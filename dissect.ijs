@@ -1,26 +1,16 @@
 NB. Copyright (c) Henry H. Rich, 2012.  All rights reserved.
 
 NB. INPROGRESS:
-NB. we would like to move the localselgiven test into calcselection, but that might wipe out the final result display.
-NB. We would need another way to make the final collector unconditional (could hokey up islocalselgiven)
+
 NB. TODO:
-NB. Check for agreement error, and abort traversal and display if failure
-NB. allow clicking any result cell, just to see its detail.  Note that clicking v in (u v) selects the whole hook
-NB. Create regression-test suite
-NB. ds '0 (1 - *)"0 '''''  .  Need to abort traversal/display when processing cell of fills?
-NB.    make traversedown set the global 'fillcell' when one found; make that the x to travdown and traversedowncalcselect;
-NB.    when processing fill cell, don't set error when insufficient results.  But clear selops & selector after error?
-NB.    Somehow must stop traversal after fill-cell error, without aborting
-NB. Test empty ops, incl in compounds
+NB. Make all error displays come from condselection.  Have displayable-error status created during travdown & propagated
+NB.  through displayrcds - & reset appropriately when fill-cell handled.
 NB. Stress multilevel selects incl boxing
 NB. release
-NB. puzzle out miltiple selections; need to display the u selector when doing a multiple select
+NB. 
 NB. Handle assignments
-NB. Encode 'Has Error' in gridobj, & remove testing logic from objects
-NB. Suppress display of verb history if all operands are sdts (unless detail requested) - but if root is sdt, select all
 NB. default needs to traverse noun operands - if not sdts
 NB. handle negative rank
-NB. get rid of bresultafterlocalsel
 NB. remove ref/labels
 NB. Fix token numbers in sentence display - use only number of token.  Include parens enclosing all selected tokens
 NB. bring x operand in below y in grid ?
@@ -433,7 +423,7 @@ end.
 NB. The locale at the top of the stack is the overall result.  Save that, and return the instrumented sentence
 NB. This call will fill in all the verb-to-noun locale references
 resultroot =: (<1 1) {:: stack
-NB.?lintonly resultroot =: <'dissectnoun'
+NB.?lintonly resultroot =: <'dissectmonad'
 ES__   =: exestring__resultroot''
 NB.?lintsaveglobals
 )
@@ -539,14 +529,15 @@ reference "Courier New bold" 10
 DISSECT=: 0 : 0
 pc dissect;
 xywh 3 43 457 414;cc parsegrid isigraph rightscale bottomscale;
-xywh 3 3 359 23;cc sentence richeditm es_autohscroll rightscale;
+xywh 3 3 360 13;cc sentence richeditm es_autohscroll rightscale;
 xywh 364 0 26 60;cc minfont combolist leftmove rightmove;
 xywh 392 1 25 11;cc lbl00 static;cn "Min Font";
 xywh 416 0 26 60;cc maxfont combolist leftmove rightmove;
 xywh 444 1 17 11;cc lbl01 static;cn "Max";
 xywh 364 15 26 60;cc maxnounsize combolist leftmove rightmove;
 xywh 392 17 69 11;cc lbl00 static;cn "Max Noun (% of scrn)";
-xywh 2 29 451 12;cc inst00 static;cn "inst00";
+xywh 3 20 359 22;cc inst00 static;cn "inst00";
+xywh 384 29 48 12;cc showerror button;cn "Show Error";
 pas 0 0;
 rem form end;
 )
@@ -573,7 +564,7 @@ if. crashed do. traversedown__resultroot ($0);selectall end.
 NB. The argument of $0 indicates that we want to set the crash variables
 NB. debug wd :: 0: 'psel dissect;pclose'
 wd DISSECT
-wd 'set inst00 *', 'Click to select/unselect; CTRL-click to sel/unsel up the tree.  / in shape shows frame, * = fills added.  Green boxes are selectors; Dclick to edit.  Click verbs or "n to get more selectors'
+wd 'set inst00 *', 'Click to select/unselect; CTRL-click to sel/unsel up the tree.  / in shape shows frame, * in shape = fills added.  Green boxes are selectors; Dclick to edit.  Click verbs or "n to get more selectors'
 winhwnd =: wd 'qhwndp'
 parsegrid=: '' conew 'jzgrid'
 wd^:(-.IFJ6) 'pshow;pshow sw_hide'
@@ -587,11 +578,17 @@ wd 'setselect maxfont ' , ": maximumfontsizex =: <: # MINFONTCHOICES
 wd 'set maxnounsize *', ; (LF ,~ ":)&.> MAXNOUNPCTCHOICES
 wd 'setselect maxnounsize ' , ": maxnoundisplaysizex =: 1
 
+wd 'setshow showerror ', ": crashed
 
 NB. Figure out the screen fraction used by 1 char in each of our sizes
 fontpixelsizes =: 10 1 %~"1 ('0123456789') (glqextent@[ glfont@>)"_ 0 valuefonts
 NB. Insert the fixed formatting
 setnames__parsegrid _2 ]\ ('GRIDID';'parsegrid'),('CELLALIGN',&<1),('CELLCOLORS',&<colorpalette),('CELLFONTS',&<fontpalette)
+
+NB. Set the initial selection of cells:
+NB. If the result is an sdt, the user is probably noodling around with a new sentence, so select everything
+NB.?lintonly resultissdt_dissectmonad_ =: 0
+if. resultissdt__resultroot do. gridcommand__resultroot =: 1 1 end.
 
 showgrid''
 wd 'pshow'
@@ -612,10 +609,6 @@ fontcharsizes =: gridwh %"1 fontpixelsizes
 
 NB. Propagate grid selection info through the tree
 highlighttokens =: $0
-NB. set the global that is used to stop display when we hit an error.  We use the global because
-NB. it is OK to display the whole tree for an @-chain when we are selecting parts before the error.
-NB. The flag is set during display when we format an error cell
-errorhasbeenshown =: 0
 traverseup__resultroot ,:0 0
 traversedown__resultroot 0;selectall
 
@@ -645,12 +638,6 @@ NB. debug qprintf '$cd cd '
 'cellcolor cellfont celledit cellref celllbl celldetail' =. 0 1 |: > 1&{@> cd
 NB. the displayable data
 celldata =. 0&{@> cd
-NB. obsolete NB. the color to use
-NB. obsolete cellcolor =. (1;0)&{::@> cd
-NB. obsolete NB. the font to use
-NB. obsolete cellfont =. (1;1)&{::@> cd
-NB. obsolete NB. editability
-NB. obsolete celledit =. (1;2)&{::@> cd
 NB. Install the reference letter wherever there is a reference and no detail.  We must assign the letter
 NB. without referring to which cells get detail, so the letters don't change
 allrefs =. /:~ ~. 0 -.~ , cellref  NB. The cells that need letters
@@ -719,6 +706,12 @@ NB. Restore original session state.  We hope this hasn't been changed while we w
 9!:39 (1) {:: Jenvirons
 codestroy''
 y
+)
+
+NB. The 'show error' button displayes the error state
+dissect_showerror_button =: 3 : 0
+traversedown__resultroot ($0);selectall
+showgrid''
 )
 
 dissect_close=: destroy
@@ -837,16 +830,12 @@ NB. We know that modifier operands are named uop, vop
 NB. Result is new locale
 clone =: 3 : 0
 NB.?lintonly uop =. vop =. <'dissectobj'
-NB. obsolete NB. Save all defined names and values
-NB. obsolete v =. ".&.> n =. (names 0) -. ;:'x y'
 NB. Create new locale with same path, but with the current object in front
 cl =. cocreate''
 NB.?lintonly cl =. coname''
 ((, copath) coname'') copath cl
 NB. Switch to the new locale
 cocurrent cl
-NB. obsolete NB. Set the variable names
-NB. obsolete (n) =: v
 NB. If there are modifier verb operands, clone them too.  We don't clone noun operands, because
 NB. they are not known until they are evaluated, and they haven't been evaluated yet, and will be evaluated only
 NB. in the original locale.  Our treatment here means that the noun may be displayed in multiple places, with the
@@ -965,198 +954,6 @@ NB. indicating whether the result of that selection is a singleton (which means 
 NB.
 NB. If sellevel is empty, it means we are doing the initial selection to find where the crash was.
 NB. When there is a selection, we always select the last thing that happened.
-NB. y is a single list with 0-4 items depending on selection status
-NB.
-NB. As a side effect, if the detaillevel of the current locale is 2, we append the token numbers of this locale
-NB. to the list of highlightable tokens.  We do this here because we don't want to highlight paths that are not traversed
-NB. because of failure
-traversedowncalcselect =: 3 : 0
-snifferror =. 0=#sellevel =: > {. y
-selops =: }. selandxy =. }. y
-NB. append to the list of highlighted tokens
-if. detaillevel >: 1 do. highlighttokens__COCREATOR =: highlighttokens__COCREATOR , tokensource end.
-NB. If there is a selector, we will ultimately produce a selection;
-NB. combine the incoming selector with the selection for this object to
-NB. produce the overall selection used for this object.
-NB. If there are multiple selectors, the input selectors must be omitted.
-resselector =. selandxy
-NB. In case we bypass selection, indicate there is none
-singleselection =. islocalselgiven =: 0
-NB. debug qprintf 'snifferror%,loc=?>coname''''%defstring 0%>uop%>vop%>cop%detaillevel%y%'
-select. #selandxy
-case. 0 do.
-  NB. No selector: we can't do much
-  'isselvalid selresult frame framingfills' =: 0;'?';($0);0
-  NB.?lintonly frames =: bresultafterlocalsel =: <''
-case. 1 do.
-  NB. Just a selector, but no operands.  Must be an active multiple selection, or we just haven't hit operands yet.
-  NB. We will not come through here if we are sniffing errors
-  NB. just collect the selected results of the derived verb, using the shape of the selector as the frame
-  try.
-    frame =: }:$>{. selandxy
-    'errorcode' =: 2
-    bresultafterlocalsel =: frame ($,) (; findselection > {. selandxy) { logvalues  NB. fails if no values
-    'errorcode' =: 3
-NB. debug qprintf 'frame logvalues bresultafterlocalsel '
-    selresult =: > bresultafterlocalsel   NB. fails if framing error
-    errorcode =: 0
-  catch.
-    NB.?lintonly frame =: $0
-    selresult =: >bresultafterlocalsel =: <'?'
-    detaillevel =: 7   NB. Turn on detail always if we have error
-  end.
-  NB.?lintonly frames =: <''
-  'isselvalid framingfills' =: 0;0
-  NB. We can pass the selector to u, which will collect; but not to v
-case. do.
-  resselector =. {. selandxy
-  NB. Must be a single selection (that's the only way to get valid operands)
-  assert. 1 = */ }: $ > {. selandxy [ 'travdowncalcselect'
-  selr =. (selx =. ; findselection selector =. > {. selandxy) { logvalues
-  opshapes =. $&.> selops  NB. Inputs to derived verb
-  frame =: >./ > frames =: (- vranks =. (verbex b. 0) {~ (i. + <:) (#selops)) }.&.> opshapes  NB. frame meaningful only if no framing error
-  NB. Audit the frames.  They should agree. and they should match the number of results we got.
-  NB. If the frame is invalid, we know that this verb is going to die before it executes; indicate agreement error
-  NB. Might as well keep the selector as is.
-  if. -. -:/ (<.&#&>/ {.&> ]) 2 {. frames,<$0 do.  NB. No agreement error on monad
-    'selresult bresultafterlocalsel framingfills islocalselgiven' =: '?';(<'?');0;3   NB. agreement error
-    if. snifferror do. 'errorcode detaillevel' =: 1;7 end.
-  else.
-    framingfills =: 0
-  NB. Also, the number of results should match the number of cells in the frame, except
-  NB. when the frame contains 0, in which case there will be 0 or 1 result.
-NB. debug qprintf '$selops selops frames $frame frame $selr selr ' 
-    if. 0 e. frame do.
-      NB. Execution on a cell of fills.  We should have 0 or 1 result.  If 0, it means that the
-      NB. execution on the cell of fills failed, and we will use a scalar numeric as the replacement
-      assert. 0 1 e.~ #selr
-      if. 0 = #selr do. selr =. <0 end.   NB. error in fill cell - use scalar numeric
-      NB. create a result of the required type and shape
-      selresult =: >bresultafterlocalsel =: <frame $ ,: > {. selr  NB. extend fill-cell with frame
-      NB. Replace selops, which will be used by lower vers, with a cell of fills.  But don't set islocalselgiven,
-      NB. so there will be no selectors or formatting - just a new operand
-      selops =: vranks ({.@,@] {.~ (((-@(<. #)) {. ])   $))&.> selops
-    else.
-      NB. frame not empty.  If there is no error, we should have just the right number of results
-      assert. (crashed__COCREATOR *. (*/ frame) > #selr) +. (*/ frame) = #selr [ 'travdowncalcselect'
-      NB. If the frame is valid, but we didn't get enough results, it means something died in this verb;
-      NB. mark this verb as requiring detail and set the selector (if any) to select the failing item, which
-      NB. will be the first item we did NOT create.  OR, it could mean that we are executing on a cells of fills, which
-      NB. might terminate with a error, which would be ignored.
-      bresultafterlocalsel =: frame $ {.^:(0=#)selr  NB. This is the (unopened, since it might not collect) result from this object's verb
-        NB. There may be wraparound if the frame was short
-      if. (*/ frame) > #selr do.
-        if. snifferror do.
-          NB. The verb crashed.  If it had a frame, we need to find the location of the error and
-          NB. select the failing cell for analysis in lower levels.  If there was no frame, we
-          NB. can't create a selector, so we will just detect the error here
-          'errorcode detaillevel' =: 2;7
-          if. 1 < */ frame do. gridusersel =: ": frame #: #selr end.
-            NB. We rely on an important observation: if u@v selects a single result cell, we can be
-            NB. sure that v (in the next level of traversal) will select to a single input cell.  Therefore,
-            NB. if vcollected is set (meaning only 1 input), the next level will not have selection enabled,
-            NB. since they will perforce have a single input cell.
-            NB. This will make us fall through to the islocalsel processing below, which will properly handle
-            NB. the case where we select the cell in error
-        end.
-        'islocalselgiven selresult' =: 3;'?'
-      else.
-        NB. The frame is what we suspected, which means the verb ran through all the cells.
-        NB. We need to see if it had an error during collection, and whether fills were added during collection
-        try.
-          NB. Since all the selected results come from a single input cell, they must be collectible.
-          NB. Collect them, and remember whether framing fills were added.  Also detect framing errors, if the collection fails.
-          selresult =: >bresultafterlocalsel   NB. try opening
-          framingfills =: -. *./ (= {.) (}.~ 1&(i.&0@:=))@$&.> selr  NB. See if fills were added.  They were, if shapes not identical.  Ignore leadng 1 axes
-          NB. If we got enough results and collection succeeded, this verb must have completed properly.  During sniff, we could clear the selector to avoid
-          NB. processing at lower levels.  But we don't
-        catch.
-          'islocalselgiven selresult' =: 3;'?'
-          if. snifferror do. 'errorcode detaillevel' =: 3;7 end.  NB. framing error
-        end.
-      end.
-    end.
-  end.
-  NB. NOTE that if errorcode is set nonzero, we will not traverse paths after the error.  So, if v fails, u will not be traversed or displayed.
-
-  NB. Calculate the selection interval corresponding to each selected result.  Box each one so
-  NB. that when we select, we will get a length error if selection goes too deep.  Bracket the
-  NB. intervals with the start & end of the selector so that we create one extra interval that works
-  NB. in case of crash, to get the inputs corresponding to the nonexistent last result
-  newsel =. frame $!.(<1 2$0) allsel =. 2 <\ (,selector) ({.@[ , ] , {:@[) selx { logticket
-
-  NB. If the selector trims down the selection of results, apply that trim to the selectors,
-  NB. the results, and the selected operands.  If we are sniffing and this verb failed, the final selection would fail
-  NB. by definition; we will have handled that case above.
-  if. *#gridusersel do.
-    NB. If the user (or us, above) gave a selector, use it.  We may have set islocalgiven=3 above as a flag indicating that we crashed on this path;
-    NB. we override this, since we may be selecting down to a non-failing subset
-    islocalselgiven =: 1
-    try.
-      NB. Get the user's selection, and convert to canonical double-boxed form
-      NB. If it is a list of boxes, treat it as axes and add one box.  If it is a single box,
-      NB. also treat it as a axes by boxing inside
-      usel =. (<@<)`(<"0&.>`<@.(1<#))`]@.(2 <. L.) ". gridusersel
-      if. #$usel do. 13!:8 (1) end.  NB. After canonizing, usel MUST be a scalar box
-
-      NB. Apply the user's selection to the selector.
-      unewsel =. usel { newsel  NB. This is where it would crash on error
-
-      NB. If the selection didn't change anything, treat it as if omitted
-      if. unewsel -: newsel do. islocalselgiven =: 0
-      NB. If this leaves nothing selected, treat it as error
-      elseif. 0 e. $unewsel do. islocalselgiven =: 2
-          NB. No failure possible in the following
-      elseif. do.
-      end.
-        NB. selops and bresultafterlocalsel will hold values after the local selector
-        NB. Now that we have a valid selection, make that the value we return
-    catch.
-      NB.?lintonly usel =. unewsel =. newsel
-      islocalselgiven =: 2
-    end.
-    NB. Now islocalselgiven = 0 if no selection, 1 if valid selection, 2 if invalid
-    NB. Now, if the selector is valid, see how well it selects.  Try selecting from
-    NB. the inputs and the result, and make a note of which ones worked.
-    if. 1 = islocalselgiven do.  NB. Still OK
-      resselector =. <>unewsel   NB. Use this selector
-      NB. If (owing to error) we had missing results, newsel will have had some flag values
-      NB. inserted: {:allsel is a selector for anything following the last valid result, and
-      NB. is a proxy for the input cell that led to error.  The other flag value is (<1 2$0), which
-      NB. stands for a cell for which there is neither valid input nor valid output (i. e. if
-      NB. it is an input, is was never executed).  Look for these in unewsel, and turn on
-      NB. corresponding bits in islocalselgiven to indicate validity.  A setting of 'input unexecuted'
-      NB. and 'no output error' means we selected an input that was PAST the error
-      islocalselgiven =: islocalselgiven + +/ 2 4 * -. ((<1 2$0),{:allsel) e. , unewsel
-      NB. Now make the selection.  This cannot fail, since selops and bresultafterlocalsel are both full-size,
-      NB. and usel was vetted above.
-      NB. For the operands, we need to handle cell repetition for agreement.  We don't repeat cells
-      NB. is the display; we show the cells and know that they will be repeated as necessary
-      selops =: selops ({~ <)&.> usel (<.&# {. [)&.>  frames
-      bresultafterlocalsel =: usel { bresultafterlocalsel
-    end.
-  elseif. -. 0 e. frame do.
-    resselector =. <>newsel
-  end.
-  NB. Now islocalselgiven is: 0=not given 1=yes,invalid 2=yes, invalid 3=yes,input only valid 5=yes,unexecd input 7=yes,all valid
-  NB. If the selector selects more than one result, we will not be able to use selection
-  NB. in v; clear those values
-  singleselection =. 2 > */ $ bresultafterlocalsel
-  NB. If we still have a selector, note that we will be allowed to use it
-  isselvalid =: *#resselector
-end.
-NB. If this level is selectable, increment the selector level to use for this and subsequent levels - whether
-NB. we have a selector yet or not.  If this level is selectable, and we didn't qualify it down to a single input,
-NB. no selection will be possible at lower levels, no matter what happens later.  So we might as well assume that
-NB. we qualified, and we just add one to the next level if selection here was possible.
-bnsellevel =: < MAXSELLEVEL <. sellevel + 1 < */ frame
-
-NB. debug qprintf 'errorcode singleselection islocalselgiven detaillevel selresult resselector selops '
-resselector;singleselection
-NB.?lintsaveglobals
-)
-NB. If sellevel is empty, it means we are doing the initial selection to find where the crash was.
-NB. When there is a selection, we always select the last thing that happened.
 NB. y is a single list with 0-4 items depending on selection status.  When operands are given, it is implied that
 NB. the selector is selecting a single application of the verb.
 NB.
@@ -1204,7 +1001,7 @@ snifferror =. 0=#sellevel =: > {. y
 selops =: ,. }. selandxy =. }. y
 NB. append to the list of highlighted tokens
 if. detaillevel >: 1 do. highlighttokens__COCREATOR =: highlighttokens__COCREATOR , tokensource end.
-qprintf 'snifferror%,loc=?>coname''''%defstring 0%>uop%>vop%>cop%detaillevel%$y%y%'
+NB. debug qprintf 'snifferror%,loc=?>coname''''%defstring 0%>uop%>vop%>cop%detaillevel%$y%y%'
 if. 0 = #selandxy do.
   NB. No selector: we can't do much
   'collected isselvalid frame frames errorcode islocalselgiven selresult selector selops localselresult' =: 0;0;($0);a:;0;0;'?';(0$a:);(1 0$a:);<(0$a:)
@@ -1263,8 +1060,8 @@ NB. debug qprintf '$selops selops frames $frame frame $selr selr '
       NB. Keep selector unchanged, since there was just one cell in the operand and there still will be
     else.
       NB. Not fill cell.  If there is no error, we should have just the right number of results
-NB. TEMP kludge!!  Error is not fatal, is we are in adverse or chasing a fill-cell.  Only too many oiperands is always bad
-      assert. (crashed__COCREATOR *. (*/ frame) > #selr) +. (*/ frame) = #selr [ 'travdowncalcselect'
+NB. TEMP kludge!!  Error is not fatal, is we are in adverse or chasing a fill-cell.  Only too many results is always bad
+      assert. ((*/ frame) > #selr) +. (*/ frame) = #selr [ 'travdowncalcselect'  NB. used to include crashed__COCREATOR
       NB. If the frame is valid, but we didn't get enough results, it means something died in this verb;
       NB. mark this verb as requiring detail and set the selector (if any) to select the failing item, which
       NB. will be the first item we did NOT create.  OR, it could mean that we are executing on a cells of fills, which
@@ -1348,7 +1145,7 @@ NB. TEMP kludge!!  Error is not fatal, is we are in adverse or chasing a fill-ce
         NB. is the display; we show the cells and know that they will be repeated as necessary
         selops =: selops ({~ <)&.> usel (<.&# {. [)&.>  frames
         NB. If the selection is valid, select the cells
-        if. islocalselgiven = 7 do. localselresult =: usel { selresult end.
+        if. islocalselgiven = 7 do. localselresult =: usel { frame $ selresult end.
       else. islocalselgiven =: islocalselgiven <. 1  NB. Change 2 to 1, indicating error
       end.
     elseif. -. 0 e. frame do.
@@ -1377,13 +1174,14 @@ else.
 end.
 NB. See if there will be fill when the cells are opened
 filled =. 1 < # ~. (>./ #@> bshp)&({.!.1)@> bshp
-collectedframe =: 's' [^:(0=#frame,shp)   (filled#'?') ,~ (":frame) , '/' , ": shp
+collectedframe =: 's' [^:(0=#frame,shp)   (filled#'*') ,~ (":frame) , '/' , ": shp
 if. collected *. (errorcode=0) do.
 NB. debug qprintf 'collected%frame%$L:0 selresult%selresult%y%'
   try.
     selresult =: > frame $ selresult
   catch.
     errorcode =: 4   NB. If framing error, so indicate
+    if. snifferror do. detaillevel =: 7 end.
   end.
 else.
   NB. if this node is not a collector, we must clear selops since they are invalid for future use
@@ -1395,17 +1193,18 @@ NB. no selection will be possible at lower levels, no matter what happens later.
 NB. we qualified, and we just add one to the next level if selection here was possible.
 bnsellevel =: < MAXSELLEVEL <. sellevel + 1 < */ frame
 
-qprintf 'collected errorcode islocalselgiven detaillevel frame $selresult selresult selector $selops selops '
+NB. debug qprintf 'collected errorcode islocalselgiven detaillevel frame $selresult selresult selector $selops selops '
 NB.?lintsaveglobals
 )
 
+NB. y is errorcode(s), result is true if it is OK for child nodes to select
+travdownselok =: -.@(+./@:e.&1 2)
 NB. y is vdisplayrcd(s)
 NB. Result is operands to pass on to traversal of v
 NB. If v had an error, we wipe out the selector and the operands
 NB. If v didn't collect, we don't use its operands
 travdownuops =: 3 : 0
-NB. obsolete 'selok valsok' =. *./\ (0 >: >./ errfromdisplayrcd y) , (*./ collfromdisplayrcd y)
-'selok valsok' =. *./\ (-. 1 2 3 +./@:e.~ errfromdisplayrcd y) , collected
+'selok valsok' =. *./\ (travdownselok errfromdisplayrcd y) , collected
 bnsellevel , (valfromdisplayrcd y) ,~^:valsok   selok # selector
 )
 
@@ -1424,7 +1223,6 @@ creategridcell =: 3 : 0"1
 NB.?lintonly minimumfontsizex__COCREATOR =. maxnoundisplaysizex__COCREATOR =. maximumfontsizex__COCREATOR =. 0
 'text cname fname loc cv ref' =. y , (#y) }. '';'';'';'';'';0 0 0
 if. 0 = #loc do. loc =. >coname'' end.
-if. cname -: 'error' do. errorhasbeenshown__COCREATOR =: 1 end.
 NB. format the text specially, for different types, detected by fname
 select. fname
 case. 'shape' do.
@@ -1593,7 +1391,7 @@ res =. (collected;selresult;islocalselgiven;detaillevel;errorcode;sellevel) , (6
 NB. If there is an error code in the old record, carry it through to the new;
 NB. also ignore any frame in the new
 if. #y do.
-  if. # 4{:: y do.
+  if. * 4{:: y do.
     res =. }: (4{y) 4} res  NB. keep old error code, ignore new shape
   end.
 end.
@@ -1605,7 +1403,7 @@ valfromdisplayrcd =: 1&{"1
 NB. Extract and open the error code from a display record
 errfromdisplayrcd =: 4&{::"1
 
-NB. Extract and open the collecotr flag from a display record
+NB. Extract and open the collector flag from a display record
 collfromdisplayrcd =: 0&{::"1
 
 
@@ -1614,10 +1412,12 @@ NB. y is a table of 2 display records (if it's only one, we just leave it alone)
 NB. If both records show error, we change u's error to 'unexecd', because v
 NB. is known to execute first & therefore must have died before u
 displayrcdfixuverror =: 3 : 0
-if. (3;3) -: 4&{"1 y do.
-  (<2) (<0 4)} y
-else.
-  y
+if. 2 = #y do.
+  if. *.&(e.&1 2 3 4)&(4&{::)/ y  do.
+    (<2) (<0 4)} y
+  else. y
+  end.
+else.  y
 end.
 )
 
@@ -1638,49 +1438,13 @@ NB. We put the selector in each operand, because we can't tell which operand mig
 NB. be deleted by an error somewhere in the other stack.  We will remove
 NB. the duplicate editselectors before display
 'sorlbl svalbl' =. ('selector';'result') ,&.> ":&.> 0 1 + sellevel
-if. isselvalid *. (* 2 bwand detaillevel) *. (1 < */ frame) do.
-  NB. First, the selection cell
-  selsel =. creategridcell gridusersel;sorlbl;'selector';'';'editselector'
-  NB. next, the result cell(s)
-  select. islocalselgiven
-  case. 0 do.
-    NB. No selection given.  Show the frame
-    seld =. creategridcell ('frame=',":frame);svalbl;'shape'
-    if. valence=2 do. seld =. seld ,~ creategridcell ' ';svalbl;'shape' end.  NB. Use space to avoid 'empty'
-  case. 3;7 do.
-    NB. Valid selection.  Use the selected values
-    seld =. creategridcell selops ,"0 1 svalbl;'value'
-  case. 1;2 do.
-    NB. Selector given, but neither selector found
-    seld =. creategridcell '';'invalid';'invalid'
-  case. do.
-    NB. Selector selected input past the error point
-    seld =. creategridcell 'unexecd';'invalid';'invalid'
-  end.
-  NB. Add the selection row
-NB. obsolete  (<@gridstackright ({."1 y) ,. <"1 ((-#y) {. selsel) ,. seld) (<a:;0)} y
-  (<@gridstackright ({."1 y) ,"0 selsel <@,"0 seld) (<a:;0)} y
-else.
-  y
-end.
-)
-condcreateinitialselector =: 3 : 0
-NB. If the cell is selected for display, and selection is possible -
-NB. we have selectors, and more than 1 result is selected -
-NB. create a selection block.  If the user has given a selection, use it
-NB. Get the labels to use for selection cells added at this level
-NB. The SELECTOR is for the level before the SELECTION
-NB. We put the selector in each operand, because we can't tell which operand might
-NB. be deleted by an error somewhere in the other stack.  We will remove
-NB. the duplicate editselectors before display
-'sorlbl svalbl' =. ('selector';'result') ,&.> ":&.> 0 1 + sellevel
 NB. Create the selector if there is something to select and we are showing detail, or if there is an early error.
 NB. debug qprintf 'detaillevel errorcode isselvalid frame '
 if. (* 2 bwand detaillevel) *. (errorcode e. 1) +. isselvalid *. (1 < */ frame) do.
   NB. next, the result cell(s)
   if. errorcode e. 1 do.
     NB. Since we won't be deleting either side, show just one (disabled) selector
-    selsel =. (-valence) {. creategridcell gridusersel;sorlbl;'selector'   NB. No editing allowed for early error
+    selsel =. (-#y) {. creategridcell gridusersel;sorlbl;'selector'   NB. No editing allowed for early error
     NB. If there is an early error, show it
     seld =. creategridcell 'agreement';'error';'error'
   else.
@@ -1691,7 +1455,7 @@ if. (* 2 bwand detaillevel) *. (errorcode e. 1) +. isselvalid *. (1 < */ frame) 
     case. 0 do.
       NB. No selector yet; show the frame and wait for input
       seld =. creategridcell ('frame=',":frame);svalbl;'shape'
-      if. valence=2 do. seld =. seld ,~ creategridcell ' ';svalbl;'shape' end.  NB. Use space to avoid 'empty'
+      if. 2=#y do. seld =. seld ,~ creategridcell ' ';svalbl;'shape' end.  NB. Use space to avoid 'empty'
     case. 1 do.
       NB. Invalid selector
       seld =. creategridcell 'invalid';'invalid';'invalid'
@@ -1700,11 +1464,10 @@ if. (* 2 bwand detaillevel) *. (errorcode e. 1) +. isselvalid *. (1 < */ frame) 
       seld =. creategridcell selops ,"1 svalbl;'value'
     case. do.  NB. Must be 5
       NB. Selector selected unexecuted cells.  That's invalid
-      seld =. creategridcell 'unexecd';'invalid';'invalid'
+      seld =. creategridcell '(unexecd)';'invalid';'invalid'
     end.
   end.
   NB. Add the selection row
-NB. obsolete  (<@gridstackright ({."1 y) ,. <"1 ((-#y) {. selsel) ,. seld) (<a:;0)} y
   (<@gridstackright ({."1 y) ,"0 selsel <@,"0 seld) (<a:;0)} y
 else.
   NB. No initial selection allowed, leave input unchanged
@@ -1714,6 +1477,8 @@ end.
 
 NB. y is gridspec
 NB. x is selectiondisplayrcd, created for the current locale
+NB. m is 0 for v, 1 for u, 2 for final collector.  The difference is that v calls create a selection whenever
+NB. detail is enabled and the selector is not given; and final collectors always produce a result
 NB. We use in the locale where islocalselgiven and detaillevel are defined.
 NB. For v, this is the v locale; for u, it is the locale of u@v.
 NB. This relies on the fact that u@v creates a selector for v only when
@@ -1724,56 +1489,22 @@ NB. We use the presence of a locale to indicate whether this is is a collector: 
 NB. no locale is given, we must be at the end of a selector block, and we enable
 NB. the cell for clicks
 NB. Result is new grid selection
-condcreateselection =: 4 : 0"1 1   NB. used for selectors & their results
-NB. Abort fast if we have already displayed an error cell
-if. -. collectorrequired'' do. y return. end.
-gs =. y
-'collect val lsel det ecode bsel' =. 6 {. x
-frm =. 6 }. x
-select. lsel
-case. 0;7 do.  NB. 0=no sel, 7=OK sel
-  NB. No selection or valid selection.  Simple result, unless there is an error
-  disptype =. ('result' , ":) bsel
-  NB. Format shapes into frame/cellshape[* if filled]
-  dispdata =. val
-  dispshape =. }: ; (,&LF)&.> ~. frm
-  dispfont =. 'value'
-NB. debug qprintf 'fill #frm frm $dispdata dispshape '
-case. 1;2;5 do.
-  NB. Invalid selection
-  disptype =. 'invalid'
-  dispdata =. ''
-  dispshape =. ' '
-  dispfont =. 'invalid'
-case. do.
-  NB. Selection valid for input but not result.  Must be a crashed cell.  Give appropriate message
-  disptype =. 'error'
-  dispdata =. ecode{::'';'agreement';errormessagefrominterp__COCREATOR;'framing'
-  dispshape =. ' '
-  dispfont =. 'error'
-end.
-NB. obsolete cobj =. creategridcell dispdata,disptype;disptype;loc,<(islocalselgiven__evloc>:5)#'clickresult'
-cobj =. creategridcell dispdata;disptype;dispfont;'';<collect#'clickresult'
-NB. If we are supposed to show detail, append the shape
-NB. We display detail if the caller is displaying detail, or if the displayrcd showed detail and this is a final collector
-NB. This makes detail operate over two levels
-if. 1 <: (det) >. collect * detaillevel do.
-  cobj =. (creategridcell dispshape;'shape';'shape') , cobj
-end.
-(<gridstackright ({."1 gs) ,< cobj) 0} gs
-)
 NB. We used the info from the displayrcd for display; but as for whether we display at all, we look
 NB. at the calling locale, which is above u & v.
-condcreateselection =: 4 : 0"1 1   NB. used for selectors & their results
+condcreateselection =: 1 : 0("1 1)   NB. used for selectors & their results
+:
 gs =. y
+'vcall final' =. m = 0 2
 'collect val lsel det ecode bsel' =. 6 {. x
 frm =. 6 }. x
-NB. If this is not a collector, or if the selector is invalid, don't create a display record
-if. collect *. islocalselgiven e. 3 7 do.
+NB. Create a display record if this is a collector, and either we have a valid
+NB. selector, or we have no selector and detail is requested
+NB. 
+if. final +. collect *. (islocalselgiven e. 3 7) +. vcall +. 0: (islocalselgiven e. 0) *. *(det bwand 2) do.
   if. ecode e. 1 2 3 do.
     NB. unexecd cell or execution error - show the error, don't try to collect
     disptype =. 'invalid'
-    dispdata =. (ecode-1){::'agreement';'unexecd';'(error)'
+    dispdata =. (ecode-1){::'agreement';'(unexecd)';'(error)'
     dispshape =. ' '
     dispfont =. 'invalid'
   else.
@@ -1787,7 +1518,6 @@ if. collect *. islocalselgiven e. 3 7 do.
       dispdata =. val
     end.
   end.
-  NB. obsolete cobj =. creategridcell dispdata,disptype;disptype;loc,<(islocalselgiven__evloc>:5)#'clickresult'
   cobj =. creategridcell dispdata;disptype;dispfont;'';<collect#'clickresult'
 
   NB. If we are supposed to show detail, append the shape
@@ -1802,23 +1532,11 @@ else.
 end.
 )
 
-NB. obsolete NB. Nilad.  Returns 1 if the object completed successfully, or if
-NB. obsolete NB. It had an error that was not displayed - either a framing error, which would not
-NB. obsolete NB. be caught until collection time, or an error running a verb with no frame, which
-NB. obsolete NB. would not be detected because there is no place to display the error result
-NB. obsolete NB. until collection time
-NB. obsolete collectorrequired =: 3 : 0
-NB. obsolete [: y
-NB. obsolete NB. obsolete (errorcode ~: 2) +. islocalselgiven = 0
-NB. obsolete -. errorhasbeenshown__COCREATOR
-NB. obsolete )
-
 NB. y is a selector: any shape, but each selector has shape ,2; so $=?,2
 NB. Result is array of boxes with one box for each selector, containing the
 NB. indices of the results for each selector
 NB. The selector is (interval]
 findselection =: 3 : 0
-NB. obsolete assert. (-: /:~) , y
 <@([ + i.@-~)/"1 logticket I. >: y
 )
 
@@ -1946,14 +1664,14 @@ traverseup__yop traverseup__uop traverseuprollup y
 NB. The result from this level is immaterial, since it never feeds up (it's a noun node)
 NB.?lintsaveglobals
 )
+
 NB. Tree traversal, down
 traversedown =: 3 : 0
 NB. Evaluate the noun operand (selecting all, but that shouldn't matter since noun nodes
 NB. are always collectors and we will get the collected result); feed that into the verb to allow
 NB. selection.
 traversedowncalcselect y  NB. To set globals only - there are no inputs here
-ydr =.traversedown__yop bnsellevel,<selectall__COCREATOR
-if. 0 = errorcode__yop do. udisplayrcd =: traversedown__uop bnsellevel,selector , valfromdisplayrcd ydr end.
+udisplayrcd =: traversedown__uop bnsellevel,selector , valfromdisplayrcd traversedown__yop bnsellevel,<selectall__COCREATOR
 NB.?lintsaveglobals
 )
 
@@ -1962,14 +1680,13 @@ NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
 NB. Create the gridobj for the noun, join to verb
 NB. Create a collector for the result
-go =. creategridobj__yop y
-NB. obsolete if. 0 = errorcode__yop do. go =. (0 { logvalues) createselection^:(0 = stealthoperand__uop) creategridobj__uop dispoperands # ,: go end.
-if. 0 = errorcode__yop do.
-  go =. creategridobj__uop dispoperands # ,: go
-  islocalselgiven =: 7   NB. this makes the final selector unconditional
-  go =. (selectiondisplayrcd udisplayrcd) condcreateselection^:(0 = stealthoperand__uop) go
+NB. If this node is a rollup of sdts, don't show the detail unless the user asks for it
+if. resultissdt *. detaillevel < 2 do.
+  (1 1 $ creategridcell (valfromdisplayrcd udisplayrcd);'input';'value';'';'clickresult');($0);_1
+else.
+  go =. creategridobj__uop dispoperands # ,: creategridobj__yop y
+  (selectiondisplayrcd udisplayrcd) 2 condcreateselection^:(0 = stealthoperand__uop) go
 end.
-go
 )
 
 
@@ -2023,13 +1740,7 @@ NB. a y to the call to the upper node - this value is used only at the very end 
 NB. Since y is a collector, we know that it will have a full result and no selectors
 NB. Since u is a collector, it too will have a result and no selectors.  That will become our result.
 traversedowncalcselect y
-ydr =. traversedown__yop bnsellevel,<selectall__COCREATOR
-if. 0 = errorcode__yop do.
-  xdr =. traversedown__xop bnsellevel,<selectall__COCREATOR
-  if. 0 = errorcode__xop do.
-    udisplayrcd =: traversedown__uop bnsellevel,selector , xdr ,&valfromdisplayrcd ydr
-  end.
-end.
+udisplayrcd =: traversedown__uop bnsellevel,selector , (traversedown__xop ,&valfromdisplayrcd traversedown__yop) bnsellevel,<selectall__COCREATOR
 NB.?lintsaveglobals
 )
 
@@ -2038,20 +1749,13 @@ NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
 NB. Create the gridobj for the verbex and operands
 NB. Create a collector for the result
-NB. Track down any error, looking first in y, then in x.  Confine error display to the error path if possible
-go =. creategridobj__yop y
-if. 0 = errorcode__yop do.
-  gox =. creategridobj__xop y
-  if. 0 = errorcode__xop do.
-NB. obsolete     go =. (0 { logvalues) createselection {.`creategridobj__uop@.(0 = stealthoperand__uop) dispoperands # gox ,: go
-    go =. {.`creategridobj__uop@.(0 = stealthoperand__uop) dispoperands # gox ,: go
-    islocalselgiven =: 7   NB. this makes the final selector unconditional
-    go =. (selectiondisplayrcd udisplayrcd) condcreateselection go  NB. final selectors must be unconditional
-  else.
-    go =. gox
-  end.
+NB. If this node is a rollup of sdts, don't show the detail unless the user asks for it
+if. resultissdt *. detaillevel < 2 do.
+  (1 1 $ creategridcell (valfromdisplayrcd udisplayrcd);'input';'value';'';'clickresult');($0);_1
+else.
+  go =. {.`creategridobj__uop@.(0 = stealthoperand__uop) dispoperands # (creategridobj__xop ,: creategridobj__yop) y
+  (selectiondisplayrcd udisplayrcd) 2 condcreateselection go  NB. final selectors must be unconditional
 end.
-go
 )
 
 NB. Terminal nouns - names or self-defining terms
@@ -2108,7 +1812,6 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 traversedown =: 3 : 0
 traversedowncalcselect y  NB. Just to set error globals
-NB. obsolete 0 {:: logvalues
 selectiondisplayrcd''
 NB.?lintsaveglobals
 )
@@ -2119,7 +1822,7 @@ NB. The grid for a noun is
 NB. ( )     [name]
 NB. (shape) value
 NB. The parts besides the value are optional
-gridobj =. 1 1 $ creategridcell (nval =. 0 {:: logvalues);'input';'value';'clickresult'
+gridobj =. 1 1 $ creategridcell (nval =. 0 {:: logvalues);'input';'value';'';'clickresult'
 if. #varname do.
   gridobj =. gridobj ,~ creategridcell (varname);'input';'value'
 end.
@@ -2207,7 +1910,6 @@ traverseup =: 3 : 0
 NB. The verbex is different from modifiers, because selection in it create qualifiers rather than selectors.
 NB. We ignore forwarded requests to set detaillevel, and only honor forwarded requests to turn it off.  We
 NB. honor local requests to do either.
-NB. obsolete ,:~^:(2=valence) (1 { y) 1} traverseuprollup 0 <. y
 NB. debug qprintf 'tupvb$y=?$y op y '
 valence # traverseuprollup y
 NB.?lintsaveglobals
@@ -2220,72 +1922,9 @@ traversedowncalcselect y
 selectiondisplayrcd''
 NB.?lintsaveglobals
 )
-NB. Tree traversal, down
-NB. traversedowncalcselect does the work; we preserve the structure here
-traversedown =: 3 : 0
-traversedowncalcselect y
-selectiondisplayrcd''
-NB.?lintsaveglobals
-)
 
 
-NB. Return grid specifier
-NB. Result is grid specifier for the result
-creategridobj =: 3 : 0
-NB. This is a single verb execution, not including a collector, which must be separately provided
-NB. [(qualx)]  verb   (qualy)
-NB.            (qual) (qualresult)
-NB. The parenthesized parts are included if the cell has been selected for editing, and
-NB. the selection in the cell is valid
-NB. ] and [ have no display, just create an empty gridsel
-if. stealthoperand e. 1 2 do.
-  gridobj =. 0 0$a:
-  inputspacing =. $0
-else.
-  NB. Input comes in column [0] and _1.  Qualifier in _2.  Calculate the width and create first row
-  inputspacing =. gridabutxy y
-  NB. Use the spacing for the inputs, since the verb has no special needs.  Make the dyad width
-  NB. at least 2, the monad at least 1, and then add 1 to space between columns.  Column 0 of the
-  NB. dyad is where the x operand goes
-  gridobj =. ,: (>: 1 >. {. 2 >. inputspacing) $ a:
 
-  NB. Install the verb
-  NB. If there is a frame for this verb, make the verb-cell editable
-  estring =. (editok =. 1 < */ frame) # 'clickverb'
-  gridobj =. (creategridcell op;'verb';'verb';'';estring) (<0,_2)} gridobj
-  NB. If dyad, install an empty verb-colored cell in each spacer position
-  if. valence = 2 do.
-    gridobj =. (creategridcell '';'verb';'verb';'';estring) (<0;<<_1 _2)} gridobj
-  end.
-  NB. If the cell is open for editing, and the inputs are valid, add space for qualifiers
-  if. editok *. isselvalid *. (* 4 bwand detaillevel) do.
-    gridobj =. gridobj , a:
-    gridobj =. (creategridcell gridusersel;'qualifier';'qualifier';'';'editqualifier') (<1,_2)} gridobj
-     NB. If a qualification has been made, select the operands and result, and install them
-    select. islocalselgiven
-    case. 0 do.
-      gridobj =. (creategridcell ' ';'qualifiedop';'value') (<0;valence {. _1 0)} gridobj
-      gridobj =. (creategridcell ('frame=',":frame);'qualifiedres';'shape') (<1 _1)} gridobj
-    case. 1;2 do.
-      NB. If selection error, install error display
-      gridobj =. (creategridcell '';'invalid';'invalid') (<0;valence {. _1 0)} gridobj
-      gridobj =. (creategridcell '';'invalid';'invalid') (<1 _1)} gridobj
-    case. 5 do.
-      NB. If selection error, install error display
-      gridobj =. (creategridcell 'unexecd';'invalid';'invalid') (<0;valence {. _1 0)} gridobj
-      gridobj =. (creategridcell '';'invalid';'invalid') (<1 _1)} gridobj
-    case. 3 do.  NB. Only input is valid
-      gridobj =. (creategridcell selops,"0 1 'qualifiedop';'value') (<0;(-#selops) {. 0 _1)} gridobj
-      gridobj =. (creategridcell (errorcode{'';'agreement';errormessagefrominterp__COCREATOR;'framing'),'error';'error') (<1 _1)} gridobj
-    case. 7 do.  NB. Input & output valid
-      gridobj =. (creategridcell selops,"0 1 'qualifiedop';'value') (<0;(-#selops) {. 0 _1)} gridobj
-      gridobj =. (creategridcell (>bresultafterlocalsel);'qualifiedres';'value') (<1 _1)} gridobj
-    end. 
-  end.
-end.
-(gridobj;((0:"0 inputspacing),_1);_1) gridjoinxyu y
-NB.?lintsaveglobals
-)
 NB. Return grid specifier
 NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
@@ -2316,45 +1955,43 @@ else.
     gridobj =. (creategridcell '';'verb';'verb';'';estring) (<0;<<_1 _2)} gridobj
   end.
   NB. If the cell is displaying detail and it is open for editing or there was an early error, create the qualifier
-  if. (* 4 bwand detaillevel) *. (errorcode e. 1) +. editok *. isselvalid do.
-    select. errorcode
-    case. 1 do.
-      NB. Early error.  Display the error next to the verb
-      gridobj =. (creategridcell 'agreement';'error';'error') (<0;valence {. _1 0)} gridobj
-    case. 2 do.
-      NB. Unexecuted cell
-      gridobj =. (creategridcell 'unexecd';'invalid';'invalid') (<0;valence {. _1 0)} gridobj
-    case. 3 do.
-      NB. Execution error, for example domain error before any cells are executed
-      gridobj =. (creategridcell errormessagefrominterp__COCREATOR;'error';'error') (<0;valence {. _1 0)} gridobj
-    case. do. NB. no error that preempts further analysis
-      NB. No early error, so there may be a selection.  If there is one, show its results; if not,
-      NB. show the frame
-      gridobj =. gridobj , a:
-      gridobj =. (creategridcell gridusersel;'qualifier';'qualifier';'';'editqualifier') (<1,_2)} gridobj
-      select. islocalselgiven
-      case. 0 do.
-        NB. No selection yet, show the frame
-        gridobj =. (creategridcell ' ';'qualifiedop';'value') (<0;valence {. _1 0)} gridobj
-        gridobj =. (creategridcell ('frame=',":frame);'qualifiedres';'shape') (<1 _1)} gridobj
-      case. 1;5 do.
-        NB. Selector invalid or unexecuted
-        gridobj =. (creategridcell ' ';'qualifiedop';'value') (<0;valence {. _1 0)} gridobj
-        gridobj =. (creategridcell ((islocalselgiven = 5){::'invalid';'unexecd');'invalid';'invalid') (<1 _1)} gridobj
-      case. 3;7 do.
-        NB. The selector is valid; the result may or may not be
-        gridobj =. (creategridcell selops ,"1 'qualifiedop';'value') (<0;(-#selops) {. 0 _1)} gridobj
-        if. islocalselgiven = 3 do.
-          gridobj =. (creategridcell errormessagefrominterp__COCREATOR;'error';'error') (<1 _1)} gridobj
-        else.
-          try.
-            dispdata =. >localselresult  NB. try opening
-            'disptype dispfont' =. 'qualifiedres';'value'
-          catch.
-            'dispdata disptype dispfont' =. 'framing';'error';'error'
-          end.
-          gridobj =. (creategridcell dispdata;disptype;dispfont) (<1 _1)} gridobj
+  NB. If this cell is unselectable and it carries an error, make sure we display the error
+  if. (errorcode e. 3) *. editok *: isselvalid do.
+    gridobj =. (creategridcell errormessagefrominterp__COCREATOR;'error';'error') (<0;valence {. _1 0)} gridobj
+  elseif. errorcode = 1	do.
+    NB. Early error.  Display the error next to the verb
+    gridobj =. (creategridcell 'agreement';'error';'error') (<0;valence {. _1 0)} gridobj
+  elseif. errorcode = 2 do.
+    NB. Unexecuted cell
+    gridobj =. (creategridcell 'unexecd';'invalid';'invalid') (<0;valence {. _1 0)} gridobj
+  elseif. (* 4 bwand detaillevel) *. editok *. isselvalid do.
+    NB. no error that preempts further analysis
+    NB. No early error, so there may be a selection.  If there is one, show its results; if not,
+    NB. show the frame
+    gridobj =. gridobj , a:
+    gridobj =. (creategridcell gridusersel;'qualifier';'qualifier';'';'editqualifier') (<1,_2)} gridobj
+    select. islocalselgiven
+    case. 0 do.
+      NB. No selection yet, show the frame
+      gridobj =. (creategridcell ' ';'qualifiedop';'value') (<0;valence {. _1 0)} gridobj
+      gridobj =. (creategridcell ('frame=',":frame);'qualifiedres';'shape') (<1 _1)} gridobj
+    case. 1;5 do.
+      NB. Selector invalid or unexecuted
+      gridobj =. (creategridcell ' ';'qualifiedop';'value') (<0;valence {. _1 0)} gridobj
+      gridobj =. (creategridcell ((islocalselgiven = 5){::'invalid';'unexecd');'invalid';'invalid') (<1 _1)} gridobj
+    case. 3;7 do.
+      NB. The selector is valid; the result may or may not be
+      gridobj =. (creategridcell selops ,"1 'qualifiedop';'value') (<0;(-#selops) {. 0 _1)} gridobj
+      if. islocalselgiven = 3 do.
+        gridobj =. (creategridcell errormessagefrominterp__COCREATOR;'error';'error') (<1 _1)} gridobj
+      else.
+        try.
+          dispdata =. >localselresult  NB. try opening
+          'disptype dispfont' =. 'qualifiedres';'value'
+        catch.
+          'dispdata disptype dispfont' =. 'framing';'error';'error'
         end.
+        gridobj =. (creategridcell dispdata;disptype;dispfont) (<1 _1)} gridobj
       end.
     end.
   end.
@@ -2373,7 +2010,6 @@ NB. Unknown modifiers create verbs (we hope).  We will create something that loo
 NB. it will be the display form of the modified input operands.  We will then pretend to be a verb.
 NB. y is the exeblock for the modifier, either 2 or 3 boxes
 create =: 3 : 0
-[: y
 create_dissectobj_ f. < ; 2 {"1 y
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
@@ -2417,12 +2053,6 @@ NB. Ignore ]@ etc.
 if. stealthoperand__uop e. 1 2 do.
   verb;vop;tokensource
 else.
-NB. obsolete NB. Look at the conjunction used, and use that to find the rank of this object (the derived verb)
-NB. obsolete if. cop -: ,'@' do.
-NB. obsolete   rank =: rank__vop
-NB. obsolete else.
-NB. obsolete   rank =: _ _ _
-NB. obsolete end.
   verb;(coname'');tokensource
 end.
 NB.?lintsaveglobals
@@ -2464,19 +2094,6 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
-'selector vcollected' =: traversedowncalcselect y
-NB. run v and save the selected result, in case it is valid
-NB. obsolete vdisplayrcd =: traversedown__vop bnsellevel,selops ,~^:vcollected selector
-vdisplayrcd =: traversedown__vop bnsellevel,vcollected # selops ,~ selector
-NB. Traverse u after v, since part of each may have run
-udisplayrcd =: traversedown__uop bnsellevel , (valfromdisplayrcd vdisplayrcd) ,~^:vcollected selector
-NB. Do the collection on the final result (valid even if we were not really a collector)
-selectiondisplayrcd udisplayrcd
-NB.?lintsaveglobals
-)
-NB. Tree traversal, down
-NB. traversedowncalcselect does the work; we preserve the structure here
-traversedown =: 3 : 0
 traversedowncalcselect y
 vdisplayrcd =: traversedown__vop bnsellevel , selector , , valence {. selops
 selectiondisplayrcd udisplayrcd =: traversedown__uop travdownuops vdisplayrcd
@@ -2487,32 +2104,12 @@ NB. Return grid specifier
 NB. y is operand(s)
 NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
-NB. This is a single verb execution, not including a collector, which must be separately provided
-NB. [selx] sel  sely   - if selection is possible
-NB.        v
-NB.             vres   - if v had a selector
-NB.        u
-
-NB. Initial select if called for
-go =. creategridobj__vop condcreateinitialselector y
-
-NB. If v collected, display its value... unless the verb was a quiet verb ][ displaying no result
-if. vcollected *. 0 = stealthoperand__vop do. go =. (0;vdisplayrcd) condcreateselection go end.
-NB. If v failed, suppress the display of u
-if. collectorrequired'' do.
-  NB. Create and append the grid object for u, which must align on the right
-  go =. creategridobj__uop ,: go   NB. monad, so no spacing
-  NB. If there is a local selector, append the selected value
-  if. islocalselgiven do. go =. (1;udisplayrcd) condcreateselection__uop go end.
-end.
-go
-NB.?lintsaveglobals
-)
-creategridobj =: 3 : 0
 NB. Create initial selector, which will show if there is a selection possible - including agreement and selection errors
-udisplayrcd condcreateselection creategridobj__uop vdisplayrcd condcreateselection creategridobj__vop condcreateinitialselector dispoperands # y
+udisplayrcd 1 condcreateselection creategridobj__uop ,: vdisplayrcd 0 condcreateselection creategridobj__vop condcreateinitialselector y
 NB. No stealthoperand v in @@: - they are turned into verbs
 )
+
+
 NB. **** & &: ****
 modlocale '&&:'
 
@@ -2535,11 +2132,6 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
 NB. Look at the conjunction used, and use that to find the rank of this object (the derived verb)
-NB. obsolete if. cop -: ,'&' do.
-NB. obsolete   rank =: 3 # {. rank__vop
-NB. obsolete else.
-NB. obsolete   rank =: _ _ _
-NB. obsolete end.
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -2596,23 +2188,6 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
-'selector vcollected' =: traversedowncalcselect y
-NB. Run both v and u, since they may both have been partially executed
-NB. obsolete vdisplayrcd =: traversedown__vop1@{: op =. bnsellevel,.selops ,.~^:vcollected ,. valence # selector
-vdisplayrcd =: traversedown__vop1@{: op =. bnsellevel ,. vcollected #"1 selops ,.~ selector
-vdisplayrcd =: vdisplayrcd ,:~ traversedown__vop0@{. op
-udisplayrcd =: traversedown__uop bnsellevel , (valfromdisplayrcd vdisplayrcd) ,~^:vcollected selector
-NB. obsolete vresult =: (traversedown__vop0@{. ,&< traversedown__vop1@{:) bsellevel,.selops ,.~^:vcollected ,. valence # selector
-NB. obsolete NB. If the selection from v was valid, then the v result must have been properly selected, and we will
-NB. obsolete NB. send its value into u.  If v did not have valid inputs, u cannot either, and will retain just the selection info
-NB. obsolete if. errorcode__vop0 +:&* errorcode__vop1 do.  end.
-NB. obsolete NB. Do the collection on the final result (valid even if we were not really a collector)
-selectiondisplayrcd udisplayrcd
-NB.?lintsaveglobals
-)
-NB. Tree traversal, down
-NB. traversedowncalcselect does the work; we preserve the structure here
-traversedown =: 3 : 0
 traversedowncalcselect y
 vdisplayrcd =: displayrcdfixuverror (traversedown__vop0@{. ,: traversedown__vop1@{:) bnsellevel ,. selector ,"1 valence {. selops
 selectiondisplayrcd udisplayrcd =: traversedown__uop travdownuops vdisplayrcd
@@ -2623,53 +2198,13 @@ NB. Return grid specifier
 NB. y is grdobj
 NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
-NB. This is a single verb execution, not including a collector, which must be separately provided
-
-NB. If the cell is selected for display, and selection is possible -
-NB. we have selectors, and more than 1 result is selected -
-NB. create a selection block.  If the user has given a selection, use it
-NB. Create the grid objects for v0 and v1 (only one of them if one failed)
-go =. condcreateinitialselector y
-go1 =. creategridobj__vop1 0 1 # go
-if. collectorrequired'' do.
-  go0 =. creategridobj__vop0 1 0 # go
-  if. collectorrequired'' do.
-    NB. If v collected, display its value
-    if. vcollected *. 0 = stealthoperand__vop do.
-      go =. (0;{:vdisplayrcd) condcreateselection go1 , vop1
-      if. collectorrequired'' do.
-        go0 =. (0;{.vdisplayrcd) condcreateselection go0 , vop0
-        if. collectorrequired'' do. go =. go0 ,: go
-        else. go =. go0 NB. v0 failed
-        end.
-      end.
-    else. go =. go0 ,: go1
-    end.
-
-    if. collectorrequired'' do.
-      NB. Create and append the grid object for u, which must align on the right
-      NB. If v failed, display only the failing path through v.  We know that v1 is executed before v0
-      go =. creategridobj__uop dispoperands # go   NB. monad, so no spacing
-      NB. If there is a local selector, append the selected value
-      if. islocalselgiven do. go =. (1;udisplayrcd) condcreateselection go end.
-    end.
-  else. go =. go0
-  end.
-else. go =. go1
-end.
-go
-NB.?lintsaveglobals
-)
-creategridobj =: 3 : 0
-NB. This is a single verb execution, not including a collector, which must be separately provided
-
 NB. Create initial selector, which will show if there is a selection possible - including agreement and selection errors
 go =. 1 creategridobj__vop0`creategridobj__vop1\ condcreateinitialselector y
 if. 0 = stealthoperand__vop do.
-  go =. vdisplayrcd condcreateselection go
+  go =. vdisplayrcd 0 condcreateselection go
 end.
-udisplayrcd condcreateselection creategridobj__uop dispoperands # go
-
+NB. NOTE the dispoperands here is local; we passed 1 1 to the higher level
+udisplayrcd 1 condcreateselection creategridobj__uop dispoperands # go
 )
 
 NB. **** u&n m&v ****
@@ -2686,7 +2221,6 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
 NB. Don't try to remember locale yet - we might clone
 verboperandx =: * verb bwand (<2 0) {:: y
-NB. obsolete rank =: _ _ _
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -2702,9 +2236,9 @@ valence =: #y
 assert. valence = 1 [ 'u&n m&v dyad not supported'
 'vl nl' =. <"0 verboperandx |. uop,vop
 NB.?lintonly vl =. nl =. coname''
-dispoperands =: setvalence__vl verboperandx |. y , resultissdt__nl
+setvalence__vl verboperandx |. y , resultissdt__nl
 resultissdt =: resultissdt__vl
-1
+dispoperands =: 1
 NB.?lintsaveglobals
 )
 
@@ -2737,12 +2271,11 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
-'selector vcollected' =: traversedowncalcselect y
-NB. Evaluate the noun operand
-noundisprcd =. traversedown__nounop 0;<selectall__COCREATOR
+traversedowncalcselect y
+vdisplayrcd =. traversedown__nounop 0;<selectall__COCREATOR
 if. 0 = errorcode__nounop do.
-  udisplayrcd =: traversedown__verbop bnsellevel , (verboperandx |. selops , valfromdisplayrcd noundisprcd) ,~^:vcollected selector
-else. udisplayrcd =: ''
+  udisplayrcd =. traversedown__verbop bnsellevel , (verboperandx |. (,selops) , valfromdisplayrcd vdisplayrcd) ,~^:collected selector
+else. udisplayrcd =. ''
 end.
 selectiondisplayrcd udisplayrcd
 NB.?lintsaveglobals
@@ -2816,8 +2349,8 @@ setvalence =: 3 : 0
 valence =: #y
 dispoperands =: setvalence__uop y
 resultissdt =: resultissdt__uop
-NB. operand validity from u passes up
-dispoperands
+NB. We take all operands here, so we can check for agreement
+valence # 1
 NB.?lintsaveglobals
 )
 
@@ -2842,11 +2375,8 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
-'selector vcollected' =: traversedowncalcselect y
-udisplayrcd =: traversedown__uop bnsellevel , selops ,~^:vcollected selector
-if. errorcode__uop do. errorcode =: errorcode__uop end.
-NB. Do the collection on the final result (valid even if we were not really a collector)
-selectiondisplayrcd udisplayrcd
+traversedowncalcselect y
+selectiondisplayrcd udisplayrcd =: traversedown__uop bnsellevel , (travdownselok errorcode) # selector , , valence {. selops
 NB.?lintsaveglobals
 )
 
@@ -2862,10 +2392,7 @@ if. isselvalid *. 1 < */ frame do.
   y =. (<@gridstackright ({."1 y) ,. rankcells) (<a:;0)} y
 end.
 NB. Create and append the grid object for u, which must align on the right
-go =. creategridobj__uop condcreateinitialselector y   NB. monad or dyad
-NB. If there is a local selector, append the selected value
-if. islocalselgiven do. go =. (0;udisplayrcd) condcreateselection go end.
-go
+udisplayrcd 1 condcreateselection creategridobj__uop dispoperands # condcreateinitialselector y
 )
 
 NB. **** um`vn ****
@@ -2894,7 +2421,6 @@ enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
 NB. return string form of operands, including instrumentation
 exestring =: 3 : 0
 initloggingtable ''
-NB. obsolete auditstg '(' , (conjlogstring '') , (exestring__uop 0 1 0) , ' ' , cop , ' (' , (exestring__vop 0 1 0) , '))'
 auditstg '(' , (conjlogstring '') , (defstring__uop 2) , ' ' , cop , (defstring__vop 3) , ')'
 )
 
@@ -2921,11 +2447,10 @@ NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
 NB. The grid for a gerund is
 NB. (value)
-gridobj =. 1 1 $ creategridcell ((2 <: detaillevel) { 'gerund';<conjex),'input';'value';'clickresult'
+gridobj =. 1 1 $ creategridcell ((2 <: detaillevel) { 'gerund';<conjex),'input';'value';'';'clickresult'
 gridobj;($0);_1
 NB.?lintsaveglobals
 )
-
 
 
 NB. **** u~ m~ ****
@@ -2955,10 +2480,11 @@ codestroy''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-dispoperands =: setvalence__uop 2$y
+dispoperands =. setvalence__uop 2$y
 resultissdt =: resultissdt__uop
-NB. We save what the next level needs; what we need is the reverse
+NB. We have what the next level needs; what we need is the reverse
 +./^:(valence=1) |. dispoperands
+NB. We have set up the args correctly so that we just pass through all display operands that we see.
 NB.?lintsaveglobals
 )
 
@@ -2984,11 +2510,9 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
-'selector vcollected' =: traversedowncalcselect y
+traversedowncalcselect (2&{. , |.&:(2&}.))^:(2<#) y
 NB. Here is where we swap the operands for calculation purposes
-udisplayrcd =: traversedown__uop bnsellevel , (|. 2 $ selops) ,~ selector
-NB. Do the collection on the final result (valid even if we were not really a collector)
-selectiondisplayrcd udisplayrcd
+selectiondisplayrcd udisplayrcd =: traversedown__uop bnsellevel , (-. errorcode e. 1) # selector , , valence {. selops
 NB.?lintsaveglobals
 )
 
@@ -2998,21 +2522,15 @@ NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
 NB. For the dyad, we have to insert a selector, since ~ has the rank of its operand and we need to
 NB. match what the interpreter does.  Since the monad has infinite rank, it will never select
-go =. condcreateinitialselector y   NB. monad or dyad
+go =. condcreateinitialselector |. y   NB. monad or dyad.  switch before selector, so it stays in the middle
 NB. ~ has no visible display - it just alters the connections
-if. valence < +/dispoperands do.
+if. valence < #y do.
 NB. If u takes more operands than we have inputs, create a label for the y operand, and a reference for the x
-  go =. |. (> {. selops) creategridref {. go,<''
-else.
-NB. Either a normal dyad, or a monad becase u is only monadic - either way, just switch the x and y
-  go =. |. go
+  go =. (> {. , selops) creategridref {. go,<''
 end.
 NB. Create and append the grid object for u, which must align on the right
-go =. creategridobj__uop go   NB. monad or dyad
 NB. If there is a local selector, append the selected value
-if. islocalselgiven do. go =. (0;udisplayrcd) condcreateselection go end.
-go
-NB.?lintsaveglobals
+udisplayrcd 1 condcreateselection creategridobj__uop go   NB. monad or dyad
 )
 
 NB. **** default ****
@@ -3123,73 +2641,53 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
-'selector vcollected' =: traversedowncalcselect y
+traversedowncalcselect y
 NB. Run v, then u, then c.  Stop in case of error
-NB. run v and save the selected result, in case it is valid.  Run in the order vop1,vop0 because
+NB. run v and save the selected result, in case it is valid.  Run in the order vop,uop because
 NB. That's the order the interpreter uses.  This will catch the failure in the side that actually failed
-vdisplayrcd =: traversedown__vop@{: op =. selops ,"1~^:vcollected (2#bnsellevel) ,"0 1 selector
-cdisplayrcd =: ''
-if. 0 = errorcode__vop do.
-  vdisplayrcd =: vdisplayrcd ,:~ traversedown__uop@{. op
-  if. 0 = errorcode__uop do.
-    cdisplayrcd =: traversedown__cop bnsellevel , (valfromdisplayrcd vdisplayrcd) ,~^:vcollected selector
-    if. errorcode__cop do. errorcode =: errorcode__cop end.
-  end.
-end.
-NB. Do the collection on the final result (valid even if we were not really a collector)
-selectiondisplayrcd cdisplayrcd
+vdisplayrcd =: displayrcdfixuverror (traversedown__uop ,: traversedown__vop) bnsellevel , selector , , valence {. selops
+NB. If v failed, upgrade the error code in u
+errorcode__uop =: errfromdisplayrcd {. vdisplayrcd
+selectiondisplayrcd cdisplayrcd =: traversedown__cop travdownuops vdisplayrcd
 NB.?lintsaveglobals
 )
 
 NB. Return grid specifier
 NB. y is table of grid specifiers, one per operand
 NB. Result is grid specifier for the result
+NB. No selectors, because this verb has infinite rank.
 creategridobj =: 3 : 0
-NB. If u or v failed, create the display for only that path.  We have to do this display separately,
-NB. because u or v might have suppressed display if c is stealth, and we must change the visibility
-NB. to show the error case; anyway, we don't want to create labels for a path we don't show.
-NB. Test v first, since that is the first path executed
-if. errorcode__vop do.
-  go =. creategridobj__vop (1 { dispoperands) # y
-  if. 0 = stealthoperand__vop do. go =. (1;vdisplayrcd) condcreateselection go end.
-elseif. errorcode__uop do.
-  go =. creategridobj__uop (0 { dispoperands) # y
-  if. 0 = stealthoperand__uop do. go =. (1;{.vdisplayrcd) condcreateselection go end.
-elseif. do.
-  NB. See how many copies of each input are needed.  If more than 1, make a reference.  Result is
-  NB. a box for each operand, containing a table of as many gridspecs as we will need for that operand
-  d =. (#"1~  +./) dispoperandsc * dispoperands  NB. The columns that are used, which will match y
-  NB. There is one column of d for each row of y, and one row for each of u and v
-  NB. For each item in y, create a grid reference if the item is used twice.  Result
-  NB. is a box for each item of y, containing a table, each row of which is a gridspec.
-  NB. Since the traversal used all operands, we have to delete any that are not dispoperands
-  by =. (+/d) <@((# ,:@}.@}:)`((>@{. creategridref }.)@])@.(2=[))"0 1 (dispoperandbool # selops) ,"0 1 y ,. <"0 (#y) {. 'xy' 
-  NB. Create the operand selectors for each of u and v.  For each verb/operand, create a box containing the
-  NB. selection to be made for each verb.  This selector will have one row for each of u and v, and
-  NB. one column for each operand.  We will assign the x operand label to u and the y operand label
-  NB. to v.  Rotate if dyad, so monad y label goes to v.  Empty list if an operand is unused
-  selxy =. (#&.>  (bwxor"1  (0 _1) {.~ -@{:@$)@:<:@:(+/\)) d
-  NB. Select the operands for each of u and v.  Result is 2 boxes, each containing a table of
-  NB. gridspecs
-  ops =. selxy {&.>"1 by
-  NB. Run u and v.  Note that u and v might have no operands (if c has display valence of 1).
-  NB. In that case, we don't run the verb
-  if. (-.vvv) +. *#op =. ; {. ops do.
-    ugridsel =. ,: creategridobj__uop op
-    if. vvv *. 0 = stealthoperand__uop do. ugridsel =. (1;0 { vdisplayrcd) condcreateselection ugridsel end.
-  else. ugridsel =. 0 3 $ a:
-  end.
-  if. (*#op =. ; {: ops) do.
-    vgridsel =. ,: creategridobj__vop op
-    if. 0 = stealthoperand__vop do. vgridsel =. (1;1 { vdisplayrcd) condcreateselection vgridsel end.
-  else. vgridsel =. 0 3 $ a:
-  end.
-  NB. Run c
-  assert. *ugridsel >.&# vgridsel [ 'fork with no operands'
-  go =. creategridobj__cop ugridsel , vgridsel
+NB. See how many copies of each input are needed.  If more than 1, make a reference.  Result is
+NB. a box for each operand, containing a table of as many gridspecs as we will need for that operand
+d =. (#"1~  +./) dispoperandsc * dispoperands  NB. The columns that are used, which will match y
+NB. There is one column of d for each row of y, and one row for each of u and v
+NB. For each item in y, create a grid reference if the item is used twice.  Result
+NB. is a box for each item of y, containing a table, each row of which is a gridspec.
+NB. Since the traversal used all operands, we have to delete any that are not dispoperands
+by =. (+/d) <@((# ,:@}.@}:)`((>@{. creategridref }.)@])@.(2=[))"0 1 (dispoperandbool # valence {. , selops) ,"0 1 y ,. <"0 (#y) {. 'xy' 
+NB. Create the operand selectors for each of u and v.  For each verb/operand, create a box containing the
+NB. selection to be made for each verb.  This selector will have one row for each of u and v, and
+NB. one column for each operand.  We will assign the x operand label to u and the y operand label
+NB. to v.  Rotate if dyad, so monad y label goes to v.  Empty list if an operand is unused
+selxy =. (#&.>  (bwxor"1  (0 _1) {.~ -@{:@$)@:<:@:(+/\)) d
+NB. Select the operands for each of u and v.  Result is 2 boxes, each containing a table of
+NB. gridspecs
+ops =. selxy {&.>"1 by
+NB. Run u and v.  Note that u and v might have no operands (if c has display valence of 1).
+NB. In that case, we don't run the verb
+if. (-.vvv) +. *#op =. ; {. ops do.
+  ugridsel =. ,: creategridobj__uop op
+  if. vvv *. 0 = stealthoperand__uop do. ugridsel =. ({.vdisplayrcd) 0 condcreateselection ugridsel end.
+else. ugridsel =. 0 3 $ a:
 end.
-go
-NB.?lintsaveglobals
+if. (*#op =. ; {: ops) do.
+  vgridsel =. ,: creategridobj__vop op
+  if. 0 = stealthoperand__vop do. vgridsel =. ({:vdisplayrcd) 0 condcreateselection vgridsel end.
+else. vgridsel =. 0 3 $ a:
+end.
+NB. Run c
+assert. *ugridsel >.&# vgridsel [ 'fork with no operands'
+cdisplayrcd 1 condcreateselection creategridobj__cop ugridsel , vgridsel
 )
 
 NB. **** hook ****
@@ -3246,17 +2744,12 @@ NB.?lintsaveglobals
 NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
-'selector vcollected' =: traversedowncalcselect y
+traversedowncalcselect y
 NB. run v and save the selected result, in case it is valid
-vdisplayrcd =: traversedown__vop bnsellevel,({:selops) ,~^:vcollected selector
+vdisplayrcd =: traversedown__vop bnsellevel , selector , , {: selops
 NB. If the selection from v was valid, then the v result must have been properly selected, and we will
 NB. send its value into u.  If v did not have valid inputs, u cannot either, and will retain just the selection info
-if. 0 = errorcode__vop do.
-  udisplayrcd =: traversedown__uop bnsellevel , (({. selops) , valfromdisplayrcd vdisplayrcd) ,~^:vcollected selector
-else. udisplayrcd =: ''
-end.
-NB. Do the collection on the final result (valid even if we were not really a collector)
-selectiondisplayrcd udisplayrcd
+selectiondisplayrcd udisplayrcd =: traversedown__uop bnsellevel , (({.selops) , valfromdisplayrcd vdisplayrcd) ,~^:collected selector
 NB.?lintsaveglobals
 )
 
@@ -3264,27 +2757,20 @@ NB. Return grid specifier
 NB. y is table of grid specifiers, one per operand
 NB. Result is grid specifier for the result
 creategridobj =: 3 : 0
-NB. If v failed, display only its result.  Handle this separately so we don't make
-NB. unneccessary references, and also don't ignore v if u is stealth
-if. *errorcode__vop do.
-  go =. (1;vdisplayrcd) condcreateselection creategridobj__vop (,_1) { y
-else.
-  NB. We must copy the input if the valence is 1 and both copies are used.
-  if. (valence=1) *. 2 = +/ dispoperandsu do.
-    y =. |. (> {. selops) creategridref {. y ,. <''
-  end.
-  NB. If v contributes, run it
-  if. {: dispoperandsu  do.
-    go =. (1;vdisplayrcd) condcreateselection creategridobj__vop (,_1) { y
-  else.
-    go =. 0 3 $ a:
-  end.
-  NB. Run u
-  go =. creategridobj__uop (({. dispoperandsu) # (,0) { y) , go
+NB. We must copy the input if the valence is 1 and both copies are used.
+if. (valence=1) *. 2 = +/ dispoperandsu do.
+  y =. |. (> {. selops) creategridref {. y ,. <''
 end.
-go
-NB.?lintsaveglobals
+NB. If v contributes, run it
+if. {: dispoperandsu  do.
+  go =. vdisplayrcd 0 condcreateselection creategridobj__vop (,_1) { y
+else.
+  go =. 0 3 $ a:
+end.
+NB. Run u
+udisplayrcd 1 condcreateselection creategridobj__uop (({. dispoperandsu) # (,0) { y) , go
 )
+
 
 0 : 0
 ds '2+''a'''
@@ -3308,7 +2794,27 @@ ds '''ab''+&+ 0'
 ds '''a''+&:+ 0'
 ds '+&{. ''a'''
 ds '+&:+ ''a'''
+ds '+&2 (3 4)'
+ds '3&* (3 4)'
+ds '+&''a'' (3 4)'
+ds '(+&2)@:(2&*) 4 6'
+ds '3 4 +"1 i. 3 2'
+ds '(i. 3 2) +"1 (3 4)'
+ds '(i. 3 2) +"1 i. 3 2'
+ds '(i. 3 2) +"1 i. 3 1'
+ds '(i. 3 2) +"1 i. 1 1'
+ds '2 3 +@]&> 5 6'
+ds '(i. 3 2) +@]"1 i. 1 1'
+ds '(i. 3 2) +@["1 i. 1 1'
 ds 'i.@(0&{) ''a'''
+ds 'i."0 (1 2)'
+ds '+~ i. 2 3'
+ds '3 4 +~ i. 2 3'
+ds '3 4 +~ i. 3 2'
+ds '3 4 +@]~ i. 3 2'
+ds '3 4 +@[~ i. 3 2'
+ds '3 4 +~ i. 2 3'
+ds '3 4 (+ - *) 0 1'
 ds '0 1 2 (+ - *) 0 1'
 ds '0 1 2 (+ - 0:) 0 1'
 ds '0 1 2 (0: - *) 0 1'
@@ -3316,6 +2822,7 @@ ds '0 1 2 (1:"0 - 0:"0) 0 1'
 ds '0 1 2 (+ - ]) 0 1'
 ds '0 1 2 ([ - -) 0 1'
 ds '0 1 2 ([ - ]) 0 1'
+ds '0 1 2 (- + * % -)"0 (3 4 5)'
 ds '0 1 (+ 0:) ''ab'''
 ds '0 1 (+ {.) ''ab'''
 ds '0 1 (+ ]) 1 2 3'
@@ -3324,6 +2831,8 @@ ds '0 1 2 + '' '''
 ds '0 (+ - *) '''''
 ds '0 (1 2 3 - *) '''''
 ds '0 (1 2 3 - *)"0 '''''
+ds '0 (1 2 3 , ])"0 $0'
+ds '0 ([: 1 2 3"0 $)"0 $0'  NB. should be $=0 0 3
 ds '0 (+ - ]) '''''
 ds '0 (1 2 3 - *)"0 (0)'
 ds '0 +@* '''''
@@ -3331,5 +2840,9 @@ ds '0 (+@* - *) '''''
 ds '0 (+@* *) '''''
 ds '0 (+ *) '''''
 ds '(#@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
+z =. 2
+ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
+ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q'''
 ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
 )
+
