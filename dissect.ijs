@@ -529,7 +529,7 @@ reference "Courier New bold" 10
 DISSECT=: 0 : 0
 pc dissect;
 xywh 3 43 457 414;cc parsegrid isigraph rightscale bottomscale;
-xywh 3 3 360 13;cc sentence richeditm es_autohscroll rightscale;
+xywh 3 3 360 13;cc sentence edit es_autohscroll rightscale;
 xywh 364 0 26 60;cc minfont combolist leftmove rightmove;
 xywh 392 1 25 11;cc lbl00 static;cn "Min Font";
 xywh 416 0 26 60;cc maxfont combolist leftmove rightmove;
@@ -673,10 +673,12 @@ rtfcolor =: '\cf' , ' ' ,~ ":
 NB. x is the tokenized sentence
 NB. y is a list of token numbers to be highlighted
 NB. Result is RTF for the sentence, with highlighted tokens bold and colored
+NB. Currently stubbed out so as not to need RTF
 createsentencertf =: 4 : 0
 tok =. <: y
 NB. If a token begins with .:, prefix it with a space
 sentence =. ' '&,^:('.:'e.~{.)&.> x
+; sentence return.
 NB. Escape \ { } by prefixing with \
 sentence =. ([: }. (1 j. 0 ,~ e.&'\{}') #!.'\' (' '&,))&.> sentence
 NB. Create list of start tokens: highlight values where the previous valus is not highlighted
