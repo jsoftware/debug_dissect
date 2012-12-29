@@ -594,6 +594,7 @@ NB.?lintonly resultissdt_dissectmonad_ =: 0
 if. resultissdt__resultroot do. gridcommand__resultroot =: 1 1 end.
 
 showgrid''
+wd^:(IFJ6) 'pshow'
 NB.?lintmsgsoff
 evtloop^:(-.IFJ6)''
 NB.?lintmsgson
