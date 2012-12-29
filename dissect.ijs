@@ -42,7 +42,10 @@ cocurrent 'dissect'
 coinsert 'jgl2'
 
 3 : 0 ''
-if. IFJ6 do. IFGTK =. -. IFCONSOLE end.
+if. IFJ6 do. IFGTK =. -. IFCONSOLE
+else.
+  require 'gtkwd wdclass'
+end.
 if. IFGTK do.
 require 'grid'
 end.
@@ -583,7 +586,7 @@ wd 'setshow showerror ', ": crashed
 NB. Figure out the screen fraction used by 1 char in each of our sizes
 fontpixelsizes =: 10 1 %~"1 ('0123456789') (glqextent@[ glfont@>)"_ 0 valuefonts
 NB. Insert the fixed formatting
-setnames__parsegrid _2 ]\ ('GRIDID';'parsegrid'),('CELLALIGN',&<1),('CELLCOLORS',&<colorpalette),('CELLFONTS',&<fontpalette)
+setnames__parsegrid t =. _2 ]\ ('GRIDID';'parsegrid'),('CELLALIGN',&<1),('CELLCOLORS',&<colorpalette),('CELLFONTS',&<fontpalette),('GRIDHWNDC',&<wd 'qhwndc parsegrid'),('GRIDPID',&<'dissect')
 
 NB. Set the initial selection of cells:
 NB. If the result is an sdt, the user is probably noodling around with a new sentence, so select everything
@@ -591,7 +594,6 @@ NB.?lintonly resultissdt_dissectmonad_ =: 0
 if. resultissdt__resultroot do. gridcommand__resultroot =: 1 1 end.
 
 showgrid''
-wd 'pshow'
 NB.?lintmsgsoff
 evtloop^:(-.IFJ6)''
 NB.?lintmsgson
@@ -647,8 +649,8 @@ if. #refcells =. <"1 ($ #: I.@,) (*cellref) *. -. celldetail do.
 NB.  cellcolor =. (colornames i. <'reference') refcells} cellcolor
   cellfont =. (fontnames i. <'reference') refcells} cellfont
 end.
-
 show__parsegrid _2 ]\ ('CELLDATA',&<celldata),('CELLEDIT',&<celledit),('CELLCOLOR',&<cellcolor),('CELLFONT',&<cellfont)
+wd^:(-.IFJ6) 'pshow'
 0 2$a:
 NB.?lintsaveglobals
 )
