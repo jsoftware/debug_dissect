@@ -6,8 +6,9 @@ NB. TODO:
 NB. Make all error displays come from condselection.  Have displayable-error status created during travdown & propagated
 NB.  through displayrcds - & reset appropriately when fill-cell handled.
 NB. Stress multilevel selects incl boxing
+NB. Select multiple ds '*@#@> ''a'';''b'';''cd'''  dclick, selector 2 0 - does not produce final selector.  Need to out any final localselresult if not outed before final collector
 NB. release
-NB. 
+NB. Show wilch axes is filled by placement of *
 NB. Handle assignments
 NB. default needs to traverse noun operands - if not sdts
 NB. handle negative rank
@@ -746,7 +747,7 @@ NB.?lintonly Row__parsegrid =. Col__parsegrid =. Cell__parsegrid =. 0
 try.
   NB. Get the index to the cell
   select. y
-  case. 'click';'dblclick' do.
+  case. 'click';'dblclick';'rclick' do.
     cindex =. <Row__parsegrid,Col__parsegrid
   case. 'change' do.
     cindex =. <Cell__parsegrid
@@ -1549,6 +1550,8 @@ NB. ***** Grid actions *****
 clickresult =: 3 : 0
 NB.?lintonly Ctrl__parsegrid__COCREATOR =. Value__parsegrid__COCREATOR =. 0
 select. y
+fcase. 'rclick' do.  NB. for Mac, which brings CTRL-click in as rclick, we treat it as crtl-click
+  Ctrl__parsegrid__COCREATOR =: 1
 case. 'click' do.
   NB. If CTRL pressed, pass the command through the tree
   gridcommand =: 2 $ ((* detaillevel bwand 2) { 1 _1) , (-.Ctrl__parsegrid__COCREATOR) # 0
