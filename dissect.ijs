@@ -43,11 +43,12 @@ cocurrent 'dissect'
 coinsert 'jgl2'
 
 3 : 0 ''
-if. IFJ6 do. IFGTK =. -. IFCONSOLE
-else.
+if. IFJ6 do. IFGUI =. -. IFCONSOLE
+elseif. IFQT +. IFGTK do.
+  IFGUI=. 1
   require 'gtkwd wdclass'
 end.
-if. IFGTK do.
+if. IFGUI do.
 require 'grid'
 end.
 ''
@@ -546,6 +547,27 @@ pas 0 0;
 rem form end;
 )
 
+DISSECTQT=: 0 : 0
+pc dissect;
+bin vh;
+cc sentence edit es_autohscroll rightscale;
+cc minfont combolist;
+cc lbl00 static;cn "Min Font";
+cc maxfont combolist;
+cc lbl01 static;cn "Max";
+bin zh;
+cc maxnounsize combolist;
+cc lbl00 static;cn "Max Noun (% of scrn)";
+bin zh;
+cc inst00 static;cn "inst00";
+cc showerror button;cn "Show Error";
+bin z;
+wh 450 450;cc parsegrid isigraph;
+bin z;
+pas 0 0;
+rem form end;
+)
+
 MAXNOUNPCTCHOICES =: 30 50 70 90
 display =: 3 : 0   NB. called in dissect locale
 displaymain__dissectinstance y
@@ -567,7 +589,7 @@ NB. If we crashed, do an initial traversal to set selection flags to find the er
 if. crashed do. traversedown__resultroot ($0);selectall end.
 NB. The argument of $0 indicates that we want to set the crash variables
 NB. debug wd :: 0: 'psel dissect;pclose'
-wd DISSECT
+wd IFQT{::DISSECT;DISSECTQT
 wd 'set inst00 *', 'Click to select/unselect; CTRL-click to sel/unsel up the tree.  / in shape shows frame, * in shape = fills added.  Green boxes are selectors; Dclick to edit.  Click verbs or "n to get more selectors'
 winhwnd =: wd 'qhwndp'
 parsegrid=: '' conew 'jzgrid'
@@ -608,7 +630,8 @@ NB. display the grid.  Should be called in the locale of the major instance
 showgrid =: 3 : 0
 NB. Check the current screensize, and calculate the box sizes in characters
 wd 'psel ',winhwnd
-gridwh =. 2 3 { 0 ". wd 'qchildxywhx parsegrid'
+glsel 'parsegrid'
+gridwh =. glqwh''
 fontcharsizes =: gridwh %"1 fontpixelsizes
 
 NB. Propagate grid selection info through the tree
