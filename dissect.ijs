@@ -4,6 +4,7 @@ NB. INPROGRESS:
 CLEANUP_dissect_ =: 1   NB. set to 0 for debugging to allow postmortem
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
 DEBVERB_dissect_ =: 0   NB. set for travdown printout
+DEBGRID_dissect_ =: 0   NB. display grid details
 
 NB. TODO:
 NB. Make all error displays come from condselection.  Have displayable-error status created during travdown & propagated
@@ -495,7 +496,7 @@ ntypeval
 NB. After the sentence has been executed, return here to display the grid
 
 NB. The colors we can use, each given a name
-MAXSELLEVEL =: 5   NB. number of different selection levels we have colors for
+MAXSELLEVEL =: 5   NB. number of different selection levels we have colors for.  We need one additional result color after the last selection
 'colornames colorpalette' =: ({."1 ,&< ".@(;:^:_1)@(}."1)) ;:;._2 (0 : 0)
 empty  0 0 0 20 20 20
 input  0 0 0 255 255 255
@@ -515,6 +516,7 @@ result4 0 0 0 , <. 0.8 * 255 204 000
 selector4 0 0 0 255 154 000
 result5 0 0 0 , <. 0.8 * 255 154 000
 selector5 0 0 0 255 104 000
+result6 0 0 0 , <. 0.8 * 255 104 000
 shape 255 255 255 0 100 100
 invalid 255 0 0 255 255 255
 error 255 255 255 255 0 0
@@ -667,7 +669,7 @@ if. # extrasx =. 0 _1 bwxor"1 |."1 ($ #: I.@(~: < ('edit' -: 4&{.)@>)@,) |. |: c
   cd =. emptycell (<"1 extrasx)} cd
   callbacks =: 2&{@> cd  NB. refresh the list
 end.
-NB. debug qprintf '$cd cd '
+qprintf^:DEBGRID '$cd cd '
 'cellcolor cellfont celledit cellref celllbl celldetail' =. 0 1 |: > 1&{@> cd
 NB. the displayable data
 celldata =. 0&{@> cd
@@ -1732,7 +1734,7 @@ traversedown =: 3 : 0
 NB. Evaluate the noun operand (selecting all, but that shouldn't matter since noun nodes
 NB. are always collectors and we will get the collected result); feed that into the verb to allow
 NB. selection.  Preserve the first element of y, which tells if we are in snifferror mode
-traversedowncalcselect ({.y),<selectall__COCREATOR  NB. To set globals only - there are no inputs here
+traversedowncalcselect (0 *&.> {.y),<selectall__COCREATOR  NB. To set globals only - there are no inputs here
 udisplayrcd =: traversedown__uop bnsellevel,selector , valfromdisplayrcd traversedown__yop bnsellevel,<selectall__COCREATOR
 NB.?lintsaveglobals
 )
@@ -1802,7 +1804,7 @@ NB. a y to the call to the upper node - this value is used only at the very end 
 NB. Since y is a collector, we know that it will have a full result and no selectors
 NB. Since u is a collector, it too will have a result and no selectors.  That will become our result.
 NB. Preserve the first element of y, which tells if we are in snifferror mode
-traversedowncalcselect ({.y),<selectall__COCREATOR
+traversedowncalcselect (0 *&.> {.y),<selectall__COCREATOR
 udisplayrcd =: traversedown__uop bnsellevel,selector , (traversedown__xop ,&valfromdisplayrcd traversedown__yop) bnsellevel,<selectall__COCREATOR
 NB.?lintsaveglobals
 )
