@@ -7,6 +7,7 @@ DEBVERB_dissect_ =: 0   NB. set for travdown printout
 DEBGRID_dissect_ =: 0   NB. display grid details
 
 NB. TODO:
+NB. ds '<@I.@(1=+/@:|@:-)"1 _~&.> <i. 5 1'  gets agreement error on the "1 _ but shows as (error)
 NB. Make all error displays come from condselection.  Have displayable-error status created during travdown & propagated
 NB.  through displayrcds - & reset appropriately when fill-cell handled.
 NB. Stress multilevel selects incl boxing
@@ -62,6 +63,7 @@ NB. Maximum line length that we will try to display in a grid cell
 
 MAXLINELEN =: 300
 
+ifdefined =: 0 <: [: 4!:0 <
 
 NB. ********************** from here on is devoted to parsing J sentences ***************
 NB.
@@ -807,7 +809,70 @@ catch.
   0
 end.
 )
- 
+
+NB. **************** code for display objects *********************
+
+NB. y is DOL, result is (y,x) extent
+DOLsize =: (0;0)&{::
+
+NB. Create the display object layout (DOL) for a noun
+NB. y is the noun
+NB. x is information about formatting
+NB. result is the layout: formatinfo;shape;y endpixels;x endpixels[;subnouns]
+NB.  formatinfo is information about the format that was finally selected:
+NB.   (pixel extent h, w);pointsize
+NB.  shape is the shape of the part of the noun that is actually formatted, which may be less than the shape of y if
+NB.   y is too big to be displayed
+NB.  y endpixels is the ending position of each row in the display.  The number of atoms will be */ (even items of shape, counting from the end)
+NB.   a gap of 1 pixel is left between blocks of rank 3, 5, etc.  This is included in the y endpixels values
+NB.  x endpixels is similar for x
+NB.  subnouns is provided only for boxed y.  It gives the DOL for each box of the represented part of y.
+createDOL =: 4 : 0
+'fontsize maxyx' =. x
+NB. If the noun is too big, cut it down
+NB. This is just to make sure we don't try to format a gigantic noun.  After we have the exact sizes,
+NB. we will trim the shape to the size needed.
+NB. maxyx is in pixels.  We assume that an atom codes as a single 7x9 character (worst case) and we trim to fit in
+NB. maxyx
+dval =. (maxyx % 9 7) (] {.~ ((] ([ <. ({.~ -@#)~) [: >.@, [: %~/\. [ ,~ _2 |.\&.|. ]) $@])) y
+
+NB. If the noun is boxed, get a DOL for each box; extract the height/width from it
+if. 32 = 3!:0 dval do.
+  hw =. DOLsize&> subDOLs =. x&createDOL&.> dval
+else.
+NB. If the noun is not boxed, just get the height/width for each atom
+  subDOLs =. 0$a:  NB. no subnouns unless boxed
+  hw =. |."1 glqextent@":"0 dval
+end.
+
+NB. combine the height/widths for the row & columns to get the size of each row/column
+NB. Get the transposition vector: we bring the odd axes (starting from the end) in front of the even
+NB. axes to get the display order.
+axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@#@$ dval
+sizes =. (*/@> rcshapes =. axes ({&.:>"0 _ $) dval) ($,)"_ _1 (_1 , ;axes) |: hw
+NB. Take max across rows to get column extents; across columns to get row extents.
+NB. row info (y endpixels) comes first
+rcextents =. +/\&.> (>./"1@[ ; >./@])/ sizes
+
+NB. Insert spacing between rank boundaries.  The extent values (nominally ending positions) will be the
+NB. starting positions after we prepend a 0.  So we want to add the spacing to the last number at a rank,
+NB. which will become the first of the next rank - except for the last, which doesn't have spacing after
+rcextents =. (*/\.@:}.&.> rcshapes)   (] + [: +/\ 0 (_1)} [: +/ #@] ($   1 {.~ -)"0 [)^:(*@#@[)&.>   rcextents
+
+NB. Assemble final result
+((maxyx <. {:@> rcextents);fontsize);(<$dval),rcextents,subDOLs
+)
+
+NB. Draw the graphics for a noun's DOL
+NB. y is noun;DOL;y,x position of top-left corner
+NB. x contains selection information:
+NB.  the index of the selected cell, if any
+NB. Result is gl2 operations to draw the noun
+drawDOL =: 4 : 0
+)
+
+
+NB. **************** end display objects ************************8
 NB. common routines used by the object locales.  Objects are subclasses of dissectobj
 
 cocurrent 'dissectobj'
@@ -1009,9 +1074,9 @@ NB.   when the verb is selected, we should offer a selector to trim the path
 NB. frame - the frame of the verb
 NB.  frames - the individual franes, boxed
 NB. errorcode - An indication of the result of applying the selection to the results of the verb, and comparing it to the
-NB.  frame of the operands.  Values > 1 indicate error, 0=OK.  The errorcode gives the
-NB.  status of the input values passed to this verb, BEFORE any local selector is applied.
-NB.  Values: 1=agreement error 2=unexecuted cell (inferred in u operand when u&v both have exec errors) 3=execution error (this verb did not compute all the selected results)
+NB.  frame of the operands.  Values > 1 indicate error, 0=OK, _1=unknown because no operands; _2=unknown because no selector.
+NB.  The errorcode gives the status of the input values passed to this verb, BEFORE any local selector is applied.
+NB.  Values: _2,_1=unknown 1=agreement error 2=unexecuted cell (inferred in u operand when u&v both have exec errors) 3=execution error (this verb did not compute all the selected results)
 NB.  4=framing error (error during collection)  Every collectible result is collected
 NB.  and displayed.
 NB. islocalselgiven - An indication of the validity of the local selector, i. e. the selector that is added on in this cell
@@ -1044,7 +1109,7 @@ if. detaillevel >: 1 do. highlighttokens__COCREATOR =: highlighttokens__COCREATO
 qprintf^:DEBTRAVDOWN 'snifferror%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%detaillevel%verbex b. 0%$y%y%'
 if. 0 = #selandxy do.
   NB. No selector: we can't do much
-  'collected isselvalid frame frames errorcode islocalselgiven selresult selector selops localselresult' =: 0;0;($0);a:;0;0;'?';(0$a:);(1 0$a:);<(0$a:)
+  'collected isselvalid frame frames errorcode islocalselgiven selresult selector selops localselresult' =: 0;0;($0);a:;_2;0;'??';(0$a:);(1 0$a:);<(0$a:)
 elseif.
 selector =: {. selandxy
 (1 = #selandxy) +. 1 < */ }: $ > {. selandxy do.
@@ -1054,11 +1119,11 @@ selector =: {. selandxy
   NB. If the frame matches the results, we can call this a collector and collect and display the results.
   if. -. ifdefined 'verbex' do.
     NB. selector and selop already set, keep them
-    'frame errorcode selresult' =: ($0);0;<{.logvalues
+    'frame errorcode selresult' =: ($0);_1;<{.logvalues
   else.
     frame =: }:$>{. selandxy
     selresult =: (; findselection > {. selandxy) { logvalues  NB. fails if no values
-    errorcode =: 2 * (*/ frame) > #selresult
+    errorcode =: 0 2 {~ (*/ frame) > #selresult
   end.
   collected =: (*/ frame) = 1
   'isselvalid frames islocalselgiven selops localselresult' =: 0;a:;0;(0 0$a:);<(0$a:)
@@ -1089,7 +1154,7 @@ NB.?lintonly selresult =: localselresult =: <'?'
   NB. Clear the selector to short-circuit further processing
   -. -:/ (<.&#&>/ {.&> ]) 2 {. frames,<$0 do.  NB. No agreement error on monad
     NB. Here for verb with agreement error
-    'collected isselvalid errorcode islocalselgiven selector selops selresult localselresult' =: 0;0;1;0;(0$a:);(0#"1 selops);'?';<(0$a:)
+    'collected isselvalid errorcode islocalselgiven selector selops selresult localselresult' =: 0;0;1;0;(0$a:);(0#"1 selops);'???';<(0$a:)
     if. snifferror do. detaillevel =: 7 end.
   elseif. do.
     NB. Normal case, verb with no agreement error
@@ -1228,7 +1293,7 @@ end.
 NB. See if there will be fill when the cells are opened
 filled =. 1 < # ~. (>./ #@> bshp)&({.!.1)@> bshp
 collectedframe =: 's' [^:(0=#frame,shp)   (filled#'*') ,~ (":frame) , '/' , ": shp
-if. collected *. (errorcode=0) do.
+if. collected *. (errorcode<:0) do.
 NB. debug qprintf 'collected%frame%$L:0 selresult%selresult%y%'
   try.
     selresult =: > frame $ selresult
@@ -1238,7 +1303,7 @@ NB. debug qprintf 'collected%frame%$L:0 selresult%selresult%y%'
   end.
 else.
   NB. if this node is not a collector, we must clear selops since they are invalid for future use
-  selresult =: '?'
+  selresult =: '?-'
 end.
 NB. If this level is selectable, increment the selector level to use for this and subsequent levels - whether
 NB. we have a selector yet or not.  If this level is selectable, and we didn't qualify it down to a single input,
@@ -1262,6 +1327,16 @@ travdownuops =: 3 : 0
 bnsellevel , (valfromdisplayrcd y) ,~^:valsok   selok # selector
 )
 
+NB. Calculate operands to use for u a
+NB. y is sellevel,selector,selops
+NB. global errorcode has been set by traversal of a
+NB. Result is operands to pass into u
+NB. If there was an agreement error, suppress the selector
+NB. If there was any other error, or if the adverb didn't collect,
+NB.  suppress the operands
+travdownadvuops =: 3 : 0
+y {.~ 2 <.^:(-.collected) _ 1 2 {~ 0 1 5 I. errorcode
+)
 NB. x is vdisplayrcds, y is operands to travdown
 NB. We produce the input operands to travdown for the left side of a fork or & .  If there was an error
 NB. on the right side, we know the left side will not run, so we discard its selops (keeping the selection if any)
@@ -1449,11 +1524,18 @@ NB. If this selection is not collecting or if it had a pre-framing error,
 NB. don't look at frame.
 selectiondisplayrcd =: 3 : 0
 res =. (collected;selresult;islocalselgiven;detaillevel;errorcode;sellevel) , (6}.y) , <collectedframe 
-NB. If there is an error code in the old record, carry it through to the new;
-NB. also ignore any frame in the new
+NB. If there is an error code in both the old and new records, the old one will be
+NB. more specific, so keep it.  If there is error in the old but not the new, we must have
+NB. had an error during a fill-cell, or perhaps execution of :: .  Ignore the old error then.
+NB. But if the new errorcode is _1, meaning no selector, keep any old error - we might just
+NB. be running out to the end.  So keep the old error if it exists in any case where new error ~: 0
+NB. If we ignore the new error, also ignore any frame in the new
 if. #y do.
-  if. * 4{:: y do.
-    res =. }: (4{y) 4} res  NB. keep old error code, ignore new shape
+  select. res ,&*&(4&{::) y
+  case. 1 1 do.
+    res =. }: (4{y) 4} res  NB. errors old & new.  keep old error code, ignore new shape
+  case. _1 1 do.   NB. old error, new is in runout
+    res =. }: (<3) 4} res  NB. errors old & new.  use (error) code, ignore new shape
   end.
 end.
 res
@@ -2343,7 +2425,7 @@ traversedown =: 3 : 0
 traversedowncalcselect y
 NB. Preserve snifferror flag
 vdisplayrcd =. traversedown__nounop ({.y),<selectall__COCREATOR
-if. 0 = errorcode__nounop do.
+if. 0 >: errorcode__nounop do.
   udisplayrcd =. traversedown__verbop bnsellevel , (verboperandx |. (,selops) , valfromdisplayrcd vdisplayrcd) ,~^:collected selector
 else. udisplayrcd =. ''
 end.
@@ -2358,7 +2440,7 @@ creategridobj =: 3 : 0
 NB. No selector is possible, so we do not produce a collector, which must be supplied elsewhere
 go =. creategridobj__nounop ''
 NB. If noun failed, keep only its display
-if. 0 = errorcode__nounop do.
+if. 0 >: errorcode__nounop do.
   NB. join noun gobj with the monadic input value; forward to the verb
   go =. creategridobj__verbop dispoperands # verboperandx |. y , go
 end.
@@ -2452,7 +2534,9 @@ NB. Tree traversal, down
 NB. traversedowncalcselect does the work; we preserve the structure here
 traversedown =: 3 : 0
 traversedowncalcselect y
-selectiondisplayrcd udisplayrcd =: traversedown__uop bnsellevel , (travdownselok errorcode) # selector , , valence {. selops
+NB. obsolete selectiondisplayrcd udisplayrcd =: traversedown__uop bnsellevel , (travdownselok errorcode) # selector , , valence {. selops
+selectiondisplayrcd udisplayrcd =: traversedown__uop travdownadvuops bnsellevel , selector , ,selops
+
 NB.?lintsaveglobals
 )
 
@@ -2463,6 +2547,7 @@ creategridobj =: 3 : 0
 NB. If there are multiple results (i. e. frame has more than 1 element), create
 NB. a line for the rank operator; then create a selector (optionally).
 NB. Put a rank operator only in sides where the frame has options
+qprintf'isselvalid frame '
 if. isselvalid *. 1 < */ frame do.
   rankcells =. ((1<*/)&.> dispoperands # frames) #&.> <@(1 1&$)@creategridcell (('"' , ":)&.> (dispoperands # ((<: + i.) valence) { verbex b. 0)),"0 1 'verb';'verb';'';'clickresult'
   y =. (<@gridstackright ({."1 y) ,. rankcells) (<a:;0)} y
@@ -2585,7 +2670,7 @@ NB.?lintsaveglobals
 
 NB. Tree traversal, down - obsolete
 NB. traversedowncalcselect does the work; we preserve the structure here
-traversedown =: 3 : 0
+traversedown =: 3 : 0  NB. obsolete version
 traversedowncalcselect (2&{. , |.&:(2&}.))^:(2<#) y
 NB. Here is where we swap the operands for calculation purposes
 selectiondisplayrcd udisplayrcd =: traversedown__uop bnsellevel , (-. errorcode e. 1) # selector , , valence {. selops
@@ -2598,7 +2683,7 @@ NB. Since the rank of u~ is either infinite or the same as u, we can just skip t
 NB. traversal of u~ and just traverse u with operands switched or replicated
 NB. We have to emulate travcalcdownselect, to the extent of setting selops for label purposes
 selops =: 2 }. y
-traversedown__uop (2&{. , |.&:(2&}.))^:(2<#) y
+traversedown__uop (2&{. , |.@(2&$)@(2&}.))^:(2<#) y
 NB.?lintsaveglobals
 )
 
@@ -2620,9 +2705,9 @@ udisplayrcd 1 condcreateselection creategridobj__uop go   NB. monad or dyad
 )
 creategridobj =: 3 : 0
 NB. ~ has no visible display - it just alters the connections
-if. valence < #y do.
+if. 2 > #y do.
 NB. If u takes more operands than we have inputs, create a label for the y operand, and a reference for the x
-  y =. (> {. , selops) creategridref {. y,<''
+  y =. (> {. , selops) creategridref ({. y),<''
 end.
 NB. Create and append the grid object for u, which must align on the right
 NB. If there is a local selector, append the selected value
@@ -2695,7 +2780,6 @@ codestroy''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-dispoperandsc =: setvalence__cop 2
 NB. dispoperands is indexed (uv;xy) giving the need for operands in each verb
 dispoperands =: setvalence__vop y
 if. vvv do.
