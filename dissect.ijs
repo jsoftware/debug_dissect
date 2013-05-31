@@ -14,6 +14,7 @@ SM_dissect_   =: smoutput
 NB. TODO:
 NB. Put $!.f in JforC
 NB. J8
+NB. ds '(i.@# ((}.>) ,. ({.>))"0 ]) b' [ b =. ;: "The quick brown fox'  routing error
 NB. ds '0 1 2 (1:"0 - 0:"0) 0 1'  too many errors - does not preverror for u or c
 NB. Fix small display: avoid double-display aftre resize of control, by calculating size before drawing (do wires first)
 NB.  display command line properly & get the rest of the display out of the way
@@ -1772,13 +1773,13 @@ waitpoints =. turnpenalty $ < 0 2 2 $ 0
 
 NB. Repeat until all destinations have been routed:
 currdist =. 1
-ndestsfound =. 0
+ndestsfound =. 1  NB. the starting point has automatically been routed
 while. ndestsfound < #routend do.
   NB. For each active point/direction, create the turn points/directions
   turns =. < ,/ (+ ,:"1  (1 _1) */ |.@])/"2 actpoints
   
   NB. Activate delayed points that have come to life
-  if. #actpoints =. actpoints , 0 {:: waitpoints do.
+  if. #actpoints =. ~. actpoints , 0 {:: waitpoints do.
 
     NB. Advance each active point to the next position
     actpoints =. +/\."2 actpoints
@@ -1786,13 +1787,25 @@ while. ndestsfound < #routend do.
     NB. Fetch distance to target.  Delete next-points that are have been filled in this direction
     targx =. (, dirtodistx)/"2 actpoints
     valmsk =. currdist <: targval =. targx (<"1@[ { ]) routdist
-    if. #actpoints =. valmsk # actpoints do.
 
+    if. 2000000 e. targval do.
+      NB. We reached a destination.
+      NB. See which destinations we reached.  Make sure each destination is reached only one time
+      reachdests =. (#~ ~:@:(2&{."1)) targx #~ targmsk =. targval = 2000000
+      NB. Set the current distance in one destination point; mark all the other parts of the
+      NB. destination as regular points so we don't reach them again
+      routdist =. 1000000 (<"1 }:"1 reachdests)} routdist
+      routdist =. currdist (<"1 reachdests)} routdist
+      NB. Count the number of destinations filled.
+      ndestsfound =. ndestsfound + #reachdests
+      NB. Remove the destination points from the active list
+      valmsk =. valmsk *. -. targmsk
+    end.
+
+    if. #actpoints =. valmsk # actpoints do.
       NB. Mark the next-points as filled at this step and keep them on the active list
       routdist =. currdist (<"1 valmsk # targx)} routdist
 
-      NB. Count the number of destinations filled.
-      ndestsfound =. ndestsfound + +/ targval +/@:= 2000000
     end.
   end.
 
@@ -1866,10 +1879,10 @@ end.
 )
 NB. display route
 rout =: 3 : 0
-  n =. ('*0123456789abcdefghijklmnopqrstuvwxyz' ([ {~ 0 >. ] <. <:@#@[) 0&{)"1 y
-  s =. ('*0123456789abcdefghijklmnopqrstuvwxyz' ([ {~ 0 >. ] <. <:@#@[) 1&{)"1 y
-  e =. ('*0123456789abcdefghijklmnopqrstuvwxyz' ([ {~ 0 >. ] <. <:@#@[) 2&{)"1 y
-  w =. ('*0123456789abcdefghijklmnopqrstuvwxyz' ([ {~ 0 >. ] <. <:@#@[) 3&{)"1 y
+  n =. ('*0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' ([ {~ 0 >. ] <. <:@#@[) 0&{)"1 y
+  s =. ('*0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' ([ {~ 0 >. ] <. <:@#@[) 1&{)"1 y
+  e =. ('*0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' ([ {~ 0 >. ] <. <:@#@[) 2&{)"1 y
+  w =. ('*0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' ([ {~ 0 >. ] <. <:@#@[) 3&{)"1 y
   n ,"1 '   ' ,"1 s ,"1 '   ' ,"1 e ,"1 '   ' ,"1 w 
 )
 
@@ -2959,7 +2972,7 @@ if. 0 = 4!:0 <'pickpixels' do.
   NB. Use the last-drawn position as the new position.  If it hasn't changed from the original, redraw
   if. pickscrollcurryx -.@-: pickscrollstartyx do.
     scrolltlc =: scrolltlc + pickscrollcurryx - pickscrollstartyx
-    dissect_dissectisi_paint 0  NB. no need to recalculate the placement
+    dissect_dissectisi_paint 0  NB. no need to recalc placement
   end.
 end.
 )
