@@ -2445,8 +2445,8 @@ NB. Select font & color
 glrgb tc
 gltextcolor''
 glfont tf , ": ts
-NB. Draw the strings, offset by the margin.  Kludge to suppress null string
-(gltext^:(*@#)@[   [: gltextxy@|. mg + {.)&>/ y
+NB. Draw the strings, offset by the margin.
+(gltext@[   [: gltextxy@|. mg + {.)&>/ y
 )
 
 NB. same parms as drawtext, except for the text boxsize
@@ -2526,7 +2526,7 @@ NB. Draw the shapes/selections.  Start at the selection level of this object
   NB. get the text,position for the shapes/selections, which are a rank-2 array
   shapeseltext =. DOshapes ,"0 actyx2&+&.> |: (,"3) 0 _1 |: > DOshapepos
   NB. draw frame/selections, which are all but the last column
-  ((sellevel + i. <: {:$DOshapes) (] {~ (<. _4 + <:@#)) cfmshape) drawtext"2 }:"2 shapeseltext
+  ((sellevel + i. <: {:$DOshapes) ((<. _4 + <:@#) { ]) cfmshape) drawtext"2^:(*@#@[) }:"2 shapeseltext
   NB. Draw the result-cell shape, the last column of the first row
   RESULTSHAPECFM drawtext (<0 _1) { shapeseltext
 end.
@@ -2966,9 +2966,9 @@ sd =. 0 ". sysdata
 if. 0 = 4!:0 <'pickpixels' do.
   pickscrollcurryx =: 1 0 { sd
   glclear''
-  glpixels (1 0 3 2 { , -~/\ sentencebrect) , picksentencepixels
   scrollblock =. -~/\ (0 (1}) {: sentencebrect) ,: 3 2 { sd
   glpixels (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) , (|. $ pickpixels) , , pickpixels
+  glpixels (1 0 3 2 { , -~/\ sentencebrect) , picksentencepixels
   glpaint''
 end.
 )
@@ -2979,7 +2979,7 @@ if. 0 = 4!:0 <'pickpixels' do.
   4!:55 'pickpixels';'picksentencepixels'  NB. indicate end-of-scroll
   NB. Use the last-drawn position as the new position.  If it hasn't changed from the original, redraw
   if. pickscrollcurryx -.@-: pickscrollstartyx do.
-    scrolltlc =: scrolltlc + pickscrollcurryx - pickscrollstartyx
+    scrolltlc =: <. scrolltlc + pickscrollcurryx - pickscrollstartyx
     dissect_dissectisi_paint 0  NB. no need to recalc placement
   end.
 end.
