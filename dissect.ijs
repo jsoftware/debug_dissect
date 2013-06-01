@@ -604,7 +604,7 @@ NB. Set the starting position, just below the sentence
 scrolltlc =: 0 ,~ 2 + {. sentencesize
 NB. obsolete dissect_dissectisi_paint 0
 NB. Calculate the initial placement.
-calcplacement''
+placeddrawing =: calcplacement''
 NB. Include expansion room
 yxneeded =. 300 100 + sentencesize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
 NB. Center the sentence in the screen area; remember size
@@ -637,12 +637,11 @@ NB. where each point is  obj#,face#,fraction
 dyxhw =. +/\"2 dyxhw  NB. Convert to start/end+1; adjust to leave top & bottom margin
 wireoff =. ((dl i. {."1) ,"0 1 >@:({:"1)) dwires  NB. convert each wire to obj,face,fraction form
 wirenets =. (<@((<0 0)&{ , {:"2)/.~ {."2) wireoff  NB. Convert nets (same source) to net form
-placeddrawing =: dl ; (ROUTINGGRIDSIZE;WIRESTANDOFF;ROUTINGTURNPENALTY) routegrid dyxhw;<wirenets
 NB.  size is ymax,xmax
 NB.  gridsize is spacing between lines
 NB.  standoff is min distance between a block and a line
 NB.  penalties is penalty for a turn (in units of movement)
-0 2$a:
+dl ; (ROUTINGGRIDSIZE;WIRESTANDOFF;ROUTINGTURNPENALTY) routegrid dyxhw;<wirenets
 NB.?lintsaveglobals
 )
 
@@ -1421,7 +1420,7 @@ case. EOK;EUNEXECD;EEXEC;EFRAMING;ENOOPS;ENOUN do.
   NB. obsolete case. _1 1 do.   NB. old error, new is in runout
   NB. obsolete   errorcode =: (*errorlevel) { 4 3  NB. errors old & new.  use (error) code, ignore new shape
     NB. If there was a fatal error in any v, we will display it; signal PREVERROR
-    for_l. vlocs do.
+    for_l. vlocs do.  NB.?lintonly l =. <'dissectobj'
       if. (EPREVERROR<errorcode__l) *. 0=errorlevel__l do. errorcode =: EPREVERROR end. 
     end.
   end.
@@ -1434,7 +1433,7 @@ case. EABORTED do.
   else.
   NB. but if u didn't execute, and we know the parent node tried and failed, it might be because
   NB. v failed (it could also be an error in monad/dyad exec).  If v failed, error will have been displayed in v; take it out of display in the parent
-    for_l. vlocs do.
+    for_l. vlocs do.  NB.?lintonly l =. <'dissectobj'
       if. (EPREVERROR<errorcode__l) *. 0=errorlevel__l do. errorcode =: EPREVERROR end. 
     end.
   end.
@@ -1487,40 +1486,6 @@ if. (errorcode__x,errorcode__y) *./@:e. EEXEC,EABORTED,ENOAGREE do.
   failingselector__okloc =: 0$a:
 end.
 0 0$0
-)
-
-NB. hop the boundary from one train to the next by installing this verb's selector (if any) as the highlight of
-NB. the verb(s) that feed into it.  We find those verbs by looking at the result locales in the input DOLs.
-NB. The selector to use for each operand is the CELL that contributed to the selection; therefore,
-NB. we use the frames, and take only as much of the last selector as that frame admits.  This gives the
-NB. address of the desired cell; to place that against the operand we have to discard trailing axes that
-NB. do not exist for the operand - this emulates cell replication.
-NB. y is the DOLs for the input operands
-calchighlight =: 3 : 0
-if. $selopinfo do.   NB. selection is invalid if this verb didn't collect
-  NB. Create a highlight for each operand - if there are selections here
-NB. obsolete   propselectors =. (#@> frames) <@;@(}:@] , (((<. #) {. ]) {:))"0 1 (>:sellevel) {. selections
-NB. obsolete   if. #accumselect =. ; (>:sellevel) {. selections do.
-  if. (*#frame) *. (sellevel < #selections) do.
-    accumselect =. ; (>:sellevel) {. selections
-    for_l. 0 {"1 ; 3 {"1 y do.   NB.?lintonly l =. <'dissectobj'
-      NB. For each operand, the rank of the cell comes from the rank of this verb; the accumulated selection
-      NB. gives the address of the cell.  We must preserve only as many trailing axes of the selector
-      NB. as exist in the operand, i. e. (operand rank)-(verb rank)
-      if. picknames__l e.~ <'DOdatapos' do.  NB. if data was formatted...
-        NB.?lintonly selopselhist =: 2 # <i.6
-        frank =. # 0 {:: valueformat__l  NB. rank of the formatted noun
-        NB. The operand we are selecting from must be at least as big as a cell.  nounrank-verbrank is the
-        NB. length of the noun-frame; we take at most that many leading selections
-NB. obsolete        assert. frank >: l_index { vranks [ 'inheritedselection'
-        if. 1: frank >: l_index { vranks do.
-          inheritedselection__l =: inheritedselection__l , l_index { selopselhist
-        end.
-      end.
-    end.
-  end.
-end.
-''
 )
 
 NB. null rankcalculus for cases where we can take no action
@@ -1982,6 +1947,7 @@ verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE)
 verbcfm =: verbcfm , < (DATACOLORS ;"1 DATATEXTCOLORS) ,"1 DATAFONT;(y+DATAFONTSIZE);DATAMARGIN
 
 RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;RESULTSHAPEFONT;(y+RESULTSHAPEFONTSIZE);RESULTSHAPEMARGIN
+NB.?lintsaveglobals
 ''
 )
 
@@ -2690,6 +2656,41 @@ NB. y is (list of starting y);(list of starting x),:(x start/end positions for y
 end.
 )
 
+NB. hop the boundary from one train to the next by installing this verb's selector (if any) as the highlight of
+NB. the verb(s) that feed into it.  We find those verbs by looking at the result locales in the input DOLs.
+NB. The selector to use for each operand is the CELL that contributed to the selection; therefore,
+NB. we use the frames, and take only as much of the last selector as that frame admits.  This gives the
+NB. address of the desired cell; to place that against the operand we have to discard trailing axes that
+NB. do not exist for the operand - this emulates cell replication.
+NB. y is the DOLs for the input operands
+calchighlight =: 3 : 0
+if. $selopinfo do.   NB. selection is invalid if this verb didn't collect
+  NB. Create a highlight for each operand - if there are selections here
+NB. obsolete   propselectors =. (#@> frames) <@;@(}:@] , (((<. #) {. ]) {:))"0 1 (>:sellevel) {. selections
+NB. obsolete   if. #accumselect =. ; (>:sellevel) {. selections do.
+  if. (*#frame) *. (sellevel < #selections) do.
+    accumselect =. ; (>:sellevel) {. selections
+    for_l. 0 {"1 ; 3 {"1 y do.   NB.?lintonly l =. <'dissectobj'
+      NB. For each operand, the rank of the cell comes from the rank of this verb; the accumulated selection
+      NB. gives the address of the cell.  We must preserve only as many trailing axes of the selector
+      NB. as exist in the operand, i. e. (operand rank)-(verb rank)
+      if. picknames__l e.~ <'DOdatapos' do.  NB. if data was formatted...
+        NB.?lintonly selopselhist =: 2 # <i.6
+        frank =. # 0 {:: valueformat__l  NB. rank of the formatted noun
+        NB. The operand we are selecting from must be at least as big as a cell.  nounrank-verbrank is the
+        NB. length of the noun-frame; we take at most that many leading selections
+NB. obsolete        assert. frank >: l_index { vranks [ 'inheritedselection'
+        if. 1: frank >: l_index { vranks do.
+          inheritedselection__l =: inheritedselection__l , l_index { selopselhist
+        end.
+      end.
+    end.
+  end.
+end.
+''
+)
+
+
 NB. Create a layout for the current locale.
 NB. DO must have been calculated already
 NB. We create a layout containing the one locale
@@ -2883,6 +2884,7 @@ arcs =. (2 2&$)"1 (1 = 4 {"1 wires) # wires
 NB. Get the max size drawn, and set the control to just big enough to hold it
 maxsize =. >./ (+/"2 pickrects) , ,/ lines , arcs
 maxsize;dos;yx;lines;arcs
+NB.?lintsaveglobals
 )
 
 NB. Draw the placed layout
