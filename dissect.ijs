@@ -2406,6 +2406,8 @@ x drawline"1 3 (, |."1)&>/ ,."0 1&.>/ y
 NB. x is interior color;(pen color,width).  If either is empty, null brush/pen is used
 NB. y is yx,:wh of rectangles to draw with that color
 drawrect =: 4 : 0
+if. 0 e. $y do. return. end.
+y =. (#~ [: -. 0 e."1 {:"2) y
 'ic pc' =. 2 {. boxopen x
 if. DEBGRAF do.
   'Rectangles: color=%j, pencolor=%j, xywh=%j' printf ic;pc; }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
@@ -2443,14 +2445,17 @@ NB. Select font & color
 glrgb tc
 gltextcolor''
 glfont tf , ": ts
-NB. Draw the strings, offset by the margin
-(gltext@[   [: gltextxy@|. mg + {.)&>/ y
+NB. Draw the strings, offset by the margin.  Kludge to suppress null string
+(gltext^:(*@#)@[   [: gltextxy@|. mg + {.)&>/ y
 )
 
 NB. same parms as drawtext, except for the text boxsize
 NB. Result is the hw of the box needed
 sizetext =: 4 : 0"1
 'vc tc tf ts mg' =. x
+if. DEBGRAF do.
+  'Sizetext: colors=%j/%j, font=%j%j, text=%j' printf vc;tc;tf;ts; (0 { y)
+end.
 glfont tf , ": ts
 NB. Add margins all around, return in hw format
 (+:mg) + |. glqextent >{.y
