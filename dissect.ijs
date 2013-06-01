@@ -1976,7 +1976,7 @@ nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEF
 nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
 nouncfm =: nouncfm , < (DATACOLORS ;"1 DATATEXTCOLORS) ,"1 DATAFONT;(y+DATAFONTSIZE);DATAMARGIN
 
-verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;VERBFONTSIZE;VERBMARGIN
+verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(y+VERBFONTSIZE);VERBMARGIN
 verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
 verbcfm =: verbcfm , < (DATACOLORS ;"1 DATATEXTCOLORS) ,"1 DATAFONT;(y+DATAFONTSIZE);DATAMARGIN
@@ -2415,6 +2415,9 @@ if. #pc do.
   glpen ({:pc) , 0
 else.
   NB. No color, no pen
+  if. IFQT do.
+    glrgb ic
+  end.
   glpen 0 5
 end.
 if. #ic do.
@@ -2422,7 +2425,7 @@ if. #ic do.
   glbrush ''
 else. glbrushnull''
 end.
-glrect 0 0 1 1 +"1 ,"2 |."1 y
+glrect 0 0 1 1 +"1^:(-.IFQT) ,"2 |."1 y
 0 0$0
 )
 
