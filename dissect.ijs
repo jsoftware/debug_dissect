@@ -650,7 +650,7 @@ dissect_dissectisi_paint =: 3 : 0
 NB. To avoid an error loop, terminate quietly if there is an error
 try.
   NB. if we need to refigure the placement because of a change like selection or a display parameter, do so.
-  if. 1 = {. y do. calcplacement'' end.
+  if. 1 = {. y do. placeddrawing =: calcplacement'' end.
   NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
   drawplacement }. scrolltlc sizeplacement placeddrawing
   glpaint''
@@ -1060,7 +1060,7 @@ end.
 qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%'
 if. 0 = #selandxy do.
   NB. No selector: we can't do much
-  'collected frame frames errorcode selresult selector selopinfo selopinfovalid' =: 0;($0);a:;ENOSEL;(0$a:);(0$a:);(0$a:);0
+  'collected frame frames errorcode selresult selector selopinfo selopinfovalid' =: 0;($0);a:;ENOSEL;(0$a:);(0$a:);(0$a:);0 0
 elseif.
 selector =: {. selandxy
 NB. The failingselector is set only during the first sniff, and used thereafter to see if we are
@@ -1087,10 +1087,10 @@ qprintf^:DEBTRAVDOWN '#logvalues '
     else.
       NB. empty selector with no operands.  This is a rank-calculus probe that ran through a verb that it couldn't predict.
       NB. Treat it as if there had been no selector.
-      'collected frame errorcode selresult selector selopinfo selopinfovalid' =: 0;($0);ENOSEL;(0$a:);(0$a:);(0$a:);0
+      'collected frame errorcode selresult selector selopinfo selopinfovalid' =: 0;($0);ENOSEL;(0$a:);(0$a:);(0$a:);(0:"0 selopinfo)
     end.
   end.
-  'frames selopinfo selopinfovalid' =: a:;(0$a:);0
+  'frames selopinfo selopinfovalid' =: a:;(0$a:);(0:"0 selopinfo)
     NB. We can pass the selector to u, which will collect; but not to v
 elseif. do.
 NB.?lintonly selresult =: 0$a:
@@ -1107,7 +1107,7 @@ NB.?lintonly selresult =: 0$a:
   'selopshapes selopselhist' =: <"1 |: > selopinfo
   if. 0 = #vranks do.
     NB. selector and selop already set, keep them
-    'collected selopinfovalid frame frames errorcode selresult' =: 1;1;($0);a:;EOK;<({.logvalues)
+    'collected selopinfovalid frame frames errorcode selresult' =: 1;(1:"0 selopinfo);($0);a:;EOK;<({.logvalues)
   elseif.
   NB. If snifferror is set, we will automatically produce a local selector to zero in on the error.
   NB. Get the frames of the verb
@@ -1371,7 +1371,12 @@ NB. keep the one from u
 inheritu =: 4 : 0
 vlocs =. x
 'dol loc' =. y
-SM^:DEBDOL 'inheritu: ' , (>coname'') , ' ' , defstring 0
+if. DEBDOL do.
+'inheritu: ' , (>coname'') , ' ' , defstring 0
+qprintf'>loc defstring__loc]0 '
+qprintf'errorcode errorcode__loc '
+end.
+SM^:DEBDOL 
 displocale =. coname''
 NB.?lintonly loc =. <'dissectobj'
 displaytype =: displaytype__loc
@@ -1437,10 +1442,10 @@ case. EABORTED do.
       if. (EPREVERROR<errorcode__l) *. 0=errorlevel__l do. errorcode =: EPREVERROR end. 
     end.
   end.
+case. ENOSEL do.
 case. do.
   assert. 0 [ 'invalid errorcode in inheritu'
   NB. The other codes are invalid for the following reasons:
-  NB. ENOSEL - the upper level had no selectors, so neither it nor any descendant should create a fillmask.
   NB. ENOAGREE - no selector should have been passed to u, which should then produce no fillmask
   NB. EPREVERROR - error code is assigned only here
 end.
