@@ -12,7 +12,7 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
-NB. ds '(0 >. ]`($:@<:)@.*) 3' 
+NB. ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'  test picking in grids
 NB. Put $!.f in JforC
 NB. handle negative rank
 NB. better pn on grid
@@ -1710,6 +1710,8 @@ NB. y is a net (table of y,x,face)
 NB. Globals in use: net number; trial flag; gridblocks
 NB. Result is modified routing grid;table of lines
 dirtodistx =: (_2 ]\ 1 0 _1 0 0 1 0 _1)&i.
+NB. the possible turn directions from each direction index
+turntable =: 2 2 2 $ 1 0 _1 0    0 1 0 _1
 routenet =: 3 : 0
 NB. Initialize the grid.  Set distances to a high value, unless not-trial and occupied, in which case _1.
 NB. Set distances to _2 if too far outside the routing rectangle.
@@ -1741,7 +1743,7 @@ currdist =. 1
 ndestsfound =. 1  NB. the starting point has automatically been routed
 while. ndestsfound < #routend do.
   NB. For each active point/direction, create the turn points/directions
-  turns =. < ,/ (+ ,:"1  (1 _1) */ |.@])/"2 actpoints
+  turns =. < ,/ (+/"2 actpoints) ,:"1 ((<a:;1;0) { actpoints) { turntable
   
   NB. Activate delayed points that have come to life
   if. #actpoints =. ~. actpoints , 0 {:: waitpoints do.
@@ -1750,7 +1752,8 @@ while. ndestsfound < #routend do.
     actpoints =. +/\."2 actpoints
 
     NB. Fetch distance to target.  Delete next-points that are have been filled in this direction
-    targx =. (, dirtodistx)/"2 actpoints
+    targx =. ({."2 ,. dirtodistx@:({:"2)) actpoints
+assert. 1 4 e.~ 3!:0 targx
     valmsk =. currdist <: targval =. targx (<"1@[ { ]) routdist
 
     if. 2000000 e. targval do.
@@ -2369,23 +2372,21 @@ x drawline"1 3 (, |."1)&>/ ,."0 1&.>/ y
 )
 
 
-NB. x is interior color;(pen color,width).  If either is empty, null brush/pen is used
+NB. x is interior color;(pen color,width).  If pen is omitted, null is used
+NB. if color is empty, use null brush
 NB. y is yx,:wh of rectangles to draw with that color
 drawrect =: 4 : 0
 if. 0 e. $y do. return. end.
-y =. (#~ [: -. 0 e."1 {:"2) y
-'ic pc' =. 2 {. boxopen x
+NB. obsolete y =. (#~ [: -. 0 e."1 {:"2) y
+ic =.> {. x
 if. DEBGRAF do.
   'Rectangles: color=%j, pencolor=%j, xywh=%j' printf ic;pc; }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
 end.
-if. #pc do.
-  glrgb }: pc
-  glpen ({:pc) , 0
+if. 1 < #x do.
+  (([: glpen 0 ,~ {:) [ glrgb@}:) 1 {:: x
 else.
   NB. No color, no pen
-  if. IFQT do.
-    glrgb ic
-  end.
+  (([: glpen 0 5"_) [ glrgb) ic
   glpen 0 5
 end.
 if. #ic do.
@@ -2403,7 +2404,7 @@ NB. Draw the rectangle, then draw the text
 drawtext =: 4 : 0"1
 'vc tc tf ts mg' =. x
 NB. Draw the rectangles
-vc drawrect > 1 {"1 y
+(<vc) drawrect > 1 {"1 y
 if. DEBGRAF do.
   'Text: colors=%j/%j, font=%j%j, xy=(%j,%j), text=%j' printf vc;tc;tf;ts; (<"0 |. mg + {. 1 {:: y) , (0 { y)
 end.
@@ -2591,7 +2592,7 @@ else.
   NB. is to give the right color to cells that are not drawn at all (empty contents) or whose contents do not fill
   NB. the cell, because of other larger values.
   if. boxmesh < 2 do.
-    (sel { > 0 {"1 cfmdata) drawrect"1 2 rects
+    ((<sel;0) { cfmdata) drawrect"0 2 rects
   end.
   NB. If there are subDOLs, process each of them.  The operand was boxed.
   if. 3 < #vf do.
@@ -3141,14 +3142,16 @@ axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@# shapeused =. $ celldata  NB. 1;0 2   o
 NB. axisshapes is the lengths of each axis assigned to y/x.  sizes is the total size of y/x
 sizes =. */@> axisshapes =. axes ({&.:>"0 _ $) celldata
 celldata =. sizes ($,) (;axes) |: celldata
+NB. grid doesn't support character display (yet), so as a kludge, box the characters
+celldata =. <"0^:(2 = 3!:0) celldata
 NB. The headers are just the odometers for the axes, in character form
 'hdrrow hdrcol' =. ":&.>@(#: i.@(*/))&.> axisshapes
-setnames__grid ('HDRROWALIGN';1),('HDRCOLALIGN';1),('HDRROWMERGE';1),('HDRCOLMERGE';1),('HDRROW';<hdrrow),:('HDRCOL';<|:hdrcol)
+setnames__grid^:(*@#) hdrrow (,   ('HDRROWALIGN';1),('HDRROWMERGE';1),:'HDRROW' ; <)~^:([:-. 0 e. $@[) (|:hdrcol) (,  ('HDRCOLALIGN';1),('HDRCOLMERGE';1),:'HDRCOL' ; <)~^:([:-.0 e. $@[) 0 2$a:
 NB. Create the color selection, just like in the non-grid case
 sel =. (FILLMASKSELLEVEL -~ #DATACOLORS) <. (* (<:FILLMASKSELLEVEL) bwand fillmask)} (_1 bwlsl fillmask) ,&,: (_2 * (<:FILLMASKSELLEVEL) bwand fillmask)
 sel =. sel + (({.   0 1 $~ 1&bwor) ({.~ -@(2<.#)) $ sel)"2 sel
 sel =. sizes ($,) (;axes) |: shapeused {.!.({.,sel) ((-$shapeused) {.!.1 $sel) ($,) sel
-show__grid ('CELLDATA';celldata),:('CELLCOLOR';sel)
+show__grid ('CELLDATA';<celldata),:('CELLCOLOR';sel)
 NB.?lintsaveglobals
 NB. obsolete end.
 NB.?lintsaveglobals
@@ -4095,7 +4098,7 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop uops
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-((vvv +. y > 0) # uop),cop,vop
+((y > 1) # uop),cop,((y > 1) # vop)
 )
 
 NB. Traversal up and down the tree.
@@ -4168,7 +4171,7 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop 0,va
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-uop,vop
+uop,(y > 1) # vop
 )
 
 NB. Traversal up and down the tree.
