@@ -12,20 +12,16 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
+NB. ds '(0 >. ]`($:@<:)@.*) 3' 
 NB. Put $!.f in JforC
-NB. J8
-NB. ds '(i.@# ((}.>) ,. ({.>))"0 ]) b' [ b =. ;: "The quick brown fox'  routing error
-NB. ds '0 1 2 (1:"0 - 0:"0) 0 1'  too many errors - does not preverror for u or c
-NB. Fix small display: avoid double-display aftre resize of control, by calculating size before drawing (do wires first)
-NB.  display command line properly & get the rest of the display out of the way
 NB. handle negative rank
+NB. better pn on grid
 NB. If grid exists, raise it on click on result
 NB. handle clicking on verb-name part to select tree
+NB. allow display of stealthoperands.  stealthoperand needs to be applied after setvalence - so calculate both sets of estheight, select at runtime
 NB. create pickrects for displayed sentence, and handle clicks there
 NB. plan: save preferences; debug globals; display sentence; J8
-NB. z =. 2 2 $ 'abc';'b';'cd';0
-NB. ds '(1&+@>) z'
-NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'  selector for final box is lost, because + result is displayed
+NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'  error is not shown
 NB.  make color-coordination better.  Rank is in wrong place - needs to go to v
 NB. Add space between the label/shape/status blocks - add to bbox layout in alignrects
 NB. green lines between ranks-3s don't show up if there's fill
@@ -33,7 +29,6 @@ NB. test errorlevel, including for fill cells.
 NB. A way to display error encountered during fill cell?
 
 NB. should we allow selection if final result is early error? (what shape then?)
-NB. allow display of stealthoperands.  stealthoperand needs to be applied after setvalence - so calculate both sets of estheight, select at runtime
 NB. routing: penalize overlap, including overlap of straight lines.  Also, think about forcing all nets of, say, 3 dests to use router.  Have height limit on direct routes.  Use router on all nets that have a routed portion.
 
 NB. worry about whether gerund needs to traverse.  Shape display of gerund is wrong, because it's calculated incorrectly.  Should use noun methods for result of `
@@ -445,7 +440,7 @@ NB. The locale at the top of the stack is the overall result.  Save that, and re
 NB. This call will fill in all the verb-to-noun locale references
 resultroot =: (<1 1) {:: stack
 NB.?lintonly resultroot =: <'dissectmonad'
-ES__   =: exestring__resultroot''
+exestring__resultroot''
 NB.?lintsaveglobals
 )
 
@@ -1372,7 +1367,7 @@ inheritu =: 4 : 0
 vlocs =. x
 'dol loc' =. y
 if. DEBDOL do.
-'inheritu: ' , (>coname'') , ' ' , defstring 0
+smoutput 'inheritu: ' , (>coname'') , ' ' , defstring 0
 qprintf'>loc defstring__loc]0 '
 qprintf'errorcode errorcode__loc '
 end.
@@ -1446,8 +1441,8 @@ case. ENOSEL do.
 case. do.
   assert. 0 [ 'invalid errorcode in inheritu'
   NB. The other codes are invalid for the following reasons:
-  NB. ENOAGREE - no selector should have been passed to u, which should then produce no fillmask
-  NB. EPREVERROR - error code is assigned only here
+  NB. ENOAGREE - agreement error aborts traversal
+  NB. EPREVERROR - error code is assigned only here and in inheritv
 end.
 
 dol ,&< displocale
@@ -2630,7 +2625,7 @@ else.
   NB. We get the border of the rectangle by adding 0/1 to the bottom 2 indexes, then extending with 0
   NB. to full shape, then converting to cell number, then looking that up in the row/column ending table
   if. #hlights do.
-'boxyx__ ysizes__ xsizes__ axisshapes__ axes__ hlights__'   =: boxyx;ysizes;xsizes;axisshapes;axes;<hlights
+    boxyx;ysizes;xsizes;axisshapes;axes;<hlights
     NB. To handle <2 axes, we will add 2 leading 0 axes to the highlight selector.
     NB. We compensate by adding 2 to all the axis numbers, and inserting a leading axis.
     NB. If there are no axes to add to, there are 2 cases: 1 axis, which is ($0);,0: we turn that
@@ -3240,7 +3235,7 @@ coinsert 'dissectobj'
 NB. Monad.  y is the locales of the verb and the noun
 create =: 3 : 0
 NB. not clonable
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. a:
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands
@@ -3251,8 +3246,8 @@ NB. we save the operands needed by the first verb.  The rule is, we will pass to
 NB. it says it can use.  For comp. ease we may compute an operand but then immediately discard it.
 setvalence__uop ,resultissdt__yop
 resultissdt =: resultissdt__uop
-NB. Don't bother fixing estheights, since this is terminal
-noun;(coname'');tokensource
+NB. Don't bother fixing estheights, since this is terminal.  No tokens either.
+noun;(coname'');''
 NB.?lintsaveglobals
 )
 
@@ -3303,7 +3298,7 @@ coinsert 'dissectobj'
 NB. Dyad.
 create =: 3 : 0
 NB. not clonable
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. a:
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands
@@ -3312,7 +3307,7 @@ NB.?lintonly uop =: <'dissectverb' [ yop =: xop =: coname''
 setvalence__uop resultissdt__xop,resultissdt__yop
 resultissdt =: resultissdt__uop
 NB. Don't bother fixing estheights, since this is terminal
-noun;(coname'');tokensource
+noun;(coname'');''
 NB.?lintsaveglobals
 )
 
@@ -3365,7 +3360,7 @@ coinsert 'dissectobj'
 NB. Monad.  y is string form of the noun;name if it is a name;tokens it came from
 create =: 3 : 0
 NB. Not clonable
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. 2 { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand, and the name if any
@@ -3418,7 +3413,7 @@ cocurrent 'dissectverb'
 coinsert 'dissectobj'
 NB. y is (string form of the verb);rank;tokens it came from
 create =: 3 : 0
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. 2 { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand
@@ -3515,7 +3510,7 @@ NB. Unknown modifiers create verbs (we hope).  We will create something that loo
 NB. it will be the display form of the modified input operands.  We will then pretend to be a verb.
 NB. y is the exeblock for the modifier, either 2 or 3 boxes
 create =: 3 : 0
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. 2 { y
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
 NB.?lintsaveglobals
@@ -3782,7 +3777,7 @@ calchighlight x
 if. errorcode = ENOAGREE do. agreementerror x return. end.
 dol =. verboperandx |. x , joinlayoutsl NOLAYOUTS traverse__nounop TRAVNOUN
 NB. obsolete 'dol oloc' =. dol traverse__verbop travdownuops nounop,<selresultshape__nounop
-verbop inheritu dol traverse__verbop bnsellevel , NORANKHIST , selector , (*./ selopinfovalid) # verboperandx |. selopinfo,createuop__nounop ''
+nounop inheritu dol traverse__verbop bnsellevel , NORANKHIST , selector , (*./ selopinfovalid) # verboperandx |. selopinfo,createuop__nounop ''
 )
 
 NB. **** &. &.: ****
@@ -3888,7 +3883,7 @@ NB. **** um`vn ****
 modlocale '`'
 
 create =: 3 : 0
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
@@ -3914,7 +3909,7 @@ auditstg '(' , (conjlogstring '') , (defstring__uop 2) , ' ' , cop , (defstring_
 )
 
 proplocales =: 3 : 0
-(y=3) # < tokensource
+(y=3) # uop,(<tokensource),vop
 )
 
 NB. Set globals, then initialize display for the noun.  There must be no DOLs, and we
@@ -4008,19 +4003,26 @@ NB. Unknown modifiers create verbs (we hope).  We will create something that loo
 NB. it will be the display form of the modified input operands.  We will then pretend to be a verb.
 NB. y is the exeblock for the modifier, either 2 or 3 boxes
 create =: 3 : 0
-create_dissectobj_ f. < ; 2 {"1 y
 NB. Get the locales
+ucvlocs =: 1 {"1 y
 if. 2 = #y do.
-'uop cop' =. 1 {"1 y
+'uop cop' =. ucvlocs
 NB.?lintonly uop =. <'dissectverb' [ cop =. ''
 stg =. (defstring__uop 2) jd cop
 else.
-'uop cop vop' =. 1 {"1 y
+'uop cop vop' =. ucvlocs
 NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
 stg =. (defstring__uop 2) jd cop jd (defstring__vop 3)
 end.
-changeobjtypeto 'dissectverb'
-create stg;0 0 0 0;tokensource
+NB. obsolete changeobjtypeto 'dissectverb'
+NB. We will treat this as a generic verb, except for the overrides we have in this locale
+((18!:2~    {. ,  'dissectverb' ; }.) 18!:2) coname''
+NB. Pass the token number of the modified in as the verb token number.  That will go into tokensource
+create_dissectverb_ f. stg;0 0 0 0;(<1 2){y
+)
+
+proplocales =: 3 : 0
+(y = 3) # (<tokensource) 1} >&.> ucvlocs
 )
 
 
@@ -4029,7 +4031,7 @@ cocurrent 'dissectfork'
 coinsert 'dissectobj'
 
 create =: 3 : 0
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. a:
 NB. Register this object so we can clean up at end
 NB. Save the operands - locales of the verbs/nouns.  'cop' is the middle verb, for similarity with the others
 'uop cop vop' =: 1 {"1 y
@@ -4051,7 +4053,7 @@ NB. obsolete if. stealthoperand__cop do.
 NB. obsolete   (2 {. y{~0 2 1 0{~stealthoperand__cop),tokensource
 NB. obsolete else.
 NB. obsolete   'xrefdetail yrefdetail' =: 0  NB. This locale creates references
-verb;(coname'');tokensource
+verb;(coname'');''
 NB. obsolete end.
 NB.?lintsaveglobals
 )
@@ -4124,7 +4126,7 @@ cocurrent 'dissecthook'
 coinsert 'dissectobj'
 
 create =: 3 : 0
-create_dissectobj_ f. < ; 2 {"1 y
+create_dissectobj_ f. a:
 NB. Register this object so we can clean up at end
 NB. Save the operands - locales of the verbs/nouns.  'cop' is the middle verb, for similarity with the others
 'uop vop' =: 1 {"1 y
@@ -4132,7 +4134,7 @@ NB.?lintonly uop =: vop =: coname''
 NB. Wait till here to add to object list so it doesn't show up twice
 newobj__COCREATOR coname''
 NB. obsolete refdetail =: 0  NB. This locale creates references
-verb;(coname'');tokensource
+verb;(coname'');''
 NB.?lintsaveglobals
 )
 
@@ -4260,6 +4262,10 @@ z =. 2
 ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
 ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q'''
 ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
+b =. ;:'The quick brown fox'
+ds '(i.@# ((}.>) ,. ({.>))"0 ]) b'
+ds '(i.@# ((}.>) ,&< ({.>))"0 ]) b'
+ds '(i.@# ((}.>) , ({.>))"0 ]) b'
 ds '0 1 2 3 {~ 2'
 ds '(i. 2 3) {~ 2'
 ds '(i. 3 2) {~ 2'
