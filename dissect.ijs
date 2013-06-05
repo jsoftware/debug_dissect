@@ -13,6 +13,7 @@ QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
 NB. ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'  test picking in grids
+NB. put a fence around route to save time?
 NB. Put $!.f in JforC
 NB. handle negative rank
 NB. better pn on grid
@@ -3108,7 +3109,13 @@ NB. ***************** grid control for objects
 
 GRID=: 0 : 0
 pc grid;pn "Grid";
-xywh 0 0 400 300;cc grid isigraph ws_border rightmove bottommove;
+xywh 0 0 400 300;cc grid isigraph;
+pas 0 0;pcenter;
+rem form end;
+)
+GRID=: 0 : 0 [^:IFQT GRID
+pc grid;pn "Grid";
+wh 800 600;cc grid isigraph;
 pas 0 0;pcenter;
 rem form end;
 )
@@ -3120,8 +3127,9 @@ if. 0 = #grid do.
   grid =: '' conew 'jzgrid'
   wd GRID
   GRIDHWNDP =: wd 'qhwndp'
-  GRIDHWNDC=: wd 'qhwndc grid'
+  GRIDHWNDC=: 0 ".^:IFQT wd 'qhwndc grid'
   GRIDID=: 'grid'
+  wd^:(IFQT) 'pshow;pshow sw_hide'
   setnames__grid 'GRIDHWNDC GRIDID'
   wd 'pn *',defstring 0
   wd 'pshow'
@@ -3160,7 +3168,11 @@ NB.?lintsaveglobals
 grid_close =: 3 : 0
 NB.?lintonly grid =: <'jzgrid'
 wd 'psel ',GRIDHWNDP,';pclose'
-if. #grid do. destroy__grid'' end.
+if. #grid do.
+  destroy__grid''
+  grid =: 0$a:
+  4!:55 <'celldata'
+end.
 NB.?lintsaveglobals
 )
 grid_cancel =: grid_close
@@ -3175,10 +3187,6 @@ try.
   case. 'click' do.
     griddatashape processdataclick Row__grid,Col__grid
     0 return.
-  case. 'destroy' do.
-    grid =: 0$a:
-    4!:55 <'celldata'
-    1 return.
   case. do.
     0 return.
   end.
@@ -3212,8 +3220,9 @@ x , y
 )
 
 NB. x is height(s) of v, y is height(s) of u
-NB. Result is combined height: the sum, but if either operand is _1, result must be _1; or if 0, must be 0
-combineheights =: (0:`+`_1:@.(*@<.))"0
+NB. Result is combined height: the sum, but if either operand is _1, result must be _1; or if 0, must be 0.
+NB. Monads may have rank 0 or 1, so we atomize all singletons
+combineheights =: (0:`+`_1:@.(*@<.))"0&({.^:(1=#))
 
 NB. Here are the object locales for creating the parse table
 NB. Each object is responsible for responding to the entry points:
@@ -4272,4 +4281,6 @@ ds '(i.@# ((}.>) , ({.>))"0 ]) b'
 ds '0 1 2 3 {~ 2'
 ds '(i. 2 3) {~ 2'
 ds '(i. 3 2) {~ 2'
+ds '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
+ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'
 )
