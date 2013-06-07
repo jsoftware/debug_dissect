@@ -15,11 +15,9 @@ NB. TODO:
 NB. ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'  test picking in grids
 NB. put a fence around route to save time?
 NB. Put $!.f in JforC
-NB. handle negative rank
 NB. better pn on grid
 NB. If grid exists, raise it on click on result
 NB. handle clicking on verb-name part to select tree
-NB. allow display of stealthoperands.  stealthoperand needs to be applied after setvalence - so calculate both sets of estheight, select at runtime
 NB. create pickrects for displayed sentence, and handle clicks there
 NB. plan: save preferences; debug globals; display sentence; J8
 NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'  error is not shown
@@ -43,7 +41,7 @@ NB. looging information about its input and outputs.  Then the modified sentence
 NB. dissect verb), and then the results are displayed in 2d form using a grid control.  Flow of the sentence generally runs from top
 NB. to bottom in the grid.  Clicks on the grid set variables to control what information is displayed.
 
-ds_z_ =: [: ([: display_dissect_ 0:@". :: 1:)`>@.(32=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])
+ds_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`]@.(2=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])
 
 NB. The locale dissectnopath is used to find local names.  Its path is empty.  The locale contains only one name, z458095869
 cocurrent 'dissectnopath'
@@ -143,7 +141,7 @@ s,LF, ; <@ARtostring y
 )
 
 parse =: 3 : 0  NB. called in dissect locale
-dissectinstance =: '' conew 'dissect'
+dissectinstance =: '' conew 'dissect'   NB. global because must persist over return to user environment
 errormessage =: 'unknown error during parsing'
 try.
   parsemain__dissectinstance y
@@ -151,10 +149,10 @@ catch.
   smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
   smoutput 13!:12''
 
-  NB.  Error encountered during parse.  We indicate this by boxing the sentence.  We
+  NB.  Error encountered during parse.  We indicate this with an unboxed sentence.  We
   NB. destroy the locale, since we can't continue
   destroy__dissectinstance^:CLEANUP''
-  <errormessage
+  errormessage
 end.
 NB.?lintsaveglobals
 )
@@ -166,8 +164,10 @@ errormessage_dissect_ =: y
 13!:8 (1)
 )
 
+dissectionlist =: 0$a:  NB. List of open dissect instances.  The last one is the most recent
 NB. Initialization
 create =: 3 : 0
+dissectionlist_dissect_ =: dissectionlist_dissect_ , coname''
 objtable =: 0$a:   NB. list of parse objects
 ticket =: 0   NB. sequential log number
 winhwnd =: ''  NB. Init to no window
@@ -441,7 +441,7 @@ NB. The locale at the top of the stack is the overall result.  Save that, and re
 NB. This call will fill in all the verb-to-noun locale references
 resultroot =: (<1 1) {:: stack
 NB.?lintonly resultroot =: <'dissectmonad'
-exestring__resultroot''
+sentence;EXE__   =: exestring__resultroot''
 NB.?lintsaveglobals
 )
 
@@ -548,9 +548,18 @@ MAXNOUNPCTCHOICES =: 30 50 70 90
 display =: 3 : 0   NB. called in dissect locale
 displaymain__dissectinstance y
 )
+NB. y is the results from running the user's original sentence and our instrumented version.
 displaymain =: 3 : 0  NB. called in object locale
+NB. Make sure the results are the same
+NB. If the sentence ran correctly for the user, make sure we get the same result
+if. -. -:/ y do.
+  smoutput 'dissect error: internal result does not match the result from the J session!  Aborting.'
+  qprintf'y '
+  return.
+end.
+
 NB. save the crash indicator
-if. crashed =: y do.
+if. crashed =: 0 = #0 {:: y do.
   NB. Save the error message for the crash
   errormessagefrominterp =: _6 }.^:(' error' -: {.) (<:13!:11''){::9!:8''
 else.
@@ -582,6 +591,8 @@ initparentnodes__resultroot 0$a:
 NB. Init the SDT-detail indicator in every object
 NB.?lintonly resultissdt_dissectmonad_ =: 0
 initnounshowdetail__resultroot resultissdt__resultroot
+NB. Init the estheights in every object
+calcallestheights__resultroot $0
 NB. If we crashed, do an initial traversal to set selection flags to find the error
 maxnoundisplaysize =: 0 0  NB. Init to small display for sniff, for speed
 if. crashed do.
@@ -599,7 +610,7 @@ sentencesize =. 0 {:: usersentence sizesentence gettokenlevels__resultroot ''
 NB. Set the starting position, just below the sentence
 scrolltlc =: 0 ,~ 2 + {. sentencesize
 NB. obsolete dissect_dissectisi_paint 0
-NB. Calculate the initial placement.
+NB. Do the initial traversal, calculate the initial placement.
 placeddrawing =: calcplacement''
 NB. Include expansion room
 yxneeded =. 300 100 + sentencesize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
@@ -669,6 +680,7 @@ if. #winhwnd do.
   wd 'pclose'
   winhwnd =: ''  NB. not required
 end.
+dissectionlist_dissect_ =: dissectionlist_dissect_ -. coname''
 NB. Restore original session state.  We hope this hasn't been changed while we were running!
 9!:7 (0) {:: Jenvirons
 9!:39 (1) {:: Jenvirons
@@ -685,6 +697,8 @@ dissect_dissectisi_paint 1
 NB. Toggle the state of stealth display
 dissect_fmshowstealth_button =: 3 : 0
 'fmshowstealth' wdsetcaption (displaystealth =: -. displaystealth) {:: 'Show ][';'Hide ]['
+NB. The operand is the list of types that should NOT be displayed
+calcallestheights__resultroot displaystealth # 1 2
 dissect_dissectisi_paint 1
 )
 
@@ -799,7 +813,7 @@ assert. 'travdown monadic'
 :
 NB.?lintonly proplocales =: ]
 if. #nloc =. proplocales x do.
-  nloc ([:  v   (v (1&{::))`(u (2 : (':';'(u traversedown v)&>/ y [ (cocurrent x)')) v)@.(2 = 3!:0@>@[)"0 _ ) x ,&< u y
+  nloc ([:  v   (v (1&{::))`(u (2 : (':';'l ([ cocurrent)~ (u traversedown v)&>/ y [ (cocurrent x) [ l =. coname''''')) v)@.(2 = 3!:0@>@[)"0 _ ) x ,&< u y
 else.
   '' v u y
 end.
@@ -825,6 +839,11 @@ setdisplayerror =: 2&((3 : 'errorwasdisplayedhere =: {. ".''*#DOstatusstring''')
 NB. init SDT-display flag in all objects.  y is the value to set
 NB. Called in locale of the base of the tree
 initnounshowdetail =: 2&((3 : 'y [ nounshowdetail =: y +. -. resultissdt') traversedown 0:)
+
+NB. calculate estheights for display.  We call estheights during the upwards traversal
+NB. Called in locale of the base of the tree
+calcallestheights =: 2&((3 : 'y [ dispstealthoperand =: {. stealthoperand -. y') traversedown (calcestheights@]))
+
 
 NB. Return selection level for each token in the input string
 NB. Result is table of (token number(s));selection level
@@ -976,6 +995,20 @@ conjlogstring =: 3 : 0
 
 NB. ***************** traverse down ****************
 
+NB. utilities for traversal and selection
+NB. These are overridden as needed by individual modifiers.  The versions here work for simple verbs
+
+NB. get the rank to use for this verb.
+NB. y is selopinfo, 0 to 2 boxes containing (remaining shape);(frame so far)
+NB. Result is the rank to use for the verb's valence, or $0 if we don't know
+getverbrank =: 3 : 0
+if. ifdefined 'verbex' do.
+  (valence { 0 1 _2) {. verbex b. 0
+else.
+  $0
+end.
+)
+
 NB. Selection calculation for traversedown
 NB. If there are input selectors, we see if this node qualifies the input still
 NB. further.  We calculate the level to be used for the next selection (which is incremented from
@@ -1022,7 +1055,7 @@ NB.  given in the input arguments.  If there is an early error (agreement), or i
 NB.  the selector is an empty list, which will suppress further analysis.  If the selector contains multiple ranges, we assume that
 NB.  we are just waiting for a final collection
 NB. selopinfo - The selection that has been applied to this operand so far, and the shape of the selected operand.  In other words,
-NB.  the (frame so far);(remaining shape).  These come in from the y input, representing the state before this level, and go out
+NB.  the (remaining shape);(frame so far).  These come in from the y input, representing the state before this level, and go out
 NB.  with the state after going through the local selection.  The operand shape is inferred from the rank of
 NB.   the verb, so is valid even when there is no selector.  List of boxes, one per operand
 NB. selopinfovalid - set if there is no frame, or if there is a local selection.  List, one per operand.  This indicates that a single operand cell
@@ -1047,11 +1080,8 @@ selopinfo =: }. selandxy =. 2 }. y
 errorlevel =: errorlevel__COCREATOR
 inheritedselection =: 0$a:
 4!:55 <'fillmask'   NB. We use existence of fillmask as a flag
-if. ifdefined 'verbex' do.
-  vranks =: (valence { 0 1 _2) {. verbex b. 0
+if. #vranks =: getverbrank selopinfo do.
   rankhistory =: rankhistory , <"0 sellevel , vranks
-else.
-  vranks =: $0
 end.
 qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%'
 if. 0 = #selandxy do.
@@ -1323,6 +1353,18 @@ else.
 end.
 )
 
+NB. Return the value of selresult
+NB. y is unused
+NB. x, if given, is result of checkframing
+NB. result is framingok;framed selresult
+NB. if framing failed, the box around each component of selresult is retained; otherwise the
+NB. boxing is removed and the results collected
+frameselresult =: 3 : 0
+(checkframing selresult) frameselresult y
+:
+'cs fill' =. x  NB. result cell size, fill atom (empty if unframable)
+(*#fill) ;< <"0@(cs&{.)@>`>@.(#fill) frame $!.(<cs $ {.!.' ' fill) selresult
+)
 
 NB. obsolete 
 NB. obsolete NB. y is errorcode(s), result is true if it is OK for child nodes to select
@@ -2000,9 +2042,10 @@ NB. the uncollectable value we will suppress the outer boxing in the display.
 NB. If collection succeeds, we fill out an incomplete execution with fills of the appropriate type;
 NB. if collection fails, we fill with spaces (OK since the values are boxed immediately, and we don't want
 NB. the fills to have text)
-'DOcellsize DOfillatom' =: checkframing selresult
-dispvalue =. <"0@(DOcellsize&{.)@>`>@.(#DOfillatom) frame $!.(<DOcellsize $ {.!.' ' DOfillatom) selresult
-valueformat =: dispvalue createDOL formatinfoused  NB. top result is boxed
+NB. obsolete 'DOcellsize DOfillatom' =: checkframing selresult
+NB. obsolete dispvalue =. <"0@(DOcellsize&{.)@>`>@.(#DOfillatom) frame $!.(<DOcellsize $ {.!.' ' DOfillatom) selresult
+NB. obsolete valueformat =: dispvalue createDOL formatinfoused  NB. top result is boxed
+valueformat =: (1 {:: (DOframinginfo =: checkframing selresult) frameselresult '') createDOL formatinfoused  NB. top result is boxed
 maxyx <. extractDOLsize valueformat
 NB.?lintsaveglobals
 :
@@ -2084,7 +2127,7 @@ createDOvn =: 4 : 0
 'cfmlabel cfmshape cfmstatus cfmdata' =. x
 SM^:DEBDOL 'createDOvn: ' , > coname''
 NB. If stealth verb, there is no display
-if. stealthoperand e. 1 2 do. stealthoperand return. end.
+if. dispstealthoperand e. 1 2 do. dispstealthoperand return. end.
 
 wd 'psel ' , ": winhwnd__COCREATOR
 glsel 'dissectisi'
@@ -2459,7 +2502,7 @@ NB.  for shape and data, we have a table which we will index by selector.
 drawDOvn =: 4 : 0
 'cfmlabel cfmshape cfmstatus cfmdata' =. x
 SM^:DEBDOL 'drawDOvn: ' , > coname''
-assert. 0 = stealthoperand
+assert. 0 = dispstealthoperand
 NB. Save the position of the object, and as a 2x2
 actyx2 =. 0 ,:~ actyx =. y
 NB. Set clipping box to the interior of this object
@@ -2520,7 +2563,8 @@ if. datapresent do.
   NB. We must always extend the data to match the frame, so that we show the full operand in case there were
   NB. unexecuted cells.  If the fill atom is nonnull, it means that the result is collectable, and we collect it.  If
   NB. not, we have to show the boxed atoms.
-  dispvalue =. <"0@(DOcellsize&{.)@>`>@.(#DOfillatom) frame $!.(<DOcellsize $ {.!.' ' DOfillatom) selresult
+NB. obsolete  dispvalue =. <"0@(DOcellsize&{.)@>`>@.(#DOfillatom) frame $!.(<DOcellsize $ {.!.' ' DOfillatom) selresult
+  'frameok dispvalue' =. DOframinginfo frameselresult ''
   NB. After the data is drawn, draw a highlighting rectangle for the item selection(s), if any.
   NB. We take all the selectors there are, up the length of the frame of this level; but if there aren't enough, we don't highlight.  Discard
   NB. selectors for higher levels.  The onl way we can get more selectors than frame is during sniff, where the lower
@@ -2528,7 +2572,7 @@ if. datapresent do.
   highlightrects =. (<^:(*@#) (>:#;accumframe) ((I.~ +/\@:(#@>)) {. ]) sellevel ((< #) # ;@}.) selections) , inheritedselection
 
 NB. obsolete   DOtruncated =: (valueformat;((<"0@>@((;frame)&($!.(<' '))))`>@.DOLcollected selresult);sel;DOLcollected;<cfmdata) drawDOL actyx + DOdatapos
-  DOtruncated =: (valueformat;dispvalue;sel;(#DOfillatom);highlightrects;<cfmdata) drawDOL actyx + {. DOdatapos
+  DOtruncated =: (valueformat;dispvalue;sel;frameok;highlightrects;<cfmdata) drawDOL actyx + {. DOdatapos
 
 else.
   DOtruncated =: 2   NB. Indicate that there is no data
@@ -2723,7 +2767,7 @@ if. 0 ~: createDO'' do.
   if. DEBLAYOUT do.
     smoutput'Stealth object, not created'
   end.
-  (, stealthoperand { 0 0 _1) { x
+  (, dispstealthoperand { 0 0 _1) { x
 else.
   NB. If there are no earlier layouts, this had better be a noun - just create its layout
   if. 0 = #x do.
@@ -3145,7 +3189,7 @@ NB. fillmask etc may have changed from other selections
 NB. obsolete griddrawnselections =: selections
 
 NB. Display the grid data
-griddatashape =: $celldata =. <"0@(DOcellsize&{.)@>`>@.(#DOfillatom) frame $!.(<DOcellsize $ {.!.' ' DOfillatom) selresult
+griddatashape =: $celldata =. DOframinginfo frameselresult ''
 axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@# shapeused =. $ celldata  NB. 1;0 2   or 0 2;1 3
 NB. axisshapes is the lengths of each axis assigned to y/x.  sizes is the total size of y/x
 sizes =. */@> axisshapes =. axes ({&.:>"0 _ $) celldata
@@ -3272,6 +3316,10 @@ defstring =: 3 : 0
 enparen^:(y>0) (defstring__uop 0) jd ' ' , (defstring__yop 0)
 )
 
+calcestheights =: 3 : 0
+''
+)
+
 NB. return string form of operands, including instrumentation
 NB. y is ignored - always 0 1 1
 exestring =: 3 : 0
@@ -3337,6 +3385,10 @@ NB. y is ignored - always 0 1 1
 exestring =: 3 : 0
 initloggingtable ''
 auditstg '(' , (logstring '') , '(' , (exestring__xop 0 2 0) , ') ' , (exestring__uop 0 2 0) , ' (' , (exestring__yop 0 2 0) , '))'
+)
+
+calcestheights =: 3 : 0
+''
 )
 
 NB. Return the locales for propsel
@@ -3408,6 +3460,10 @@ value =: 3 : 0
 0 {:: logvalues
 )
 
+calcestheights =: 3 : 0
+''
+)
+
 proplocales =: 3 : 0
 (y = 3) # <tokensource
 )
@@ -3416,7 +3472,7 @@ NB. Set globals, then initialize display for the noun.  There must be no DOLs, a
 NB. return no U dols
 traverse =: 4 : 0
 assert. 0 = #x
-traversedowncalcselect y  NB. Just to set error globals
+traversedowncalcselect y  NB. To set globals, including selresult
 'displaytype displayhandlesin displayhandleout displaystring displaylevrank nounhasdetail' =: 'noun';($0);0;varname;NORANKHIST,<0
 x ,&< coname''  NB. Return the empty DOLs
 )
@@ -3450,9 +3506,12 @@ NB. obsolete NB. [ and ], as dyads, are treated as monads.  Also, they have no d
 NB. obsolete NB. Height of a stealthoperand is 0 to avoid assigning a label to it
 NB. obsolete estheights =: 1 * , 1:^:(valence=1) 2 2 #: >: 1 2 i. stealthoperand  NB. 0=] 1=[ 2=normal
 NB. Height of a stealthoperand is 0 monadic, 0 _1 dyadic.  Others have height 1
-estheights =: (<valence,stealthoperand) {:: a: , 2 4 $ 1;0;0;0 ; 1 1;_1 0;0 _1;0 0
 0 0$0
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+estheights =: (<valence,dispstealthoperand) {:: a: , 2 4 $ 1;0;0;0 ; 1 1;_1 0;0 _1;0 0
 )
 
 NB. return string form of operands, not including instrumentation
@@ -3504,10 +3563,10 @@ traversedowncalcselect y  NB. Just to set error globals
 calchighlight x
 NB. If no vranks, this verb must have failed to execute owing to upstream error.  Leave no levrank then
 NB. obsolete 'displaytype displayhandlesin displayhandleout displaystring displaylevrank' =: 'verb';((($0);(,0);_0.3 0.3) {::~ stealthoperand { valence , 1 1 1);0;op;((*#vranks) # ,:sellevel,vranks)
-'displaytype displayhandlesin displayhandleout displaystring displaylevrank' =: 'verb';((($0);(,0);_0.3 0.3) {::~ stealthoperand { valence , 1 1 1);0;op;<rankhistory
+'displaytype displayhandlesin displayhandleout displaystring displaylevrank' =: 'verb';((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1);0;op;<rankhistory
 NB. Pass the DOLs through, but delete any stealthoperand.  This is where we trim the display
-if. (valence = 2) *. stealthoperand e. 1 2 do.
-  x =. (<<< <:stealthoperand) { x
+if. (valence = 2) *. dispstealthoperand e. 1 2 do.
+  x =. (<<< <:dispstealthoperand) { x
 end.
 x  ,&< coname'' NB. no v, so no change to the DOLs
 )
@@ -3580,10 +3639,13 @@ valence =: #y
 setvalence__vop y
 setvalence__uop resultissdt__vop
 resultissdt =: resultissdt__uop
-estheights =: estheights__vop combineheights estheights__uop    NB. height of 0 is special flag, meaning 'stealth'
 NB. Return the dispoperands from v
 0 0 $0
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+estheights =: estheights__vop combineheights estheights__uop    NB. height of 0 is special flag, meaning 'stealth'
 )
 
 NB. return string form of operands, not including instrumentation
@@ -3676,11 +3738,14 @@ NB. For dyad, we need to clone v.
   setvalence__vop1 {: y
   setvalence__uop resultissdt__vop0 , resultissdt__vop1
   resultissdt =: resultissdt__uop
-  estheights =: (estheights__vop0,estheights__vop1) combineheights estheights__uop
 end.
 0 0 $0
 NB. We always get both operands for v, since we have cloned vop0/vop1 (it's not worth saving the operand).
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+estheights =: (estheights__vop0,estheights__vop1) combineheights estheights__uop
 )
 
 NB. return string form of operands, not including instrumentation
@@ -3750,8 +3815,12 @@ assert. valence = 1 [ 'u&n m&v dyad not supported'
 NB.?lintonly vl =. nl =. coname''
 setvalence__vl verboperandx |. y , resultissdt__nl
 resultissdt =: resultissdt__vl
-estheights =: verboperandx { estheights__vl
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+vl =. verboperandx { uop,vop
+estheights =: verboperandx { estheights__vl
 )
 
 NB. return string form of operands, not including instrumentation
@@ -3837,6 +3906,8 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
+NB. Save the type of v
+vtype =: (<2 0) {:: y
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
 verb;(coname'');tokensource
 NB.?lintsaveglobals
@@ -3851,8 +3922,11 @@ setvalence =: 3 : 0
 valence =: #y
 setvalence__uop y
 resultissdt =: resultissdt__uop
-estheights =: estheights__uop
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+estheights =: estheights__uop
 )
 
 NB. return string form of operands, not including instrumentation
@@ -3863,7 +3937,8 @@ enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
 NB. return string form of operands, including instrumentation
 exestring =: 3 : 0
 initloggingtable ''
-auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop 0 1 0) , ' ' , cop , ' (' , (exestring__vop 0,valence,0) , ')))'
+NB. obsolete auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop 0 1 0) , ' ' , cop , ' (' , (exestring__vop 0,valence,0) , ')))'
+auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop 0 1 0) , ')' , cop , '(' , (exestring__vop 0,valence,0) , '))'
 )
 
 NB. Return the locales for propsel
@@ -3885,10 +3960,32 @@ NB. The result is the DOL, up through the result of u
 NB. We do not create a cell; we just traverse u.  There is no visible indication of the rank operator, except in the
 NB. frames
 traverse =: 4 : 0
+NB. for u"n, resolve n internally.  It will not dispay, but we need a result for getverbrank
+if. vtype bwand noun do. NOLAYOUTS traverse__vop TRAVNOUN end.
 traversedowncalcselect y
 calchighlight x
 if. errorcode = ENOAGREE do. agreementerror x return. end.
 '' inheritu x traverse__uop bnsellevel , rankhistory ; rankcalculus^:(-.*./selopinfovalid) selector , selopinfo
+)
+
+NB. overrides for calcselect
+
+NB. get the rank to use for this verb.
+NB. y is selopinfo, 0 to 2 boxes containing (remaining shape);(frame so far)
+NB. Result is the rank to use for the verb's valence, or $0 if we don't know
+getverbrank =: 3 : 0
+rank =. $0
+NB. We use the actual executed rank unless this verb has negative rank and there are operands.
+NB. in that case we calculate the rank to use after referring to the actual operand rank
+if. vtype bwand noun do.
+  if. _1 e. * nrank =. 3 $&.|. 1 {:: frameselresult__vop '' do.
+    if. #y do.
+      rank =. 0 >. (#@(0&{::)@> y) (] + (* <&0)) (valence { 0 1 _2) {. nrank
+    end.
+  end.
+end.
+if. 0 = #rank do. rank =. getverbrank_dissectobj_ f. y end.
+rank
 )
 
 NB. **** um`vn ****
@@ -3918,6 +4015,10 @@ NB. return string form of operands, including instrumentation
 exestring =: 3 : 0
 initloggingtable ''
 auditstg '(' , (conjlogstring '') , (defstring__uop 2) , ' ' , cop , (defstring__vop 3) , ')'
+)
+
+calcestheights =: 3 : 0
+''
 )
 
 proplocales =: 3 : 0
@@ -3966,9 +4067,12 @@ setvalence =: 3 : 0
 valence =: #y
 setvalence__uop 2$y
 resultissdt =: resultissdt__uop
-estheights =: <./^:(valence=1) |. estheights__uop
 0 0$0
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+estheights =: <./^:(valence=1) |. estheights__uop
 )
 
 NB. return string form of operands, not including instrumentation
@@ -4033,6 +4137,8 @@ NB. Pass the token number of the modified in as the verb token number.  That wil
 create_dissectverb_ f. stg;0 0 0 0;(<1 2){y
 )
 
+NB. display height is always just 1
+
 proplocales =: 3 : 0
 (y = 3) # (<tokensource) 1} >&.> ucvlocs
 )
@@ -4083,14 +4189,20 @@ if. vvv do.
   setvalence__cop resultissdt__uop , resultissdt__vop
   NB. We have to ensure that any stealthoperand produces a 0 height for all it contributes to,
   NB. so we don't assign a label to a stealthoperand
-  estheights =: >./ estheights__cop combineheights (estheights__uop ,: estheights__vop)
 else.
   setvalence__cop resultissdt__uop , resultissdt__vop
-  estheights =: ({: estheights__cop) combineheights estheights__vop
 end.
 resultissdt =: resultissdt__cop
 0 0$0
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+if. vvv do.
+  estheights =: >./ estheights__cop combineheights (estheights__uop ,: estheights__vop)
+else.
+  estheights =: ({: estheights__cop) combineheights estheights__vop
+end.
 )
 
 NB. return string form of operands, not including instrumentation
@@ -4159,12 +4271,14 @@ setvalence =: 3 : 0
 valence =: #y
 setvalence__vop {: y
 setvalence__uop 2$y
-estheights =: >./^:(valence=1) estheights__uop (*@[ * +) 0 , estheights__vop
-NB. ([ v) =[  (] v) =mv  (u []) m=u~ d=u (=u~~)
 NB. dispoperands is set from u
 resultissdt =: resultissdt__uop
 0 0$0
 NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+estheights =: >./^:(valence=1) estheights__uop (*@[ * +) 0 , estheights__vop
 )
 
 NB. return string form of operands, not including instrumentation
@@ -4199,8 +4313,9 @@ vop inheritu (dol ,~ 0 {  x) traverse__uop (<3 {."1 (0 1) {"1 rankhistory) 1} ((
 )
 
 
-
-0 : 0
+NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ 3 : ''destroy__y 0'' dissectinstance_dissect_ [ ' , enparen_dissect_);._2 runtests_base_
+NB. wd@('psel dissect;pclose'"_)"0 i. 100
+runtests_base_ =: 0 : 0
 ds '2+''a'''
 ds '2,''a'''
 ds '2 3+''a'''
@@ -4261,7 +4376,7 @@ ds '0 (+ - *) '''''
 ds '0 (1 2 3 - *) '''''
 ds '0 (1 2 3 - *)"0 '''''
 ds '0 (1 2 3 , ])"0 $0'
-ds '0 ([: 1 2 3"0 $)"0 $0'  NB. should be $=0 0 3
+ds '0 ([: 1 2 3"0 $)"0 $0'
 ds '0 (+ - ]) '''''
 ds '0 (1 2 3 - *)"0 $0'
 ds '0 (1 2 3 - *)"0 (0)'
@@ -4270,17 +4385,17 @@ ds '0 (+@* - *) '''''
 ds '0 (+@* *) '''''
 ds '0 (+ *) '''''
 ds '(#@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
-z =. 2
-ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
-ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q'''
+ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' [ z =. 2
+ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q''' [  z =. 2
 ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
-b =. ;:'The quick brown fox'
-ds '(i.@# ((}.>) ,. ({.>))"0 ]) b'
-ds '(i.@# ((}.>) ,&< ({.>))"0 ]) b'
-ds '(i.@# ((}.>) , ({.>))"0 ]) b'
+ds '(i.@# ((}.>) ,. ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+ds '(i.@# ((}.>) ,&< ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+ds '(i.@# ((}.>) , ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
 ds '0 1 2 3 {~ 2'
 ds '(i. 2 3) {~ 2'
 ds '(i. 3 2) {~ 2'
 ds '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
 ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'
+ds '1 2 +"_1 0 (1 2)'
+ds '1 2 ,"_1 i. 2 3'
 )
