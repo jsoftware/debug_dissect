@@ -302,9 +302,10 @@ while. do.
     NB. If the assignment is an AR assignment, ignore it with a warning
     elseif. (sdt+noun) ([ -: bwand) 0 { exetypes do.
       rname =. (<0 1) {:: exeblock  NB. locale of sdt
+      NB.?lintonly op_dissectnoun_ =: '' [ rname =. <'dissectnoun'
       if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
         if. '`' = {. lvalue do.
-          smoutput 'AR assignment to ' , qend , ' ignored'
+          smoutput 'AR assignment to ' , lvalue , ' ignored'
           rname =. 0$a:
         else.
           rname =. ;: :: (a:$~0:) lvalue
@@ -324,7 +325,7 @@ while. do.
 
     NB. We can't deal with assignments to object locatives since we track only the part of speech, not the value, at parse time
     if. +./ elocs =. '__'&(+./@:E.)@> rname do.
-      'Assignment to object locatives not supported: ' , ;:^:_1 elocs # rname
+      smoutput 'Assignment to object locatives not supported: ' , ;:^:_1 elocs # rname
       rname =. (-. elocs) # rname
     end.
       
@@ -859,7 +860,6 @@ NB. calculate estheights for display.  We call estheights during the upwards tra
 NB. Called in locale of the base of the tree
 calcallestheights =: 2&((3 : 'y [ dispstealthoperand =: {. stealthoperand -. y') traversedown (calcestheights@]))
 
-
 NB. Return selection level for each token in the input string
 NB. Result is table of (token number(s));selection level
 NB. Called in locale at the base of the tree
@@ -906,6 +906,7 @@ NB.?lintonly valence =: errorlevel =: snifferror =: 1
 NB.?lintonly defstring =: ":
 NB.?lintonly resultissdt =: nounhasdetail =: nounshowdetail =: 0
 NB.?lintonly 'displaytype displayhandlesin displayhandleout displaystring displaylevrank fillmask' =: '';($0);($0);'';(0 3$a:);($0)
+NB.?lintonly dispstealthoperand =: 0
 NB.?lintsaveglobals
 ''
 )
@@ -2476,7 +2477,7 @@ if. 0 e. $y do. return. end.
 NB. obsolete y =. (#~ [: -. 0 e."1 {:"2) y
 ic =.> {. x
 if. DEBGRAF do.
-  'Rectangles: color=%j, pencolor=%j, xywh=%j' printf ic;pc; }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
+  'Rectangles: color=%j, pencolor=%j, xywh=%j' printf (2{.x), }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
 end.
 if. 1 < #x do.
   (([: glpen 0 ,~ {:) [ glrgb@}:) 1 {:: x
@@ -2723,7 +2724,6 @@ else.
   NB. We get the border of the rectangle by adding 0/1 to the bottom 2 indexes, then extending with 0
   NB. to full shape, then converting to cell number, then looking that up in the row/column ending table
   if. #hlights do.
-    boxyx;ysizes;xsizes;axisshapes;axes;<hlights
     NB. To handle <2 axes, we will add 2 leading 0 axes to the highlight selector.
     NB. We compensate by adding 2 to all the axis numbers, and inserting a leading axis.
     NB. If there are no axes to add to, there are 2 cases: 1 axis, which is ($0);,0: we turn that
@@ -3639,6 +3639,7 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands.  uop is the locale of a noun, or the string for a name
 'uop cop vop' =: 1 {"1 y
+NB.?lintonly uop=:<'dissectnoun' [ vop=: <'dissectverb'
 NB. Remember if uop is a name
 uopisname =: name = (<0 0) {:: y
 utoken =: (<0 2) { y
@@ -3943,6 +3944,7 @@ NB.?lintsaveglobals
 
 calcestheights =: 3 : 0
 vl =. verboperandx { uop,vop
+NB.?lintonly vl =. coname''
 estheights =: verboperandx { estheights__vl
 )
 
