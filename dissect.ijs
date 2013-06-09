@@ -2,6 +2,7 @@ NB. Copyright (c) Henry H. Rich, 2012, 2013.  All rights reserved.
 
 NB. INPROGRESS:
 CLEANUP_dissect_ =: 1   NB. set to 0 for debugging to allow postmortem
+DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
 DEBVERB_dissect_ =: 0   NB. set for travdown printout
 DEBLAYOUT_dissect_ =: 0   NB. display grid details
@@ -12,23 +13,22 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
-NB. ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'  test picking in grids
-NB. put a fence around route to save time?
+NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' 
+NB.  make color-coordination better.  Rank is in wrong place - needs to go to v
+NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
 NB. Put $!.f in JforC
+NB. routing: penalize overlap, including overlap of straight lines.  Also, think about forcing all nets of, say, 3 dests to use router.  Have height limit on direct routes.  Use router on all nets that have a routed portion.
 NB. better pn on grid
 NB. If grid exists, raise it on click on result
 NB. handle clicking on verb-name part to select tree
 NB. create pickrects for displayed sentence, and handle clicks there
 NB. plan: save preferences; debug globals; display sentence; J8
-NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'  error is not shown
-NB.  make color-coordination better.  Rank is in wrong place - needs to go to v
 NB. Add space between the label/shape/status blocks - add to bbox layout in alignrects
 NB. green lines between ranks-3s don't show up if there's fill
 NB. test errorlevel, including for fill cells.
 NB. A way to display error encountered during fill cell?
 
 NB. should we allow selection if final result is early error? (what shape then?)
-NB. routing: penalize overlap, including overlap of straight lines.  Also, think about forcing all nets of, say, 3 dests to use router.  Have height limit on direct routes.  Use router on all nets that have a routed portion.
 
 NB. worry about whether gerund needs to traverse.  Shape display of gerund is wrong, because it's calculated incorrectly.  Should use noun methods for result of `
 
@@ -184,8 +184,11 @@ NB.?lintsaveglobals
 )
 
 NB. Add new object to the list of objects
+NB. We make the newset object first to solve a subtle problem: certain locales (like assignments) coinsert an
+NB. existing locale to resolve undefined names.  If a locale in the path is destroyed, it will make names
+NB. like codestroy unresolvable.  So, we order the locales here so be destroy in the opposite order of creation.
 newobj =: 3 : 0
-objtable =: objtable , y
+objtable =: y , objtable
 )
 
 NB. Utility to create rank,invertible flags for a verbname
@@ -251,6 +254,7 @@ while. do.
     exetypes =. > subj # , 4 1 {. stack   NB. the corresponding types
   end.
   NB.?lintonly exeblock =. 3 3$<'' [ exetypes =. 0 0 0 [ subj =. 0 1 1 1
+  QP^:DEBPARSE'pline exetypes exeblock stack '
   pline
 
   case. 0;1 do.  NB. monad
@@ -284,48 +288,48 @@ while. do.
       return.
     end.
   case. 7 do.  NB. assignment
-    NB. Create an assignment block for the operands, and put that on the stack.  The type of the assignment
-    NB. will be the type of the rvalue
-failparse 'assignment not supported'
+    NB. Create an assignment block for the operands, and put that on the stack.
     nobj =. conew 'dissectassign'
     stack =. ((subj i. 1){.stack),(create__nobj exeblock),((>:subj i: 1)}. stack)
-
-    NB. Now try to handle the case of names assigned within a sentence and reused later.
-    NB. extract the type of the rvalue, in 4!:0 form.  If it's a verb, go get its rank
-    if. 3 = rtype =. (noun,adv,conj) i. cavn bwand 2 { exetypes do.
-      vobj =. (<2 1) { exeblock
-      NB.?lintmsgsoff
-      rrank =. _ _ _ NB. rank__vobj''
-      NB.?lintmsgson
-    else.
-      rrank =. $0
-    end.
-
-    NB. The left operand is a name or a noun.  
-    NB. If the lvalue is a name, make it global if the assignment is global.
-    rname =. (<0 1) { exeblock
-    if. name = 0 { exetypes do.
-NB. ...wrong      if. (<'=:') -: 1 { exetypes do. rname =. (('_',loc,'_') ,~ ])&.> rname end.
-    NB. If it is a noun, we can handle it only if it is a
-    NB. self-defining term.  In that case, turn it into a list of names.  If the noun starts with '`',
-    NB. change the type of the rvalue to 'verb of infinite rank'    NB. Add definitions to the local name-table for each surviving name
-    else.  NB.?lintonly [ rname =. <'dissectnoun'
-      if. sdt bwand 0 { exetypes do.
-        if. 2 = 3!:0 lvalue =. value__rname'' do.  NB.?lintonly [ lvalue =. ''
-          if. '`' = {. lvalue do.
-            rrank =. _ _ _
-            lvalue =. }. lvalue
-          end.
-          rname =. ;: :: (a:$~0:) lvalue
+    NB. See if we can analyze the assignment.  If so, add to the name table.
+    NB. If the assignment is not a noun value, ignore it with a warning
+    if. 0 = noun bwand 2 { exetypes do.
+      smoutput 'non-noun assignment ignored'
+      rname =. 0$a:
+    NB. See if it's a simple assignment to a name
+    elseif. name = 0 { exetypes do.
+      rname =. (<0 1) { exeblock  NB. boxed name
+    NB. If the assignment is an AR assignment, ignore it with a warning
+    elseif. (sdt+noun) ([ -: bwand) 0 { exetypes do.
+      rname =. (<0 1) {:: exeblock  NB. locale of sdt
+      if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
+        if. '`' = {. lvalue do.
+          smoutput 'AR assignment to ' , qend , ' ignored'
+          rname =. 0$a:
         else.
-          failparse 'Invalid assignment'
-          return.
+          rname =. ;: :: (a:$~0:) lvalue
         end.
       else.
-        rname =. 0$a:
+        failparse 'Invalid assignment'
+        return.
       end.
+    NB. If the assignment is to a variable name, we can do nothing with it
+    elseif. do.
+      rname =. 0$a:
     end.
-    defnames =. (rname ,"0 1 rtype;rrank) , defnames
+
+    NB. rname has the list of names that we should define.  If this is a global assignment,
+    NB. append the locale name to each name that doesn't contain a locative
+    if. (<'=:') -: (<1 1) { exeblock do. rname =. (('_',(>loc),'_') ,~ ])^:('__'&(+./@:E.) +: '_' = {:)&.> rname end.
+
+    NB. We can't deal with assignments to object locatives since we track only the part of speech, not the value, at parse time
+    if. +./ elocs =. '__'&(+./@:E.)@> rname do.
+      'Assignment to object locatives not supported: ' , ;:^:_1 elocs # rname
+      rname =. (-. elocs) # rname
+    end.
+      
+    NB. Define the names, as nouns (J nameclass 0).
+    defnames =. (rname ,"0 1 (0;'')) , defnames
 
   case. 8 do.  NB. ( x )
     stack =. (<<<0 2) { stack
@@ -362,9 +366,14 @@ NB. ...wrong      if. (<'=:') -: 1 { exetypes do. rname =. (('_',loc,'_') ,~ ])&
       end.
       NB. Look up the object locative in the local name table, resolving to type;value/rank if found
       if. (<objloc) e. {."1 defnames do.
-        'objtype objvalrank' =. 1 2 { (({."1 defnames) i. objloc) { defnames
+        'objtype objvalrank' =. 1 2 { (({."1 defnames) i. <objloc) { defnames
         gloc =. objvalrank
-      else.
+      elseif. (<objloc =. objloc , '_' , (>loc) , '_') e. {."1 defnames do.
+        NB. not found as a local, but it may have been assigned in this sentence as a global.  If so,
+        NB. use that value
+        'objtype objvalrank' =. 1 2 { (({."1 defnames) i. <objloc) { defnames
+        gloc =. objvalrank
+      elseif. do.
       NB. Nothing found in local table - set to resolve the whole thing globally
         gloc =. loc
         glopart =. qend
@@ -374,17 +383,23 @@ NB. ...wrong      if. (<'=:') -: 1 { exetypes do. rname =. (('_',loc,'_') ,~ ])&
       NB. an object locative, or if the local search failed.  This search will start in locale gloc.
       NB. This search, if performed, must succeed, and we will convert the result to a type/(rank if verb)
       if. #glopart do.
-        savloc =. coname''
-        NB.?lintonly savloc =. <'dissect'
-        NB.?lintmsgsoff
-        cocurrent gloc
-        NB.?lintmsgson
-        if. 3 = objtype =. 4!:0 <glopart do.
-          objvalrank =. rankinv_dissect_ f. glopart
+        NB. First, see if this global name was assigned in this sentence.  If so, use that value
+        if. (<objloc =. glopart , '_' , (>gloc) , '_') e. {."1 defnames do.
+          NB. Name is in our local table.  Use that
+          'objtype objvalrank' =. 1 2 { (({."1 defnames) i. objloc) { defnames
         else.
-          objvalrank =. $0
+          savloc =. coname''
+          NB.?lintonly savloc =. <'dissect'
+          NB.?lintmsgsoff
+          cocurrent gloc
+          NB.?lintmsgson
+          if. 3 = objtype =. 4!:0 <glopart do.
+            objvalrank =. rankinv_dissect_ f. glopart
+          else.
+            obtype =. _1
+          end.
+          cocurrent savloc
         end.
-        cocurrent savloc
       end.
       NB. Now objtype/objvalrank are set.  If the name is a noun or verb, create a locale for it
       NB.?lintonly 'objtype objvalrank' =. 0;0 0 0 0
@@ -400,7 +415,7 @@ NB. ...wrong      if. (<'=:') -: 1 { exetypes do. rname =. (('_',loc,'_') ,~ ])&
         nobj =. conew 'dissectverb'
         ntypeval =. create__nobj qend;objvalrank;(#queue)
       case. do.
-        failparse 'error in object type'
+        failparse 'undefined name: ' , qend
         return.
       end.
 
@@ -872,7 +887,10 @@ tokensource =: ~. > 0 { y
 stealthoperand =: 0   NB. set for verbs that have no display, viz [ ] [:
 
 NB. The following names are guaranteed modified in the clone after this object is cloned:
-resultissdt =: 0  NB. Set if the result of this object is derived wholly from SDTs
+NB. resultissdt is guaranteed set in all objects, and not initialized so that if we coinsert an object
+NB. we will not have an initial value to block inheritance
+NB. Before monad/dyad execution, resultissdt is set for modifier processing.  After monad/dyad, it is set
+NB. for verb processing.
 estheights =: 1
 failingselector =: 0$a:  NB. If this is ever modified, it will be modified in both the clone and the original
 
@@ -886,7 +904,7 @@ errorwasdisplayedhere =: 1   NB. allow display of error during initial sniff
 
 NB.?lintonly valence =: errorlevel =: snifferror =: 1
 NB.?lintonly defstring =: ":
-NB.?lintonly nounhasdetail =: nounshowdetail =: 0
+NB.?lintonly resultissdt =: nounhasdetail =: nounshowdetail =: 0
 NB.?lintonly 'displaytype displayhandlesin displayhandleout displaystring displaylevrank fillmask' =: '';($0);($0);'';(0 3$a:);($0)
 NB.?lintsaveglobals
 ''
@@ -1723,6 +1741,40 @@ end.
 NB. Return list of wires
 wires
 NB.?lintsaveglobals
+)
+
+NB. point in polygon, for convex ccw polygon (2D)
+NB. x is the polygon
+NB. y is the point(s)
+NB. result is 1 if point is tolerantly in polygon, including on the edge
+pipccw =: (0&(*./@:<:))"1 @: (2&((-/ . *)\)"2) @: (-"1/ (, {.))~
+
+NB. convex hull
+NB. y is a table of y,x value (or x, y if you want to think of it that way)
+NB. result is y,x points of the convex hull, in CCW order in left-handed coordinates
+convexhull =: 3 : 0
+pts =. y
+NB. Find points with max/in x and y; make a ccw quadrilateral out of them: 4 edges, closed
+ccwminmax =. (, {.) pts {~ 0 2 1 3 { , (i.!.0    <./ , >./)"1 |: pts
+NB. Calculate outside-the-edge masks for each point, and discard points inside all edges (Eddy-Floyd)
+NB. The determinant of (y,x) in ccw order in left-handed system is positive, so we take polygon-point to get + determinant for ccw
+anyout =. +./"1 outmask =. ccwminmax 0&(>!.0) @: (2&((-/ . *)\)"2) @: (-"1"_ 1) pts
+outpts =. anyout # pts
+outmask =. anyout # outmask
+assert. *./ 1 = +/"1 outmask  NB. each point can be outside only one edge
+NB. Each surviving point will be outside exactly one edge; associate the point with that edge
+outpts =. ((=/~ i. 4) -:"1/ outmask) <@# outpts 
+NB. Find the convex hull corresponding to each edge.  The two endpoints PQ of the edge are known to
+NB. be on the hull.  Sort the points outside the edge into the order they will be encountered in a CCW sweep from P.
+NB. For each edge AB, we calculate the winding of the triangle ABC (C is the next point).  If ABC is cw, delete point B.
+NB. Repeat the procedure until no points are deleted.
+NB. Taking, say, the first edge, which goes from ymin to xmin, the points must have a smaller x than the edge point but they could have equal y.
+NB. So calculate the slope as dy/dx, sort decending.  For the second edge, the points must have larger y, so
+NB. calculate -dx/dy, sort decending.  For third, dy/dx descending; for fourth, -dx/dy descending
+sortpts =. outpts \:&.> 1 _1 1 _1 *&.> %/"1&.> 0 _1 0 _1 |."1&.>  outpts -"1&.> <"1 }: ccwminmax
+hullpts =. (<"1 }. ccwminmax) ({.@] , }.@] (#~ 0&(<!.0)) 3&((-/ . *)@:(}. -"1 {.)\)@:,~)^:(1<#@])^:_:&.> sortpts
+NB. Append each quadrilateral point with the following hull points and run together to form the result
+; (<"1 }: ccwminmax) ,&.> hullpts
 )
 
 NB. Angle ranges for allowable lines, startpoint to endpoint, in the screen's upside-down y coordinates
@@ -3189,7 +3241,7 @@ NB. fillmask etc may have changed from other selections
 NB. obsolete griddrawnselections =: selections
 
 NB. Display the grid data
-griddatashape =: $celldata =. DOframinginfo frameselresult ''
+griddatashape =: $celldata =. 1 {:: DOframinginfo frameselresult ''
 axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@# shapeused =. $ celldata  NB. 1;0 2   or 0 2;1 3
 NB. axisshapes is the lengths of each axis assigned to y/x.  sizes is the total size of y/x
 sizes =. */@> axisshapes =. axes ({&.:>"0 _ $) celldata
@@ -3427,7 +3479,7 @@ NB. Not clonable
 create_dissectobj_ f. 2 { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
-NB. Save the operand, and the name if any
+NB. Save the operand, and the name if any.  We look into op from other locales to get the value of sdts
 'op varname' =: 2 {. y
 NB. If the name is empty, this must be an SDT
 resultissdt =: 0 = #varname
@@ -3455,11 +3507,11 @@ NB.?lintonly 'logvalues logticket' =: (1$a:);$0
 NB.?lintsaveglobals
 )
 
-NB. Return value of result
-value =: 3 : 0
-0 {:: logvalues
-)
-
+NB. obsolete NB. Return value of result
+NB. obsolete value =: 3 : 0
+NB. obsolete 0 {:: logvalues
+NB. obsolete )
+NB. obsolete 
 calcestheights =: 3 : 0
 ''
 )
@@ -3488,6 +3540,8 @@ NB. Save the operand
 op =: 0 {:: y
 invok =: (1;3) {:: y
 stealthoperand =: 1 2 3 0 {~ (;:'][[:') i. <op
+NB. Every verb counts as an sdt for modifier processing.
+resultissdt =: 1
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -3575,17 +3629,80 @@ NB. **** assignment ****
 cocurrent 'dissectassign'
 coinsert 'dissectobj'
 
-NB. Object to handle assignments
+NB. Assignment does nothing and has no display (for now).  We just have to keep things going for sentence display
 
-NB. Unknown modifiers create verbs (we hope).  We will create something that looks like a verb -
-NB. it will be the display form of the modified input operands.  We will then pretend to be a verb.
-NB. y is the exeblock for the modifier, either 2 or 3 boxes
+NB. Assignment.  y is the locales of the lvalue, copula, rvalue
 create =: 3 : 0
-create_dissectobj_ f. 2 { y
+NB. not clonable
+create_dissectobj_ f. (<1 2) { y
+NB. Register this object so we can clean up at end
+newobj__COCREATOR coname''
+NB. Save the operands.  uop is the locale of a noun, or the string for a name
 'uop cop vop' =: 1 {"1 y
-NB.?lintonly uop =: vop =: coname'' [ cop =: ''
+NB. Remember if uop is a name
+uopisname =: name = (<0 0) {:: y
+utoken =: (<0 2) { y
+NB. Since we don't participate in traversal, fix it so that references to this locale are picked up
+NB. by the object of assignment.  We will take resultissdt from the assigner
+coinsert vop
+noun;(coname'');tokensource
 NB.?lintsaveglobals
 )
+
+destroy =: 3 : 0
+destroy_dissectobj_ f. ''
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+if. uopisname do.
+  enparen^:(y>0) uop jd cop jd (defstring__vop 0)
+else.
+  enparen^:(y>0) (enparen defstring__uop 0) jd cop jd (defstring__vop 0)
+end.
+)
+NB. No display, so no heights
+calcestheights =: 3 : 0
+''
+)
+
+NB. This will only be called if the rvalue is a verb; in that case, pass the call on
+setvalence =: 3 : 0
+setvalence__vop y
+)
+
+NB. return string form of operands, including instrumentation
+NB. y is ignored - always 0 1 1
+exestring =: 3 : 0
+initloggingtable ''
+if. uopisname do.
+  auditstg '(' , uop , ' ' , cop , (exestring__vop 0 1 0) , ')'
+else.
+  auditstg '((' , (exestring__uop 0 1 0) , ' )' , cop , (exestring__vop 0 1 0) , ')'
+end.
+)
+
+NB. Return the locales for propsel
+proplocales =: 3 : 0
+NB. If uop is a name, we just return its token number; if a value, we return the locale of the noun
+((y = 3) # (utoken [^:uopisname uop),<tokensource),(vop #~ y > 1)
+)
+
+NB. Traversal up and down the tree.
+NB. x is the DOL(s) for the input operands
+NB. The input y gives the selection level and inherited state of selection, which is passed to travdowncalcselect,
+NB. where it is combined with the selector for this level to produce the selector for v and u.
+NB. We call travdowncalcselect to get the selection for this level; then we traverse v (using the
+NB. selector found here), and display v; then we traverse u using the selector found here.
+NB. When we display v, its data will display only if it collects at this level
+NB. We do not display u: we pass its display information back so that it can eventually
+NB. be displayed if it ever reaches a collector.
+NB. The result is the DOL, with everything except the result of u
+traverse =: 4 : 0
+NB. We just pass this traversal on through
+x traverse__vop y
+)
+
 
 
 
@@ -3624,6 +3741,8 @@ NB. Ignore ]@ etc.
 NB. obsolete if. stealthoperand__uop e. 1 2 do.
 NB. obsolete   verb;vop;tokensource
 NB. obsolete else.
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB. obsolete end.
 NB.?lintsaveglobals
@@ -3710,6 +3829,8 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
 NB. Look at the conjunction used, and use that to find the rank of this object (the derived verb)
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -3798,6 +3919,8 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
 NB. Don't try to remember locale yet - we might clone
 verboperandx =: * verb bwand (<2 0) {:: y   NB. Index of the verb operand
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -3909,6 +4032,8 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 NB. Save the type of v
 vtype =: (<2 0) {:: y
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -3998,6 +4123,7 @@ newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: coname'' [ cop =: '' [ conjex =: ''
+resultissdt =: resultissdt__uop *. resultissdt__vop
 noun;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -4054,6 +4180,8 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop' =: 1 {"1 y
 NB.?lintonly uop =: coname'' [ cop =: ''
 NB. obsolete refdetail =: 0  NB. This locale creates a reference
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -4122,13 +4250,13 @@ create =: 3 : 0
 NB. Get the locales
 ucvlocs =: 1 {"1 y
 if. 2 = #y do.
-'uop cop' =. ucvlocs
-NB.?lintonly uop =. <'dissectverb' [ cop =. ''
-stg =. (defstring__uop 2) jd cop
+  'uop cop' =. ucvlocs
+  NB.?lintonly uop =. <'dissectverb' [ cop =. ''
+  stg =. (defstring__uop 2) jd cop
 else.
-'uop cop vop' =. ucvlocs
-NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
-stg =. (defstring__uop 2) jd cop jd (defstring__vop 3)
+  'uop cop vop' =. ucvlocs
+  NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
+  stg =. (defstring__uop 2) jd cop jd (defstring__vop 3)
 end.
 NB. obsolete changeobjtypeto 'dissectverb'
 NB. We will treat this as a generic verb, except for the overrides we have in this locale
@@ -4171,6 +4299,8 @@ NB. obsolete if. stealthoperand__cop do.
 NB. obsolete   (2 {. y{~0 2 1 0{~stealthoperand__cop),tokensource
 NB. obsolete else.
 NB. obsolete   'xrefdetail yrefdetail' =: 0  NB. This locale creates references
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop *. resultissdt__cop
 verb;(coname'');''
 NB. obsolete end.
 NB.?lintsaveglobals
@@ -4258,6 +4388,8 @@ NB.?lintonly uop =: vop =: coname''
 NB. Wait till here to add to object list so it doesn't show up twice
 newobj__COCREATOR coname''
 NB. obsolete refdetail =: 0  NB. This locale creates references
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');''
 NB.?lintsaveglobals
 )
@@ -4398,4 +4530,11 @@ ds '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i
 ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'
 ds '1 2 +"_1 0 (1 2)'
 ds '1 2 ,"_1 i. 2 3'
+ds 'y =. 2 + 5'
+ds 'zzz + 5 [ zzz =. 6'
+ds '''a b c'' =. i. 3'
+ds '''`a b c'' =. +`-`%'
+ds 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
+ds '-&.> i. 3'
+ds '-&.:> i. 3'
 )
