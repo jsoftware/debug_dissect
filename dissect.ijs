@@ -542,7 +542,7 @@ bin s;
 cc fmshowstealth button;cn "Show ][";
 cc fmshowerror button;cn "Show Error";
 bin z;
-wh 20 20;cc dissectisi isigraph;
+minwh 20 20;cc dissectisi isigraph flush;
 bin z;
 pas 0 0;
 rem form end;
@@ -3211,7 +3211,7 @@ rem form end;
 )
 GRID=: 0 : 0 [^:IFQT GRID
 pc grid;pn "Grid";
-wh 800 600;cc grid isigraph;
+minwh 800 600;cc grid isigraph flush;
 pas 0 0;pcenter;
 rem form end;
 )
