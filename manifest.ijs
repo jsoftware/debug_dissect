@@ -5,7 +5,7 @@ PLATFORMS=: ''
 FILES=: 0 : 0
 dissect.ijs
 )
-RELEASE=: 'j602 j801 j802'
+RELEASE=: 'j602 j801'
 DEPENDS=: 0 : 0
 )
 DESCRIPTION=: 0 : 0
