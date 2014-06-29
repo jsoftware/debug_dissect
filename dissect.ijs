@@ -1,4 +1,7 @@
-NB. Copyright (c) Henry H. Rich, 2012, 2013.  All rights reserved.
+NB. Copyright (c) Henry H. Rich, 2012-2014.  All rights reserved.
+
+NB. Clear definitions of old locales and create anew.  This will remove hangover derfinitions. These can be small since the hold mostly verb-names
+((cocreate ([ coerase))"0~   2 1 {.~ #) ;: 'dissect dissectobj dissectmonad dissectdyad dissectnoun dissectverb dissectassign dissectvandnm dissectfork dissecthook'
 
 NB. INPROGRESS:
 CLEANUP_dissect_ =: 1   NB. set to 0 for debugging to allow postmortem
@@ -13,10 +16,13 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
+NB. ds '(+ ; ,)/ i. 2 3'   click on final result crashes - should not traverse?
+NB. hook doesn't propagate select to v.  This is problematic
+NB. picking in nouns gives domain error
+NB. ds '0 (1 2 3 - *)"0 (0 1 2)'  click in final result, then click in 0*0 result.  error.
 NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' 
 NB.  make color-coordination better.  Rank is in wrong place - needs to go to v
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
-NB. Put $!.f in JforC
 NB. routing: penalize overlap, including overlap of straight lines.  Also, think about forcing all nets of, say, 3 dests to use router.  Have height limit on direct routes.  Use router on all nets that have a routed portion.
 NB. better pn on grid
 NB. If grid exists, raise it on click on result
@@ -38,8 +44,7 @@ NB. the call is:
 NB. [options] ds sentence
 NB. where sentence is a string to be executed.  The sentence is parsed and modified so that every verb execution creates
 NB. looging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
-NB. dissect verb), and then the results are displayed in 2d form using a grid control.  Flow of the sentence generally runs from top
-NB. to bottom in the grid.  Clicks on the grid set variables to control what information is displayed.
+NB. dissect verb), and then the results are displayed in 2d form
 
 ds_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`]@.(2=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])
 
@@ -51,7 +56,6 @@ z458095869 =: (([ ,. <"0@] ,. (".@[`[`[`(rankinv_dissect_@[))@.]&.>) (4!:0)) @ (
 
 require 'strings gl2'
 require '~addons/format/printf/printf.ijs'
-require 'grid'
 cocurrent 'dissect'
 coinsert 'jgl2'
 
@@ -172,11 +176,11 @@ objtable =: 0$a:   NB. list of parse objects
 ticket =: 0   NB. sequential log number
 winhwnd =: ''  NB. Init to no window
 NB. Save the initial environment: locale size, boxing chars
-Jenvirons =: (9!:6'') ;< (9!:38 '')
-NB. Set boxing chars that we can see in the grid
-9!:7 '+++++++++|-'
-NB. Use lightweight locales
-9!:39 (0) 1} 9!:38 ''
+Jenvirons =: (9!:38 '')
+NB. obsolete NB. Set boxing chars that we can see in the grid
+NB. obsolete 9!:7 '+++++++++|-'
+NB. Use lightweight locales - we use less than 100 entries usually
+9!:39 (1) 1} 9!:38 ''
 NB. For nodes that do not have a parallel path (i. e. all but forks and &), this locale will
 NB. be the predecessor locale, and will not signal an error
 errorcode =: 0
@@ -514,7 +518,7 @@ ntypeval
 )
 
 
-NB. After the sentence has been executed, return here to display the grid
+NB. After the sentence has been executed, return here to display
 
 
 DISSECT=: 0 : 0
@@ -560,6 +564,7 @@ wdpmove =: ([: wd 'pmovex ' , ])`([: wd 'pmove ' , ])@.IFQT
 
 FONTSIZECHOICES =: 8 10 12 14 16
 MAXNOUNPCTCHOICES =: 30 50 70 90
+MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 display =: 3 : 0   NB. called in dissect locale
 displaymain__dissectinstance y
@@ -584,7 +589,7 @@ end.
 
 NB.?lintonly COCREATOR =: <'dissectobj'
 NB. Create a selector that will admit anything, without infinities
-TRAVNOUN =: 0;NORANKHIST;0 , >:ticket
+TRAVNOUN =: 0;NORANKHIST,<0 , >:ticket
 
 NB. The argument of $0 indicates that we want to set the crash variables
 NB. debug wd :: 0: 'psel dissect;pclose'
@@ -610,7 +615,7 @@ initnounshowdetail__resultroot resultissdt__resultroot
 NB. Init the estheights in every object
 calcallestheights__resultroot $0
 NB. If we crashed, do an initial traversal to set selection flags to find the error
-maxnoundisplaysize =: 0 0  NB. Init to small display for sniff, for speed
+maxnoundisplaysizes =: 2 2$0  NB. Init to small display for sniff, for speed
 if. crashed do.
   joinlayoutsl traverse 1   NB. Don't forget the final display!
   setdisplayerror__resultroot''
@@ -642,7 +647,7 @@ NB.?lintsaveglobals
 NB. lay out the grid.  Should be called in the locale of the major instance
 calcplacement =: 3 : 0
 NB. Check the current screensize, and calculate the box sizes in characters
-maxnoundisplaysize =: <. screensize * maxnoundisplayfrac
+maxnoundisplaysizes =: <. (maxnoundisplayfrac , MAXEXPLORERDISPLAYFRAC) */ screensize
 
 NB. Select our drawing control, so we have something to check sizes with
 wd 'psel ',winhwnd
@@ -698,8 +703,7 @@ if. #winhwnd do.
 end.
 dissectionlist_dissect_ =: dissectionlist_dissect_ -. coname''
 NB. Restore original session state.  We hope this hasn't been changed while we were running!
-9!:7 (0) {:: Jenvirons
-9!:39 (1) {:: Jenvirons
+9!:39 Jenvirons
 codestroy''
 y
 )
@@ -740,8 +744,8 @@ NB. The characters are drawn, with appropriate colors
 sizesentence =: 4 : 0
 'DSX__ DSY__'   =: x;<y
 usentence =. x
-NB. Reselect in case grids were drawn
-wd 'psel ' , ": winhwnd
+NB. Reselect in case explorers were drawn
+wd 'psel ' , winhwnd
 glsel 'dissectisi'
 
 NB. Create table of token#,level.  Decrement token # to account for queue-end added at front.
@@ -811,8 +815,9 @@ NOLAYOUTS traverse__resultroot TRAVNOUN
 )
 
 NORANKHIST =: <0 0$a:
+NORANKHISTNOUN =: <''   NB. string means noun
 
-NB. Conjunction for tree traversal down
+NB. Conjunction for tree traversal down (i. e. root to leaves)
 NB. y is the argument to pass to the first node
 NB. x is the traversal type: 0 to stop before nouns, 1 to go through conjunction noun operands, 2 to go through everything, 3 to get tokens for the sentence
 NB. u is the verb for applying to y at each level going down; its result will be the y for the next level
@@ -835,14 +840,18 @@ else.
 end.
 )
 
-NB. Propagate selection down the tree.  y is the value to propagate.  We propagate
+NB. Propagate selection down the tree (root to leaves).  y is the value to propagate.  We propagate
 NB. selections to all verb operands; #selections to conjunction noun operands as well
 NB. The calls to traversedown must be named verbs!!
 propsel0 =: 0&((3 : 'selections =: y') traversedown 0:)
 propsel1 =: 1&((3 : ('displaysellevel =: y')) traversedown 0:)
 propsel =: propsel1@# [ propsel0
 
-NB. Propagate selection up the tree, until we hit a monad/dyad execution.  y is value to select
+NB. Clear scroll point (at nodes BELOW the starting node).  y is 1 to start, and the assignment is made only if <: 0
+propscroll =: 0&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
+
+
+NB. Propagate selection up the tree (leaves to root), until we hit a monad/dyad execution.  y is value to select
 propselup =: 3 : 'selections =: y if. -. ({. copath coname'''') e. ;: ''dissectmonad dissectdyad'' do. propselup__parent y end.'
 
 NB. init parent nodes in all objects.  This must be done in a separate verb because only a named verb resets the locale
@@ -864,15 +873,20 @@ NB. Return selection level for each token in the input string
 NB. Result is table of (token number(s));selection level
 NB. Called in locale at the base of the tree
 gettokenlevels =: 3&((3 : '<displaysellevel') traversedown (3 : ('<;y';':';'<,:x,y')))
+
+
 NB. common routines used by the object locales.  Objects are subclasses of dissectobj
 
 cocurrent 'dissectobj'
 coinsert 'dissect'
 
+NB. The following names must be redefined when an object is cloned
+clonenames_dissect_ =: ;: 'selections scrollpoints displaysellevel explorer errorwasdisplayedhere'
 
 NB. Object creation.  create the signaling variables used for communicating with the grid.
 NB. y is <the tokens that these values came from
 NB. Each verb-type object is responsible for creating:
+NB. titlestring: the name that will appear in the display at the top of a box
 NB. stealthoperand: at create time, this is set to 0 for normal verb, 1 for verbs that have no display (][), 2 for [:
 NB. valence: when the verb gets a valence (i. e. when its monad/dyad exec happens), that valence is saved.
 NB. estheights: number of blocks from the bottom of the noun node to the input(s) to this node.  This list has one atom per
@@ -883,6 +897,7 @@ NB.  as the verb, for pleasing display
 create =: 3 : 0
 coinsert COCREATOR
 NB. The following names are not modified after the object is cloned:
+titlestring =: ''
 tokensource =: ~. > 0 { y
 stealthoperand =: 0   NB. set for verbs that have no display, viz [ ] [:
 
@@ -897,15 +912,12 @@ failingselector =: 0$a:  NB. If this is ever modified, it will be modified in bo
 NB. The following names are possibly modified after cloning.  Therefore, they must be copied into the clone
 NB. when the clone is created, so that a mod to the original doesn't affect the clone.
 NB. IF YOU ADD NAMES HERE YOU MUST ALSO ADD THEM IN clone!
-selections =: 0$a:
-displaysellevel =: 0
-grid =: 0$a:
-errorwasdisplayedhere =: 1   NB. allow display of error during initial sniff
+(clonenames) =: (0$a:);(0 2$0);0;'';1
 
 NB.?lintonly valence =: errorlevel =: snifferror =: 1
 NB.?lintonly defstring =: ":
 NB.?lintonly resultissdt =: nounhasdetail =: nounshowdetail =: 0
-NB.?lintonly 'displaytype displayhandlesin displayhandleout displaystring displaylevrank fillmask' =: '';($0);($0);'';(0 3$a:);($0)
+NB.?lintonly 'displayhandlesin displayhandleout displaylevrank fillmask' =: '';($0);($0);'';(0 3$a:);($0)
 NB.?lintonly dispstealthoperand =: 0
 NB.?lintsaveglobals
 ''
@@ -914,7 +926,7 @@ NB.?lintsaveglobals
 NB. Object destruction
 destroy =: 3 : 0
 NB. if there is a grid attached to this control, destroy it.
-if. #grid do. grid_close'' end.
+destroyexplorer''
 codestroy''
 )
 
@@ -946,10 +958,7 @@ NB.?lintonly cl =. coname''
 ((, copath) coname'') copath cl
 NB. Perform unaliased initialization.  The values (look in create) that may be different between
 NB. clones, and that are not guaranteed to be assigned after the clone, must be initialized in the clone.
-selections__cl =: selections
-displaysellevel__cl =: displaysellevel
-grid__cl =: 0$a:
-errorwasdisplayedhere__cl =: 1
+(,&'__cl'&.> clonenames) =: ".&.> clonenames
 
 NB. Switch to the new locale
 cocurrent cl
@@ -1053,6 +1062,9 @@ NB. frame - the frame of the verb.
 NB. frames - the individual franes, boxed
 NB. accumframe - The frame - but when we inherit u, we add on the rank from u, so that when we are
 NB.  finished, accumframe shows the ranks of the levels of selection.  Used for calculating the rank display.
+NB.  accumframe may hold one extra level for unexpanded detail.  In this case, the value in the last box of accumframe
+NB.   holds the value that will be used for that selector when detail is to be expanded.  This value is always negative, so that
+NB.   negative values in accumframe can be discarded as not representing actual ranks
 NB. errorcode - An indication of the result of applying the selection to the results of the verb, and comparing it to the
 NB.  frame of the operands.  Values > 0 indicate error, 0=OK, _1=unknown because no operands; _2=unknown because no selector.
 NB.  The errorcode gives the status of the input values passed to this verb, BEFORE any local selector is applied.
@@ -1073,7 +1085,7 @@ NB. selector - the selector to use for subnodes of the current node, created by 
 NB.  given in the input arguments.  If there is an early error (agreement), or if the local selector gives an error,
 NB.  the selector is an empty list, which will suppress further analysis.  If the selector contains multiple ranges, we assume that
 NB.  we are just waiting for a final collection
-NB. selopinfo - The selection that has been applied to this operand so far, and the shape of the selected operand.  In other words,
+NB. selopinfo - The shape of the selected operand, and the selection that has been applied to this operand so far.  In other words,
 NB.  the (remaining shape);(frame so far).  These come in from the y input, representing the state before this level, and go out
 NB.  with the state after going through the local selection.  The operand shape is inferred from the rank of
 NB.   the verb, so is valid even when there is no selector.  List of boxes, one per operand
@@ -1091,7 +1103,8 @@ NB.  top-level errors
 NB. inheritedselection - the selection performed by the verb this node's outputs feed into.  Cleared here, and set when two nodes
 NB.  are joined together
 NB. vranks - the rank(s) of the operand. 1 or 2 numbers, but empty for a noun or for a verb that didn't execute
-NB. rankhistory - 1{y holds the table of previous ranks.  We append vranks to it, to produce the rank stack for this operand
+NB. rankhistory - 1{y holds the table of previous ranks.  We append vranks to it, to produce the rank stack for this operand.  The format of the rank stack is
+NB.  (string form of name to display);(sel level);(rank r)[;(rank l)
 traversedowncalcselect =: 3 : 0
 assert. 1 = #$y
 'sellevel rankhistory' =: 2 {. y
@@ -1100,9 +1113,9 @@ errorlevel =: errorlevel__COCREATOR
 inheritedselection =: 0$a:
 4!:55 <'fillmask'   NB. We use existence of fillmask as a flag
 if. #vranks =: getverbrank selopinfo do.
-  rankhistory =: rankhistory , <"0 sellevel , vranks
+  rankhistory =: rankhistory , titlestring ; <"0 sellevel , vranks
 end.
-qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%'
+qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%rankhistory%'
 if. 0 = #selandxy do.
   NB. No selector: we can't do much
   'collected frame frames errorcode selresult selector selopinfo selopinfovalid' =: 0;($0);a:;ENOSEL;(0$a:);(0$a:);(0$a:);0 0
@@ -1146,7 +1159,7 @@ NB.?lintonly selresult =: 0$a:
   NB. the operands and results to produce selopinfo.
   NB.
   NB. We know that we MUST be processing a single selection and can therefore collect any result that comes out of this path
-  NB. If this is a noun, it could be a terminal, in which case what we do doen't matter, or it could be nvv, in which case we
+  NB. If this is a noun, it could be a terminal, in which case what we do doesn't matter, or it could be nvv, in which case we
   NB. have to treat it as a verb of infinite rank.  We will detect that by the absence of verbex, and use the one (required) value of the noun
   NB. Extract the components of selopinfo
   'selopshapes selopselhist' =: <"1 |: > selopinfo
@@ -1156,13 +1169,13 @@ NB.?lintonly selresult =: 0$a:
   elseif.
   NB. If snifferror is set, we will automatically produce a local selector to zero in on the error.
   NB. Get the frames of the verb
-  frame =: >./ > frames =: (- vranks) }.&.> ,selopshapes  NB. frame meaningful only if no framing error
+  execdframe =. >./ > execdframes =. (- vranks) }.&.> ,selopshapes  NB. frame meaningful only if no framing error
   NB. Audit the frames.  They should agree. and they should match the number of results we got.
   NB. If the frame is invalid, we know that this verb is going to die before it executes; indicate agreement error
   NB. Clear the selector to short-circuit further processing
-  -. -:/ (<.&#&>/ {.&> ]) 2 {. frames,<$0 do.  NB. No agreement error on monad
+  -.@-:/ (<.&#&>/ {.&> ]) 2 {. execdframes,<$0 do.  NB. No agreement error on monad
     NB. Here for verb with agreement error
-    'collected errorcode selector selopinfovalid selresult' =: 0;ENOAGREE;(0$a:);(0:"0 selopinfo);(0$a:)
+    'collected errorcode selector selopinfovalid selresult frames frame' =: 0;ENOAGREE;(0$a:);(0:"0 selopinfo);(0$a:);execdframes;execdframe
   elseif.
   NB. Calculate the shape of the selected operand.  We will
   NB. return this shape, whether there is a valid selection or not, in case rank calculus allows us to
@@ -1171,28 +1184,34 @@ NB.?lintonly selresult =: 0$a:
   NB. other operand, then remove the frame from each operand
 NB. obsolete   selopinfo =: selopinfo (((frame }.~ ]) , }.~) #)&.> frames
 
-  selopshapes =: selopshapes (}.~ #)&.> frames
+  NB. frame and selresult will be the values we use for DISPLAY at this node.  At this point frame is
+  NB. what we expect to see - deviation will be because of error
+  NB. selopshapes will be the shapes passed into the next selection level applied to this input
+  NB.  kludge - this will depend on the current selection for u\ u/. etc
+  'frames selopshapes' =: calcdispframe execdframes
+  frame =: >./ > frames  NB. The common "frame"
+NB. obsolete   selopshapes =: selopshapes (}.~ #)&.> frames
   a: -: selector do.
     NB. There were no selectors.  This means that rank calculus was applied somewhere to give us a shape without
     NB. a valid selector.  The frame is valid, as just calculated, and the operand shapes too
     'collected errorcode selector selresult selopinfovalid' =: 0;ENOOPS;(,a:);(0$a:);(1:"0 selopinfo)
   elseif. do.
     assert. 1 = */ }: $ > selector  [ 'travdowncalcselect'
-    selr =. (selx =. ; findselection > selector) { logvalues
+    selx =. calcdispselx ; findselection > selector
     NB. Normal case, verb with no agreement error
     NB. Assume the verb completed unless we learn otherwise
     NB. If we get to here, the operand being presented will be collected, as in u@:v .  So we can display it.
     'collected errorcode' =: 1,EOK
     NB. Also, the number of results should match the number of cells in the frame, except
     NB. when the frame contains 0, in which case there will be 0 or 1 result.
-qprintf^:DEBTRAVDOWN '$selopinfo selopinfo $frames frames $frame frame $selr selr ' 
+qprintf^:DEBTRAVDOWN '$selopinfo selopinfo $frames frames $frame frame $selx ' 
     if. 0 e. frame do.
       NB. Execution on a cell of fills.  We should have 0 or 1 result.  If 0, it means that the
       NB. execution on the cell of fills failed, and we will use a scalar numeric as the replacement
-      assert. 0 1 e.~ #selr
-      if. 0 = #selr do. selr =. <0 end.   NB. error in fill cell - use scalar numeric
+      assert. 0 1 e.~ #selx
       NB. create a result of the required type and shape
-      selresult =: {. selr  NB. we will extend fill-cell with frame
+      if. 0 = #selx do. selresult =: <0 else. selresult =: ({.selx) { logvalues end.   NB. error in fill cell - use scalar numeric
+      NB. we will extend fill-cell with frame
 NB. obsolete       NB. Replace selops, which will be used by lower verbs, with a cell of fills.  But don't set islocalselgiven,
 NB. obsolete       NB. so there will be no selectors or formatting - just a new operand
 NB. obsolete       selopinfo =: vranks ({.@,@] {.~ ((-@(<. #)) {. ]))&.> selopinfo
@@ -1200,20 +1219,20 @@ NB. obsolete       selopinfo =: vranks ({.@,@] {.~ ((-@(<. #)) {. ]))&.> selopin
     else.
       NB. Not fill cell.  If there is no error, we should have just the right number of results
 NB. TEMP kludge!!  Error is not fatal, if we are in adverse or chasing a fill-cell.  Only too many results is always bad
-      assert. ((*/ frame) > #selr) +. (*/ frame) = #selr [ 'travdowncalcselect'  NB. used to include crashed__COCREATOR
+      assert. ((*/ frame) > #selx) +. (*/ frame) = #selx [ 'travdowncalcselect'  NB. used to include crashed__COCREATOR
       NB. If the frame is valid, but we didn't get enough results, it means something died in this verb;
       NB. mark this verb as requiring detail and set the selector (if any) to select the failing item, which
       NB. will be the first item we did NOT create.  OR, it could mean that we are executing on a cells of fills, which
       NB. might terminate with a error, which would be ignored.
       NB. See if all the cells executed
-      if. (*/ frame) > #selr do.
+      if. (*/ frame) > #selx do.
         NB. Cells did not execute.  If the selector is the one we found when sniffing errors, the error is in this cell.
         NB. Mark this cell as an execution error.  But if the selector is different, there is no permanent error here: either the user
         NB. changed the selector to a later cell which didn't execute anything, or we have determined that this cell
         NB. was partially-executed because of an error elsewhere, and there's no error here.  In those case, we mark
         NB. the cell as partially-executed, with no error
         if. selector -: failingselector do.
-          errorcode =: (*#selr) { EABORTED,EEXEC
+          errorcode =: (*#selx) { EABORTED,EEXEC
           NB. If we are sniffing for errors, and
           NB. there is a frame, sutoset the selection (for the next level) to point to the first unexecuted cell.  Do this only
           NB. for thw top-level error
@@ -1232,23 +1251,23 @@ NB. TEMP kludge!!  Error is not fatal, if we are in adverse or chasing a fill-ce
               NB. wanted to select at the root, they could have.  But in the case of error, we really want the
               NB. root to have the entire failing selector, so that it can display it; so we propagate
               NB. the selector back to the originating monad/dyad
-              (propselup [ propsel) (sellevel {. selections) , <frame #: #selr
+              (propselup [ propsel) (sellevel {. selections) , <frame #: #selx
 qprintf^:DEBTRAVDOWN 'errorcode selections ' 
             end.
           end.
         else.
-          errorcode =: ((0=#failingselector) +. *#selr) { EABORTED,EUNEXECD  NB. Indicate partial execution, but without error
+          errorcode =: ((0=#failingselector) +. *#selx) { EABORTED,EUNEXECD  NB. Indicate partial execution, but without error
         end.
       end.
       NB. We need to save the selected value.  We use this to calculate the predicted frame after collection.
 NB. obsolete       selresult =: {.^:(0=#)selr  NB. This is the (unopened, since it might not collect) result from this object's verb
-      selresult =: selr  NB. This is the (unopened, since it might not collect) result from this object's verb
+      selresult =: fetchselr selx  NB. This is the (unopened, since it might not collect) result from this object's verb
     end.
 
     NB. Handle selection for the next level
 
-    NB. If the selector trims down the selection of results, apply that trim to the selectors,
-    NB. the results, and the selected operands.  If we are sniffing and this verb failed, the final selection would fail
+    NB. If the selection trims down the selection of results, apply that trim to the selector.
+    NB. If we are sniffing and this verb failed, the final selection would fail
     NB. by definition; we will have handled that case above.  We increment sellevel whenever there is a frame, so that even nonselecting
     NB. frames show up in the shape display; but empty frames do not have selectors (to make the color sequence predictable).
     NB. Thus, we have to skip the selection when the frame is empty
@@ -1259,11 +1278,10 @@ NB. obsolete       selresult =: {.^:(0=#)selr  NB. This is the (unopened, since 
       NB. that when we select, we will get a length error if selection goes too deep.  Bracket the
       NB. intervals with the start & end of the selector so that we create one extra interval that works
       NB. in case of crash, to get the inputs corresponding to the nonexistent last result
-      newsel =. frame $!.(<1 2$0) allsel =. 2 <\ (,>selector) enclosing selx { logticket
+      newsel =. tickettonatural frame $!.(<1 2$0) 2 <\ (,>selector) enclosing selx { logticket
       NB. Apply the user's selection to the selector.
-      unewsel =. (sellevel { selections) { newsel  NB. This is where it would crash on error
+      selector =: <> (sellevel { selections) { newsel  NB. This is where it would crash on error
 
-      selector =: <>unewsel   NB. Use this selector
       NB. If (owing to error) we had missing results, newsel will have had some flag values
       NB. inserted: {:allsel is a selector for anything following the last valid result, and
       NB. is a proxy for the input cell that led to error.  The other flag value is (<1 2$0), which
@@ -1311,7 +1329,11 @@ NB. or a missing or empty selector, don't try to calculate fillmask for the cell
 NB. create a zero fillmask below)
 NB. If no cells were executed, no fillmask is meaningful.
 NB. If the fillmask is not created, wipe out any previously-existing one
-if. -. errorcode e. ENOAGREE,EABORTED,ENOOPS do.
+if. errorcode e. ENOAGREE,EABORTED,ENOOPS do.
+  NB. We may change the errorcode later, so if we didn't set the fillmask, we need to show that this
+  NB. node can never display the value
+  collected =: 0
+else.
   if. 1 < */ frame do.
     NB. If this level is selectable, increment the selector level to use for this and subsequent levels - whether
     NB. we have a selector yet or not.  If this level is selectable, and we didn't qualify it down to a single input,
@@ -1333,10 +1355,6 @@ if. -. errorcode e. ENOAGREE,EABORTED,ENOOPS do.
     NB. if there were no cells executed
     fillmask =: (FILLMASKSELLEVEL * sellevel) $~ frame , $@> {. selresult
   end.
-else.
-  NB. We may change the errorcode later, so if we didn't set the fillmask, we need to show that this
-  NB. node can never display the value
-  collected =: 0
 NB. obsolete else.
 NB. obsolete  NB. if this node is not a collector, we must clear selops since they are invalid for future use
 NB. obsolete  'selresult selresultshape' =: (<'?-');$0
@@ -1344,10 +1362,10 @@ end.
 
 NB. If this verb has a frame, increment the selection level, whether it allows selection or not
 bnsellevel =: < sellevel + *#frame
-NB. Initialize the counter of this verb's frames; negative if nonselecting
+NB. Initialize the counter of this verb's frames; may be overridden later to provicde initial selection for unexpanded detail
 accumframe =: <frame
 
-qprintf^:DEBTRAVDOWN 'collected collectedframe errorcode frame $selresult selresult selresultshape selector selopinfovalid selopinfo fillmask selections '
+qprintf^:DEBTRAVDOWN 'collected collectedframe errorcode frame $selresult selresult selresultshape selector selopinfovalid selopinfo fillmask selections rankhistory '
 NB.?lintsaveglobals
 )
 
@@ -1385,6 +1403,19 @@ frameselresult =: 3 : 0
 (*#fill) ;< <"0@(cs&{.)@>`>@.(#fill) frame $!.(<cs $ {.!.' ' fill) selresult
 )
 
+NB. Utilities for inspecting accumframe.  The last box of accumframe may be a prospective value, i. e. the value used
+NB. for selecting unexpanded detail.  Except when we are selecting, we want to ignore the negative values
+NB. We put this selector into accumframe so that it will be passed along as the DOL is moved from locale to locale
+NB. For all of these, y is accumframe
+NB. Boxed accumframe, including only actual shapes
+afact =: }:^:(0>{.@>@{:)
+NB. Flattened accumframe, with negative values removed
+afflat =: (#~ >:&0)@;
+NB. Flattened accumframe, with 1 in the first position of each box.  Used to reshape the selector
+afkey =: [: ; [: {.&1&.> #@>
+NB. Number of values in accumframe
+afcount =: +/@:(0 <: ;)
+
 NB. obsolete 
 NB. obsolete NB. y is errorcode(s), result is true if it is OK for child nodes to select
 NB. obsolete travdownselok =: -.@(+./@:e.&1 2 3 4 5)
@@ -1413,7 +1444,8 @@ NB. we will abort traversal at that point.
 NB. y is the dol (x operand to traverse)
 NB. result is a suitable return value from traverse, viz y ,&< locale
 agreementerror =: 3 : 0
-'displaytype displayhandlesin displayhandleout displaystring displaylevrank' =: 'verb';_0.3 0.3;0;(defstring 0);<rankhistory
+NB. Since we abort the traversal, roll up the failing part and install it as the last name in the rank stack
+'displayhandlesin displayhandleout displaylevrank' =: _0.3 0.3;0;<(<defstring 0) (<_1 0)} rankhistory
 y ,&< coname''
 )
 
@@ -1429,18 +1461,16 @@ inheritu =: 4 : 0
 vlocs =. x
 'dol loc' =. y
 if. DEBDOL do.
-smoutput 'inheritu: ' , (>coname'') , ' ' , defstring 0
+smoutput 'inheritu: in ' , (>coname'') , ' ' , defstring 0
 qprintf'>loc defstring__loc]0 '
 qprintf'errorcode errorcode__loc '
 end.
-SM^:DEBDOL 
 displocale =. coname''
 NB.?lintonly loc =. <'dissectobj'
-displaytype =: displaytype__loc
 displayhandlesin =: displayhandlesin__loc
 displayhandleout =: displayhandleout__loc
-displaystring =: displaystring__loc
 displaylevrank =: displaylevrank__loc
+dispstealthoperand =: dispstealthoperand__loc
 NB. If the u was uncollectable, or if it executed no cells, it can't contribute to the fillmask
 NB. and its fillmask is guaranteed undefined.  Likewise, if there was no selector, there will be no fillmask
 NB. Append the frame of u to the ranks calculated at this level.  If u lacked selectors, the frame
@@ -1535,7 +1565,7 @@ if. (errorcode__x,errorcode__y) *./@:e. EEXEC,EABORTED,ENOAGREE do.
   NB. Among the hard error codes, there is a severity order.  ABORTED/NOAGREE fail before
   NB. executing anything, and are worse than EXEC (and ABORTED/NOAGREE have meaningless values for selresult).
   NB. If both have ABORTED/NOAGREE, fail y; if only one does, fail that one; otherwise fail the
-  NB. one with fewer results, y is tied
+  NB. one with fewer results, y if tied
   okloc =. x   NB. set default
   select. (errorcode__x,errorcode__y) e. EABORTED,ENOAGREE
   case. 0 0 do.  NB. EXEC,EXEC
@@ -1574,7 +1604,7 @@ end.
 NB.?lintonly x =. y =. <'dissectobj'
 NB. In the dyad, x is v0 and y is v1
 if. (errorcode__x , errorcode__y) +./@:> EOK do.
-  , bnsellevel
+  , bnsellevel , NORANKHIST
 else.
   bnsellevel , NORANKHIST , rankcalculus^:(collected__x *: collected__y) selector , (createuop__x '') , (createuop__y '')
 end.
@@ -1583,9 +1613,9 @@ end.
 NB. x tells which ranks to use: must be a list or a:
 NB. y is the selector + other operands
 NB. Result is y, with sellevel and ranks for v
-NB. we pull the ranks according to x
+NB. we pull the ranks according to x (ranks are textstring;level;left[;right])
 travdownvops =: 4 : 0
-bnsellevel , (< (x) {"1 rankhistory) , y
+bnsellevel , (< x {"1 rankhistory) , y
 )
 
 
@@ -1951,6 +1981,11 @@ rout =: 3 : 0
 )
 
 NB. *************** end of router - start of display-object management **************
+SCROLLBARWIDTH =: 14  NB. width of scrollbar in pixels
+SCROLLBARCOLOR =: <192 192 192   NB. color for scrollbar - no pen
+SCROLLBARENDCOLOR =: <240 240 240
+SCROLLBARENDTHICKNESS =: 10
+SCROLLBARTRAVELERCOLOR =: <128 128 128
 
 NB. for the verb-name cell
 VERBCOLOR =: 114 30 30
@@ -2017,7 +2052,7 @@ DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
 
 FRINGECOLOR =: (220 220 220 , 200 200 0 , 255 0 0 ,: 255 255 255) ;"1 (0 0 0 1)   NB. color/border of fringes: in order label,shape,status,data
 
-DOBORDERCOLORS =: _3 ]\ 0 0 0  255 0 0  0 0 255  NB. Black border for box, but red if incomplete, blue if uncollected
+DOBORDERCOLORS =: _3 ]\ 0 0 255 0 0 255  0 0 0  255 0 0   NB. Black border for box, but red if incomplete, blue if empty
 RANKCOLOR =: 0 220 128  NB. color of dashed line for high-rank ops
 BOXBORDERCOLOR =: 0 0 0  NB. color of lines between boxes
 HIGHLIGHTBORDERSTYLE =: 0 0 0 2  NB. color,width of lines for highlight
@@ -2059,10 +2094,11 @@ satzcfm =: satzcfm , SATZCOLOR;SATZTEXTCOLOR;SATZFONT;SATZFONTSIZE;SATZMARGIN
 NB. *********** create DOs
 cocurrent 'dissectobj'
 
-NB. y is a dol
+NB. y is a dol (i. e. valueformat)
 NB. result is hw of the DOL.  This is the maximum of x and y, plus a margin if
 NB. the data is boxed
 extractDOLsize =: (((+:BOXMARGIN) * 3 < #) + {:@>@(1 2&{))"1
+
 NB. Create the display object layout (DOL) for a noun
 NB. data to use comes from globals set by traversedown
 NB.  selresult - the value of the noun is the unboxed value
@@ -2075,21 +2111,19 @@ NB. y is information about formatting (font size for the data)
 NB. result is the layout, saved in globals in the locale
 NB.  formatinfoused is information about the format that was finally selected:
 NB.   pointsize
-NB.  valueformat is shapeused;y endpixels;x endpixels[;subnouns]
-NB.   shapeused is the shape of the part of the noun that is actually formatted, which may be less than the shape of selresult if
-NB.    selresult is too big to be displayed
+NB.  valueformat is shape;y endpixels;x endpixels[;subnouns]
 NB.   y endpixels is the ending position of each row in the display.  The number of atoms will be */ (even items of shape, counting from the end)
 NB.    a gap of 1 pixel is left between blocks of rank 3, 5, etc.  This is included in the y endpixels values
 NB.   x endpixels is similar for x
 NB.   subnouns is provided only for boxed selresult.  It gives the valueformat for each box of the represented part of selresult.
-NB.   Its shape is shapeused.
-NB.  The actual result of the verb is the size of the allocated data area, in pixels, hw
+NB.
+NB.  The actual result of createDOL is the size of the allocated data area, in pixels, hw
 createDOL =: 3 : 0
 NB. The monad is what is called externally.  It uses the top-level values saved in the locale
-'font fontsize margin maxyx' =. formatinfoused =: y
+formatinfoused =: y
 NB. Create the data for the selresult.  We have to try to collect it, because the verb may have encountered
 NB. an error before we tried to collect it, possibly leaving an uncollectable result (i. e. it would have
-NB. had a framing error if it survived long enough to collect.  If collection succeeds, we use the
+NB. had a framing error if it survived long enough to collect).  If collection succeeds, we use the
 NB. collected value; if not, we box the atoms, collect that, and use it.  When we come to display
 NB. the uncollectable value we will suppress the outer boxing in the display.
 NB. If collection succeeds, we fill out an incomplete execution with fills of the appropriate type;
@@ -2098,21 +2132,20 @@ NB. the fills to have text)
 NB. obsolete 'DOcellsize DOfillatom' =: checkframing selresult
 NB. obsolete dispvalue =. <"0@(DOcellsize&{.)@>`>@.(#DOfillatom) frame $!.(<DOcellsize $ {.!.' ' DOfillatom) selresult
 NB. obsolete valueformat =: dispvalue createDOL formatinfoused  NB. top result is boxed
-valueformat =: (1 {:: (DOframinginfo =: checkframing selresult) frameselresult '') createDOL formatinfoused  NB. top result is boxed
-maxyx <. extractDOLsize valueformat
+(1 {:: (DOframinginfo =: checkframing selresult) frameselresult '') createDOL formatinfoused  NB. top result is boxed
 NB.?lintsaveglobals
 :
 NB. The dyad does the work, and calls itself if the value is boxed.  The dyad returns
-NB. valueformat
-'font fontsize margin maxyx' =. y
+NB. valueformat, which is (unused);y endpixels;x endpixels[subDOLs]
+'font fontsize margin' =. y
 value =. x
 
-NB. If the noun is too big, cut it down
-NB. This is just to make sure we don't try to format a gigantic noun.  After we have the exact sizes,
-NB. we will trim the shape to the size needed.
-NB. maxyx is in pixels.  We assume that an atom codes as a single 7x9 character (worst case) and we trim to fit in
-NB. maxyx
-value =. (maxyx % 9 7) (] {.~ ((] ([ <. ({.~ -@#)~) [: >.@, [: %~/\. [ ,~ _2 |.\&.|. ]) $@])) value
+NB. obsolete NB. If the noun is too big, cut it down
+NB. obsolete NB. This is just to make sure we don't try to format a gigantic noun.  After we have the exact sizes,
+NB. obsolete NB. we will trim the shape to the size needed.
+NB. obsolete NB. maxyx is in pixels.  We assume that an atom codes as a single 7x9 character (worst case) and we trim to fit in
+NB. obsolete NB. maxyx
+NB. obsolete value =. (maxyx % 9 7) (] {.~ ((] ([ <. ({.~ -@#)~) [: >.@, [: %~/\. [ ,~ _2 |.\&.|. ]) $@])) value
 NB. If the noun is empty, we can't very well calculate its display size,
 NB. so just use a canned size
 if. 0 e. $value do.
@@ -2144,76 +2177,69 @@ else.
   bdynos =. rcshapes (+ *)@(1&(|.!.0))@:(0&(i.&1@:~:)@|."1)@(#: i.@#)&.> rcextents
   NB. obsolete rcextents =. (*/\.@:}.&.> rcshapes)   (] + [: +/\ 0 (_1)} [: +/ #@] ($   1 {.~ -)"0 [)^:(*@#@[)&.>   rcextents
   rcextents =. +/\&.> bdynos +&.> rcextents
-  NB. Remove values that are beyond the maximum - but leave one, so if we have just one huge box, we see part of it
-  rcextents =. rcextents ([ {.~ 1 >. I.)&.> maxyx
+
+NB. obsolete   rcextents =. rcextents ([ {.~ 1 >. I.)&.> maxyx
 end.
 NB. Assemble final result
-(<$value),rcextents,subDOLs
+($value);rcextents,subDOLs
 NB.?lintsaveglobals
 )
 
-NB. Create display object, vectoring to the indicated type
-NB. y is travdown display info record
-createDO =: 3 : 0
-('createDO',displaytype)~ y
-)
-
-createDOnoun =: 3 : 'nouncfm createDOvn y'
-createDOverb =: 3 : 'verbcfm createDOvn y'
-
-NB. create the display object for a verb: header + result
-NB. x is color/font/margin info:
+NB. create the display object for a verb/noun: header + result
+NB. y is color/font/margin info:
 NB.  (info for label);(info for shape);(info for status line);(info for data)
 NB.  Each info is:
 NB.    color;text color;font;fontsize;margin
 NB.  for label and status line, we have just a list
 NB.  for shape and data, we have a table which we will index by selector. 
 NB. formatting info is in globals
-NB. we set globals:
+NB. we set globals, all of which have one entry for main and one for explorer if allowed
 NB.  DOsize - pixel size of object
-NB.  DOhandlepos - table, yx of handle(s) within the object
 NB.  DOlabelpos - yx,:hw of the string, within the object
 NB.  DOshapepos - yx,:hw of shape, within the object
 NB.  DOdatapos - yxhw of data, within the object
+NB.  DOcfm - the cfm info given in y
 NB. result is 0 if we created the object, 1 if it was omitted
-createDOvn =: 4 : 0
-'cfmlabel cfmshape cfmstatus cfmdata' =. x
+createDOvn =: 3 : 0
+if. #y do. DOcfm =: y end.
+'cfmlabel cfmshape cfmstatus cfmdata' =. DOcfm
 SM^:DEBDOL 'createDOvn: ' , > coname''
-NB. If stealth verb, there is no display
-if. dispstealthoperand e. 1 2 do. dispstealthoperand return. end.
+NB. If stealth verb, there is no display; but because of inheritance and suppressed detail, we might have the stealthoperand flag
+NB. set in a locale that is creating a noun; we'd better create that.  We detect nouns, as usual, by absence of handles in
+if. (dispstealthoperand e. 1 2) *. (*#displayhandlesin) do. dispstealthoperand return. end.
 
-wd 'psel ' , ": winhwnd__COCREATOR
+NB. We need a graphics object selected so we can check text sizes.  We use the
+NB. main form, because the isigraph may not be opened on the explorer yet
+wd 'psel ' , winhwnd__COCREATOR
 glsel 'dissectisi'
-
-NB. Save the fixed values
-DOlabelstring =: displaystring
 
 NB. Create the top line: name (if any), flanked by rank(s) (if any)
 NB. We are creating one box that will describe the top line
 NB. Get size of verb/name string, plus margin
-if. #displaystring do.
-NB. obsolete   glfont ; ":&.> 2 3 { cfmlabel
-NB. obsolete   vhw =. (+: 4 {:: cfmlabel) + |. glqextent displaystring
-  stringdesc =. ALIGNCENTER addalignmentrect cfmlabel sizetext <displaystring
-  if. #displaylevrank do.
-    NB. Audit the rank to enforce descending order (empty values have no effect); then we
-    NB. reset empty cells in the original to space; then delete rows that have no effect in the
-    NB. rolled-up value
-    rolledlevrank =. <./@,&.>/\. &.(,&(<_)) &.|. }."1 displaylevrank
-    newrankmsk =. ~: rolledlevrank =. (a: = }."1 displaylevrank)} rolledlevrank ,: <' '
-    DOranklevels =: (_4 + #cfmshape) <. newrankmsk # > {."1 displaylevrank
-    DOranks =: ":&.> |: newrankmsk # rolledlevrank
-    rankrects =. (DOranklevels { cfmshape) sizetext"1"_ _1 DOranks
-    NB. Make the left rank left-justified, the right rank right justified.  Align each stack
-    NB. vertically
-    rankdescs =. (((<ALIGNLEFT) addalignmentgroup [: ,. addalignmentrect~)"2 0 (ALIGNLEFT,ALIGNLEFT) {.~ #) rankrects
-    NB. Join the rank to the string, horizontally
-    namedesc =. (<ALIGNCENTER) addalignmentgroup rankdescs ({.@[ , ] , }.@[) stringdesc
-  else.
-    NB. No lev/rank: it'll be just the string
+if. 2 = 3!:0 displaylevrank do.
+  NB. string; no ranks
+  if. #DOranks =: displaylevrank do.
+    stringdesc =. ALIGNCENTER addalignmentrect cfmlabel sizetext <DOranks
     namedesc =. (<ALIGNCENTER) addalignmentgroup stringdesc
+  else. namedesc =. 0 addalignmentrect 0 0
   end.
-else. namedesc =. 0 addalignmentrect 0 0
+else.
+  NB. table; contains string;level;rank[;rank].  
+  NB. Audit the rank to enforce descending order (empty values have no effect); then we
+  NB. reset empty cells in the original to space; then delete rows that have no effect in the
+  NB. rolled-up value.  Rows (except the first) containing only infinities are known to have no effect
+  NB. Propagate nonempty symbols over empties.  This handles the case of ~, which assigns a rank but doesn't have a display.
+  NB. Remove lines with no display symbol
+  nonemptylevrank =. ([^:(*@#@>@[)/\. {."1 displaylevrank) (<a:;0)} displaylevrank
+  rolledlevrank =. <./@,&.>/\. &.(,&(<_)) &.|. 2 }."1 nonemptylevrank
+  newrankmsk =. (~: *. 1 (0}) [: -. (<_)&(*./@:="1)) rolledlevrank =. (a: = 2 }."1 nonemptylevrank)} rolledlevrank ,: <' '
+  DOranklevels =. (_4 + #cfmshape) <. newrankmsk # > 1 {"1 nonemptylevrank
+  DOranks =: (":&.> newrankmsk # rolledlevrank) (}:"1@[ ,. ] ,. {:"1@[) newrankmsk # {."1 nonemptylevrank
+  DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) cfmlabel ,:"1 (DOranklevels { cfmshape)
+  rankrects =. DOrankcfm sizetext"1 0 DOranks
+  NB. Make the left rank left-justified, the right rank right justified.  Align each stack
+  NB. vertically({."1 displaylevrank) ({."1@] ,. [ ,. }."1@])
+  namedesc =. (<ALIGNCENTER) addalignmentgroup (ALIGNLEFT,ALIGNLEFT) addalignmentrect DOrankcfm sizetext"1 0 DOranks
 end.
 
 
@@ -2254,7 +2280,7 @@ NB. The result shape is valid if it collected with meaningful execution
 if. normalresult =. collected *. (0 < #selresult) *. -. errorcode e. ENOAGREE,EABORTED do.
   shapetouse =. selresultshape
 else.
-  shapetouse =. ; accumframe
+  shapetouse =. afflat accumframe   NB. delete unexpanded detail
 end.
 NB. If we have no shape, either it's a scalar, or we have empty frame with unknown shape.
 NB. in both cases, it's OK to elide the shape/selector line.
@@ -2263,9 +2289,9 @@ if. #shapetouse do.
   NB. The last box of DOshapes (possibly empty) is the part of the shape that is not in the frame,
   NB. in other words the shape of the (filled) result cell.  This will be drawn in a special color, and
   NB. no selection will be drawn below it.
-  assert. shapetouse >:&# ;accumframe
+NB. assert. shapetouse >:&# ;accumframe  not valid, when extra internal ranks, such as from u/, are possible
 NB. obsolete   DOshapes =: ,: (1 ,~ ; {.&1&.> #@> accumframe) (({.~ #) <;.1 ]) shapetouse
-  DOshapes =: ,: (; {.&1&.> #@> accumframe) ([ <;.1 ({.~ #)~) shapetouse
+  DOshapes =: ,: (afkey afact accumframe) ([ <;.1 ({.~ #)~) shapetouse  NB. Remove last box of accumframe if neg
   NB. If there are selections, line them up under the boxes in the shape containing selectable values
   NB. (i. e. more than one cell)
   if. sellevel < #selections do.
@@ -2274,7 +2300,7 @@ NB. obsolete   DOshapes =: ,: (1 ,~ ; {.&1&.> #@> accumframe) (({.~ #) <;.1 ]) s
   NB. append the result cell.  If there are selections this will be duplicated; no problem, since it is discarded for display
   if. normalresult do.
     NB. when we have a shape, use it to calculate the shape of the result cell
-    DOshapes =: DOshapes ,. < (#;accumframe) }. shapetouse
+    DOshapes =: DOshapes ,. < (afcount accumframe) }. shapetouse
   else.
     NB. If we are using a frame rather than a shape, use result shape of '...'
     DOshapes =: DOshapes ,. <'...'
@@ -2293,10 +2319,11 @@ end.
 NB. Agreement error is special: it formats the status above the verb, it aborts traversal,
 NB. and it suppresses the display of data.  Go ahead and
 NB. handle that here.
+'DOlabelpos DOshapepos DOstatuspos DOdatapos displayscrollbars' =: <,:0  NB. make sure all names defined
 if. errorcode = ENOAGREE do.
   NB. Create rectangles for status and verb, and stack them, expanding the status line if needed
   picknames =: 'DOstatuspos DOlabelpos'
-  arects =. , alignrects > (ALIGNLEFT;ALIGNCENTER) addalignmentgroup statusdesc ,: namedesc
+  arects =. ,: , alignrects > (ALIGNLEFT;ALIGNCENTER) addalignmentgroup statusdesc ,: namedesc
 NB. format the DOL if any
 elseif. normalresult do.
   NB. The case of no results can happen here only if we have EUNEXECD which we passed through
@@ -2306,27 +2333,43 @@ elseif. normalresult do.
   NB. Get size of shape string, plus margin.
   NB. shape of result is shape of fillmask; box according to shapes of selectors
   NB. Stack vertically: string/rank,shape,status,data
-  datadesc =. ALIGNCENTER addalignmentrect createDOL ((<_1;2 3 4) { cfmdata),<maxnoundisplaysize
+
+  NB. Find the sizes to display: main, and explorer if allowed.  A table of 1 or 2 rows
+  hwtable =. calcformsize valueformat =: createDOL ((<_1;2 3 4) { cfmdata)
+
+  NB. If data doesn't fit in the allocated area, append scrollbars as needed.  We install the
+  NB. bars here; the endpoints and traveler are added when the box is drawn
+  if. +./ displayscrollbars =: hwtable <"1 extractDOLsize valueformat do. hwtable =. hwtable +"1 SCROLLBARWIDTH * |."1 displayscrollbars end.
+
+  datadesc =. ALIGNCENTER addalignmentrect hwtable
   picknames =: 'DOlabelpos DOshapepos DOstatuspos DOdatapos'
-  arects =. , alignrects > (ALIGNLEFT;ALIGNCENTER) addalignmentgroup namedesc , shapedesc , statusdesc ,: datadesc
+  arects =. ,@:alignrects@:>@:((ALIGNLEFT;ALIGNCENTER)&addalignmentgroup)"_1 (namedesc , shapedesc ,: statusdesc) ,"_ _1 datadesc
 elseif. do.
   NB. Create rectangles for verb and status, and stack them, expanding the status line if needed
   picknames =: 'DOlabelpos DOshapepos DOstatuspos'
-  arects =. , alignrects > (ALIGNLEFT;ALIGNCENTER) addalignmentgroup namedesc , shapedesc ,: statusdesc
+  arects =. ,: , alignrects > (ALIGNLEFT;ALIGNCENTER) addalignmentgroup namedesc , shapedesc ,: statusdesc
 end.
-NB. pickrects and picknames contain info for picking
+NB. pickrects and picknames contain info for picking.  pickrects is a table, picknames is a list
+NB. arects is a TABLE of info, one for each size
 pickrects =: brect@> arects
 NB. If any pickrects are empty, delete them.  This will also delete them from the eventual display
 pickok =. * (<1 0)&{"2 pickrects
-pickrects =: pickok # pickrects
+pickrects =: pickok #"_1 pickrects
 NB.?lintmsgsoff
-(picknames =: pickok # ;: picknames) =: pickok # arects
+(picknames =: ({.pickok) # ;: picknames) =: |: pickok #"_1 arects
 NB.?lintmsgson
 NB. There should always be SOMETHING to display (shape, label, or data), but during sniff we don't allow
 NB. any space for the data, which could leave us with nothing.  Make sure we have a valid DOsize then
-DOsize =: 2 2 >. {: brect pickrects
+DOsize =: 2 2&>.@{:@brect"_1 pickrects
 
-DOhandlepos =: displayhandlesin */ 0 (0}) DOsize
+NB. obsolete DOhandlepos =: displayhandlesin */ 0 (0}) DOsize
+
+NB. If selections have changed such that this locale cannot raise an explorer, delete any old one that exists
+if. 2 > #DOsize do. destroyexplorer '' end.
+
+NB. Set the initial scrollpoints, in case the noun is big
+scrolltravelers =: (2 2$0)"1 scrollpoints =: initscrollpoints''
+
 NB.?lintonly 'DOlabelpos DOshapepos DOstatuspos DOdatapos' =: <2 2 $ 0
 NB.?lintonly 'DOranks DOranklevels DOshapes' =: ($0);($0);<0$a:
 0  NB. object created, say so
@@ -2345,9 +2388,9 @@ NB. result is boxed hw,:alignment
 addalignmentrect =: <@(,:~)"1
 
 NB. y is a table of boxed rects, or a list representing horizontal stacking
-NB. x is (vert alignment mode;horiz alignment mode)
+NB. x is (vert alignment mode;horiz alignment mode) - possibly boxed lists for each
 NB. result is one box representing those aligned objects
-addalignmentgroup =: [: < {:@[ ,. {.@[ ,  ,:^:(0>.2-#@$)@]
+addalignmentgroup =: [: < >^:(1<L.)@{:@[ ,. >^:(1<L.)@{.@[ ,  ,:^:(0>.2-#@$)@]
 
 
 NB. manifests for alignment/formatting
@@ -2369,7 +2412,7 @@ NB. according to the flags at each level.
 NB. y, a rectobj,  is either an open rect description or a table of boxes, where the first row and column contain
 NB.  alignment flags [, space before [, space after]]
 NB. for that column/row: 0=center 1=ljust 2=rjust 3=spread
-NB. The other cells of y contain either rectobjs.
+NB. The other cells of y contain rectobjs.
 NB. The open rect description is a table containing yx followed by formatting selection: 0=center 1=ljust 2=rjust 3=swell
 NB. The result has the same structure as the input, except that the alignment boxes and formatting info are
 NB. removed, and all the rectangles are adjusted to be relative to the (0,0) origin of
@@ -2471,7 +2514,7 @@ x drawline"1 3 (, |."1)&>/ ,."0 1&.>/ y
 
 NB. x is interior color;(pen color,width).  If pen is omitted, null is used
 NB. if color is empty, use null brush
-NB. y is yx,:wh of rectangles to draw with that color
+NB. y is yx,:hw of rectangles to draw with that color
 drawrect =: 4 : 0
 if. 0 e. $y do. return. end.
 NB. obsolete y =. (#~ [: -. 0 e."1 {:"2) y
@@ -2527,40 +2570,37 @@ NB. Add margins all around, return in hw format
 
 cocurrent 'dissectobj'
 
-NB. Draw display object, vectoring to the indicated type
-NB. y is yx
-NB. result is pickrect for the object, yx,:hw
-drawDO =: 3 : 0
-wd 'psel ' , ": winhwnd__COCREATOR
-glsel 'dissectisi'
-SM^:DEBDOL 'drawDO: ' , (> coname'') , ' ' , displaytype , ' ' , defstring 0
-if. DEBOBJ do.
-  'Object: locale=%j, type=%j, label=%j, xywh=((%j,%j)-(%j,%j))' printf (coname''),displaytype;DOlabelstring;(<"0 , |."1 y,:DOsize)
-end.
-('drawDO',displaytype)~ y
-y,:DOsize
+EXPLORERYX =: 0 0   NB. The place on the explorer isigraph to start the display
+NB. Draw the main object, and also the explorer if it is active
+NB. If x is given, it selects the view(s) to draw
+drawDOvnall =: 3 : 0
+a: drawDOvnall y
+:
+if. #y do. DOyx =: (#DOsize) {. y ,: EXPLORERYX end.
+drawDOvn"1 x { (>:*#explorer) {. ((#DOsize) {. (winhwnd__COCREATOR;explorer),.(0;1),.(1<#DOsize);0) ,. |: <"_1@> DOyx;DOsize;DOlabelpos;DOshapepos;DOstatuspos;DOdatapos;displayscrollbars;pickrects;scrollpoints
 )
 
-drawDOnoun =: 3 : 'nouncfm drawDOvn y'
-drawDOverb =: 3 : 'verbcfm drawDOvn y'
-
-NB. y is yx of top-left corner
-NB. result is graphics ops to draw the DO
-NB. x is color/font/margin info:
+NB. y is info for the surface we are drawing (position, size, etc)
+NB. side-effect is graphics ops to draw the DO
+NB. DOcfm is color/font/margin info:
 NB.  (info for label);(info for shape);(info for status line);(info for data)
 NB.  Each info is:
 NB.    color;text color;font;fontsize;margin
 NB.  for label and status line, we have just a list
-NB.  for shape and data, we have a table which we will index by selector. 
-drawDOvn =: 4 : 0
-'cfmlabel cfmshape cfmstatus cfmdata' =. x
+NB.  for shape and data, we have a table which we will index by selector.
+NB. Result is pick window (yx,:hw) for the DO
+drawDOvn =: 3 : 0
+NB. These local variables cover the global names inside this routine (kludge).  hwindex is the window number we are displaying
+'hwnd hwindex explorable DOyx DOsize DOlabelpos DOshapepos DOstatuspos DOdatapos displayscrollbars pickrects scrollpoint' =. y
+wd 'psel ' , hwnd
+glsel 'dissectisi'
+'cfmlabel cfmshape cfmstatus cfmdata' =. DOcfm
 SM^:DEBDOL 'drawDOvn: ' , > coname''
-assert. 0 = dispstealthoperand
 NB. Save the position of the object, and as a 2x2
-actyx2 =. 0 ,:~ actyx =. y
+actyx2 =. 0 ,:~ DOyx
 NB. Set clipping box to the interior of this object
 glclipreset''
-glclip 0 0 1 1 + , |."1 actyx ,: DOsize
+glclip 0 0 1 1 + , |."1 DOyx ,: DOsize
 
 NB. See which elements are present
 'labelpresent shapepresent statuspresent datapresent' =. (i. 4) e. presentx =. (;: 'DOlabelpos DOshapepos DOstatuspos DOdatapos') i. picknames
@@ -2572,15 +2612,13 @@ end.
 
 NB. Draw the verb/name string, if any
 if. labelpresent do.
-  cfmlabel drawtext DOlabelstring;actyx2 + (<0 , *#displaylevrank) {:: DOlabelpos
-
-  NB. Draw the ranks, if any
-  if. #displaylevrank do.
-    NB. Discard the verb, run together what's left.  Must match the data to display, and
-    NB. must have same left and right count.  The boxes of DOlabelpos, except the string, hold
-    NB. lists of boxed rects
-    rankrects =. >@,@> (<0;<<1) { DOlabelpos
-    (DOranklevels { cfmshape) drawtext"_ _1 DOranks ,"0 <"2 actyx2 +"2 rankrects
+  NB. If DOranks is a string, it contains ranks with no labels.  It is the only thing
+  NB. in the box; draw it there
+  if. 2 = 3!:0 DOranks do.
+    cfmlabel drawtext DOranks;actyx2 + (<0 0) {:: DOlabelpos
+  else.
+    NB. DOranks contains [rank],string,rank.  Draw them all
+    DOrankcfm drawtext DOranks ,"0 <"2 actyx2 +"2 > DOlabelpos
   end.
 end.
 
@@ -2620,28 +2658,57 @@ NB. obsolete  dispvalue =. <"0@(DOcellsize&{.)@>`>@.(#DOfillatom) frame $!.(<DOc
   'frameok dispvalue' =. DOframinginfo frameselresult ''
   NB. After the data is drawn, draw a highlighting rectangle for the item selection(s), if any.
   NB. We take all the selectors there are, up the length of the frame of this level; but if there aren't enough, we don't highlight.  Discard
-  NB. selectors for higher levels.  The onl way we can get more selectors than frame is during sniff, where the lower
+  NB. selectors for higher levels.  The only way we can get more selectors than frame is during sniff, where the lower
   NB. selection is propagated up automatically
-  highlightrects =. (<^:(*@#) (>:#;accumframe) ((I.~ +/\@:(#@>)) {. ]) sellevel ((< #) # ;@}.) selections) , inheritedselection
+  highlightrects =. (<^:(*@#) (>: afcount accumframe) ((I.~ +/\@:(#@>)) {. ]) sellevel ((< #) # ;@}.) selections) , inheritedselection
 
 NB. obsolete   DOtruncated =: (valueformat;((<"0@>@((;frame)&($!.(<' '))))`>@.DOLcollected selresult);sel;DOLcollected;<cfmdata) drawDOL actyx + DOdatapos
-  DOtruncated =: (valueformat;dispvalue;sel;frameok;highlightrects;<cfmdata) drawDOL actyx + {. DOdatapos
+  NB. position the start point so that the selected scroll data starts in the window
+  (valueformat;dispvalue;sel;frameok;highlightrects;<cfmdata) drawDOL scrollpoint -~ DOyx + {. DOdatapos
 
-else.
-  DOtruncated =: 2   NB. Indicate that there is no data
+  NB. If there are scrollbars, draw them
+  if. +./ displayscrollbars do.
+    't l b r' =. , DOyx +"1 +/\ DOdatapos  NB. t l b r of region
+    'sh sw' =. (2 * SCROLLBARENDTHICKNESS) -~ 'h w' =. ({: DOdatapos) - SCROLLBARWIDTH * |. displayscrollbars  NB. actual data h/w
+    
+    datahw =. extractDOLsize valueformat
+QP^:DEBDOL 'displayscrollbars DOyx DOdatapos datahw t l b r h w scrollpoint sw sh '
+    scrolltravv =. scrolltravh =. 0 0
+    NB. draw horizontal scroll
+    if. 1 { displayscrollbars do.
+      SCROLLBARCOLOR drawrect ([ smoutput) (vpos =. -/\. b , SCROLLBARWIDTH) ,. (l , w)
+      SCROLLBARENDCOLOR drawrect ([ smoutput) vpos ,."1 (l , SCROLLBARENDTHICKNESS) ,: (-/\. (l+w) , SCROLLBARENDTHICKNESS)
+      scrolltravh =. SCROLLBARENDTHICKNESS + <. sw * 0 >. 1 <. (+/\ (1 { scrollpoint) , w) % (1 { datahw)
+      SCROLLBARTRAVELERCOLOR drawrect ([ smoutput) vpos ,. -~/\ l + scrolltravh
+    end.
+    NB. vertical
+    if. 0 { displayscrollbars do.
+      SCROLLBARCOLOR drawrect ([ smoutput) (hpos =. -/\. r , SCROLLBARWIDTH) ,.~ (t , h)
+      SCROLLBARENDCOLOR drawrect ([ smoutput) hpos ,.~"1 (t , SCROLLBARENDTHICKNESS) ,: (-/\. (t+h) , SCROLLBARENDTHICKNESS)
+      scrolltravv =. SCROLLBARENDTHICKNESS + <. sh * 0 >. 1 <. (+/\ (0 { scrollpoint) , h) % (0 { datahw)
+      SCROLLBARTRAVELERCOLOR drawrect ([ smoutput) hpos ,.~ -~/\ t + scrolltravv
+    end.
+    scrolltravelers =: (scrolltravv ,: scrolltravh) hwindex} scrolltravelers
+QP^:DEBDOL 'scrolltravelers '
+  end.
+
 end.
-
 NB. Draw border rectangles for each component - filling out to the full width of the box
 if. #presentx do.
   ((<'') ,. (<presentx;1) { FRINGECOLOR) drawrect"1 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
 end.
 
-NB. Draw a rectangle for the object, just to get the border.  Color is used to show (normal,clipped,noncollected)
-('';(DOtruncated { DOBORDERCOLORS),1) drawrect actyx ,: DOsize
+NB. Draw a rectangle for the object, just to get the border.  Color is used to show (no data,NA,all drawn,explorable)
+('';((#.datapresent,explorable) { DOBORDERCOLORS),1) drawrect DOyx ,: DOsize
 
-NB. After we have drawn the local copy, refresh the grid, if there is one
-if. #grid do. drawgridcontrol'' end.
+NB. If we drew to the explorer, we must paint it
+if. 1 = hwindex do. glpaint'' end.
 
+NB. obsolete NB. After we have drawn the local copy, refresh the grid, if there is one
+NB. obsolete if. #grid do. drawgridcontrol'' end.
+NB. obsolete 
+NB. obsolete 
+NB. obsolete DOyx,:DOsize
 NB.?lintsaveglobals
 )
 
@@ -2652,11 +2719,11 @@ NB.  top-level display of an uncollectable result, which has each atom boxed.  W
 NB.  atoms but not the boxing.  boxmesh is 0 or 1 for the top level, or 2 for recursions.  We
 NB.  use this to fill the rectangles only on the top level
 NB. y is yx of top-left corner
-NB. We execute is gl2 operations to draw the DOL
-NB. Result is 0 if all the cells were displayed, 1 if not
+NB. We execute the gl2 operations to draw the DOL
 drawDOL =: 4 : 0"1
 'vf data sel boxmesh hlights cfmdata' =. x
 'shapeused ysizes xsizes' =. 3 {. vf
+SM^:DEBDOL 'drawDOL: ' , > coname''
 NB. If the data is empty, draw nothing (but signal validity).  The size
 NB. of the empty was accounted for when the block was created
 if. 0 e. $data do.
@@ -2668,9 +2735,8 @@ else.
     'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' printf (<"0 |. y),xsizes;ysizes
   end.
 
-  NB. Extract only the part we used
-  usedd =. shapeused {. data
-
+NB. obsolete   NB. Extract only the part we used
+  usedd =. data
   NB. Create the rectangles for each atom.  This will be mxnx2x2.
   rects =. (boxyx,:0) +"2 ysizes ,."1/&(|.!.0 ,. 2 (-~/\) 0&,) xsizes
   NB. *** following code copied in grid display ***
@@ -2749,8 +2815,9 @@ else.
 NB. y is (list of starting y);(list of starting x),:(x start/end positions for y lines);(y start/endpositions for x lines)
   end.
 
-  NB. If there was a rectangle for every value, signal validity
-  ($data) ~:&(*/) 2 {. $rects 
+NB. obsolete   NB. If there was a rectangle for every value, signal validity
+NB. obsolete   ($data) ~:&(*/) 2 {. $rects 
+  0
 end.
 )
 
@@ -2772,16 +2839,17 @@ NB. obsolete   if. #accumselect =. ; (>:sellevel) {. selections do.
       NB. For each operand, the rank of the cell comes from the rank of this verb; the accumulated selection
       NB. gives the address of the cell.  We must preserve only as many trailing axes of the selector
       NB. as exist in the operand, i. e. (operand rank)-(verb rank)
-      if. picknames__l e.~ <'DOdatapos' do.  NB. if data was formatted...
-        NB.?lintonly selopselhist =: 2 # <i.6
-        frank =. # 0 {:: valueformat__l  NB. rank of the formatted noun
-        NB. The operand we are selecting from must be at least as big as a cell.  nounrank-verbrank is the
-        NB. length of the noun-frame; we take at most that many leading selections
-NB. obsolete        assert. frank >: l_index { vranks [ 'inheritedselection'
-        if. 1: frank >: l_index { vranks do.
-          inheritedselection__l =: inheritedselection__l , l_index { selopselhist
-        end.
-      end.
+      NB. The referred-to object may not have been dreated for display, so don't refer to formatting variables
+NB. obsolete       if. picknames__l e.~ <'DOdatapos' do.  NB. if data was formatted...
+NB. obsolete         NB.?lintonly selopselhist =: 2 # <i.6
+NB. obsolete         frank =. # 0 {:: valueformat__l  NB. rank of the formatted noun
+NB. obsolete         NB. The operand we are selecting from must be at least as big as a cell.  nounrank-verbrank is the
+NB. obsolete         NB. length of the noun-frame; we take at most that many leading selections
+NB. obsolete NB. obsolete        assert. frank >: l_index { vranks [ 'inheritedselection'
+NB. obsolete         if. 1: frank >: l_index { vranks do.
+        inheritedselection__l =: inheritedselection__l , l_index { selopselhist
+NB. obsolete         end.
+NB. obsolete       end.
     end.
   end.
 end.
@@ -2797,8 +2865,9 @@ NB. so that it is near the minimum without going under
 createlayout =: 3 : 0
 NB. DOL table is the one DOL
 NB. Place the block so that its center is on a grid position
-objstart =. <. >.&.(%&ROUTINGGRIDSIZE)&.(+&(-: DOsize)) y
-dolpos =. (coname''),&<&,: objstart,:DOsize
+NB. Use the first (main) size
+objstart =. <. >.&.(%&ROUTINGGRIDSIZE)&.(+&(-: {. DOsize)) y
+dolpos =. (coname''),&<&,: objstart,:{.DOsize
 NB. the result is in this locale, bottom face
 ,: dolpos,(0 2 2$a:);<(,:(coname''),<1,displayhandleout)
 )
@@ -2807,19 +2876,24 @@ NB. join layout(s) to the current object
 NB. x is table of input layout(s)
 NB. y is unused - we create the current object
 NB. We join the input objects, then append the DOL for the current object
-NB. Result is DOL for the combined layour
+NB. Result is DOL for the combined layout:
+NB.  locale of obj;(start,:size of object);internal wires;handles out
+NB.   wires are brick, where each 2x2 is a table of start,:end, each in the format (locale;face#,fractional position)
+NB.   handles in/out are a table of startpoints, (locale;face#,fractional position)
 joinlayouts =: 4 : 0
 NB. Create the DO for the block to add on.  If stealth operand, just
 NB. pass on the selected input layout
 assert. 2 = #$x
 if. DEBLAYOUT do.
-  qprintf'Joinlayouts:loc?coname'''' displaystring x '
+  qprintf'Joinlayouts:loc=?>coname'''' x '
 end.
 if. 0 ~: createDO'' do.
   if. DEBLAYOUT do.
     smoutput'Stealth object, not created'
   end.
-  (, dispstealthoperand { 0 0 _1) { x
+  NB. If the input is a noun result that has had detail removed, it may contain no layouts.  In that case,
+  NB. if we pass it to a stealth operand it must make a layout for it  Example: z + ] 3
+  if. 0 = #x do. createlayout 0 0 else. (, dispstealthoperand { 0 0 _1) { x end.
 else.
   NB. If there are no earlier layouts, this had better be a noun - just create its layout
   if. 0 = #x do.
@@ -2834,7 +2908,7 @@ else.
     NB. Remember, result position is centered on the midpoint of the object
     if. #respos =. (#~ >:&0) (0.5 + ((1;1)&{::"1) upperresult) ({.@] + (* {:))"0 1 (_1 0 ,~ {:"1 upperyxhw) {~ upperdol i. {."1 upperresult do.
       NB. Place the block midway between the results.
-      hplace =. <. ((+/ % #) respos) - -: (1 { DOsize) + ROUTINGGRIDSIZE
+      hplace =. <. ((+/ % #) respos) - -: (1 { {.DOsize) + ROUTINGGRIDSIZE
     else.
       hplace =. 0
     end.
@@ -2864,12 +2938,12 @@ NB. ***** joining display objects *****
 NOLAYOUTS =: 0 4$a:   NB. Starting point for nouns: no layouts at all
 NB.
 NB. This code deals with screen layouts, which are kept in the form
-NB. (DOL locales);(yx,;hw for each locale);wires;resulthook
+NB. (DOL locales);(yx,:hw for each locale);wires;resulthook
 NB. where
 NB.  DOL locales is list of DOL locales
 NB.  yx,:hw brick of yx for each locale - each position relative to top-left of layout
-NB.  wires is brick of nx2x2: locale;(face# tblr),(fractional position)  source then dest
-NB.  resulthook is a wire: (result DOL locale);(face,position of hook on bottom row)
+NB.  wires is brick of nx2x2: locale,<(face# tblr),(fractional position)  source then dest
+NB.  resulthook is a wire: (result DOL locale),<(face,position of hook on bottom row)
 NB. The screen size of the layout is {:@$@> 1 2 { layout
 NB. If a layout is a reference only, it will have empty DOLtable and margins
 
@@ -2879,6 +2953,14 @@ NB. Result is reference layout, as a table
 createreference =: 3 : 0
 NB. The reference has the same resulthook as the main layout, but no DOLs, pixels, or wires
 (((0$a:),&< 0 2 2$0),(0 2 2$a:);3&{)"1 y
+)
+
+NB. Create a self-reference to the current object (which may not exist yet)
+NB. y is the position(s) of the output wire
+NB. Result is reference layout, as a table
+createselfreference =: 3 : 0
+NB. The reference has the same resulthook as the main layout, but no DOLs, pixels, or wires
+(((0$a:),&< 0 2 2$0) , (0 2 2$a:) (;<) (coname'') (,<) 1 , ])"0 , y
 )
 
 NB. Create empty layout, as a table
@@ -2972,15 +3054,15 @@ tlc =. x
 NB. Apply scroll offset
 yx =. yx +"1 tlc
 wires =. wires +"1 tlc,tlc,0
-pickrects =: 0 2 2 $ 0
+locpickrects =: 0 2 2 $ 0
 for_d. picklocs =: dos do.  NB.?lintonly d =. <'dissectobj'
-  pickrects =: pickrects , (d_index{yx),:DOsize__d
+  locpickrects =: locpickrects , (d_index{yx),:{.DOsize__d
 end.
 lines =. (2 2&$)"1 (0 = 4 {"1 wires) # wires
 arcs =. (2 2&$)"1 (1 = 4 {"1 wires) # wires
 
 NB. Get the max size drawn, and set the control to just big enough to hold it
-maxsize =. >./ (+/"2 pickrects) , ,/ lines , arcs
+maxsize =. >./ (+/"2 locpickrects) , ,/ lines , arcs
 maxsize;dos;yx;lines;arcs
 NB.?lintsaveglobals
 )
@@ -3024,7 +3106,7 @@ NB.?lintsaveglobals
 )
 
 NB. **************************** mouse events in the graphics window ********************
-NB. in the locale of the form
+NB. in the locale of the main form
 
 NB. x is pick rectangles, YX,;HW
 NB. y is y,x
@@ -3037,19 +3119,25 @@ index ;"0 1 y -"1 (<index;0) { x
 NB. pick flags
 'PICKLB PICKRB PICKCTRL PICKSHIFT' =: |. 1 bwlsl~ i. 4
 
-dissect_dissectisi_mbldown =: 3 : 0
+NB. mouse button, both left and right.  Return number of picks performed.
+NB. x is l or r, y is formatted sysdata
+dissect_dissectisi_mbdown =: 4 : 0
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100'
-for_r. pr =. pickrects findpickhits 1 0 { sd =. 0 ". sysdata do.
+for_r. pr =. locpickrects findpickhits 1 0 { y do.
   'l yx' =. r
   pickloc =. l { picklocs
   NB.?lintonly pickloc =. <'dissectobj'
-  pickDO__pickloc yx;#. 4 5 6 7 { sd
+  x pickDO__pickloc 0;yx;#. 4 5 6 7 { y
 end.
-NB. If the user clicked outside a pickrect, that is the start of a scroll operation.
+#pr
+NB.?lintsaveglobals
+)
+dissect_dissectisi_mbldown =: 3 : 0
+NB. If the user left-clicked outside a pickrect, that is the start of a scroll operation.
 NB. Remember the clicked position, and the pixels in the screen (we use the presence of
 NB. the screen buffer as an indicator of scroll-in-progress, and delete it when we're done,
 NB. since it's big)
-if. 0 = #pr do.
+if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
   NB. Read the pixels from the end of the sentence area to the bottom of the screen
   picksentencepixels =: glqpixels 1 0 3 2 { , -~/\ sentencebrect
   scrollblock =. -~/\ (0 (1}) {: sentencebrect) ,: 3 2 { sd
@@ -3057,9 +3145,16 @@ if. 0 = #pr do.
   pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
 NB.?lintsaveglobals
 end.
+NILRET
+)
+
+dissect_dissectisi_mbrdown =: 3 : 0
+'r' dissect_dissectisi_mbdown 0 ". sysdata
+NILRET
 )
 
 NB. mouse movement.  If we are scrolling, drag the pixels along
+NB. If we are dragging a scrollbar, vector to the object locale to handle that
 dissect_dissectisi_mmove =: 3 : 0
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100'
 sd =. 0 ". sysdata
@@ -3070,232 +3165,180 @@ if. 0 = 4!:0 <'pickpixels' do.
   glpixels (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) , (|. $ pickpixels) , , pickpixels
   glpixels (1 0 3 2 { , -~/\ sentencebrect) , picksentencepixels
   glpaint''
+elseif. 0 = 4!:0 <'scrollinglocale' do.
+  NB. Perform the scroll, on the main window, but in the locale of the data
+  0 scrollmmove__scrollinglocale 1 0 { sd
 end.
 )
 
 NB. mouse release.  If we are scrolling, set the new offset and redraw
+NB. If we are dragging a scrollbar, vector to the object locale to finish that
 dissect_dissectisi_mblup =: 3 : 0
 if. 0 = 4!:0 <'pickpixels' do.
-  4!:55 'pickpixels';'picksentencepixels'  NB. indicate end-of-scroll
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. indicate end-of-scroll
   NB. Use the last-drawn position as the new position.  If it hasn't changed from the original, redraw
   if. pickscrollcurryx -.@-: pickscrollstartyx do.
     scrolltlc =: <. scrolltlc + pickscrollcurryx - pickscrollstartyx
     dissect_dissectisi_paint 0  NB. no need to recalc placement
   end.
+elseif. 0 = 4!:0 <'scrollinglocale' do.
+  4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 end.
 )
 
 cocurrent 'dissectobj'
 
-NB. ********************************** pick DOs
-NB. Pick for display object, vectoring to the indicated type
-NB. y is (y,x relative to pickrect);pickflags (numeric atom)
-NB. no result.  selections are performed
-pickDO =: 3 : 0
-('pickDO',displaytype)~ y
-0 0$0
+NB. x is view number, y is yx (in the window)
+NB. Result is (x,y) in the flattened display within which the yx falls
+pixeltoflatyx =: 4 : 0
+(1 2 { valueformat) I.&> >: (x{scrollpoints) + y
 )
 
-pickDOnoun =: pickDOvn
-pickDOverb =: pickDOvn
-
-NB. x is operand type (0=noun 3=verb)
-NB. y is (y,x relative to pickrect);pickflags (numeric atom)
-pickDOvn =: 3 : 0
-'yx flags' =. y
-SM^:DEBPICK 'pick: ' , DOlabelstring
-for_r. pickrects findpickhits yx do.
-  'ix pyx' =. r
-  ('pickDO' , displaytype , ix {:: picknames)~ pyx
-end.
-)
-
-NB. For all these verbs, y is the yx position of the click relative to start of pickrect
-
-pickDOverbDOlabelpos =: 3 : 0
-0 0$0
-)
-
-pickDOverbDOshapepos =: 3 : 0
-0 0$0
-)
-
-pickDOverbDOstatuspos =: 3 : 0
-0 0$0
-)
-
-pickDOverbDOdatapos =: 3 : 0
-NB. Click in the data region.  If we displayed the entire result, select the clicked part;
-NB. if not, launch a grid for the object
-if. DOtruncated do.
-  if. 0 = #grid do.
-    drawgridcontrol''
-  end.
-else.
-  NB. Not truncated.  Find the indexes of the clicked cell
-  'shapeused ysizes xsizes' =. 3 {. valueformat
-  NB. Find the y,x position of the click and go process it
-  shapeused processdataclick (ysizes;xsizes) I.&> >: y
-end.
-)
-
-
-NB. Since labeled nouns are never SDTs, ignore a click on the name
-pickDOnounDOlabelpos =: 3 : 0
-0 0$0
-)
-
-NB. Nouns are either primitives or SDTs.  Clicking on the shape will expand an SDT if possible.  Once expanded,
-NB. the display becomes a verb, ad cannot be collapsed.
-pickDOnounDOshapepos =: 3 : 0
-if. nounhasdetail > nounshowdetail do.
-  nounshowdetail =: 1
-  dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
-end.
-0 0$0
-)
-
-pickDOnounDOstatuspos =: 3 : 0
-0 0$0
-)
-
-pickDOnounDOdatapos =: 3 : 0
-NB. If the display of a noun's detail is suppressed, and it has detail, any click on it will turn on the detail
-if. nounhasdetail > nounshowdetail do.
-  nounshowdetail =: 1
-  dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
-else.
-  NB. If the noun is displaying detail, treat a click in the data area same as for a verb result
-  pickDOverbDOdatapos y
-end.
-)
-
-NB. x is the shape of the displayed object
-NB. y is y,x position
-NB. We process a click on that cell.  We convert the y,x to a cell address, change the selectors for the click,
-NB. and redraw the screen
-processdataclick =: 4 : 0
+NB. y is flatyx, result is index list within the noun
+flatyxtoindexlist =: 3 : 0
+s =. 0 {:: valueformat   NB. shape of the noun
 NB. Split the shapeused into vert;horiz, ending on horiz.  OK to add high-order 0s to
 NB. ensure that there is some infix of length 2.
 NB. Convert row/col to indexes.  Interleave the indexes for row/col to get cell indexes.  Remove 0
 NB. if it was added
-selx =. (-#x) {. , |: (|. |: _2&(]\)&.|. 0 0 , x) #: y
-SM^:DEBPICK 'cell: ' , ": selx
-NB. Split the selection into boxes according to the list of ranks of u operands.
-NB. Ignore indexes beyond the accumframe.  Prepend the selections that are inherited from above
-assert. (#selx) >: # ; accumframe  [  'pick rank error'
+(-#s) {. , |: (|. |: _2&(]\)&.|. 0 0 , s) #: y
+)
+
+NB. y is y,x position
+NB. We process a click on that cell.  We convert the y,x to a cell address, change the selectors for the click,
+NB. and redraw the screen
+processdataclick =: 3 : 0
+selx =. flatyxtoindexlist y
+QP^:DEBPICK 'y selx '
+QP^:DEBPICK 'accumframe sellevel #selections selections '
+assert. (#selx) >: afcount accumframe  [  'pick rank error'
 assert. sellevel <: #selections
-bselx =. (sellevel {. selections) , selx (] <;.1 ({.~ #)) (; {.&1&.> #@> accumframe)
+NB. Extract the part of accumframe that holds valid selectors.  The last box, if negative, holds
+NB. the default selector for unexpanded detail
+af =. afact accumframe
+NB. Split the selection into boxes according to the list of ranks of u operands.
+NB. Ignore indexes beyond the accumframe.  Prepend the selections that are inherited from above,
+NB. and append the selector for unexpanded detail, if any
+bselx =. (sellevel {. selections) , (selx (] <;.1 ({.~ #)) (afkey af)) , (accumframe }.~ #af)
 NB. If the new selection is the same as the old, do nothing (for speed).  Consider only the
 NB. part of selections up to the length of bselx (there may be a spurious excess after sniff).
 NB. bselx is known to contain no empty boxes
 if. -. selections (({.~ #) -: ]) bselx do.
+QP^:DEBPICK 'bselx selections '
   NB. See how many of the new selections match the old; take all of them, plus one more.
   NB. We know there is a mismatch somewhere before the end of bselx
   NB. Make that the selection in all subnodes
-  propsel a =. bselx ([ {.~ [: >: ({.~ #) i.&0@:= ]) selections
+  propsel bselx ([ {.~ [: >: ({.~ #) i.&0@:= ]) selections
+  NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
+  propscroll 1   NB. 1 causes the scroll to be unchanged in THIS node, cleared to the leaves
   dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
 end.
+)
+
+NB. Handle mouse movement for scrolling.  Called in the locale whose data is being displayed.
+NB. x is the window number to draw, y is the yx of the click.  Globals were set at the start of the scroll
+NB. to allow us to figure out the new scrollpoint.
+scrollmmove =: 4 : 0
+exp =. x  NB. 1 for explorer
+NB. select the coordinate for the scrolling axis
+c =. scrollingaxis { y
+dsize =. ((1+scrollingaxis);_1) {:: valueformat
+NB. move the original scrollpoint by the fraction of the data size corresponding to the fraction of mouse movement to scrollbar size
+newspt =. <. scrollingorigscrollpt + dsize * (c-scrollingorigclick) % -~/ scrollinglimits
+NB. Clamp the scrollpoint to keep the window entirely within the noun
+newspt =. 0 >. scrollptlimit <. newspt
+NB. If the scrollpoint changed, remember the new value and call for a redraw of the modified window
+if. newspt ~: (<exp,scrollingaxis) { scrollpoints do.
+  scrollpoints =: newspt (<exp,scrollingaxis)} scrollpoints
+  exp drawDOvnall ''
+  if. 0 = exp do. glpaint'' end.
+end.
+NILRET
 )
 
 NB. **************** end display objects ************************
 
 
-NB. ***************** grid control for objects
+NB. ***************** explorer control for objects
 
-GRID=: 0 : 0
-pc grid;pn "Grid";
-xywh 0 0 400 300;cc grid isigraph;
+EXPLORER=: 0 : 0
+pc explorer;
+xywh 0 0 ?;cc dissectisi isigraph;
 pas 0 0;pcenter;
 rem form end;
 )
-GRID=: 0 : 0 [^:IFQT GRID
-pc grid;pn "Grid";
-minwh 800 600;cc grid isigraph flush;
+EXPLORER=: 0 : 0 [^:IFQT EXPLORER
+pc explorer;
+minwh ?;cc dissectisi isigraph flush;
 pas 0 0;pcenter;
 rem form end;
 )
 
-NB. Draw the grid for the object, using the current selections.  Called in object locale
-drawgridcontrol =: 3 : 0
-NB. obsolete NB.?lintonly griddrawnselections =: ''
-if. 0 = #grid do.
-  grid =: '' conew 'jzgrid'
-  wd GRID
-  GRIDHWNDP =: wd 'qhwndp'
-  GRIDHWNDC=: 0 ".^:IFQT wd 'qhwndc grid'
-  GRIDID=: 'grid'
-  wd^:(IFQT) 'pshow;pshow sw_hide'
-  setnames__grid 'GRIDHWNDC GRIDID'
-  wd 'pn *',defstring 0
-  wd 'pshow'
-  setnames__grid ,: 'CELLCOLORS';DATATEXTCOLORS ,"1 DATACOLORS
-NB. obsolete   griddrawnselections =: 0   NB. guaranteed not to match a real selection
-NB.?lintsaveglobals
-end.
-NB.?lintonly grid =: <'jzgrid'
-
-NB. obsolete if. selections -.@-: griddrawnselections do.
-NB. If we fall through to here, we need to draw using the current selections.  We don't try to optimize, since
-NB. fillmask etc may have changed from other selections
-NB. obsolete griddrawnselections =: selections
-
-NB. Display the grid data
-griddatashape =: $celldata =. 1 {:: DOframinginfo frameselresult ''
-axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@# shapeused =. $ celldata  NB. 1;0 2   or 0 2;1 3
-NB. axisshapes is the lengths of each axis assigned to y/x.  sizes is the total size of y/x
-sizes =. */@> axisshapes =. axes ({&.:>"0 _ $) celldata
-celldata =. sizes ($,) (;axes) |: celldata
-NB. grid doesn't support character display (yet), so as a kludge, box the characters
-celldata =. <"0^:(2 = 3!:0) celldata
-NB. The headers are just the odometers for the axes, in character form
-'hdrrow hdrcol' =. ":&.>@(#: i.@(*/))&.> axisshapes
-setnames__grid^:(*@#) hdrrow (,   ('HDRROWALIGN';1),('HDRROWMERGE';1),:'HDRROW' ; <)~^:([:-. 0 e. $@[) (|:hdrcol) (,  ('HDRCOLALIGN';1),('HDRCOLMERGE';1),:'HDRCOL' ; <)~^:([:-.0 e. $@[) 0 2$a:
-NB. Create the color selection, just like in the non-grid case
-sel =. (FILLMASKSELLEVEL -~ #DATACOLORS) <. (* (<:FILLMASKSELLEVEL) bwand fillmask)} (_1 bwlsl fillmask) ,&,: (_2 * (<:FILLMASKSELLEVEL) bwand fillmask)
-sel =. sel + (({.   0 1 $~ 1&bwor) ({.~ -@(2<.#)) $ sel)"2 sel
-sel =. sizes ($,) (;axes) |: shapeused {.!.({.,sel) ((-$shapeused) {.!.1 $sel) ($,) sel
-show__grid ('CELLDATA';<celldata),:('CELLCOLOR';sel)
-NB.?lintsaveglobals
-NB. obsolete end.
-NB.?lintsaveglobals
+NB. Called in the locale of the object
+createexplorer =: 3 : 0
+NB. Start the window definition, so we can use existence of 'explorer' to indicate destination
+NB. Create the isigraph and finish creating the form
+wd ctl   =. '?' (taketo , (": |. -:^:(-.IFQT) {: DOsize) , takeafter) EXPLORER
+wd 'pshow'
+explorer =: wd 'qhwndp'
+NB. Draw the object on the explorer form
+1 drawDOvnall ''
 )
 
-grid_close =: 3 : 0
-NB.?lintonly grid =: <'jzgrid'
-wd 'psel ',GRIDHWNDP,';pclose'
-if. #grid do.
-  destroy__grid''
-  grid =: 0$a:
-  4!:55 <'celldata'
+NB. Use destroy to remove the explorer window without writing to the main form, as for example
+NB. when the old explorer is invalid
+destroyexplorer =: 3 : 0
+if. #explorer do.
+  wd 'psel ', explorer
+  wd 'pclose'
+  explorer =: ''
 end.
-NB.?lintsaveglobals
 )
-grid_cancel =: grid_close
 
-NB. Grid event handler, called in the locale of the object
-grid_gridhandler =: 3 : 0
-NB.?lintonly grid =: <'jzgrid'
-NB.?lintonly Row__grid =. Col__grid =. Cell__grid =. 0
-try.
-  NB. Get the index to the cell
-  select. y
-  case. 'click' do.
-    griddatashape processdataclick Row__grid,Col__grid
-    0 return.
-  case. do.
-    0 return.
+NB. Use close to return control back to the main form
+explorer_close =: 3 : 0
+destroyexplorer''  NB. Remove the form
+)
+explorer_cancel =: explorer_close
+
+NB. ** explorer mouse events **
+
+NB. The only event is a click in the one defined region.  We are already in the object locale
+explorer_dissectisi_mbldown =: 3 : 0
+NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100'
+yx =. EXPLORERYX -~ 1 0 { sd =. 0 ". sysdata
+if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;#. 4 5 6 7 { sd end.
+)
+
+
+NB. mouse movement.
+NB. If we are dragging a scrollbar, vector to the object locale to handle that
+explorer_dissectisi_mmove =: 3 : 0
+NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100'
+sd =. 0 ". sysdata
+if. 0 = 4!:0 <'scrollinglocale__COCREATOR' do.
+  NB. Perform the scroll, on this explorer window.  If the scroll was started in a different locale,
+  NB. abort it.
+  if. scrollinglocale__COCREATOR -: coname'' do.
+    1 scrollmmove 1 0 { sd
+  else.
+    explorer_dissectisi_mblup''
   end.
-catch.
-  smoutput 'error in gridhandler'
-  smoutput 'locale: ' , >coname''
-  smoutput 13!:12 ''
-  smoutput (9!:8 '') {~ <: 13!:11 ''
-  0
 end.
 )
 
-NB. ***** end object grid control ****
+NB. mouse release.  If we are scrolling, set the new offset and redraw
+NB. If we are dragging a scrollbar, vector to the object locale to finish that
+explorer_dissectisi_mblup =: 3 : 0
+if. 0 = 4!:0 <'scrollinglocale__COCREATOR' do.
+  4!:55 ;: 'scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
+end.
+)
+
+NB. ********************** end of explorer ***************
+
+NB. ***************** utilities used by the object locales *****************
+
 NB. y is a selector: any shape, but each selector has shape ,2; so $=?,2
 NB. Result is array of boxes with one box for each selector, containing the
 NB. indices of the results for each selector
@@ -3319,6 +3362,156 @@ NB. x is height(s) of v, y is height(s) of u
 NB. Result is combined height: the sum, but if either operand is _1, result must be _1; or if 0, must be 0.
 NB. Monads may have rank 0 or 1, so we atomize all singletons
 combineheights =: (0:`+`_1:@.(*@<.))"0&({.^:(1=#))
+
+NB. ******************* class-dependent portion of display and pick support **********************
+cocurrent 'dissectobj'
+
+NB. Calculate the size in pixels to allocate on the main form
+NB. y is valueformat
+NB. result is table of allowed sizes.  If exploring is allowed, the second row is the size for exploring
+calcformsize =: 3 : 0
+sz =. extractDOLsize y
+}:^:(sz -: {.) maxnoundisplaysizes <."1 sz
+)
+
+NB. Initialize the scroll point.  Nilad.
+NB. Result is scroll point (in pixels) for the beginning display
+initscrollpoints =: 3 : 0
+(#DOsize) # ,: 0 0
+)
+
+NB. Create DO
+createDO =: 3 : 'createDOvn (*#displayhandlesin) {"1 nouncfm,.verbcfm'
+NB. Draw DO.  y is yx of DO
+drawDO =: 3 : 'drawDOvnall y'
+
+NB. ********************************** pick DOs
+NB. Pick for display object, vectoring to the indicated type
+NB. x is ('l' or 'r') flag
+NB. y is main/explorer(y,x relative to pickrect);pickflags (numeric atom of left,right,ctrl,shift)
+NB. no result.  selections are performed
+pickDO =: 4 : 0
+QP^:DEBPICK 'coname'''' y '
+'exp yx flags' =. y
+for_r. (exp{pickrects) findpickhits yx do.
+  'ix pyx' =. r
+QP^:DEBPICK 'x ix pyx exp yx flags ix{::picknames '
+  if. 3 = 4!:0 <name =. 'pick' , x , ix {:: picknames do. (flags,exp) name~ pyx end.
+end.
+0 0$0
+)
+
+NB. For all these verbs, x is (button flags,view number), y is the yx position of the click relative to start of pickrect
+
+picklDOdatapos =: 4 : 0
+QP^:DEBPICK 'valueformat scrollpoints y '
+NB. Click in the data region.
+'flags exp' =. x
+NB. If the click is in the scrollbar, handle scrolling
+NB. See which scrollbar, if any, the click is in
+dhw =. (<exp,1) { DOdatapos
+if. 1 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
+  NB. sclick is the mask indicating which axis was selected
+  NB. select the information for the selected axis, for analysis
+  'trav clickpos end bindlist spt' =. (sclickx =. sclick i. 1)&{&.> (exp{scrolltravelers);y;shw;(1 2{valueformat);(exp{scrollpoints)
+QP^:DEBPICK 'trav clickpos end bindlist spt '
+  NB. Classify the click as +-creep, +-page, or click in traveler
+  assert. (-: /:~) SCROLLBARENDTHICKNESS,trav,end-SCROLLBARENDTHICKNESS
+  select. clickpos I.~ scrollbarsections =. SCROLLBARENDTHICKNESS,trav,end-SCROLLBARENDTHICKNESS
+  NB. If creep, move to the next index, or one screenful, whichever is smaller
+  case. 0 do. NB. creep back
+    newspt =. (spt (I.~ { 0 , ]) >bindlist) >. spt - end   NB. prev item, but no more than 1 screenful
+  case. 4 do. NB. creep forward
+    newspt =. ((>:spt) (I.~ { ]) >bindlist) <. spt + end   NB. next item, but no more than 1 screenful
+  NB. If scroll, move to the start of last cell that is displayed on the screen, or one screenful if that would not progress
+  case. 1 do.   NB. scroll back
+    newspt =. ((spt-end) ([ [^:(spt <: ]) I.~ { ]) 0 , >bindlist)
+  case. 3 do.  NB. scroll forward
+    newspt =. ((spt+end) ([ [^:(spt >: ]) I.~ { 0 , ]) >bindlist)
+  NB. If click in traveler, start waiting for mmove events
+  case. 2 do.
+    newspt =. spt   NB. keep spt unchanged
+    NB. Remember what we need for handling the mouse movement:
+    NB. which locale is scrolling (for main view); which axis is scrolling; starting clickpos (on the entire isigraph control) for that axis;
+    NB. start/trav/end limits for that axis (on the entire isigraph control)
+    dwo =. sclickx { exp { DOyx + 0 {"2 DOdatapos  NB. Data Window Offset in selected window
+    'scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit' =: (coname'');sclickx;spt;(clickpos+dwo);(dwo+0 _1 { scrollbarsections);(end -~ {:>bindlist)
+  end.
+  NB. Clamp the scrollpoint to keep the window entirely within the noun
+  newspt =. 0 >. (end -~ {:>bindlist) <. newspt
+
+  NB. If the scrollpoint changed, remember the new value and call for a redraw of the modified window
+  if. newspt ~: spt do.
+    scrollpoints =: newspt (<exp,sclickx)} scrollpoints
+    exp drawDOvnall ''
+    if. 0 = exp do. glpaint'' end.
+  end.
+
+else.
+  NB. Not scrollbar.  Find the indexes of the clicked cell
+  NB. Find the y,x position of the click and go process it
+  processdataclick exp pixeltoflatyx y
+end.
+)
+
+NB. right click - if explorable, do the explorer stuff
+pickrDOdatapos =: 4 : 0
+if. 1 < #DOsize do.
+  if. 0 = #explorer do. createexplorer''
+  else. explorer_close''
+  end.
+end.
+)
+
+NB. *** traversal support ***
+NB. y is natural frame(s) of the executed verb
+NB. result is (frame of value to display);(selopshapes for next level - cells of this verb)
+calcdispframe =: 3 : 0
+selopshapes (] ,&< (}.~ #)&.>) y
+)
+
+NB. y is all the indexes that were selected by  the selector
+NB. Result is the selectors to display (a list), in order.  The atom count should match the frame returned by calcdispframe
+calcdispselx =: ]
+
+NB. y is the result of calcdispselx.  Result is the matching values.  These values will be collected to
+NB. produce the displayed result.  We might have to add boxing if we want to ensure collectibility
+fetchselr =: 3 : 0
+y { logvalues
+)
+
+NB. y is the intervals for each ticket, expanded into an array using the shape of the frame
+NB. Result is the array reordered to natural order (some primitives process out of order; we reorder to match selection)
+tickettonatural =: ]
+
+cocurrent 'dissectnoun'
+
+NB. Inherit pickDO from default object
+NB. For all these verbs, x is button flags, y is the yx position of the click relative to start of pickrect
+
+NB. Since labeled nouns are never SDTs, ignore a click on the name
+NB. Nouns are either primitives or SDTs.  Clicking on the shape will expand an SDT if possible.  Once expanded,
+NB. the display becomes a verb, ad cannot be collapsed.
+picklDOshapepos =: 4 : 0
+if. nounhasdetail > nounshowdetail do.
+  nounshowdetail =: 1
+  dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
+end.
+0 0$0
+)
+
+picklDOdatapos =: 4 : 0
+NB. If the display of a noun's detail is suppressed, and it has detail, any click on it will turn on the detail
+if. nounhasdetail > nounshowdetail do.
+  nounshowdetail =: 1
+  dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
+else.
+  NB. If the noun is displaying detail, treat a click in the data area same as for a verb result
+  x picklDOdatapos_dissectobj_ f. y
+end.
+)
+
+cocurrent 'dissectexpandable'  NB. locale for items that expand when name is clicked
 
 NB. Here are the object locales for creating the parse table
 NB. Each object is responsible for responding to the entry points:
@@ -3393,14 +3586,15 @@ NB. selector found here), and display v; then we traverse u using the selector f
 NB. When we display v, its data will display only if it collects at this level
 NB. We do not display u: we pass its display information back so that it can eventually
 NB. be displayed if it ever reaches a collector.
-NB. The result is the DOL, with everything except the result of u
+NB. The result is  DOL ,&< locale  where DOL is the accumulated display (leading up to the current result),
+NB.   and locale is the current result, to be displayed eventually
 traverse =: 4 : 0
 traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs here
 dol =. joinlayoutsl x traverse__yop TRAVNOUN
 yop inheritu dol traverse__uop travdownuops yop
 NB. If detail is turned off, display only the final result
 if. -. nounshowdetail do.
-  'displaytype displayhandlesin displaystring displaylevrank nounhasdetail' =: 'noun';($0);'';NORANKHIST,<1
+  'displayhandlesin displaylevrank nounhasdetail' =: ($0);NORANKHISTNOUN,<1
   NOLAYOUTS ,&< coname''
 end.
 )
@@ -3464,7 +3658,7 @@ dol =. dol , joinlayoutsl x traverse__yop TRAVNOUN
 (xop,yop) inheritu dol traverse__uop xop travdownuops yop
 NB. If detail is turned off, display only the final result
 if. -. nounshowdetail do.
-  'displaytype displayhandlesin displaystring displaylevrank nounhasdetail' =: 'noun';($0);'';NORANKHIST,<1
+  'displayhandlesin displaylevrank nounhasdetail' =: ($0);NORANKHISTNOUN,<1
   NOLAYOUTS ,&< coname''
 end.
 )
@@ -3525,7 +3719,7 @@ NB. return no U dols
 traverse =: 4 : 0
 assert. 0 = #x
 traversedowncalcselect y  NB. To set globals, including selresult
-'displaytype displayhandlesin displayhandleout displaystring displaylevrank nounhasdetail' =: 'noun';($0);0;varname;NORANKHIST,<0
+'displayhandlesin displayhandleout displaylevrank nounhasdetail' =: ($0);0;varname;0
 x ,&< coname''  NB. Return the empty DOLs
 )
 
@@ -3537,9 +3731,9 @@ create_dissectobj_ f. 2 { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand
-op =: 0 {:: y
+titlestring =: 0 {:: y
 invok =: (1;3) {:: y
-stealthoperand =: 1 2 3 0 {~ (;:'][[:') i. <op
+stealthoperand =: 1 2 3 0 {~ (;:'][[:') i. <titlestring
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
 verb;(coname'');tokensource
@@ -3571,7 +3765,7 @@ estheights =: (<valence,dispstealthoperand) {:: a: , 2 4 $ 1;0;0;0 ; 1 1;_1 0;0 
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 NB. Apply parentheses if right conjunction operand - but only if more than 1 word
-enparen^:((y>2) *. 1 < #@;: op ) op
+enparen^:((y>2) *. 1 < #@;: titlestring ) titlestring
 )
 
 NB. return string form of operands, including instrumentation
@@ -3583,15 +3777,15 @@ exestring =: 3 : 0
 NB. Init list of logvbls we will use
 vars =. ''
 NB. Instrument the forward verb - bivalent
-fv =. '(' , (logstring '') , '@(' , (verblogstring '') , op , '))'
+fv =. '(' , (logstring '') , '@(' , (verblogstring '') , titlestring , '))'
 NB. If inputs needed, capture them all - for both valences
 if. inp do.
   vars =. vars ,'xy'
-  fv =. '(' , fv , '@' , (logstring 'y') , ' :(' , (logstring 'x') , '@[ ' , fv , (logstring 'y') , '@[)"(' , op , '))'
+  fv =. '(' , fv , '@' , (logstring 'y') , ' :(' , (logstring 'x') , '@[ ' , fv , (logstring 'y') , '@[)"(' , titlestring , '))'
 end.
 NB. If inverse also needed, do it too
 if. inv do.
-  opi =. op , '^:_1'
+  opi =. titlestring , '^:_1'
   iv =. '(' , (logstring 'I') , '@(' , opi , '))'
   vars =. vars , 'I'
   if. inp do.
@@ -3616,13 +3810,13 @@ assert. 1 2 e.~ #x
 traversedowncalcselect y  NB. Just to set error globals
 calchighlight x
 NB. If no vranks, this verb must have failed to execute owing to upstream error.  Leave no levrank then
-NB. obsolete 'displaytype displayhandlesin displayhandleout displaystring displaylevrank' =: 'verb';((($0);(,0);_0.3 0.3) {::~ stealthoperand { valence , 1 1 1);0;op;((*#vranks) # ,:sellevel,vranks)
-'displaytype displayhandlesin displayhandleout displaystring displaylevrank' =: 'verb';((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1);0;op;<rankhistory
+NB. obsolete 'displaytype displayhandlesin displayhandleout displaylevrank' =: 'verb';((($0);(,0);_0.3 0.3) {::~ stealthoperand { valence , 1 1 1);0;op;((*#vranks) # ,:sellevel,vranks)
+'displayhandlesin displayhandleout displaylevrank' =: ((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1);0;<rankhistory
 NB. Pass the DOLs through, but delete any stealthoperand.  This is where we trim the display
 if. (valence = 2) *. dispstealthoperand e. 1 2 do.
   x =. (<<< <:dispstealthoperand) { x
 end.
-x  ,&< coname'' NB. no v, so no change to the DOLs
+x ,&< coname'' NB. no v, so no change to the DOLs
 )
 
 NB. **** assignment ****
@@ -3713,15 +3907,16 @@ NB. Each group of modifiers has a locale to create objects of its type
 cocurrent 'dissect'
 dissectmodindex =: 0$a:  NB. list of (<list of boxed modifier words)
 
+NB. x is object class(es) to include, default 'dissectobj'
 NB. y is string containing the modifiers that will be handled in this
 NB. locale.  Result is the locale name.  Side effect: index extended
 NB. MAJOR SIDE EFFECT: locale is changed
-modlocale =: 3 : 0
+modlocale =: ''&$: : (4 : 0)
 NB.?lintmsgsoff
-cocurrent newloc =. <'dissectmod' , ": <: # dissectmodindex_dissect_ =: dissectmodindex_dissect_ , <;: y
+cocurrent@(0&cocreate)@([ coerase) newloc =. <'dissectmod' , ": <: # dissectmodindex_dissect_ =: dissectmodindex_dissect_ , <;: y
 NB.?lintmsgson
-coinsert 'dissectobj'
-18!:4 newloc
+coinsert x , ' dissectobj'
+18!:4 newloc   NB. No named verb from here to the end!
 i. 0 0
 )
 
@@ -3899,8 +4094,8 @@ traverse =: 4 : 0
 traversedowncalcselect y
 calchighlight x
 if. errorcode = ENOAGREE do. agreementerror x return. end.
-dol =. joinlayoutsl (0 1 # x) traverse__vop1 0 2 travdownvops selector , ((1 { selopinfovalid) # 1) { selopinfo
-dol =. dol ,~ joinlayoutsl (1 0 # x) traverse__vop0 0 1 travdownvops selector , ((0 { selopinfovalid) # 0) { selopinfo
+dol =. joinlayoutsl (0 1 # x) traverse__vop1 0 1 2 travdownvops selector , ((1 { selopinfovalid) # 1) { selopinfo
+dol =. dol ,~ joinlayoutsl (1 0 # x) traverse__vop0 0 1 2 travdownvops selector , ((0 { selopinfovalid) # 0) { selopinfo
 if. snifferror__COCREATOR do. vop0 isolateverror vop1 end.   NB. On the first pass, figure out where the error is
 (vop0,vop1) inheritu dol traverse__uop vop0 travdownuops vop1
 )
@@ -4031,6 +4226,7 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
+titlestring =: cop   NB. Since this may show up in the rank stack, have a title string
 NB. Save the type of v
 vtype =: (<2 0) {:: y
 NB.?lintonly uop =: vop =: coname'' [ cop =: ''
@@ -4087,7 +4283,7 @@ NB. The result is the DOL, up through the result of u
 NB. We do not create a cell; we just traverse u.  There is no visible indication of the rank operator, except in the
 NB. frames
 traverse =: 4 : 0
-NB. for u"n, resolve n internally.  It will not dispay, but we need a result for getverbrank
+NB. for u"n, resolve n internally.  It will not display, but we need a result for getverbrank
 if. vtype bwand noun do. NOLAYOUTS traverse__vop TRAVNOUN end.
 traversedowncalcselect y
 calchighlight x
@@ -4113,6 +4309,168 @@ if. vtype bwand noun do.
 end.
 if. 0 = #rank do. rank =. getverbrank_dissectobj_ f. y end.
 rank
+)
+NB. **** m/ u/ ****
+'dissectexpandable' modlocale '/'
+
+create =: 3 : 0
+NB. Handle m/ as a general verb
+if. noun bwand (<0 0) {:: y do.
+  changeobjtypeto localedefault
+  create y
+  return.
+end.
+create_dissectobj_ f. (<1 2) {  y
+NB. Register this object so we can clean up at end
+newobj__COCREATOR coname''
+NB. Save the operands - locale of the verb, and string form of the adv
+'uop cop' =: 1 {"1 y
+titlestring =: (defstring__uop 2) , cop   NB. Default title to the value when u not used.  When u used, we take from u
+NB.?lintonly uop =: coname'' [ cop =: ''
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop
+verb;(coname'');tokensource
+NB.?lintsaveglobals
+)
+
+destroy =: 3 : 0
+destroy_dissectobj_ f. ''
+)
+
+NB. Set the valence used for executing this verb, and propagate to descendants
+NB. The descendant is always executed as a dyad
+setvalence =: 3 : 0
+valence =: #y
+setvalence__uop 2$y
+resultissdt =: resultissdt__uop
+NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+NB. Since u is always a dyad, combine heights if we are a monad
+estheights =: <./^:(valence=1) estheights__uop
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+enparen^:(y=3) (defstring__uop 2) jd cop
+)
+
+NB. return string form of operands, including instrumentation
+exestring =: 3 : 0
+initloggingtable ''
+if. valence = 1 do.
+  NB. Use unadorned verb on empty operand to get neutral.  Save every result of verb execution.  Also save overall result.
+  auditstg '((' , (logstring '') , '@:(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop 0 1 0) , ')/`(' , (defstring__uop 2), '/)@.(0=#))))'
+else.
+  NB. Simulate dyad u/ by creating a rank
+  auditstg '((' , (logstring '') , '@:(' , (verblogstring '') , (exestring__uop 0 1 0) , ')"(_ (_1)} ' , (defstring__uop 2), ' b. 0))"_)'
+end.
+)
+
+NB. Return the locales for propsel
+proplocales =: 3 : 0
+uop,(y=3) # <tokensource
+)
+
+NB. get the rank to use for this verb.
+NB. We treat u/ like u"(lu,_)
+getverbrank =: 3 : 0
+if. valence = 1 do. _ else. _ (1}) getverbrank_dissectobj_ f. y end.
+)
+
+
+NB. Traversal up and down the tree.
+NB. 
+NB. The result is the DOL, up through the result of u
+traverse =: 4 : 0
+if. valence = 1 do.  NB. monad u/
+  NB. If there is no selection, we simply roll up the display of everything under the name u/ and fall through,
+  NB. so that the value will be displayed in the collector.  We do not traverse u in this case.
+
+  NB. If there is a selection, we handle the cases of 0, 1, and 2 items specially:
+  NB. 0 or 1 items just pass through to display u/ at the collector without traversing u.  Exactly 2 items
+  NB. does not need a selector; we traverse u and pass its result to the collector.
+
+  NB. If there are more than 2 items, if there is no selector we process u/ as above, but if there is a
+  NB. selector we create a new node to handle the / selection.  This node will display all the results of
+  NB. u, allowing selection of one.  We will pass no layouts to the collector, which will display its selected result
+
+  NB. Create display type: 
+  traversedowncalcselect y
+  if. frame -: ,1 do.
+    NB. We have a selection of a u/ of exactly 2 items.  Convert to dyad
+    x =. x , createreference x   NB. Create reference for dyad u
+    NB. Remove the line we added for u/
+    x traverse__uop bnsellevel , (}:rankhistory) ; rankcalculus^:(-.*./selopinfovalid) selector , 2 # selopinfo
+    NB. No inheritu, because this locale plays no part in the display
+  elseif. (1 < nitems =. {.frame) *. (sellevel < #selections) do.
+    NB. We have a selector, and more than 2 possible selections.  Display the selector, and traverse u
+    if. nitems (| = <:@[) {. sellevel {:: selections do. x =. x , createreference x  NB. Guaranteed selector is valid
+    else. x =. x , createselfreference 0.4   NB. loop from right of box to y argument
+    end.
+
+    NB. No calchighlight needed - it will be done in u
+    NB. Replace the last line of rankhistory with simple '/'
+    NB. Traverse u to display it and its descendants, and create a display node for pre-u.  u will be inherited into the display
+    NB. of the selector created here, which is part of the result
+    dol =. joinlayoutsl '' inheritu x traverse__uop bnsellevel , ((<cop) (<_1 0)} rankhistory) ; rankcalculus^:(-.*./selopinfovalid) selector , 2 # selopinfo
+    'displayhandlesin displayhandleout displaylevrank' =: (,0);0;<rankhistory
+    dol ,&< coname''
+  elseif. do.
+    NB. Display u/ as a monolith
+    NB. We are subsuming u in the display of this node.  Just display the values we have selected
+    NB. The accumframe here holds the (negative) starting selection value, if there is unexpanded detail
+    'accumframe displayhandlesin displayhandleout displaylevrank' =: (<_1:"0 frame);(,0);0;<rankhistory
+    NB. no selection, so no calchighlight needed
+    x ,&< coname'' NB. no v, so no change to the DOLs
+  end.
+NB. 
+else.  NB. dyad
+  traversedowncalcselect y
+  calchighlight x
+  if. errorcode = ENOAGREE do. agreementerror x return. end.
+  '' inheritu x traverse__uop bnsellevel , rankhistory ; rankcalculus^:(-.*./selopinfovalid) selector , selopinfo
+end.
+)
+
+NB. *** traversal support ***
+NB. y is natural frame(s) of the executed verb
+NB. result is (frame of value to display);(selopshapes for next level - cells of this verb)
+calcdispframe =: 3 : 0
+if. valence = 1 do.
+  NB. There are selops; the number of results is one less than the number of items.
+  NB. Return empty if # items is 0 or 1
+  calcdispframe_dissectobj_ f. , < (#~ >&0) <: {. {.@> selopshapes
+else. calcdispframe_dissectobj_ f. y
+end.
+)
+
+NB. y is all the indexes that were selected by  the selector
+NB. Result is the selectors to display (a list), in order.  The atom count should match the frame returned by calcdispframe
+calcdispselx =: 3 : 0
+if. valence = 1 do.
+  NB. If the frame is empty, take the last result; otherwise take the first results
+  ({.!._1 frame) {. y
+else. calcdispselx_dissectobj_ f. y
+end.
+)
+
+NB. y is the result of calcdispselx.  Result is the matching values.  These values will be collected to
+NB. produce the displayed result.  We might have to add boxing if we want to ensure collectibility
+NB. Since u/ executes from the end, we reverse the order for display
+fetchselr =: 3 : 0
+if. valence = 1 do.
+  NB. If this verb is expanding, box each result so we don't collect the different executions together
+  <"0^:(*#frame) (|.y) { logvalues
+else. fetchselr_dissectobj_ f. y
+end.
+)
+
+NB. y is the intervals for each ticket, expanded into an array using the shape of the frame
+NB. Result is the array reordered to natural order; reversed, since u/ processes in reverse order
+tickettonatural =: 3 : 0
+if. valence = 1 do. |. y else. y end.
 )
 
 NB. **** um`vn ****
@@ -4160,7 +4518,7 @@ assert. 0 = #x
 traversedowncalcselect 2 {. y  NB. Just to set error globals
 calchighlight x
 selresult =: <conjex
-'displaytype displayhandlesin displayhandleout displaystring displaylevrank nounhasdetail' =: 'noun';($0);0;'';NORANKHIST,<0
+'displayhandlesin displayhandleout displaylevrank nounhasdetail' =: ($0);0;NORANKHISTNOUN,<0
 x ,&< coname''  NB. Return the empty DOLs
 )
 
@@ -4233,7 +4591,7 @@ NB. We assign it to the estimated longer side of u.
 if. (#x) < 2 do.
   x =. |.^:(*>/estheights__uop) (, createreference) x
 end.
-'' inheritu (|. x) traverse__uop bnsellevel , (0 _1 1 {"1 rankhistory) ; (*./ selopinfovalid) # selector , _1 0 { selopinfo
+'' inheritu (|. x) traverse__uop bnsellevel , (0 1 _1 2 {"1 rankhistory) ; (*./ selopinfovalid) # selector , _1 0 { selopinfo
 )
 
 
@@ -4440,10 +4798,10 @@ calchighlight x
 if. errorcode = ENOAGREE do. agreementerror x return. end.
 NB. If this is a monad, make a reference for y, assigning the label to v, since it will always be used
 if. 1 = #x do. x =. (,~ createreference) x end.
-dol =. joinlayoutsl (0 1 # x) traverse__vop 0 _1 travdownvops selector , ((_1 { selopinfovalid) # _1) { selopinfo
+dol =. joinlayoutsl (0 1 # x) traverse__vop 0 1 _1 travdownvops selector , ((_1 { selopinfovalid) # _1) { selopinfo
 NB. Use selop0 for x, and selresult for y - but only if selop0 exists, and no travdownuops error
 NB. replace the rank with the left rank of the hook, alone
-vop inheritu (dol ,~ 0 {  x) traverse__uop (<3 {."1 (0 1) {"1 rankhistory) 1} (((0 { selopinfovalid) #  0) { selopinfo) ((,3)}   1 1 1 0 1&(#^:_1))^:(1 4 -: ,&#) travdownuops vop 
+vop inheritu (dol ,~ 0 {  x) traverse__uop (<0 1 2 {"1 rankhistory) 1} (((0 { selopinfovalid) #  0) { selopinfo) ((,3)}   1 1 1 0 1&(#^:_1))^:(1 4 -: ,&#) travdownuops vop 
 )
 
 
@@ -4539,4 +4897,3 @@ ds '''`a b c'' =. +`-`%'
 ds 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
 ds '-&.> i. 3'
 ds '-&.:> i. 3'
-)
