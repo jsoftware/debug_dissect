@@ -16,10 +16,6 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
-NB. ds '(+ ; ,)/ i. 2 3'   click on final result crashes - should not traverse?
-NB. hook doesn't propagate select to v.  This is problematic
-NB. picking in nouns gives domain error
-NB. ds '0 (1 2 3 - *)"0 (0 1 2)'  click in final result, then click in 0*0 result.  error.
 NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' 
 NB.  make color-coordination better.  Rank is in wrong place - needs to go to v
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
@@ -546,7 +542,7 @@ bin s;
 cc fmshowstealth button;cn "Show ][";
 cc fmshowerror button;cn "Show Error";
 bin z;
-minwh 20 20;cc dissectisi isigraph flush;
+wh 20 20;cc dissectisi isigraph;
 bin z;
 pas 0 0;
 rem form end;
@@ -2216,6 +2212,7 @@ glsel 'dissectisi'
 NB. Create the top line: name (if any), flanked by rank(s) (if any)
 NB. We are creating one box that will describe the top line
 NB. Get size of verb/name string, plus margin
+QP'displaylevrank '
 if. 2 = 3!:0 displaylevrank do.
   NB. string; no ranks
   if. #DOranks =: displaylevrank do.
@@ -2228,11 +2225,12 @@ else.
   NB. Audit the rank to enforce descending order (empty values have no effect); then we
   NB. reset empty cells in the original to space; then delete rows that have no effect in the
   NB. rolled-up value.  Rows (except the first) containing only infinities are known to have no effect
-  NB. Propagate nonempty symbols over empties.  This handles the case of ~, which assigns a rank but doesn't have a display.
   NB. Remove lines with no display symbol
-  nonemptylevrank =. ([^:(*@#@>@[)/\. {."1 displaylevrank) (<a:;0)} displaylevrank
+NB. obsolete   nonemptylevrank =. ([^:(*@#@>@[)/\. {."1 displaylevrank) (<a:;0)} displaylevrank
+  nonemptylevrank =. (#~   (<'') ~: {."1) displaylevrank 
   rolledlevrank =. <./@,&.>/\. &.(,&(<_)) &.|. 2 }."1 nonemptylevrank
-  newrankmsk =. (~: *. 1 (0}) [: -. (<_)&(*./@:="1)) rolledlevrank =. (a: = 2 }."1 nonemptylevrank)} rolledlevrank ,: <' '
+NB. obsolete   newrankmsk =. (~: *. 1 (0}) [: -. (<_)&(*./@:="1)) rolledlevrank =. (a: = 2 }."1 nonemptylevrank)} rolledlevrank ,: <' '
+  newrankmsk =. 1:"_1 rolledlevrank =. (a: = 2 }."1 nonemptylevrank)} rolledlevrank ,: <' '
   DOranklevels =. (_4 + #cfmshape) <. newrankmsk # > 1 {"1 nonemptylevrank
   DOranks =: (":&.> newrankmsk # rolledlevrank) (}:"1@[ ,. ] ,. {:"1@[) newrankmsk # {."1 nonemptylevrank
   DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) cfmlabel ,:"1 (DOranklevels { cfmshape)
@@ -2240,6 +2238,7 @@ else.
   NB. Make the left rank left-justified, the right rank right justified.  Align each stack
   NB. vertically({."1 displaylevrank) ({."1@] ,. [ ,. }."1@])
   namedesc =. (<ALIGNCENTER) addalignmentgroup (ALIGNLEFT,ALIGNLEFT) addalignmentrect DOrankcfm sizetext"1 0 DOranks
+QP'displaylevrank nonemptylevrank rolledlevrank newrankmsk DOranklevels DOranks '
 end.
 
 
@@ -3269,7 +3268,7 @@ rem form end;
 )
 EXPLORER=: 0 : 0 [^:IFQT EXPLORER
 pc explorer;
-minwh ?;cc dissectisi isigraph flush;
+wh ?;cc dissectisi isigraph;
 pas 0 0;pcenter;
 rem form end;
 )
@@ -4709,7 +4708,8 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop uops
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-((y > 1) # uop),cop,((y > 1) # vop)
+NB. obsolete ((y > 1) # uop),cop,((y > 1) # vop)
+(uop),cop,(vop)
 )
 
 NB. Traversal up and down the tree.
@@ -4786,7 +4786,8 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop 0,va
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-uop,(y > 1) # vop
+NB. obsolete uop,(y > 1) # vop
+uop,vop
 )
 
 NB. Traversal up and down the tree.
