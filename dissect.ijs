@@ -4188,8 +4188,8 @@ nounop inheritu dol traverse__verbop bnsellevel , NORANKHIST , selector , (*./ s
 )
 
 NB. **** &. &.: ****
-modlocale '&.&.:'
-NB. we emulate this with v^"_1@:u&[:]v
+(>localecompose_dissect_) modlocale '&.&.:'
+NB. we emulate this with v^"_1@:u&[:]v.  The only thing we do here is defstring, so we can recover the original display form of the verb
 
 create =: 3 : 0
 create_dissectobj_ f. (<2 1) { y
@@ -4210,10 +4210,17 @@ uop =: 1 {:: create__nobj (_3 [\ verb;iop;($0);conj;'@:';($0)) , 0 { y
 
 NB. Now change this locale to &&: and create i&v
 NB. Replace the uop with the iop we just created, and the cop with the given conjunction, with '.' removed
-changeobjtypeto localecompose
-
-create (uop;(<<<1){cop) (<0 1;1)} y
+NB. We leave the &. locale in the path, so that we can override
+NB. obsolete coinsert localecompose
+NB. obsolete changeobjtypeto localecompose
+create__localecompose f. (uop;(<<<1){cop) (<0 1;1)} y
 NB.?lintsaveglobals
+)
+
+NB. return string form of operands, not including instrumentation
+NB. We keep the original form 
+defstring =: 3 : 0
+enparen^:(y=3) (defstring__vop__uop 2) jd cop jd (defstring__vop 3)
 )
 
 
