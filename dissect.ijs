@@ -16,7 +16,7 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
-NB. ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' 
+NB. dissect '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' 
 NB.  make color-coordination better.  Rank is in wrong place - needs to go to v
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
 NB. routing: penalize overlap, including overlap of straight lines.  Also, think about forcing all nets of, say, 3 dests to use router.  Have height limit on direct routes.  Use router on all nets that have a routed portion.
@@ -37,12 +37,12 @@ NB. worry about whether gerund needs to traverse.  Shape display of gerund is wr
 NB. dissect - 2d graphical single-sentence debugger
 
 NB. the call is:
-NB. [options] ds [sentence]
+NB. [options] dissect [sentence]
 NB. where sentence is a string to be executed.  The sentence is parsed and modified so that every verb execution creates
 NB. looging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
 NB. dissect verb), and then the results are displayed in 2d form.  If sentence is omitted, the sentence from the last error is used.
 
-ds_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`]@.(2=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])@getsentence_dissect_
+dissect_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`]@.(2=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])@getsentence_dissect_
 
 NB. The locale dissectnopath is used to find local names.  Its path is empty.  The locale contains only one name, z458095869
 cocurrent 'dissectnopath'
@@ -395,7 +395,7 @@ while. do.
           NB.?lintmsgsoff
           cocurrent gloc
           NB.?lintmsgson
-          if. 3 = objtype =. 4!:0 <glopart do.
+          if. 3 = objtype =. 4!:0 :: _2: <glopart do.
             objvalrank =. rankinv_dissect_ f. glopart
           else.
             obtype =. _1
@@ -521,12 +521,12 @@ NB. After the sentence has been executed, return here to display
 DISSECT=: 0 : 0
 pc dissect;
 xywh 3 19 20 20;cc dissectisi isigraph;
-xywh 4 2 26 60;cc fmfontsize combolist;
-xywh 32 3 17 11;cc lbl01 static;cn "Font";
-xywh 52 2 26 60;cc fmmaxnounsize combolist;
-xywh 80 4 69 11;cc lbl00 static;cn "Max Noun (% of scrn)";
-xywh 156 3 30 12;cc fmshowstealth button;cn "Show ][";
-xywh 192 3 26 12;cc fmshowerror button;cn "Show Err";
+xywh 4 2 54 60;cc fmfontsize combolist;
+xywh 60 4 24 11;cc lbl01 static;cn "Font";
+xywh 88 2 42 60;cc fmmaxnounsize combolist;
+xywh 131 4 69 11;cc lbl00 static;cn "Max Noun (% of scrn)";
+xywh 202 4 49 12;cc fmshowstealth button;cn "Show ][";
+xywh 254 4 65 12;cc fmshowerror button;cn "Show Err";
 pas 0 0;
 rem form end;
 )
@@ -534,16 +534,16 @@ rem form end;
 DISSECT=: 0 : 0 [^:IFQT DISSECT
 pc dissect;
 bin vh;
-wh 15 10;cc fmfontsize combolist;
-wh 20 10;cc lbl00 static;cn "Min Font";
+minwh 54 60;cc fmfontsize combolist;
+minwh 24 11;cc lbl00 static;cn "Min Font";
 bin s;
-cc fmmaxnounsize combolist;
-cc lbl01 static;cn "Max Noun (% of scrn)";
+minwh 42 60;cc fmmaxnounsize combolist;
+minwh 42 60;cc lbl01 static;cn "Max Noun (% of scrn)";
 bin s;
-cc fmshowstealth button;cn "Show ][";
-cc fmshowerror button;cn "Show Error";
+minwh 49 12;cc fmshowstealth button;cn "Show ][";
+minwh 65 12;cc fmshowerror button;cn "Show Error";
 bin z;
-wh 20 20;cc dissectisi isigraph;
+minwh 20 20;cc dissectisi isidraw flush;
 bin z;
 pas 0 0;
 rem form end;
@@ -3143,12 +3143,12 @@ if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
   pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
 NB.?lintsaveglobals
 end.
-NILRET
+''
 )
 
 dissect_dissectisi_mbrdown =: 3 : 0
 'r' dissect_dissectisi_mbdown 0 ". sysdata
-NILRET
+''
 )
 
 NB. mouse movement.  If we are scrolling, drag the pixels along
@@ -3267,7 +3267,7 @@ rem form end;
 )
 EXPLORER=: 0 : 0 [^:IFQT EXPLORER
 pc explorer;
-wh ?;cc dissectisi isigraph;
+minwh ?;cc dissectisi isidraw;
 pas 0 0;pcenter;
 rem form end;
 )
@@ -4808,92 +4808,92 @@ vop inheritu (dol ,~ 0 {  x) traverse__uop (<0 1 2 {"1 rankhistory) 1} (((0 { se
 NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ 3 : ''destroy__y 0'' dissectinstance_dissect_ [ ' , enparen_dissect_);._2 runtests_base_
 NB. wd@('psel dissect;pclose'"_)"0 i. 100
 runtests_base_ =: 0 : 0
-ds '2+''a'''
-ds '2,''a'''
-ds '2 3+''a'''
-ds '1 2 + ''ab'''
-ds '1 2 +@+ ''ab'''
-ds '1 2 +&+ ''ab'''
-ds '1 2 +&+~ ''ab'''
-ds '''ab'' +&+ 1 2'
-ds '1 2 +@(]"0) ''ab'''
-ds '1 2 +@(0:"0) ''ab'''
-ds '0 1 2 + 1 2'
-ds '+@+ ''a'''
-ds '+@{. ''a'''
-ds '0 +&+ ''a'''
-ds '0 +&+ ''ab'''
-ds '0 +&:+ ''a'''
-ds '''a''+&+ 0'
-ds '''ab''+&+ 0'
-ds '''a''+&:+ 0'
-ds '+&{. ''a'''
-ds '+&:+ ''a'''
-ds '+&2 (3 4)'
-ds '3&* (3 4)'
-ds '+&''a'' (3 4)'
-ds '(+&2)@:(2&*) 4 6'
-ds '3 4 +"1 i. 3 2'
-ds '(i. 3 2) +"1 (3 4)'
-ds '(i. 3 2) +"1 i. 3 2'
-ds '(i. 3 2) +"1 i. 3 1'
-ds '(i. 3 2) +"1 i. 1 1'
-ds '2 3 +@]&> 5 6'
-ds '(i. 3 2) +@]"1 i. 1 1'
-ds '(i. 3 2) +@["1 i. 1 1'
-ds 'i.@(0&{) ''a'''
-ds 'i."0 (1 2)'
-ds '+~ i. 2 3'
-ds '3 4 +~ i. 2 3'
-ds '3 4 +~ i. 3 2'
-ds '3 4 +@]~ i. 3 2'
-ds '3 4 +@[~ i. 3 2'
-ds '3 4 +~ i. 2 3'
-ds '3 4 (+ - *) 0 1'
-ds '0 1 2 (+ - *) 0 1'
-ds '0 1 2 (+ - 0:) 0 1'
-ds '0 1 2 (0: - *) 0 1'
-ds '0 1 2 (1:"0 - 0:"0) 0 1'
-ds '0 1 2 (+ - ]) 0 1'
-ds '0 1 2 ([ - -) 0 1'
-ds '0 1 2 ([ - ]) 0 1'
-ds '0 1 2 (- + * % -)"0 (3 4 5)'
-ds '0 1 (+ 0:) ''ab'''
-ds '0 1 (+ {.) ''ab'''
-ds '0 1 (+ ]) 1 2 3'
-ds '(0 1 2 + 0 1"_) 5'
-ds '0 1 2 + '''''
-ds '0 1 2 + '' '''
-ds '0 (+ - *) '''''
-ds '0 (1 2 3 - *) '''''
-ds '0 (1 2 3 - *)"0 '''''
-ds '0 (1 2 3 , ])"0 $0'
-ds '0 ([: 1 2 3"0 $)"0 $0'
-ds '0 (+ - ]) '''''
-ds '0 (1 2 3 - *)"0 $0'
-ds '0 (1 2 3 - *)"0 (0)'
-ds '0 +@* '''''
-ds '0 (+@* - *) '''''
-ds '0 (+@* *) '''''
-ds '0 (+ *) '''''
-ds '(#@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
-ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' [ z =. 2
-ds 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q''' [  z =. 2
-ds '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
-ds '(i.@# ((}.>) ,. ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
-ds '(i.@# ((}.>) ,&< ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
-ds '(i.@# ((}.>) , ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
-ds '0 1 2 3 {~ 2'
-ds '(i. 2 3) {~ 2'
-ds '(i. 3 2) {~ 2'
-ds '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
-ds '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'
-ds '1 2 +"_1 0 (1 2)'
-ds '1 2 ,"_1 i. 2 3'
-ds 'y =. 2 + 5'
-ds 'zzz + 5 [ zzz =. 6'
-ds '''a b c'' =. i. 3'
-ds '''`a b c'' =. +`-`%'
-ds 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
-ds '-&.> i. 3'
-ds '-&.:> i. 3'
+dissect '2+''a'''
+dissect '2,''a'''
+dissect '2 3+''a'''
+dissect '1 2 + ''ab'''
+dissect '1 2 +@+ ''ab'''
+dissect '1 2 +&+ ''ab'''
+dissect '1 2 +&+~ ''ab'''
+dissect '''ab'' +&+ 1 2'
+dissect '1 2 +@(]"0) ''ab'''
+dissect '1 2 +@(0:"0) ''ab'''
+dissect '0 1 2 + 1 2'
+dissect '+@+ ''a'''
+dissect '+@{. ''a'''
+dissect '0 +&+ ''a'''
+dissect '0 +&+ ''ab'''
+dissect '0 +&:+ ''a'''
+dissect '''a''+&+ 0'
+dissect '''ab''+&+ 0'
+dissect '''a''+&:+ 0'
+dissect '+&{. ''a'''
+dissect '+&:+ ''a'''
+dissect '+&2 (3 4)'
+dissect '3&* (3 4)'
+dissect '+&''a'' (3 4)'
+dissect '(+&2)@:(2&*) 4 6'
+dissect '3 4 +"1 i. 3 2'
+dissect '(i. 3 2) +"1 (3 4)'
+dissect '(i. 3 2) +"1 i. 3 2'
+dissect '(i. 3 2) +"1 i. 3 1'
+dissect '(i. 3 2) +"1 i. 1 1'
+dissect '2 3 +@]&> 5 6'
+dissect '(i. 3 2) +@]"1 i. 1 1'
+dissect '(i. 3 2) +@["1 i. 1 1'
+dissect 'i.@(0&{) ''a'''
+dissect 'i."0 (1 2)'
+dissect '+~ i. 2 3'
+dissect '3 4 +~ i. 2 3'
+dissect '3 4 +~ i. 3 2'
+dissect '3 4 +@]~ i. 3 2'
+dissect '3 4 +@[~ i. 3 2'
+dissect '3 4 +~ i. 2 3'
+dissect '3 4 (+ - *) 0 1'
+dissect '0 1 2 (+ - *) 0 1'
+dissect '0 1 2 (+ - 0:) 0 1'
+dissect '0 1 2 (0: - *) 0 1'
+dissect '0 1 2 (1:"0 - 0:"0) 0 1'
+dissect '0 1 2 (+ - ]) 0 1'
+dissect '0 1 2 ([ - -) 0 1'
+dissect '0 1 2 ([ - ]) 0 1'
+dissect '0 1 2 (- + * % -)"0 (3 4 5)'
+dissect '0 1 (+ 0:) ''ab'''
+dissect '0 1 (+ {.) ''ab'''
+dissect '0 1 (+ ]) 1 2 3'
+dissect '(0 1 2 + 0 1"_) 5'
+dissect '0 1 2 + '''''
+dissect '0 1 2 + '' '''
+dissect '0 (+ - *) '''''
+dissect '0 (1 2 3 - *) '''''
+dissect '0 (1 2 3 - *)"0 '''''
+dissect '0 (1 2 3 , ])"0 $0'
+dissect '0 ([: 1 2 3"0 $)"0 $0'
+dissect '0 (+ - ]) '''''
+dissect '0 (1 2 3 - *)"0 $0'
+dissect '0 (1 2 3 - *)"0 (0)'
+dissect '0 +@* '''''
+dissect '0 (+@* - *) '''''
+dissect '0 (+@* *) '''''
+dissect '0 (+ *) '''''
+dissect '(#@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
+dissect 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' [ z =. 2
+dissect 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q''' [  z =. 2
+dissect '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
+dissect '(i.@# ((}.>) ,. ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+dissect '(i.@# ((}.>) ,&< ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+dissect '(i.@# ((}.>) , ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+dissect '0 1 2 3 {~ 2'
+dissect '(i. 2 3) {~ 2'
+dissect '(i. 3 2) {~ 2'
+dissect '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
+dissect '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'
+dissect '1 2 +"_1 0 (1 2)'
+dissect '1 2 ,"_1 i. 2 3'
+dissect 'y =. 2 + 5'
+dissect 'zzz + 5 [ zzz =. 6'
+dissect '''a b c'' =. i. 3'
+dissect '''`a b c'' =. +`-`%'
+dissect 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
+dissect '-&.> i. 3'
+dissect '-&.:> i. 3'
