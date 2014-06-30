@@ -16,6 +16,8 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 NB. TODO:
+NB. dissect '+&.>/ z' [ z =. 1;'a';3;4
+NB.  error because the same locale seems to get placed twice, owing to error
 NB. dissect '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' 
 NB.  make color-coordination better.  Rank is in wrong place - needs to go to v
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
@@ -1248,7 +1250,7 @@ NB. TEMP kludge!!  Error is not fatal, if we are in adverse or chasing a fill-ce
               NB. wanted to select at the root, they could have.  But in the case of error, we really want the
               NB. root to have the entire failing selector, so that it can display it; so we propagate
               NB. the selector back to the originating monad/dyad
-              (propselup [ propsel) (sellevel {. selections) , <frame #: #selx
+              (propselup [ propsel) (sellevel {. selections) , < frame getfailingindex #selx
 qprintf^:DEBTRAVDOWN 'errorcode selections ' 
             end.
           end.
@@ -1275,10 +1277,10 @@ NB. obsolete       selresult =: {.^:(0=#)selr  NB. This is the (unopened, since 
       NB. that when we select, we will get a length error if selection goes too deep.  Bracket the
       NB. intervals with the start & end of the selector so that we create one extra interval that works
       NB. in case of crash, to get the inputs corresponding to the nonexistent last result
-      newsel =. tickettonatural frame $!.(<1 2$0) 2 <\ (,>selector) enclosing selx { logticket
-      NB. Apply the user's selection to the selector.
-      selector =: <> (sellevel { selections) { newsel  NB. This is where it would crash on error
-
+NB. obsolete        newsel =. tickettonatural frame $!.(<1 2$0) 2 <\ (,>selector) enclosing selx { logticket
+NB. obsolete       NB. Apply the user's selection to the selector.
+NB. obsolete        selector =: <> (sellevel { selections) { newsel  NB. This is where it would crash on error
+      selector =: < (sellevel { selections) { tickettonatural frame $ 2 ]\ (,>selector) enclosing selx { logticket
       NB. If (owing to error) we had missing results, newsel will have had some flag values
       NB. inserted: {:allsel is a selector for anything following the last valid result, and
       NB. is a proxy for the input cell that led to error.  The other flag value is (<1 2$0), which
@@ -1338,7 +1340,7 @@ else.
     NB. we qualified, and we just add one to the next level if selection here was possible.
     NB. Calculate the per-item part of fillmask: the selection level (upper bits), plus validity,
     NB. which is 0=OK, 2=first missing item, 3=later missing item.  No 'first missing item' unless there is an error here
-    fillmask =: (FILLMASKSELLEVEL * sellevel) + frame $!.FILLMASKUNEXECD (FILLMASKNORMAL #~ #selresult) , (errorcode = EEXEC) # FILLMASKERROR
+    fillmask =: (FILLMASKSELLEVEL * sellevel) + tickettonatural frame $!.FILLMASKUNEXECD (FILLMASKNORMAL #~ #selresult) , (errorcode = EEXEC) # FILLMASKERROR
     NB. Expand all the cells of selresult to
     NB. the shape of the maxsize, with FILLMASKFILL for any added cells.
     NB. Combine the per-item and per-atom parts of the fillmask
@@ -1397,7 +1399,7 @@ frameselresult =: 3 : 0
 (checkframing selresult) frameselresult y
 :
 'cs fill' =. x  NB. result cell size, fill atom (empty if unframable)
-(*#fill) ;< <"0@(cs&{.)@>`>@.(#fill) frame $!.(<cs $ {.!.' ' fill) selresult
+(*#fill) ;< <"0@(cs&{.)@>`>@.(#fill) tickettonatural frame $!.(<cs $ {.!.' ' fill) selresult
 )
 
 NB. Utilities for inspecting accumframe.  The last box of accumframe may be a prospective value, i. e. the value used
@@ -2877,7 +2879,7 @@ NB. We join the input objects, then append the DOL for the current object
 NB. Result is DOL for the combined layout:
 NB.  locale of obj;(start,:size of object);internal wires;handles out
 NB.   wires are brick, where each 2x2 is a table of start,:end, each in the format (locale;face#,fractional position)
-NB.   handles in/out are a table of startpoints, (locale;face#,fractional position)
+NB.   handles in/out are a table of startpoints, (locale;single face#,fractional position)
 joinlayouts =: 4 : 0
 NB. Create the DO for the block to add on.  If stealth operand, just
 NB. pass on the selected input layout
@@ -2899,7 +2901,7 @@ else.
   else.
     'upperdol upperyxhw upperwires upperresult' =. joinlayoutslr/ x
     if. DEBLAYOUT do.
-      qprintf'Joined upper objects:dol=?upperdol%yxhw=?upperyxhw%wires=?upperwires%res=?upperresult%'
+      qprintf'Joined upper objects:dol=?upperdol%yxhw=?upperyxhw%wires=?upperwires%$upperresult%res=?upperresult%'
     end.
     NB. Look up results of upper, and put lower block midway.  Use only results that exist - the rest
     NB. are references.  If there are no real results, there must be no dols either; just place the block at 0
@@ -2941,7 +2943,7 @@ NB. where
 NB.  DOL locales is list of DOL locales
 NB.  yx,:hw brick of yx for each locale - each position relative to top-left of layout
 NB.  wires is brick of nx2x2: locale,<(face# tblr),(fractional position)  source then dest
-NB.  resulthook is a wire: (result DOL locale),<(face,position of hook on bottom row)
+NB.  resulthook is a table of: (result DOL locale),<(face,position of hook on bottom row)
 NB. The screen size of the layout is {:@$@> 1 2 { layout
 NB. If a layout is a reference only, it will have empty DOLtable and margins
 
@@ -2958,7 +2960,7 @@ NB. y is the position(s) of the output wire
 NB. Result is reference layout, as a table
 createselfreference =: 3 : 0
 NB. The reference has the same resulthook as the main layout, but no DOLs, pixels, or wires
-(((0$a:),&< 0 2 2$0) , (0 2 2$a:) (;<) (coname'') (,<) 1 , ])"0 , y
+(((0$a:),&< 0 2 2$0) , (0 2 2$a:) (;<@,:) (coname'') (,<) 1 , ])"0 , y
 )
 
 NB. Create empty layout, as a table
@@ -3474,9 +3476,15 @@ calcdispselx =: ]
 
 NB. y is the result of calcdispselx.  Result is the matching values.  These values will be collected to
 NB. produce the displayed result.  We might have to add boxing if we want to ensure collectibility
+NB. Result always stays in execution order
 fetchselr =: 3 : 0
 y { logvalues
 )
+
+NB. x is the frame of the full expected result
+NB. y is the number of results we actually got
+NB. result is index list of the failing location
+getfailingindex =: #:
 
 NB. y is the intervals for each ticket, expanded into an array using the shape of the frame
 NB. Result is the array reordered to natural order (some primitives process out of order; we reorder to match selection)
@@ -4069,7 +4077,7 @@ defstring =: defstring__localeat f.
 NB. return string form of operands, including instrumentation
 exestring =: 3 : 0
 initloggingtable ''
-rankstg =. (cop -: ,'&') # '"', (')' ,~ '(]&' , defstring__vop 3)
+rankstg =. (cop -: ,'&') # '"', (')' ,~ '(]&' , defstring__vop0 3)
 auditstg '(' , (logstring '') , '@(' , (verblogstring '') , '(' , (exestring__vop0 0,valence__vop0,0) , '@[ ' , (exestring__uop 0 1 0) , (exestring__vop1 0,valence__vop1,0) , '@] ' , ')' , rankstg , '))'
 )
 
@@ -4181,7 +4189,7 @@ nounop inheritu dol traverse__verbop bnsellevel , NORANKHIST , selector , (*./ s
 
 NB. **** &. &.: ****
 modlocale '&.&.:'
-NB. we emulate this with v^"_1@:u&v
+NB. we emulate this with v^"_1@:u&[:]v
 
 create =: 3 : 0
 create_dissectobj_ f. (<2 1) { y
@@ -4448,20 +4456,29 @@ NB. y is all the indexes that were selected by  the selector
 NB. Result is the selectors to display (a list), in order.  The atom count should match the frame returned by calcdispframe
 calcdispselx =: 3 : 0
 if. valence = 1 do.
-  NB. If the frame is empty, take the last result; otherwise take the first results
-  ({.!._1 frame) {. y
+  NB. If the frame is empty, take the last result; otherwise drop the last result IF there are more results than the frame calls for
+  {:`(}:^:(({.frame)<:#)) @.(*#frame) y
 else. calcdispselx_dissectobj_ f. y
 end.
 )
 
 NB. y is the result of calcdispselx.  Result is the matching values.  These values will be collected to
 NB. produce the displayed result.  We might have to add boxing if we want to ensure collectibility
-NB. Since u/ executes from the end, we reverse the order for display
+NB. Result always stays in execution order
 fetchselr =: 3 : 0
 if. valence = 1 do.
   NB. If this verb is expanding, box each result so we don't collect the different executions together
-  <"0^:(*#frame) (|.y) { logvalues
+  <"0^:(*#frame) y { logvalues
 else. fetchselr_dissectobj_ f. y
+end.
+)
+
+NB. x is the frame of the full expected result
+NB. y is the number of results we actually got
+NB. result is index list of the failing location
+getfailingindex =: 4 : 0
+if. valence = 1 do. x #: _1 - y  NB. count back from the end
+else. getfailingindex_dissectobj_ f. y
 end.
 )
 
