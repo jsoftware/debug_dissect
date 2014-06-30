@@ -37,12 +37,12 @@ NB. worry about whether gerund needs to traverse.  Shape display of gerund is wr
 NB. dissect - 2d graphical single-sentence debugger
 
 NB. the call is:
-NB. [options] ds sentence
+NB. [options] ds [sentence]
 NB. where sentence is a string to be executed.  The sentence is parsed and modified so that every verb execution creates
 NB. looging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
-NB. dissect verb), and then the results are displayed in 2d form
+NB. dissect verb), and then the results are displayed in 2d form.  If sentence is omitted, the sentence from the last error is used.
 
-ds_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`]@.(2=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])
+ds_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`]@.(2=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])@getsentence_dissect_
 
 NB. The locale dissectnopath is used to find local names.  Its path is empty.  The locale contains only one name, z458095869
 cocurrent 'dissectnopath'
@@ -55,6 +55,7 @@ require '~addons/format/printf/printf.ijs'
 cocurrent 'dissect'
 coinsert 'jgl2'
 
+getsentence =: (' ' takeafter LF (i:~ }. ]) [: }:^:(LF={:) (13!:12))^:(0=#)
 
 NB. Maximum line length that we will try to display in a grid cell
 
@@ -2212,7 +2213,6 @@ glsel 'dissectisi'
 NB. Create the top line: name (if any), flanked by rank(s) (if any)
 NB. We are creating one box that will describe the top line
 NB. Get size of verb/name string, plus margin
-QP'displaylevrank '
 if. 2 = 3!:0 displaylevrank do.
   NB. string; no ranks
   if. #DOranks =: displaylevrank do.
@@ -2238,7 +2238,6 @@ NB. obsolete   newrankmsk =. (~: *. 1 (0}) [: -. (<_)&(*./@:="1)) rolledlevrank 
   NB. Make the left rank left-justified, the right rank right justified.  Align each stack
   NB. vertically({."1 displaylevrank) ({."1@] ,. [ ,. }."1@])
   namedesc =. (<ALIGNCENTER) addalignmentgroup (ALIGNLEFT,ALIGNLEFT) addalignmentrect DOrankcfm sizetext"1 0 DOranks
-QP'displaylevrank nonemptylevrank rolledlevrank newrankmsk DOranklevels DOranks '
 end.
 
 
