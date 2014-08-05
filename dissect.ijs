@@ -19,6 +19,7 @@ QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
+NB. dissect '1 2 3 +"1"2 i. 3 4 3'   no checkerboarding on green?
 NB. dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'  does not display detail of failing node.  The problem arises
 NB.  when  inheriting into the final noun node, which is ENOEXECD (i. e. no display).  In this case it would be OK to switch
 NB.  locales, because the noun node has no frame and would therefore not affect selection.  Perhaps change the ecode to EEMPTYNOUN.
@@ -2125,7 +2126,7 @@ NB. obsolete NB. _3=unexecuted, _2=error, _1=fill
 NB. obsolete DATACOLORS =: DATACOLORS , _3 ]\ 255 192 203  255 0 0  0 255 255
 
 NB. Now spread out the data colors, providing the checkerboard
-DATACOLORS =: <. ,/ DATACOLORS  *"1/ 1 1 1 ,: 0.93 0.93 0.95
+DATACOLORS =: <. ,/ DATACOLORS  *"1/ 1 1 1 ,: 0.88 0.83 0.88
 
 DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
 
@@ -2139,7 +2140,7 @@ HIGHLIGHTCOLORS =: <. (*    1 <. 110 % RGBTOLUMINANCE) (0 0 0 (0}) SHAPECOLORS)
 FRINGECOLOR =: (220 220 220 , 200 200 0 , 255 0 0 ,: 255 255 255) ;"1 (0 0 0 1)   NB. color/border of fringes: in order label,shape,status,data
 
 DOBORDERCOLORS =: _3 ]\ 0 0 255 0 0 255  0 0 0  255 0 0   NB. Black border for box, but red if incomplete, blue if empty
-RANKCOLOR =: 0 220 128  NB. color of dashed line for high-rank ops
+RANKCOLOR =: 0 0 255  NB. color of dashed line for high-rank ops
 BOXBORDERCOLOR =: 0 0 0  NB. color of lines between boxes
 HIGHLIGHTBORDERSTYLE =: 0 0 0 2  NB. color,width of lines for highlight
 WIRECOLOR =: 0 0 0   NB. Color of wires
@@ -2438,7 +2439,7 @@ if. 2 > #DOsize do. destroyexplorer '' end.
 if. (0 = #scrollpoints) *. (<'DOdatapos') e. picknames do.
   if. #shr =. hlightforselection'' do.
     NB. calculate highlight rectangle tlbr; compare ending position against size of each datapos object; if either coordinate too high, set scroll to start at selection
-    scrollpoints =: ({. htlbr) *"1 0 a   =. (b   =.pickrects {~ < a: ; _1 ;~ picknames i. <'DOdatapos') +./@:<"1 {: htlbr =. valueformat hlighttotlbr (<0 1) { shr
+    scrollpoints =: ({. htlbr) *"1 0 (pickrects {~ < a: ; _1 ;~ picknames i. <'DOdatapos') +./@:<"1 {: htlbr =. valueformat hlighttotlbr (<0 1) { shr
   end.
 end.
 NB. In case a view has been added or deleted, make the number of scrollpoints match the number of views.  Default to 0 if not set above
@@ -2685,7 +2686,7 @@ if. 3 < #ic do.
     tr =. segofsts (- ,. ])&.> 3 {"1 tlbr   NB. find intersection with right edge, producing (right,top)
     tr =. tr ([ + [: (,. -) 0 >. (- {."1)~)&.> 0 {"1 tlbr   NB. find (negative) amount top is below rectangle top, and transfer that to right (sub from y, add to x)
     NB. stipple in black
-    gllines a   =. 1 0 3 2 {"1 ; bl ,.&.> tr
+    gllines 1 0 3 2 {"1 ; bl ,.&.> tr
   end.
   if. 2 bwand stiptype =. 3 { ic do.
     NB. downright stippling requested
@@ -2697,7 +2698,7 @@ if. 3 < #ic do.
     br =. segofsts (+ ,. ])&.> 3 {"1 tlbr   NB. find intersection with right edge, producing (right,bottom)
     br =. br ([ + [: (,. -) 0 >. (- {."1)~)&.> 0 {"1 tlbr   NB. find (negative) amount bottom is below rectangle bottom, and transfer that to right (sub from y, add to x)
     NB. stipple in black
-    gllines a   =. 1 0 3 2 {"1 ; tl ,.&.> br
+    gllines 1 0 3 2 {"1 ; tl ,.&.> br
   end.
 end.
 0 0$0
@@ -2812,7 +2813,6 @@ if. datapresent do.
   glclip 0 0 1 1 + , |."1 (DOyx,:0) + DOdatapos
   NB. Create the coloring mask for the selection: it might be inside a box, if the fillmask is boxed
   sel =. (<:#cfmdata) checkerboardfillmask fillmask
-
   NB. We must always extend the data to match the frame, so that we show the full operand in case there were
   NB. unexecuted cells.  If the fill atom is nonnull, it means that the result is collectable, and we collect it.  If
   NB. not, we have to show the boxed atoms.
