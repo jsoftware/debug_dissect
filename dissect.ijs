@@ -7,18 +7,18 @@ NB. INPROGRESS:
 CLEANUP_dissect_ =: 1   NB. set to 0 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
+DEBHLIGHT_dissect_ =: 0   NB. set for highlight printout
 DEBVERB_dissect_ =: 0   NB. set for travdown printout
 DEBLAYOUT_dissect_ =: 0   NB. display grid details
 DEBGRAF_dissect_ =: 0   NB. display all drawn graphics
 DEBOBJ_dissect_ =: 0  NB. display drawn-object details
-DEBDOL_dissect_ =: 0  NB. display drawing locales
+DEBDOL_dissect_ =: 0  NB. display drawing locales and inheritu
 DEBDOL2_dissect_ =: 0  NB. display drawing locales
 DEBPICK_dissect_ =: 0  NB. display pick progress
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
-NB. dissect 'i.@> z' [ z =. 1 1;(3,:4);6   NB. when middle cell is selected, local fill should have a different color
 NB. dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'  does not display detail of failing node.  The problem arises
 NB.  when  inheriting into the final noun node, which is ENOEXECD (i. e. no display).  In this case it would be OK to switch
 NB.  locales, because the noun node has no frame and would therefore not affect selection.  Perhaps change the ecode to EEMPTYNOUN.
@@ -27,7 +27,6 @@ NB.  problem is that selecting a non-error cell causes the detail to vanish.
 NB. dissect 'i.@> z' [ z =. <@,"0 (1 0.5 2)   same
 
 NB. Need different text color for digits/text, and for nouns with leading 1s in the shape
-NB. Have different colors for different levels of operand highlighting
 
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
 NB. routing: penalize overlap, including overlap of straight lines.  Also, think about forcing all nets of, say, 3 dests to use router.  Have height limit on direct routes.  Use router on all nets that have a routed portion.
@@ -1107,7 +1106,7 @@ NB. If there were results to display, we will create a fillmask for them.  The c
 EHASFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC   NB. there are results, and a fillmask
 EFAILED =: ENOAGREE,EABORTED,EEXEC,EFRAMING,ENOEXECD,EUNEXECD,EFRAMINGABORT,EFRAMINGEXEC  NB. incomplete execution
 EPROPERR =: ENOEXECD,EUNEXECD    NB. propagate error - if u generates error, this passes it on
-EGENERR =: EABORTED,EEXEC,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC   NB. generate error in u
+EGENERR =: ENOAGREE,EABORTED,EEXEC,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC   NB. generate error in u
 EALLFRAMING =: EFRAMING,EFRAMINGABORT,EFRAMINGEXEC   NB. framing error, with or without others
 NB. selresult - the result of applying the selection to the result of the verb.  This is the selection based on the INPUT to
 NB.   this verb, not including any local selector, which is used for subnodes (the local selector is used for selector and selopinfo)
@@ -1129,7 +1128,8 @@ NB.  level of this node (in the upper bits), and validity information in the low
 NB.  0=normal 1=fill 2=first unexecuted cell (presumably error, but that may depend on what happened elsewhere) 3=later unexecd cell
 NB.  error is calculated per result cell & propagated to atoms; fill is calculated per atom.  fillmask is valid only for nouns, or if the
 NB.  unselected result has a frame with multiple cells, and is undefined otherwise
-'FILLMASKNORMAL FILLMASKFILL FILLMASKERROR FILLMASKUNEXECD FILLMASKSELLEVEL' =: i. 5
+'FILLMASKNORMAL FILLMASKFILL FILLMASKUNEXECD FILLMASKERROR FILLMASKCHECKER' =: i. 5
+FILLMASKSELLEVEL =: 1 bwlsl FILLMASKCHECKER
 NB. errorlevel - a copy of errorlevel__COCREATOR at the time this is parsed, this indicates whether we were in a try block during
 NB.  execution of this verb.  When it comes time to display error info, we don't use the result failure type for anything except
 NB.  top-level errors
@@ -1143,11 +1143,12 @@ NB. Initialize the locales where detail is to come from.  We will inherit these 
 'sellevel rankhistory' =: 2 {. y
 selopinfo =: }. selandxy =. 2 }. y
 errorlevel =: errorlevel__COCREATOR
-opselin =: 0$a:  NB. initialize opselin to empty (=no selection)
+opselin =: 0 2$a:  NB. initialize opselin to empty (=no selection)
 if. #vranks =: getverbrank selopinfo do.
   rankhistory =: rankhistory , titlestring ; <"0 sellevel , |. vranks
 end.
 qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%rankhistory%'
+qprintf^:DEBHLIGHT 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%y%'
 if. 0 = #selandxy do.
   NB. No selector: we can't do much
   'frame frames errorcode selresult selector selopinfo selopinfovalid physreqandhighlights' =: ($0);a:;ENOSEL;(0$a:);(0$a:);(0$a:);0 0;<NOPHYSREQ
@@ -1325,6 +1326,7 @@ qprintf^:DEBTRAVDOWN 'edisp'''' selections '
       NB. We handle that here by replicating the previous selectors if monad turns to dyad, or keeping the
       NB. selectors for y (kludge) if dyad to monad.  In any case, add the physical selections for this node
       physreqandhighlights =: physreqandhighlights  (($&.|.~ #) ,"1 ]) calcphysandhighlights ''
+qprintf^:DEBHLIGHT'physreqandhighlights frames '
     else.
       NB. If there was no selection, we can still create a display for v if this selection produces a single cell,
       NB. which we know will be presented to v all at once.  Account for operand replication, by using the common frame
@@ -1474,9 +1476,10 @@ end.
 )
 
 
-NB. Use the fillmask to give the color for each cell.  Low-order 2 bits are 0=normal 1=fill 2=error 3=unexecd
-NB. Convert that to color # (from bits 1 up) if normal, or _2 _4 _6 otherwise; then add in a checkerboard
-NB. x is the upper limit on selection level, x is the fillmask to create a checkerboard for
+NB. Use the fillmask to give the color for each cell.  Low-order 2 bits are 0=normal 1=fill 2=error 3=unexecd;
+NB.  bit 2 is 0; higher bits are checkerboard
+NB. We just add in the checkerboard
+NB. x is the upper limit on selection level (after checkerboard added), y is the fillmask to create a checkerboard for
 NB. if y is boxed, this must be a selection node, and we recur on the selected node, to put the checkerboard there
 checkerboardfillmask =: 4 : 0
 if. L. y do.
@@ -1487,10 +1490,12 @@ if. L. y do.
   end.
   y
 else.
-  sel =. (x - FILLMASKSELLEVEL) <. (* (<:FILLMASKSELLEVEL) bwand y)} (_1 bwlsl y) ,&,: (_2 * (<:FILLMASKSELLEVEL) bwand y)
+NB. obsolete   sel =. (x - FILLMASKSELLEVEL) <. (* (<:FILLMASKSELLEVEL) bwand y)} (_1 bwlsl y) ,&,: (_2 * (<:FILLMASKSELLEVEL) bwand y)
+sel =. ((2 bwlsl x) <. (-FILLMASKCHECKER) bwand y) bwor (<:FILLMASKCHECKER) bwand y
   NB. Checkerboard: works for scalars too.  Create a checkerboard cell of rank no more than 2, then
   NB. replicate as needed for higher rank, so that there is a predictable odd/even pattern within each rank-2 cell
-  sel + (({.   0 1 $~ 1&bwor) ({.~ -@(2<.#)) $ sel)"2 sel
+NB. obsolete   sel + (({.   0 1 $~ 1&bwor) ({.~ -@(2<.#)) $ sel)"2 sel
+sel + (({.   (0,FILLMASKCHECKER) $~ 1&bwor) ({.~ -@(2<.#)) $ sel)"2 sel
 end.
 )
 NB. Utilities for inspecting accumframe.  The last box of accumframe may be a prospective value, i. e. the value used
@@ -1575,8 +1580,8 @@ case. 0 do.
       NB. it will display simply as whatever the lower error was.
       selresult =: selresult , <res
     end.
-    NB. Inherit the fact of failure, but preserve existing data.  If we failed framing, pass that up the line
-    errorcode =: (#.(errorcode__loc e. EALLFRAMING) , errorcode e. EHASFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC  NB. Inherit the error indic
+    NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
+    errorcode =: (#.(errorcode__loc e. ENOAGREE) ,(errorcode__loc e. EALLFRAMING) , errorcode e. EHASFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC,4#ENOAGREE  NB. Inherit the error indic
   end.
   if. (errorcode = ENOEXECD) *. (errorcode__loc = EUNEXECD) do. errorcode =: errorcode__loc end.
   NB. Then, if both locales have fillmasks, insert or replace the fillmask from u.  If
@@ -1609,7 +1614,7 @@ case. 0 do.
       else.
         NB. The value to use for filling cells in the u fillmask depends on the errorcode for u.  If there
         NB. is no error, it's just normal fill
-        fillval =. (FILLMASKUNEXECD,(2#FILLMASKERROR),FILLMASKFILL) {~ (EUNEXECD,EEXEC,EFRAMINGEXEC) i. errorcode__loc
+        fillval =. (FILLMASKSELLEVEL * sellevel) + (FILLMASKUNEXECD,(2#FILLMASKERROR),FILLMASKFILL) {~ (EUNEXECD,EEXEC,EFRAMINGEXEC) i. errorcode__loc
         fillmask =: (((#>sellevel { selections) }. $fillmask) ([ {.!.fillval (({.!.1 $)~ -@#)~ ($,) ]) fillmask__loc) (sellevel { selections)} fillmask
       end.
     else. fillmask =: fillmask__loc
@@ -2046,6 +2051,9 @@ rout =: 3 : 0
 )
 
 NB. *************** end of router - start of display-object management **************
+RGBTOLUMINANCE =: +/@:*"1&0.2989 0.5870 0.1140
+
+
 SCROLLBARWIDTH =: 14  NB. width of scrollbar in pixels
 SCROLLBARCOLOR =: <192 192 192   NB. color for scrollbar - no pen
 SCROLLBARENDCOLOR =: <240 240 240
@@ -2087,12 +2095,11 @@ DATAMARGIN =: 1
 NB. The shape colors/textcolors give the main data colors for the selection level
 SHAPECOLORS =: ".;._2 (0 : 0)
 200 200 255
-153 255 000
-204 255 000
+000 255 000
+255 000 255
+000 255 255
+255 000 000
 255 255 000
-255 204 000
-255 154 000
-255 104 000
 )
 SHAPETEXTCOLORS =: 0 0 0"1 SHAPECOLORS
 NB. for the shape display of the (filled) result cell
@@ -2106,13 +2113,20 @@ NB. Data colors are like the shape colors, but there is a checkerboard effect, s
 NB. odd color has the background dimmed a little.  The first (unselected) data color
 NB. is different from the shape color, to keep them separate
 DATACOLORS =: (255 255 255 (0}) SHAPECOLORS)
-NB. The last elements of DATACOLORS are the special types:
-NB. _3=unexecuted, _2=error, _1=fill
-DATACOLORS =: DATACOLORS , _3 ]\ 255 192 203  255 0 0  0 255 255
-DATACOLORS =: <. ,/ DATACOLORS  *"1/ 1 1 1 ,: 0.83 0.83 0.94
+NB. obsolete NB. The last elements of DATACOLORS are the special types:
+NB. obsolete NB. _3=unexecuted, _2=error, _1=fill
+NB. obsolete DATACOLORS =: DATACOLORS , _3 ]\ 255 192 203  255 0 0  0 255 255
+
+NB. Now spread out the data colors, providing the checkerboard
+DATACOLORS =: <. ,/ DATACOLORS  *"1/ 1 1 1 ,: 0.93 0.93 0.95
 
 DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
 
+NB. The colors for each level of highlighting.  The first highlight contrasts with normal
+NB. data; thereafter we rely on the vivid colors to contrast, and we match each highlight with
+NB. its shape selector; but we reeduce the intensity to a max value to ensure contrast with the
+NB. background
+HIGHLIGHTCOLORS =: <. (*    1 <. 110 % RGBTOLUMINANCE) (0 0 0 (0}) SHAPECOLORS)
 
 
 FRINGECOLOR =: (220 220 220 , 200 200 0 , 255 0 0 ,: 255 255 255) ;"1 (0 0 0 1)   NB. color/border of fringes: in order label,shape,status,data
@@ -2290,7 +2304,7 @@ else.
   nonemptylevrank =. 2 ({."1 ,. |.@:}."1) (#~   (<'') ~: {."1) displaylevrank 
   rolledlevrank =. <./@,&.>/\. &.(,&(<_)) &.|. 2 }."1 nonemptylevrank
   newrankmsk =. 1:"_1 rolledlevrank =. (a: = 2 }."1 nonemptylevrank)} rolledlevrank ,: <' '
-  DOranklevels =. (_4 + #cfmshape) <. newrankmsk # > 1 {"1 nonemptylevrank
+  DOranklevels =. (<:#cfmshape) <. newrankmsk # > 1 {"1 nonemptylevrank
   DOranks =: (":&.> newrankmsk # rolledlevrank) (}:"1@[ ,. ] ,. {:"1@[) newrankmsk # {."1 nonemptylevrank
   DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) cfmlabel ,:"1 (DOranklevels { cfmshape)
   rankrects =. DOrankcfm sizetext"1 0 DOranks
@@ -2354,7 +2368,7 @@ NB. assert. shapetouse >:&# ;accumframe  not valid, when extra internal ranks, s
   end.
   NB. Convert the shapes to characters, and get the pixel extent of each string.  Start at the selection level
   NB. of this object
-  shapeext =. ((sellevel + i. {:$DOshapes) ((<. _4 + <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes =: ":&.> DOshapes
+  shapeext =. ((sellevel + i. {:$DOshapes) ((<. <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes =: ":&.> DOshapes
   NB. Create a rect object for the shape/selections
   shapedesc =. (<ALIGNCENTER) addalignmentgroup (<ALIGNSPREAD)&addalignmentgroup@,."1@|: ALIGNSPREAD addalignmentrect shapeext
 else.
@@ -2417,7 +2431,7 @@ if. 2 > #DOsize do. destroyexplorer '' end.
 if. (0 = #scrollpoints) *. (<'DOdatapos') e. picknames do.
   if. #shr =. hlightforselection'' do.
     NB. calculate highlight rectangle tlbr; compare ending position against size of each datapos object; if either coordinate too high, set scroll to start at selection
-    scrollpoints =: ({. htlbr) *"1 0 a   =. (b   =.pickrects {~ < a: ; _1 ;~ picknames i. <'DOdatapos') +./@:<"1 {: htlbr =. valueformat hlighttotlbr shr
+    scrollpoints =: ({. htlbr) *"1 0 a   =. (b   =.pickrects {~ < a: ; _1 ;~ picknames i. <'DOdatapos') +./@:<"1 {: htlbr =. valueformat hlighttotlbr (<0 1) { shr
   end.
 end.
 NB. In case a view has been added or deleted, make the number of scrollpoints match the number of views.  Default to 0 if not set above
@@ -2433,13 +2447,16 @@ NB. Create highlight rect for the current selection.  The highlight rect is an i
 NB. We take all the selectors there are, up the length of the frame of this level; but if there aren't enough, we don't highlight.  Discard
 NB. selectors for higher levels.  The only way we can get more selectors than frame is during sniff, where the lower
 NB. selection is propagated up automatically.
-NB. Result is boxed highlight rect (if any), or empty list if no selection
+NB. Result is table of (selection type (0 here));(boxed highlight rect (if any)), or empty table if no selection
 hlightforselection =: 3 : 0
-(<^:(*@#) (>: afcount accumframe) ((I.~ +/\@:(#@>)) {. ]) sellevel ((< #) # ;@}.) selections)
+(<0) ,. (,@<^:(*@#) (>: afcount accumframe) ((I.~ +/\@:(#@>)) {. ]) sellevel ((< #) # ;@}.) selections)
 )
 
 NB. Create highlight rects for the operands that have been selected from this node
-NB. Each y is a sequence of selections from selecthlightsout:
+NB. y is a table of (selection level);(<list of hrects)
+NB. Overall result of table of (selection level);(hrect, a single cell).  We 
+NB.
+NB. Each 1{y is a sequence of selections from selecthlightsout:
 NB. In general, each selector contains an atom/array of index lists of selected cells.  If the selector contains an array,
 NB. each list describes one selected cell (obviously all such cells have the same rank) and the shape with respect to lists
 NB. gives the shape of the selected group of cells, which may become important is subsequent selectors select from the group.
@@ -2448,13 +2465,14 @@ NB. We go through the sequence, appending each new selection to the previous one
 NB. hrects.  The interesting part comes when one of the selections contains an array of lists (example: u/.).  When this is first
 NB. encountered, it creates an array of rects.  If this array is subsequently selected from, the leading axes of the selection
 NB. select from the array of rects, and any surplus is appended to the selection.
-hlightforoperands =: ;@:(3 : 0&.>)`(a:"0)@.(0=#)
+hlightforoperands =: ;@:(4 : 0&.>/"1)`(a:"0)@.(0=#)
+NB. Here x is the initial selection level, used for the first box.  Selection levels of subsequent boxes are incremented by 1 
 NB. ({:@$@[ <. <:@#@$@]) is the smaller of (length of each new selection),(surplus shape of old selection)
 NB. We use that many atoms from each new selection to take from the old selections, and then append
 NB. the new selections, with those leading atoms removed.  The result may have any shape, but each list is
 NB. an hrect
-rects =. ((}."1~ <:@#@$) ,~"1 ] {~ ({:@$@[ <. <:@#@$@]) <@{."1 [)&.>/\.&.|. y
-; ,@:(<"1)&.> rects
+rects =. ((}."1~ <:@#@$) ,~"1 ] {~ ({:@$@[ <. <:@#@$@]) <@{."1 [)&.>/&.|. y
+; x ;"0&.> ,@:(<"1)&.> rects
 )
 
 NB. Convert highlight rectangle(s) to rectangles (tl,:br) unboxed (never empty)
@@ -2622,13 +2640,14 @@ drawmesh =: 4 : 0
 x drawline"1 3 (, |."1)&>/ ,."0 1&.>/ y
 )
 
-
+STIPWIDTH =: 10
 NB. x is interior color;(pen color,width).  If pen is omitted, null is used
 NB. if color is empty, use null brush
+NB. Color may be RGBA, where A is the stipple pattern: 0=none, 1=downleft, 2=downright, 3=both
 NB. y is yx,:hw of rectangles to draw with that color
 drawrect =: 4 : 0
 if. 0 e. $y do. return. end.
-ic =.> {. x
+irgb =. 3 {. ic =.> {. x
 if. DEBGRAF do.
   'Rectangles: color=%j, pencolor=%j, xywh=%j' printf (2{.x), < }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
 end.
@@ -2636,19 +2655,48 @@ if. 1 < #x do.
   (([: glpen 0 ,~ {:) [ glrgb@}:) 1 {:: x
 else.
   NB. No color, no pen
-  (([: glpen 0 5"_) [ glrgb) ic
-  glpen 0 5
+  (([: glpen 0 5"_) [ glrgb) irgb
+NB. obsolete   glpen 0 5
 end.
 if. #ic do.
-  glrgb ic
+  glrgb irgb
   glbrush ''
 else. glbrushnull''
 end.
 glrect 0 0 1 1 +"1^:(-.IFQT) ,"2 |."1 y
+NB. If stippling called for, do it
+if. 3 < #ic do.
+  tlbr =. ,"2 +/\"2 y
+  (([: glpen 1 0"_) [ glrgb) 0 0 0
+  if. 1 bwand stiptype =. 3 { ic do.
+    NB. downleft stippling requested: get the list of segments in the rect
+    startsegno =. >.(%&STIPWIDTH) +/"1 (0 1) {"2 tlbr   NB. tl
+    endsegno =. <. (%&STIPWIDTH) +/"1 (2 3) {"2 tlbr   NB. br
+    segofsts =. startsegno (STIPWIDTH * [ + i.@>:@-~)&.> endsegno  NB. y-intercept of segment
+    bl =. segofsts (- ,. ])&.> 1 {"1 tlbr   NB. find intersection with left edge, producing (left,bottom)
+    bl =. bl ([ + [: (,. -) 0 <. (- {."1)~)&.> 2 {"1 tlbr   NB. find (negative) amount bottom is below rectangle bottom, and transfer that to left (add y, sub x)
+    tr =. segofsts (- ,. ])&.> 3 {"1 tlbr   NB. find intersection with right edge, producing (right,top)
+    tr =. tr ([ + [: (,. -) 0 >. (- {."1)~)&.> 0 {"1 tlbr   NB. find (negative) amount top is below rectangle top, and transfer that to right (sub from y, add to x)
+    NB. stipple in black
+    gllines a   =. 1 0 3 2 {"1 ; bl ,.&.> tr
+  end.
+  if. 2 bwand stiptype =. 3 { ic do.
+    NB. downright stippling requested
+    startsegno =. >.(%&STIPWIDTH) -/"1 (0 3) {"2 tlbr   NB. tr
+    endsegno =. <. (%&STIPWIDTH) -/"1 (2 1) {"2 tlbr   NB. bl
+    segofsts =. startsegno (STIPWIDTH * [ + i.@>:@-~)&.> endsegno  NB. y-intercept of segment
+    tl =. segofsts (+ ,. ])&.> 1 {"1 tlbr   NB. find intersection with left edge, producing (left,top)
+    tl =. tl ([ +"1 0 (0) >. (- {."1)~)&.> 0 {"1 tlbr   NB. find amount top is above rectangle top, and transfer that to left (add y, add x)
+    br =. segofsts (+ ,. ])&.> 3 {"1 tlbr   NB. find intersection with right edge, producing (right,bottom)
+    br =. br ([ + [: (,. -) 0 >. (- {."1)~)&.> 0 {"1 tlbr   NB. find (negative) amount bottom is below rectangle bottom, and transfer that to right (sub from y, add to x)
+    NB. stipple in black
+    gllines a   =. 1 0 3 2 {"1 ; tl ,.&.> br
+  end.
+end.
 0 0$0
 )
 
-NB. x is (background color[;line color]);text color;text font;text size;yx margin around text (scalar or yx)
+NB. x is (background color[;pen color,width]);text color;text font;text size;yx margin around text (scalar or yx)
 NB. y is text;yx,:hw of box
 NB. Draw the rectangle, then draw the text
 drawtext =: 4 : 0"1
@@ -2738,7 +2786,7 @@ NB. Draw the shapes/selections.  Start at the selection level of this object
   NB. get the text,position for the shapes/selections, which are a rank-2 array
   shapeseltext =. DOshapes ,"0 actyx2&+&.> |: (,"3) 0 _1 |: > DOshapepos
   NB. draw frame/selections, which are all but the last column
-  ((sellevel + i. <: {:$DOshapes) ((<. _4 + <:@#) { ]) cfmshape) drawtext"2^:(*@#@[) }:"2 shapeseltext
+  ((sellevel + i. <: {:$DOshapes) ((<. #) { ]) cfmshape) drawtext"2^:(*@#@[) }:"2 shapeseltext
   NB. Draw the result-cell shape, the last column of the first row
   RESULTSHAPECFM drawtext (<0 _1) { shapeseltext
 end.
@@ -2756,7 +2804,7 @@ if. datapresent do.
   NB. Reduce the cliprect to the data window (including scrollbars, which are drawn last)
   glclip 0 0 1 1 + , |."1 (DOyx,:0) + DOdatapos
   NB. Create the coloring mask for the selection: it might be inside a box, if the fillmask is boxed
-  sel =. (#cfmdata) checkerboardfillmask fillmask
+  sel =. (<:#cfmdata) checkerboardfillmask fillmask
 
   NB. We must always extend the data to match the frame, so that we show the full operand in case there were
   NB. unexecuted cells.  If the fill atom is nonnull, it means that the result is collectable, and we collect it.  If
@@ -2766,7 +2814,7 @@ if. datapresent do.
   NB. We take all the selectors there are, up the length of the frame of this level; but if there aren't enough, we don't highlight.  Discard
   NB. selectors for higher levels.  The only way we can get more selectors than frame is during sniff, where the lower
   NB. selection is propagated up automatically
-  highlightrects =. (shr =. hlightforselection'') , hlightforoperands opselin
+  highlightrects =. ~. (shr =. hlightforselection'') , hlightforoperands opselin
   NB. position the start point so that the selected scroll data starts in the window
   (valueformat;dispvalue;sel;frameok;highlightrects;<cfmdata) drawDOL scrollpoint -~ DOyx + {. DOdatapos
 
@@ -2815,6 +2863,20 @@ if. 1 = hwindex do. glpaint'' end.
 
 NB.?lintsaveglobals
 )
+
+NB. x is text-color info, a la cfmdata
+NB. y is fillmask codes
+NB. result is the value to use for drawtext, with stippling added to the rect color
+rectcolorfromfillmask =: ({~      [: < 0 ;~ (- <. 2 ^. FILLMASKCHECKER)&bwlsl)
+
+NB. x is text-color info, a la cfmdata
+NB. y is fillmask codes
+NB. result is the value to use for drawtext: the selected color, with stippling added
+textinfofromfillmask =: ({:"1@] ((,~&.> 0&{"1) 0}"0 1 ]) ({~ {."1))    (0,FILLMASKCHECKER)&#:
+
+NB. y is fillmask code
+NB. result is 1 if the fillmask is data or plain fill; 0 if error or unexecd
+fillmaskisvaliddata =: FILLMASKUNEXECD ~: FILLMASKUNEXECD&bwand
 
 NB. Draw the graphics for a noun's DOL
 NB. x is DOL;values;selection;boxmesh;highlights;cfminfo   selection is replicated if needed
@@ -2865,7 +2927,7 @@ else.
     NB. is to give the right color to cells that are not drawn at all (empty contents) or whose contents do not fill
     NB. the cell, because of other larger values.
     if. boxmesh < 2 do.
-      ((<sel;0) { cfmdata) drawrect"0 2 rects
+      (cfmdata rectcolorfromfillmask sel) drawrect"0 2 rects
     end.
     drawrectmesh =. boxmesh > 0  NB. Remember whether we should draw the box lines
     boxmesh =. <2   NB. suppress rectangles, but draw box lines, on lower-level boxing
@@ -2886,7 +2948,7 @@ else.
   else.
     NB. Not boxed; draw each cell.  If the cell is error/unexecd, delete the text, since the cell
     NB. doesn't really have a value.  We leave its space as a reminder of how big it might have been
-    (sel { cfmdata) drawtext"1 ((sel >: _2 * FILLMASKFILL) (# ":)&.> usedd) (,<)"0 2 rects 
+    (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":)&.> usedd) (,<)"0 2 rects 
   end.
 
   NB. Draw borders at any boundary (except the first) where a rank rolls over.  The width of the line
@@ -2905,7 +2967,7 @@ else.
 
   NB. Draw accumulated highlight rects
   if. #hlights do.
-    mesh =. (boxyx +"2 |:"2) vf hlighttotlbr hlights  NB. create top,bottom,:left,right, adjust for rectangle origin
+    mesh =. (boxyx +"2 |:"2) vf hlighttotlbr {:"1 hlights  NB. create top,bottom,:left,right, adjust for rectangle origin
     NB. Expand to size of axisshapes, split into y and x axes
     NB. Create delta-y and delta-x
     NB. create indexes of ymin ymax ,: xmin xmax
@@ -2913,7 +2975,9 @@ else.
     NB. Adjust for rectangle origin
     NB. Create (ystart,yend);(xstart,xend),:(xstart,xend);(ystart,yend)
     NB. Draw mesh
-    HIGHLIGHTBORDERSTYLE (drawmesh   [: (,: |.) ;/)"1 2 mesh
+    NB. Install the highlight color for the rects into the border
+    hlightstyles =. (HIGHLIGHTCOLORS {~ {."1 hlights) 0 1 2}"1 HIGHLIGHTBORDERSTYLE
+    hlightstyles (drawmesh   [: (,: |.) ;/)"1 2 mesh
 NB. y is (list of starting y);(list of starting x),:(x start/end positions for y lines);(y start/endpositions for x lines)
   end.
 
@@ -3103,7 +3167,7 @@ end.
 NB. x is a single DOL, y is the physreqandhighlights table for it
 NB. Install the highlight rects for it, provided the operand has not been marked as a stealth path.
 NB. The proviso is to prevent highlighting an operand that is nominally referred to in a stealth path but doesn't
-NB. actuall affect the result
+NB. actually affect the result
 addselecttoDOL =: 4 : 0"1 2
 if. # ohandles =. 3 {:: x do.  NB. If there are handles, they point to the output
   loc =. {. 0 {"1 ohandles  NB. the locale of the DOL
@@ -3634,9 +3698,11 @@ NB. Then keep only the part after sellevel for the node we are adding to (since 
 NB. to the operands already).
 NB. If, after this trimming, there is an empty box in a selection, delete the selection as invalid - it must be
 NB. a u value that was filled with empties and inherited by a higher node in which the early parts are invalid (this happens only in expansion nodes)
+NB. We give the highlight the level it applies to
 addselectedoperands =: 3 : 0
 allh =. (_1}L:1"0 <\)~/ y
-opselin =: opselin , (#~   *./@:*@:(#@>)@>) (<0$a:) -.~ sellevel }.&.> allh  NB. If nothing left after discarding sellevel, add nothing
+NB. obsolete opselin =: opselin , (#~   *./@:*@:(#@>)@>@{:"1) (#~  a: ~: {:"1) (,.  i.@#) sellevel }.&.> allh  NB. If nothing left after discarding sellevel, add nothing
+opselin =: opselin , (#~  a: ~: {:"1) (,.~  <"0@i.@#) sellevel }.&.> allh  NB. If nothing left after discarding sellevel, add nothing
 )
 
 cocurrent 'dissectexpandable'  NB. locale for items that expand when name is clicked
@@ -3981,6 +4047,7 @@ NB. Set globals, then initialize display for the verb
 traverse =: 4 : 0
 assert. 1 2 e.~ #x
 traversedowncalcselect y  NB. Just to set error globals
+if. errorcode = ENOAGREE do. agreementerror x return. end.
 NB. If no vranks, this verb must have failed to execute owing to upstream error.  Leave no levrank then
 'displayhandlesin displayhandleout displaylevrank' =: ((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1);0;<rankhistory
 NB. Pass the DOLs through, but mark a stealthoperand for removal by deleting the output handles
@@ -5075,6 +5142,7 @@ dissect '(i. 3 2) +"1 i. 3 2'
 dissect '(i. 3 2) +"1 i. 3 1'
 dissect '(i. 3 2) +"1 i. 1 1'
 dissect '2 3 +@]&> 5 6'
+dissect '2 3 +&:+: 4 5 6'   NB. must show sgreement error
 dissect '(i. 3 2) +@]"1 i. 1 1'
 dissect '(i. 3 2) +@["1 i. 1 1'
 dissect 'i.@(0&{) ''a'''
@@ -5097,7 +5165,7 @@ dissect '0 1 2 (- + * % -)"0 (3 4 5)'
 dissect '0 1 (+ 0:) ''ab'''
 dissect '0 1 (+ {.) ''ab'''
 dissect '0 1 (+ ]) 1 2 3'
-dissect '(0 1 2 + 0 1"_) 5'
+dissect '(0 1 2 + 0 1"_) 5'   NB. must show agreement error
 dissect '0 1 2 + '''''
 dissect '0 1 2 + '' '''
 dissect '0 (+ - *) '''''
@@ -5188,5 +5256,6 @@ dissect 'i.@:> z' [ z =. <@,"0 (1 0.5 2)
 dissect '<^:]"0 z' [ z =. 0 1 0.5
 dissect '<^:]"0 z' [ z =. 0 1 2
 dissect '<^:]"0 z' [ z =. 1 2 0
+dissect '1 2 3 +"1"2 i. 3 4 3'
 )
    
