@@ -1147,6 +1147,7 @@ opselin =: 0 2$a:  NB. initialize opselin to empty (=no selection)
 if. #vranks =: getverbrank selopinfo do.
   rankhistory =: rankhistory , titlestring ; <"0 sellevel , |. vranks
 end.
+selx =. 0$0  NB. In case we don't set it, we need this syntactically to pass to a verb that doesn't need it
 qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%rankhistory%'
 qprintf^:DEBHLIGHT 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%y%'
 if. 0 = #selandxy do.
@@ -1353,8 +1354,14 @@ NB. (meaning they all ran), we will create the opened version of selresult, whic
 NB. It is valid only if errorcode=0 and collected=1.
 
 'maxsize fillatom' =. checkframing selresult
+
+NB. Calculate the shape of the result of this execution.  This comes from looking at the results, unless this
+NB. is an expansion node, in which case selresult contains extraneous information and we need to examine the actual
+NB. result of the verb.  In that case the overall verb may have failed, in which case selresultshape is immaterial,
+NB. since nothing closer to the root will execute.
+selresultshape =: selx calcselresultshape maxsize
+
 NB. Calculate the fill mask for the current verb, without requiring it to collect properly
-selresultshape =: frame,maxsize
 
 NB. If the result has a frame, simulate collecting it, to detect framing error.  If not, leave
 NB. fillmask undefined.  If selection was impossible, either because the were no operand shapes
@@ -3670,6 +3677,11 @@ NB. y is the intervals for each ticket, expanded into an array using the shape o
 NB. Result is the array reordered to natural order (some primitives process out of order; we reorder to match selection)
 tickettonatural =: ]
 
+NB. x is the selected indices that matched the selector
+NB. y is max size of a selresult as calculated by checkframe
+NB. Result is the shape we expect this result to have, for use in later traversal
+calcselresultshape =: 4 : 'frame,y'
+
 NB. Return 1 if this object creates an expansion node, which has multiple results displayed side-by-side for selection
 isexpansionnode =: 0:
 
@@ -4750,6 +4762,16 @@ NB. If the frame is empty or 1, take the last result; otherwise drop the last re
 , {:`(}:^:(({.frame)<:#)) @.(1 < {.frame)^:(*@#) y
 )
 
+NB. x is the selected indices that matched the selector
+NB. y is max size of a selresult as calculated by checkframe
+NB. Result is the shape we expect this result to have, for use in later traversal
+calcselresultshape =: 4 : 0
+if. 0 = $x do. $0   NB. error, immaterial
+else.
+  $ ({:x) {:: logvalues
+end.
+)
+
 NB. The dyadic valence:
 startdyad ''
 
@@ -5257,5 +5279,6 @@ dissect '<^:]"0 z' [ z =. 0 1 0.5
 dissect '<^:]"0 z' [ z =. 0 1 2
 dissect '<^:]"0 z' [ z =. 1 2 0
 dissect '1 2 3 +"1"2 i. 3 4 3'
+dissect 'a ([ + (+/ % #)@]) z' [ z =. 3 9 6 */ 1 5 9 2 [ a =. 6 5 3
 )
    
