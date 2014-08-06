@@ -1,6 +1,6 @@
 NB. manifest for dissect
 CAPTION=: 'Run a sentence and produce a 2D display of results'
-VERSION=: '3.0.3'
+VERSION=: '3.0.4'
 PLATFORMS=: ''
 FILES=: 0 : 0
 dissect.ijs

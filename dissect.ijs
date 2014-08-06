@@ -19,13 +19,9 @@ QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
-NB. dissect '1 2 3 +"1"2 i. 3 4 3'   no checkerboarding on green?
-NB. dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'  does not display detail of failing node.  The problem arises
-NB.  when  inheriting into the final noun node, which is ENOEXECD (i. e. no display).  In this case it would be OK to switch
-NB.  locales, because the noun node has no frame and would therefore not affect selection.  Perhaps change the ecode to EEMPTYNOUN.
-NB.  If this is fixed, next
-NB.  problem is that selecting a non-error cell causes the detail to vanish.
-NB. dissect 'i.@> z' [ z =. <@,"0 (1 0.5 2)   same
+NB. dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'  selecting a non-error cell causes the detail to vanish.
+NB. Audit selection for in-bounds
+NB. Display failing node of u/ as error cell; don't set to all fill
 
 NB. Need different text color for digits/text, and for nouns with leading 1s in the shape
 
@@ -1104,11 +1100,12 @@ NB.  incomplete results; the lower a value, the more precise it is, so we will r
 NB.  with a lower during inheritu.
 (errorcodenames =: ;:'ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL') =: _1 + i. 12
 NB. If there were results to display, we will create a fillmask for them.  The cases follow:
-EHASFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC   NB. there are results, and a fillmask
+EHASVALIDFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC
+EHASFILLMASK =: EHASVALIDFILLMASK   NB. there are results, and a fillmask
 EFAILED =: ENOAGREE,EABORTED,EEXEC,EFRAMING,ENOEXECD,EUNEXECD,EFRAMINGABORT,EFRAMINGEXEC  NB. incomplete execution
-EPROPERR =: ENOEXECD,EUNEXECD    NB. propagate error - if u generates error, this passes it on
-EGENERR =: ENOAGREE,EABORTED,EEXEC,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC   NB. generate error in u
 EALLFRAMING =: EFRAMING,EFRAMINGABORT,EFRAMINGEXEC   NB. framing error, with or without others
+EGENERR =: ENOAGREE,EFRAMINGABORT,EFRAMINGEXEC,EABORTED,EEXEC,EFRAMING 
+EPROPERR =: ENOEXECD,EUNEXECD
 NB. selresult - the result of applying the selection to the result of the verb.  This is the selection based on the INPUT to
 NB.   this verb, not including any local selector, which is used for subnodes (the local selector is used for selector and selopinfo)
 NB.   Since the selected result might not collect properly, we leave it
@@ -1149,6 +1146,10 @@ if. #vranks =: getverbrank selopinfo do.
   rankhistory =: rankhistory , titlestring ; <"0 sellevel , |. vranks
 end.
 selx =. 0$0  NB. In case we don't set it, we need this syntactically to pass to a verb that doesn't need it
+NB. If a compound is bypassed for display (for example, u@:v where u fails, holding some data), we may display
+NB. u rather than u@:v.  But then, selection will leave out the u@:v locale.  So, each locale keeps the
+NB. name of the locale in which propsel should start; this is set to u@:v in this case
+pickpropselloc =: coname ''
 qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%rankhistory%'
 qprintf^:DEBHLIGHT 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%y%'
 if. 0 = #selandxy do.
@@ -1369,7 +1370,8 @@ NB. fillmask undefined.  If selection was impossible, either because the were no
 NB. or a missing or empty selector, don't try to calculate fillmask for the cells (we might
 NB. create a zero fillmask below)
 NB. If no cells were executed, no fillmask is meaningful.
-if. errorcode e. EHASFILLMASK do.
+NB. If nothing was executed, create a dummy fillmask that we can add results to
+if. errorcode e. EHASVALIDFILLMASK do.
   if. 1 < */ frame do.
     NB. If this level is selectable, increment the selector level to use for this and subsequent levels - whether
     NB. we have a selector yet or not.  If this level is selectable, and we didn't qualify it down to a single input,
@@ -1377,7 +1379,7 @@ if. errorcode e. EHASFILLMASK do.
     NB. we qualified, and we just add one to the next level if selection here was possible.
     NB. Calculate the per-item part of fillmask: the selection level (upper bits), plus validity,
     NB. which is 0=OK, 2=first missing item, 3=later missing item.  No 'first missing item' unless there is an error here
-    fillmask =: (FILLMASKSELLEVEL * sellevel) + tickettonatural frame $!.FILLMASKUNEXECD (FILLMASKNORMAL #~ #selresult) , (errorcode = EEXEC) # FILLMASKERROR
+    fillmask =: (FILLMASKSELLEVEL * sellevel) + tickettonatural frame $!.FILLMASKUNEXECD (FILLMASKNORMAL #~ #selresult) , (errorcode e. EEXEC,EUNEXECD,EABORTED,ENOEXECD) # FILLMASKERROR
     NB. Expand all the cells of selresult to
     NB. the shape of the maxsize, with FILLMASKFILL for any added cells.
     NB. Combine the per-item and per-atom parts of the fillmask
@@ -1404,6 +1406,8 @@ if. errorcode e. EHASFILLMASK do.
     NB. if there were no cells executed
     fillmask =: (FILLMASKSELLEVEL * sellevel) $~ frame , $@> {. selresult
   end.
+elseif. errorcode e. EHASFILLMASK do.
+  fillmask =: frame $ FILLMASKUNEXECD
 end.
 
 NB. If this verb has a frame, increment the selection level, whether it allows selection or not
@@ -1478,8 +1482,12 @@ if. L. x do.
     1 ,&< tickettonatural y
   end.
 else.
-  'cs fill' =. checkframing y  NB. result cell size, fill atom (empty if unframable)
-  (*#fill) ;< <"0@(cs&{.)@>`>@.(#fill) tickettonatural ((-#cs) }. $x) $!.(<cs $ {.!.' ' fill) y
+  NB. If we are trying to create a valid selresult out of nothing, just give it the shape of the frame
+  if. 0 = #y do. 1 ; 0:"0 x
+  else.
+    'cs fill' =. checkframing y  NB. result cell size, fill atom (empty if unframable)
+    res =. (*#fill) ;< <"0@(cs&{.)@>`>@.(#fill) tickettonatural ((-#cs) }. $x) $!.(<cs $ {.!.' ' fill) y
+  end.
 end.
 )
 
@@ -1554,7 +1562,7 @@ inheritu =: 3 : 0
 'dol floc' =. y
 loc =. '' ($,) floc   NB. remove uninheritable flag
 SM^:DEBDOL 'inheritu: in ' , (>coname'') , ' ' , defstring 0
-QP^:DEBDOL'$floc >loc defstring__loc]0 edisp'''' edisp__loc'''' selresult '
+QP^:DEBDOL'$floc >loc defstring__loc]0 edisp'''' edisp__loc'''' >selector selresult '
 QP^:DEBDOL2'accumframe physreqandhighlights physreqandhighlights__loc '
 NB. The display information is always inherited from the last u, which creates it.
 NB. The only time we wouldn't inherit is if the error is detected before the last u, example 1.5 u/ y which
@@ -1562,6 +1570,7 @@ NB. would detect it on u/.  We detect that by the error-point codes
 if. errorcode -.@e. EABORTED,EEXEC do. (DISPINFO) =: ".@(,&'__loc')&.> DISPINFO end.
 NB. If the new dol is uninheritable (it is a selector node added by u/ or u^:v and its fillmask etc
 NB. is incommensurate with the selector for the current node), inherit nothing and display the current locale
+resultloc =. coname''   NB. To begin with, we have not switched locales
 select. #$floc
 case. 0 do.
   NB.?lintonly loc =. <'dissectobj'
@@ -1575,28 +1584,48 @@ case. 0 do.
     if. errorcode__loc e. EFAILED do.
       assert. 0 e. frame  [ 'u failed but u@v succeeded'
     end.
-  NB. If u@v failed short, and u has the error source, create a new selresult for u@v using the
-  NB.  result of u (collected, if possible).  Copy the errorcode from the source.
-  elseif. (errorcode e. EPROPERR) *. (errorcode__loc e. EGENERR) do.
-    NB. If u has a result, make it show up in u@v
-    if. errorcode__loc e. EHASFILLMASK do.
-      NB. If the selresult is uncollectable (it shouldn't be if we inherit a framing error, but it might
-      NB. if there was an exec error masking a latent framing error), leave it boxed
-      'ok res' =. fillmask__loc frameselresult__loc selresult__loc  NB. Try to expand selresult
-      if. -. ok do. res =. selresult__loc end.
-      NB. Kludge: if this didn't collect, this one selresult will have an extra boxing level, but
-      NB. it will display simply as whatever the lower error was.
-      selresult =: selresult , <res
+
+  NB. If u has the error source then u@v should have failed short.  If u@v (or u/) has any results, then
+  NB. copy any result from u as one more result (consider failure during u/ or +"1@v"2).  If u@v has no results,
+  NB. inherit the u locale to replace it
+  elseif. errorcode__loc e. EGENERR do.
+    assert. errorcode e. EPROPERR [ 'u@v died but u@v was OK'  NB. if u died, u@v should be sick
+    if. errorcode e. EHASFILLMASK do.
+      NB. If u@v has a result, and u does also, install u's result as a new result in u@v (ex: u"1@v)
+      NB. It is possible for u@v to have a result but not u (ex: u@v where u fails after the first time)
+      if. 0: errorcode__loc e. EHASFILLMASK do.
+        NB. If the selresult is uncollectable (it shouldn't be if we inherit a framing error, but it might
+        NB. if there was an exec error masking a latent framing error), leave it boxed
+        'ok res' =. fillmask__loc frameselresult__loc selresult__loc  NB. Try to expand selresult
+        if. -. ok do. res =. selresult__loc end.
+        NB. Kludge: if this didn't collect, this one selresult will have an extra boxing level, but
+        NB. it will display simply as whatever the lower error was.
+        selresult =: selresult , <res
+        if. errorcode = ENOEXECD do. errorcode =: EUNEXECD end.  We now have a value
+      end.
+      NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
+      errorcode =: (#.(errorcode__loc e. ENOAGREE) ,(errorcode__loc e. EALLFRAMING) , errorcode e. EHASVALIDFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC,4#ENOAGREE  NB. Inherit the error indic
+    else.
+      NB. u@:v has no result - replace it with u.
+      pickpropselloc__loc =: resultloc   NB. u will vector to u@v for pick purposes
+      resultloc =. loc   NB. but we will display from u
+SM^:DEBHLIGHT'inheriting u locale'
     end.
-    NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
-    errorcode =: (#.(errorcode__loc e. ENOAGREE) ,(errorcode__loc e. EALLFRAMING) , errorcode e. EHASFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC,4#ENOAGREE  NB. Inherit the error indic
+  elseif. (errorcode__loc = ENOEXECD) *. (errorcode = EUNEXECD) do.
+    NB. If u@v had results but u didn't, the explanation must be that v failed (perhaps we should signal a different error code for u).
+    NB. We will have put out the error on v, so we suppress it on u.  But if this is an expansion node (which we can detect because the
+    NB. fillmask exists and is boxed), we will keep the display so we can select results
+    if. 0 = L. fillmask do.
+      errorcode =: ENOEXECD
+    end.
   end.
-  if. (errorcode = ENOEXECD) *. (errorcode__loc = EUNEXECD) do. errorcode =: errorcode__loc end.
-  NB. Then, if both locales have fillmasks, insert or replace the fillmask from u.  If
+  NB. (errorcode__loc = EUNEXECD) *. (errorcode = ENOEXECD) can happen if the error path is not selected
+
+  NB. If both locales have fillmasks, insert or replace the fillmask from u.  If
   NB.  this is an expansion node, also modify the selresult (which may overwrite the
   NB.  selresult added from the error)
 
-  if. errorcode *.&(e.&EHASFILLMASK) errorcode__loc do.
+  if. errorcode *.&(e.&(EHASFILLMASK)) errorcode__loc do.
     NB. If a fillmask was calculated at the lower level, it should be more accurate than the
     NB. fillmask for the current level, or at least more detailed.  If this level has a selection, we
     NB. know ipso facto that this level had a frame and therefore a fillmask; in that case, insert
@@ -1649,7 +1678,7 @@ case. 2 do.
 end.
 QP^:DEBDOL'endingecode=?edisp'''' '
 
-dol ,&< coname''
+dol ,&< resultloc
 )
 
 NB. called in locale of an operand
@@ -1682,7 +1711,7 @@ NB.?lintonly y =. <'dissectobj'
 if. errorcode__y > EOK do.
   bnsellevel , <NORANKHIST
 else.
-  bnsellevel , (<NORANKHIST) , rankcalculus^:(errorcode__y -.@e. EHASFILLMASK) selector , createuop__y {:physreqandhighlights
+  bnsellevel , (<NORANKHIST) , rankcalculus^:(errorcode__y -.@e. EHASVALIDFILLMASK) selector , createuop__y {:physreqandhighlights
 end.
 :
 NB.?lintonly x =. y =. <'dissectobj'
@@ -1690,7 +1719,7 @@ NB. In the dyad, x is v0 and y is v1
 if. (errorcode__x , errorcode__y) +./@:> EOK do.
   bnsellevel , <NORANKHIST
 else.
-  bnsellevel , (<NORANKHIST) , rankcalculus^:(errorcode__x *:&(e.&EHASFILLMASK) errorcode__y) selector , (createuop__x {.physreqandhighlights) , (createuop__y {:physreqandhighlights)
+  bnsellevel , (<NORANKHIST) , rankcalculus^:(errorcode__x *:&(e.&EHASVALIDFILLMASK) errorcode__y) selector , (createuop__x {.physreqandhighlights) , (createuop__y {:physreqandhighlights)
 end.
 )
 
@@ -2347,7 +2376,7 @@ NB. We create this line if there are selections (even if there is an error) or i
 NB. there is a shape (from selresultshape if no error, or accumframe if error).  There will
 NB. always be a shape EXCEPT for agreement error, which doesn't execute
 NB. The result shape is valid if it collected with meaningful execution
-if. normalresult =. (0 < #selresult) *. errorcode e. EHASFILLMASK do.
+if. normalresult =. (0 < #selresult) *. errorcode e. EHASVALIDFILLMASK do.
   shapetouse =. selresultshape
 else.
   shapetouse =. afflat accumframe   NB. delete unexpanded detail
@@ -2439,7 +2468,11 @@ if. 2 > #DOsize do. destroyexplorer '' end.
 if. (0 = #scrollpoints) *. (<'DOdatapos') e. picknames do.
   if. #shr =. hlightforselection'' do.
     NB. calculate highlight rectangle tlbr; compare ending position against size of each datapos object; if either coordinate too high, set scroll to start at selection
-    scrollpoints =: ({. htlbr) *"1 0 (pickrects {~ < a: ; _1 ;~ picknames i. <'DOdatapos') +./@:<"1 {: htlbr =. valueformat hlighttotlbr (<0 1) { shr
+SM^:DEBHLIGHT'setting scrollpoint'
+QP^:DEBHLIGHT'defstring]0 edisp'''' shr accumframe sellevel selections valueformat selresult fillmask '
+    if. #htlbr =. valueformat hlighttotlbr (<0 1) { shr do.
+      scrollpoints =: ({. htlbr) *"1 0 (pickrects {~ < a: ; _1 ;~ picknames i. <'DOdatapos') +./@:<"1 {: htlbr
+    end.
   end.
 end.
 NB. In case a view has been added or deleted, make the number of scrollpoints match the number of views.  Default to 0 if not set above
@@ -2491,7 +2524,12 @@ NB. to full shape, then converting to cell number, then looking that up in the r
 NB. Result is table of top,left,:bottom,right
 NB. If there are more selection axes than axes in the noun, drop down through the hierarchy as
 NB. necessary to find them
-hlighttotlbr =: (4 : 0"1 0)`((2 2$0)"0)@.(0=#@])
+NB. It is possible that this routine will be called with an invalid rectangle: to wit, when, during sniff,
+NB. we select a nonexistent output (which we keep for highlighting porposes, since the input exists).  This
+NB. case manifests as surplus shape with no corresponding subDOLs.  We return INVALIDRECT then
+INVALIDRECT =: 2 2 $ 0 0 _1 _1
+
+hlighttotlbr =: (INVALIDRECT -.~ 4 : 0"1 0)`((2 2$0)"0)@.(0=#@])
 sel =. 0 0 , >y
 axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@# shapeused =. 0 0 , 0 {:: x  NB. axes: 1;0 2   or 0 2;1 3
 NB. axisshapes is the lengths of each axis assigned to y/x.  sizes is the total size of y/x
@@ -2506,7 +2544,12 @@ tlx =. (<"0 axes) (#./@:({"1))"0 _ shapeused ,: localsel   NB. extend localsel w
 tl =. tlx ({ 0&,)&> 1 2 { x  NB. fetch yx of topleft from input positions
 NB. We have top-left.  If there is surplus selector, recur to get the position of the next-level rectangle, and add the tl to produce the result
 if. sel >&# shapeused do.   NB. surplus selection
-  tl +"1 ((3;2 }. (#shapeused) {. sel) {:: x) hlighttotlbr (#shapeused) }. sel   NB. recur to produce result
+  if. 3 < #x do.
+    tl&+"1^:(INVALIDRECT -.@-: ]) ((3;2 }. (#shapeused) {. sel) {:: x) hlighttotlbr (#shapeused) }. sel   NB. recur to produce result
+  else.
+    NB. Surplus selector: return invalid rectangle
+    INVALIDRECT
+  end.
 else.
   NB. No surplus selector: we are at the bottom.  Get the index of the lower-right corner, and return the rectangle
   tl ,: ((<"0 axes) (#./@:({"1))"0 _ shapeused ,: localsel ([ + -@#@[ {. ]) 1 1) ({ 0&,)&> 1 2 { x
@@ -2974,18 +3017,20 @@ else.
 
   NB. Draw accumulated highlight rects
   if. #hlights do.
-    mesh =. (boxyx +"2 |:"2) vf hlighttotlbr {:"1 hlights  NB. create top,bottom,:left,right, adjust for rectangle origin
-    NB. Expand to size of axisshapes, split into y and x axes
-    NB. Create delta-y and delta-x
-    NB. create indexes of ymin ymax ,: xmin xmax
-    NB. Convert to pixel numbers
-    NB. Adjust for rectangle origin
-    NB. Create (ystart,yend);(xstart,xend),:(xstart,xend);(ystart,yend)
-    NB. Draw mesh
-    NB. Install the highlight color for the rects into the border
-    hlightstyles =. (HIGHLIGHTCOLORS {~ {."1 hlights) 0 1 2}"1 HIGHLIGHTBORDERSTYLE
-    hlightstyles (drawmesh   [: (,: |.) ;/)"1 2 mesh
-NB. y is (list of starting y);(list of starting x),:(x start/end positions for y lines);(y start/endpositions for x lines)
+    if. #mesh =. (boxyx +"2 |:"2) vf hlighttotlbr {:"1 hlights do. NB. create top,bottom,:left,right, adjust for rectangle origin
+QP^:DEBHLIGHT'hlights mesh '
+      NB. Expand to size of axisshapes, split into y and x axes
+      NB. Create delta-y and delta-x
+      NB. create indexes of ymin ymax ,: xmin xmax
+      NB. Convert to pixel numbers
+      NB. Adjust for rectangle origin
+      NB. Create (ystart,yend);(xstart,xend),:(xstart,xend);(ystart,yend)
+      NB. Draw mesh
+      NB. Install the highlight color for the rects into the border
+      hlightstyles =. (HIGHLIGHTCOLORS {~ {."1 hlights) 0 1 2}"1 HIGHLIGHTBORDERSTYLE
+      hlightstyles (drawmesh   [: (,: |.) ;/)"1 2 mesh
+      NB. y is (list of starting y);(list of starting x),:(x start/end positions for y lines);(y start/endpositions for x lines)
+    end.
   end.
 
   0
@@ -3194,6 +3239,7 @@ joinlayoutsl_dissect_ =: 3 : 0
 loc =. '' ($,) loc   NB. remove uninheritable flag
 NB. If there are operand selections, apply them to the input locales
 if. x *. *#physreqandhighlights__loc do.
+QP^:DEBHLIGHT'physreqandhighlights__loc >loc defstring__loc]0 '
   NB. The highlight requests have been consolidated by inheritu so that they now are a list for
   NB. each operand, with one highlight request per sellevel.  Also, physreqandhighlights has been
   NB. brought back so that it contains all the selections out to the last highlight request.
@@ -3407,7 +3453,7 @@ QP^:DEBPICK 'bselx selections '
   NB. See how many of the new selections match the old; take all of them, plus one more.
   NB. We know there is a mismatch somewhere before the end of bselx
   NB. Make that the selection in all subnodes
-  propsel bselx ([ {.~ [: >: ({.~ #) i.&0@:= ]) selections
+  propsel__pickpropselloc bselx ([ {.~ [: >: ({.~ #) i.&0@:= ]) selections
   NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
   propscroll 1   NB. 1 causes the scroll to be unchanged in THIS node, cleared to the leaves
   1  NB. redraw required
@@ -5267,7 +5313,6 @@ dissect '  (,1) ((}."1~ <:@#@$) ,~"1 ] {~ ({:@$@[ <. <:@#@$@]) <@{."1 [) ,.0 '
 dissect '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
 dissect '$@i."1 ]3 + i. 5 2'   NB. select to test vertical resize
 dissect 'z + > ''a'';1' [ z =. 1
-dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'
 dissect 'i.@> z' [ z =. 1 1;(3,.4);6   NB. fills and selections
 dissect 'i.@> z' [ z =. 1 1;(3,:4);6   NB. fills and selections
 dissect 'i.@>@> z' [ z =. (1 1;(3,.4);6);<(2;4 2;6,:2)
@@ -5278,7 +5323,12 @@ dissect 'i.@:> z' [ z =. <@,"0 (1 0.5 2)
 dissect '<^:]"0 z' [ z =. 0 1 0.5
 dissect '<^:]"0 z' [ z =. 0 1 2
 dissect '<^:]"0 z' [ z =. 1 2 0
-dissect '1 2 3 +"1"2 i. 3 4 3'
 dissect 'a ([ + (+/ % #)@]) z' [ z =. 3 9 6 */ 1 5 9 2 [ a =. 6 5 3
+dissect '1 2 3 +"1"2 i. 3 4 3'
+dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'
 )
-   
+
+
+NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ 3 : ''destroy__y 0 [ dissect_dissectisi_paint__y 0'' dissectinstance_dissect_ [ ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+
+
