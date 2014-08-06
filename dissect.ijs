@@ -19,7 +19,6 @@ QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
-NB. dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'  selecting a non-error cell causes the detail to vanish.
 NB. Audit selection for in-bounds
 NB. Display failing node of u/ as error cell; don't set to all fill
 
@@ -928,7 +927,7 @@ NB. The following names are guaranteed modified in the clone after this object i
 
 NB. The following names are possibly modified after cloning.  Therefore, they must be copied into the clone
 NB. when the clone is created, so that a mod to the original doesn't affect the clone.
-(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;0
+(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;$0
 
 NB.?lintonly valence =: errorlevel =: snifferror =: 1
 NB.?lintonly defstring =: ":
@@ -1591,18 +1590,6 @@ case. 0 do.
   elseif. errorcode__loc e. EGENERR do.
     assert. errorcode e. EPROPERR [ 'u@v died but u@v was OK'  NB. if u died, u@v should be sick
     if. errorcode e. EHASFILLMASK do.
-      NB. If u@v has a result, and u does also, install u's result as a new result in u@v (ex: u"1@v)
-      NB. It is possible for u@v to have a result but not u (ex: u@v where u fails after the first time)
-      if. 0: errorcode__loc e. EHASFILLMASK do.
-        NB. If the selresult is uncollectable (it shouldn't be if we inherit a framing error, but it might
-        NB. if there was an exec error masking a latent framing error), leave it boxed
-        'ok res' =. fillmask__loc frameselresult__loc selresult__loc  NB. Try to expand selresult
-        if. -. ok do. res =. selresult__loc end.
-        NB. Kludge: if this didn't collect, this one selresult will have an extra boxing level, but
-        NB. it will display simply as whatever the lower error was.
-        selresult =: selresult , <res
-        if. errorcode = ENOEXECD do. errorcode =: EUNEXECD end.  We now have a value
-      end.
       NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
       errorcode =: (#.(errorcode__loc e. ENOAGREE) ,(errorcode__loc e. EALLFRAMING) , errorcode e. EHASVALIDFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC,4#ENOAGREE  NB. Inherit the error indic
     else.
@@ -1618,6 +1605,13 @@ SM^:DEBHLIGHT'inheriting u locale'
     if. 0 = L. fillmask do.
       errorcode =: ENOEXECD
     end.
+  elseif. (errorcode__loc = EUNEXECD) *. (errorcode = ENOEXECD) do.
+    NB. u executed incompletely, but u@v not at all??  Yes, it must be that there was an error, but we
+    NB. selected off the error path, so now we don't go through GENERR.  Replace u@v with u (actually the
+    NB. NOEXECD is probably from a monad/dyad exec
+    pickpropselloc__loc =: resultloc   NB. u will vector to u@v for pick purposes
+    resultloc =. loc   NB. but we will display from u
+SM^:DEBHLIGHT'inheriting u locale'
   end.
   NB. (errorcode__loc = EUNEXECD) *. (errorcode = ENOEXECD) can happen if the error path is not selected
 
@@ -5324,8 +5318,21 @@ dissect '<^:]"0 z' [ z =. 0 1 0.5
 dissect '<^:]"0 z' [ z =. 0 1 2
 dissect '<^:]"0 z' [ z =. 1 2 0
 dissect 'a ([ + (+/ % #)@]) z' [ z =. 3 9 6 */ 1 5 9 2 [ a =. 6 5 3
-dissect '1 2 3 +"1"2 i. 3 4 3'
-dissect 'i.@> z' [ z =. 1 1;(3,.4);'a'
+dissect '(i. 3) +"1"2 i. 3 4 3'
+dissect 'i.@> z' [ z =. 1 1;(3 4);'a'
+dissect 'i.@> z' [ z =. 1 1;(3,:4);'a'
+dissect '(#@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
+dissect '(#@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+dissect '(#@>)"1 ] 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
+dissect '(#@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
+dissect '(#@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+dissect '(#@>)"1 |: 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
+dissect '(>:@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
+dissect '(>:@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+dissect '(>:@>)"1 ] 5 2 $ 0;1;2;''cd'';''e'';''fg'''
+dissect '(>:@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;1;2'
+dissect '(>:@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+dissect '(>:@>)"1 |: 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
 )
 
 
