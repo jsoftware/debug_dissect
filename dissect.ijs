@@ -3,7 +3,10 @@ NB. Copyright (c) Henry H. Rich, 2012-2014.  All rights reserved.
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since the hold mostly verb-names
 ((cocreate ([ coerase))"0~   2 1 {.~ #) ;: 'dissect dissectobj dissectmonad dissectdyad dissectnoun dissectverb dissectassign dissectvandnm dissectfork dissecthook dissectexpandable dissectrighttoleft'
 
-NB. INPROGRESS:
+NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).  In J6 tooltips
+NB. take over the timer interrupt
+ALLOWNONQTTOOLTIP_dissect_ =: 0
+
 CLEANUP_dissect_ =: 1   NB. set to 0 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
@@ -15,6 +18,7 @@ DEBOBJ_dissect_ =: 0  NB. display drawn-object details
 DEBDOL_dissect_ =: 0  NB. display drawing locales and inheritu
 DEBDOL2_dissect_ =: 0  NB. display drawing locales
 DEBPICK_dissect_ =: 0  NB. display pick progress
+DEBTIME_dissect_ =: 0  NB. Show elapsed times
 QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
@@ -151,6 +155,7 @@ s,LF, ; <@ARtostring y
 )
 
 parse =: 3 : 0  NB. called in dissect locale
+QP^:DEBTIME'startparse=?6!:1'''' '
 if. #dissectinstance do. '' return. end.  NB. Return empty... which will bypass display
 dissectinstanceforregression =: dissectinstance =: '' conew 'dissect'   NB. global because must persist over return to user environment
 errormessage =: 'unknown error during parsing'
@@ -204,6 +209,8 @@ NB. Utility to create rank,invertible flags for a verbname
 NB. y is name of a verb, visible in current context
 NB. result is (ranks), 1 if invertible
 rankinv =: ".@(,&' b. 0') , 1:@". :: 0: @(,&' b. _1')
+NB. We don't actually use this info, and some vferbs crash taking the inverse, so skip it
+rankinv =: ($0)"_
 
 NB. anything beginning with one of these words and ending with . is a control word
 controlwords =: ;: 'assert break continue for goto label if do else elseif end return select case fcase throw try catch catchd catcht while whilst'
@@ -463,6 +470,7 @@ NB. The locale at the top of the stack is the overall result.  Save that, and re
 NB. This call will fill in all the verb-to-noun locale references
 resultroot =: (<1 1) {:: stack
 NB.?lintonly resultroot =: <'dissectmonad' [ scrollinglocale =: <'dissectobj'
+QP^:DEBTIME'endparse=?6!:1'''' '
 sentence;EXE__ =: exestring__resultroot''
 NB.?lintsaveglobals
 )
@@ -567,7 +575,7 @@ wdpmove =: ([: wd 'pmovex ' , ])`([: wd 'pmove ' , ])@.IFQT
 NB. timer covers.  On 602 we have a single global, shared by all instances, indicating which locale the
 NB. timer is running for.  Kludge, but seemingly OK since only one locale can have focus.  Called
 NB. in the locale of the desired return
-wdtimer =: (3 : 0)`([: wd 'ptimer ' , ":)@.IFQT
+wdtimer =: ]`(3 : 0)`([: wd 'ptimer ' , ":)@.(+/ +./\ IFQT,ALLOWNONQTTOOLTIP)  NB. 0=J6 notooltip, 1=J6 tooltip, 2=QT
 runningtimerloc_dissect_ =: coname ''
 wd 'timer ' , ": y
 NB.?lintsaveglobals
@@ -585,9 +593,11 @@ dissectinstance =: 0$a:
 )
 
 display =: 3 : 0   NB. called in dissect locale
+QP^:DEBTIME'startdisplay=?6!:1'''' '
 if. #dissectinstance do.
   displaymain__dissectinstance y
   dissectinstance =: 0$a:
+QP^:DEBTIME'enddisplay=?6!:1'''' '
   0 0$0
 else.   NB. user tried recursive execution
   'Vivisection is illegal.'
@@ -726,6 +736,7 @@ NB.  size is ymax,xmax
 NB.  gridsize is spacing between lines
 NB.  standoff is min distance between a block and a line
 NB.  penalties is penalty for a turn (in units of movement)
+QP^:DEBTIME'startrouter=?6!:1'''' '
 dl ; (ROUTINGGRIDSIZE;WIRESTANDOFF;ROUTINGTURNPENALTY) routegrid dyxhw;<wirenets
 NB.?lintsaveglobals
 )
@@ -737,6 +748,7 @@ try.
 NB. if we need to refigure the placement because of a change like selection or a display parameter, do so.
   if. 1 = {. y do. placeddrawing =: calcplacement'' end.
 NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
+QP^:DEBTIME'startdraw=?6!:1'''' '
   drawplacement }. sizedrawingandform 0
   glpaint''
   
@@ -1807,6 +1819,9 @@ NB. ****************** place-and-route for wires ***********************
 ROUTINGGRIDSIZE =: 5   NB. number of pixels between routing channels
 WIRESTANDOFF =: 4  NB. min number of pixels between a wire and a block
 ROUTINGTURNPENALTY =: 3   NB. number of blocks of penalty to assign to a turn
+ROUTINGOCCUPANCYPENALTY =: 3   NB. number of blocks of penalty to assign to an overlap (trialroute only)
+ROUTINGNEIGHBORPENALTY =: 1   NB. number of blocks of penalty to assign to a neighboring route
+
 
 ROUTINGMARGIN =: 2   NB. min number of wire spacings to leave around border.  Used to calc routing area
 
@@ -1863,22 +1878,23 @@ initgridverbs gridsize
 NB. Calculate the routing area size.  Adjust blocks to leave a minimum top/left margin,
 NB. and create the routing area to leave a right/bottom margin
 gridblocks =: gridblocks +"1 ([: <. 0 >. ROUTINGMARGIN&-)&.(%&gridsize) (<./ {."2 gridblocks) - WIRESTANDOFF
-initgrids''
-NB. Route the nets, building up occupancy as needed
-1 routenets gridblocks;<nets
-NB. As a perf boost, skip the placement adjustment if there are no spots occupied more than once
-if. 1 +./@:< , occupancy do.
-NB. Move the blocks to leave extra space where the occupancy exceeds 1
-NB. Look at the ew occupancy.  Create a state machine to process from the bottom up.  Result is the
-NB. number of bump-ups needed at each position; reset when each new object is encountered.  So the
-NB. number of bump-ups is in the cell BELOW the bottom of the object
-NB. First we convert to (_high-value if neg, surplus occupancy otherwise);
-NB. Then we add up the surplus occupancy, resetting when we hit _high-value
+while. do.
+  initgrids''
+  NB. Route the nets, building up occupancy as needed
+  1 routenets gridblocks;<nets
+  NB. As a perf boost, skip the placement adjustment if there are no spots occupied more than once
+  if. -. 1 +./@:< , occupancy do. break. end.
+  NB. Move the blocks to leave extra space where the occupancy exceeds 1
+  NB. Look at the ew occupancy.  Create a state machine to process from the bottom up.  Result is the
+  NB. number of bump-ups needed at each position; reset when each new object is encountered.  So the
+  NB. number of bump-ups is in the cell BELOW the bottom of the object
+  NB. First we convert to (_high-value if neg, surplus occupancy otherwise);
+  NB. Then we add up the surplus occupancy, resetting when we hit _high-value
   bumpups =. (0 >. +)/\.   ((0 >. <:)  + _1000000 * 0&>) 1 {"1 occupancy
-NB. Now, process the blocks from the bottom up.  Each block will look at the bump-up count from the state
-NB. machine, which gives the number of cells needed since the last object was processed, and then add
-NB. to that the number of bumpups from the last-processed block in its column.  The max, over the columns
-NB. of the object, is the number of bumpups for the object (which we save in each column of the bumpup table
+  NB. Now, process the blocks from the bottom up.  Each block will look at the bump-up count from the state
+  NB. machine, which gives the number of cells needed since the last object was processed, and then add
+  NB. to that the number of bumpups from the last-processed block in its column.  The max, over the columns
+  NB. of the object, is the number of bumpups for the object (which we save in each column of the bumpup table
   bumpsinlastobj =. (1{$occupancy)$0
   bumpsinobjns =. (#gscrowcolvec) # 0
   for_b. \: gscrowplus1 =. >: {:@(0&{::)"1 gscrowcolvec do.
@@ -1886,7 +1902,7 @@ NB. of the object, is the number of bumpups for the object (which we save in eac
     bumpsinlastobj =. (bumps =. 0 >. >./ ((<(b { gscrowplus1);cols) { bumpups) + cols { bumpsinlastobj) cols} bumpsinlastobj
     bumpsinobjns =. bumps b} bumpsinobjns
   end.
-NB. Repeat for columns
+  NB. Repeat for columns
   bumpups =. (0 >. +)/\.&.|:   ((0 >. <:)  + _1000000 * 0&>) 0 {"1 occupancy
   bumpsinlastobj =. ({.$occupancy)$0
   bumpsinobjew =. (#gscrowcolvec) # 0
@@ -1895,10 +1911,9 @@ NB. Repeat for columns
     bumpsinlastobj =. (bumps =. 0 >. >./ ((<rows;(b { gsccolplus1)) { bumpups) + rows { bumpsinlastobj) rows} bumpsinlastobj
     bumpsinobjew =. bumps b} bumpsinobjew
   end.
-NB. Now move the blocks the specified number of grid positions - by moving all the OTHER blocks down (to avoid negative placement)
+  NB. Now move the blocks the specified number of grid positions - by moving all the OTHER blocks down (to avoid negative placement)
   gridblocks =: gridblocks +"1"2 1 gridtoyx (-"1~ >./) bumpsinobjns,.bumpsinobjew
 end.
-
 NB. Reinit the grid variables
 initgrids''
 
@@ -2047,49 +2062,79 @@ routdist =. ((#routend) {.!.2000000 (0)) (<"1 routend,.initdir)} routdist
 
 NB. Set the source as the current point, perpendicular to the face.  Clear list of waiting points
 actpoints =. ,: ({. routend) ,: ({. faces) { faceperpdir
+NB. Delay line for turns.  We put turns in before any processing, so there is a wait stage for each atom
 waitpoints =. turnpenalty $ < 0 2 2 $ 0
-
+NB. Delay line for penalties.  We record the penalty in routdist before adding the point to the delay line,
+NB. so there has to be one extra atom here so the point isn't removed as soon as it is added
+penaltypoints =. (>: trialroute { ROUTINGOCCUPANCYPENALTY,ROUTINGNEIGHBORPENALTY) $ < 0 2 2 $ 0
+neighborofst =. _2 ]\ 0 0   1 0   _1 0   0 1   0 _1   NB. penalize any route with these neighbors
 NB. Repeat until all destinations have been routed:
 currdist =. 1
 ndestsfound =. 1  NB. the starting point has automatically been routed
 while. ndestsfound < #routend do.
 NB. For each active point/direction, create the turn points/directions
+NB. The turn point is BEFORE the step to the new position
   turns =. < ,/ (+/"2 actpoints) ,:"1 ((<a:;1;0) { actpoints) { turntable
   
 NB. Activate delayed points that have come to life
-  if. #actpoints =. ~. actpoints , 0 {:: waitpoints do.
-    
-NB. Advance each active point to the next position
+  if. #actpoints =. ~. actpoints , (0 {:: waitpoints) , (0 {:: penaltypoints) do.
+    NB. Advance each active point to the next position
     actpoints =. +/\."2 actpoints
-    
-NB. Fetch distance to target.  Delete next-points that are have been filled in this direction
+    NB. Fetch distance to target.  Delete next-points that are have been filled in this direction
     targx =. ({."2 ,. dirtodistx@:({:"2)) actpoints
     assert. 1 4 e.~ 3!:0 targx
-    valmsk =. currdist <: targval =. targx (<"1@[ { ]) routdist
     
-    if. 2000000 e. targval do.
-NB. We reached a destination.
-NB. See which destinations we reached.  Make sure each destination is reached only one time
+    NB. Fetch the values we are moving to and see if any are destinations
+    if. 2000000 e. targval =. targx (<"1@[ { ]) routdist do.
+    NB. We reached a destination.
+    NB. See which destinations we reached.  Make sure each destination is reached only one time
       reachdests =. (#~ ~:@:(2&{."1)) targx #~ targmsk =. targval = 2000000
-NB. Set the current distance in one destination point; mark all the other parts of the
-NB. destination as regular points so we don't reach them again
+      NB. Set the current distance in one destination point; mark all the other parts of the
+      NB. destination as regular points so we don't reach them again
       routdist =. 1000000 (<"1 }:"1 reachdests)} routdist
       routdist =. currdist (<"1 reachdests)} routdist
-NB. Count the number of destinations filled.
+      NB. Count the number of destinations filled.
       ndestsfound =. ndestsfound + #reachdests
-NB. Remove the destination points from the active list
-      valmsk =. valmsk *. -. targmsk
+      NB. Remove the destination points from the active list
+      actpoints =. (-. targmsk) # actpoints
+      targval =. (-. targmsk) # targval
+      targx =. (-. targmsk) # targx
     end.
+
+    NB. As a perf boost, cull the points whose distance is too high already (includes unreachable cell)
     
-    if. #actpoints =. valmsk # actpoints do.
-NB. Mark the next-points as filled at this step and keep them on the active list
-      routdist =. currdist (<"1 valmsk # targx)} routdist
-      
+    if. #actpoints =. actpoints #~ valmsk =. currdist <: targval do.
+      NB. Keep the other values in lockstep
+      targval =. valmsk # targval
+      targx =. valmsk # targx
+
+      NB. If the new points are close to a boundary, give them a penalty
+      NB. If the new position is close to a parallel route, penalize it one tick (might be too much)
+      NB. remove the point from the active list and list it as a penalty
+      NB.    During trialroute, we care only about direct conflict.  During real route, pnalize us for a having a neighbor
+      if. trialroute do.
+        penaltymask =. 0 < (({."2 ,. 0 = (<1 0)&{"2) actpoints) (<"1@[ { ]) occupancy
+      else.  NB. Regular route, penalty if any neighbor occupied
+        penaltymask =. 0 < +/@,"2 (({."2 actpoints) +"1/ neighborofst) (<"1@[ { ]) occupancy
+      end.
+      neighbors =. < penaltymask # actpoints
+      actpoints =. (-. penaltymask) # actpoints
+
+      NB. Mark the next-points as filled at this step and keep them on the active list
+      NB. We have to include the routing penalty in the stored distance, lest the return route
+      NB. not realize this path has a penalty; and this 
+      newdist =. currdist + penaltymask * <:#penaltypoints   NB. putative new value
+      valmsk =. newdist <: targval
+
+      routdist =. (valmsk # newdist) (<"1 valmsk # targx)} routdist
+    else. neighbors =. < 0 2 2 $ 0
     end.
+  else. neighbors =. < 0 2 2 $ 0
   end.
   
-NB. Add turns to the waiting queue
+NB. Add turns to the waiting queue, penalties to the penalty queue
   waitpoints =. (}. waitpoints) , turns
+  penaltypoints =.  (}. penaltypoints) , neighbors
   
 NB. tick the clock
   currdist =. currdist + 1
@@ -3582,8 +3627,9 @@ index ;"0 1 y -"1 (<index;0) { x
 
 NB. ****** tooltips *****
 
-NB. J602 emulation of ptimer.  On QT we will define as dissect_timer and immediately overwrite
-(IFQT {:: 'sys_timer_z_' ; 'dissect_timer') =: 3 : 0
+NB. J602 emulation of ptimer.  On QT, or if tooltips disabled on J6, we will define as dissect_timer and immediately overwrite
+NB. On J6 with tooltip, this redefines the timer handler
+((IFQT +. -. ALLOWNONQTTOOLTIP) {:: 'sys_timer_z_' ; 'dissect_timer') =: 3 : 0
 l =. runningtimerloc_dissect_
 NB.?lintonly l =. <'dissect'
 try.
@@ -4228,7 +4274,7 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand, as the display and executable form (we may modify the display form later)
 'execform titlestring' =: boxopen 0 {:: y
-invok =: (1;3) {:: y
+NB. obsolete invok =: (1;3) {:: y
 stealthoperand =: 1 2 3 0 {~ (;:'][[:') i. <titlestring
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
