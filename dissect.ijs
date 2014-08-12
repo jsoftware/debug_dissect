@@ -578,7 +578,6 @@ NB. in the locale of the desired return
 wdtimer =: ]`(3 : 0)`([: wd 'ptimer ' , ":)@.(+/ +./\ IFQT,ALLOWNONQTTOOLTIP)  NB. 0=J6 notooltip, 1=J6 tooltip, 2=QT
 runningtimerloc_dissect_ =: coname ''
 wd 'timer ' , ": y
-NB.?lintsaveglobals
 )
 
 FONTSIZECHOICES =: 8 10 12 14 16
@@ -1836,8 +1835,10 @@ NB.?lintsaveglobals
 NB. occupancy tells which object (if neg) or the number of routes (if nonneg) fill the cell.  We keep different counts
 NB. for ns and ew
 NB. Convert each gridblock to units of gridsize, covering the gridpoints that are within a standoff
+NB. y is gridblocks;nets
 initgrids =: 3 : 0
-NB.?lintonly 'gridsize standoff penalties' =: 5 5 5 [ 'gridblocks nets' =: (0 2 2$0);<0 $a:
+'gridblocks nets' =. y
+NB.?lintonly 'gridsize standoff penalties' =: 5 5 5 [ 'gridblocks nets' =. (0 2 2$0);<0 $a:
 rareasize =: (standoff + gridsize * >: ROUTINGMARGIN) + >./ {:"2 gridblocks
 NB. Create top-left,:bottom-right+1 in grid units for each block
 gscblocks =. <. yxtogrid gridblocks +"2 (2) #"0 (gridsize-standoff),standoff+gridsize
@@ -1872,25 +1873,42 @@ NB.   face # 0=top, 1=bot, 2=left, 3=right
 routegrid =: 4 : 0
 'gridsize standoff penalties' =: x
 turnpenalty =: {. penalties
-'gridblocks nets' =: y
+'gridblocks nets' =. y
 NB. Create verb to convert input y,x to grid coordinates
 initgridverbs gridsize
 NB. Calculate the routing area size.  Adjust blocks to leave a minimum top/left margin,
 NB. and create the routing area to leave a right/bottom margin
-gridblocks =: gridblocks +"1 ([: <. 0 >. ROUTINGMARGIN&-)&.(%&gridsize) (<./ {."2 gridblocks) - WIRESTANDOFF
+gridblocks =. gridblocks +"1 ([: <. 0 >. ROUTINGMARGIN&-)&.(%&gridsize) (<./ {."2 gridblocks) - WIRESTANDOFF
+NB. We will perform the trial place-and-route, saving all the results so we can choose the one we like best
+gridblocks =. ,: gridblocks
+placementscores =. $0
 while. do.
-  initgrids''
+  NB. Perform a trial route
+  initgrids ({:gridblocks);<nets
   NB. Route the nets, building up occupancy as needed
-  1 routenets gridblocks;<nets
-  NB. As a perf boost, skip the placement adjustment if there are no spots occupied more than once
-  if. -. 1 +./@:< , occupancy do. break. end.
-  NB. Move the blocks to leave extra space where the occupancy exceeds 1
-  NB. Look at the ew occupancy.  Create a state machine to process from the bottom up.  Result is the
-  NB. number of bump-ups needed at each position; reset when each new object is encountered.  So the
-  NB. number of bump-ups is in the cell BELOW the bottom of the object
-  NB. First we convert to (_high-value if neg, surplus occupancy otherwise);
-  NB. Then we add up the surplus occupancy, resetting when we hit _high-value
-  bumpups =. (0 >. +)/\.   ((0 >. <:)  + _1000000 * 0&>) 1 {"1 occupancy
+  1 routenets ({:gridblocks);<nets
+  NB. Score the placement: 1 point for a crossing, a zillion for occupancy>1
+  placementscores =. placementscores , score =. (1000000 * 1 +./@:< , occupancy) + +/@, 1 1 -:"1 occupancy
+  NB. If the placement is perfect, or we have gotten the max occupancy OK and have tried enough, stop looking
+  NB. MAXTRIALROUTES is the 3 here
+  if. (score = 0) +. (score < 1000000) *. (3 <: #placementscores)  do. break. end.
+
+  NB. Not perfect.  Adjust the placement for the next try.
+  if. score >: 100000 do.
+    NB. We had occupancy > 1 in some cell.
+    NB. Move the blocks to leave extra space where the occupancy exceeds 1
+    NB. Look at the ew occupancy.  Create a state machine to process from the bottom up.  Result is the
+    NB. number of bump-ups needed at each position; reset when each new object is encountered.  So the
+    NB. number of bump-ups is in the cell BELOW the bottom of the object
+    NB. First we convert to (_high-value if neg, surplus occupancy otherwise);
+    NB. Then we add up the surplus occupancy, resetting when we hit _high-value
+    bumpups =. (0 >. +)/\.   ((0 >. <:)  + _1000000 * 0&>) 1 {"1 occupancy
+  else.
+    NB. No problem with occupancy too high, but there were wire crossings.  See if more space will get rid of them.
+    NB. We will add at most one space per empty area to try to avoid crossings.
+    NB. The lookup table produces 1 if both values are >0, _1000000 if either value negative, 0 otherwise
+    bumpups =. 1 <.  (0 >. +)/\.  crosspt =. (0 0 _1000000 0 1 _1000000 _1000000 _1000000 _1000000  ) {~ 3 3 #. * occupancy
+  end.
   NB. Now, process the blocks from the bottom up.  Each block will look at the bump-up count from the state
   NB. machine, which gives the number of cells needed since the last object was processed, and then add
   NB. to that the number of bumpups from the last-processed block in its column.  The max, over the columns
@@ -1903,7 +1921,12 @@ while. do.
     bumpsinobjns =. bumps b} bumpsinobjns
   end.
   NB. Repeat for columns
-  bumpups =. (0 >. +)/\.&.|:   ((0 >. <:)  + _1000000 * 0&>) 0 {"1 occupancy
+  if. score >: 100000 do.
+    bumpups =. (0 >. +)/\.&.|:   ((0 >. <:)  + _1000000 * 0&>) 0 {"1 occupancy
+  else.
+    NB.?lintonly crosspt =. 2 2 $ 0
+    bumpups =. 1 <.  (0 >. +)/\.&.|:   crosspt
+  end.
   bumpsinlastobj =. ({.$occupancy)$0
   bumpsinobjew =. (#gscrowcolvec) # 0
   for_b. \: gsccolplus1 =. >: {:@(1&{::)"1 gscrowcolvec do.
@@ -1912,15 +1935,18 @@ while. do.
     bumpsinobjew =. bumps b} bumpsinobjew
   end.
   NB. Now move the blocks the specified number of grid positions - by moving all the OTHER blocks down (to avoid negative placement)
-  gridblocks =: gridblocks +"1"2 1 gridtoyx (-"1~ >./) bumpsinobjns,.bumpsinobjew
+  gridblocks =. gridblocks , ({: gridblocks) +"1"2 1 gridtoyx (-"1~ >./) bumpsinobjns,.bumpsinobjew
 end.
+NB. Use the placement with the best score
+bestx =. (i. <./) placementscores
+
 NB. Reinit the grid variables
-initgrids''
+initgrids (bestx { gridblocks);<nets
 
 NB. Route again, this time to create the final routing
-wires =. 0 routenets gridblocks;<nets
+wires =. 0 routenets (bestx { gridblocks);<nets
 NB. Return the block placement and the wires to draw
-({."2 gridblocks);wires
+((<bestx;a:;0) { gridblocks);wires
 NB.?lintsaveglobals
 )
 
@@ -2143,43 +2169,67 @@ end.
 NB. Starting at each dest, extract lines for all nets that were drawn, and mark occupancy for the net
 wires =. 0 5 $0
 for_d. }. routend,.faces do.
-NB. get the starting position / direction for the wire
-  dir =. (2{d) { faceperpdir
+  NB. get the starting position / direction for the wire
   wirestart =. currpos =. 2 {. d
-NB. initialize the distance that got us to the endpoint
+  NB. initialize the distance that got us to the endpoint
   currdist =. <./ (<wirestart) { routdist
-  while. currdist > 0 do.
-    ew =. 0={.dir  NB. current direction of movement
+  NB. Init the variables that we will use to calculate next step:
+  NB. The direction of movement, initialized to perpendicular to the destination face.  Add this to currpos to get nextpos
+  dir =. (2{d) { faceperpdir
+  NB. The layer number corresponding to the OPPOSITE of the direction of movement (we are
+  NB. going back up the wire; the distance was stored for the other direction when we came down the wire
+  currlayer =. dirtodistx -dir
+  NB. 0 if we are going ns, 1 if ew
+  ew =. 0={.dir  NB. current direction of movement
+  NB. The distance from nextpos to the turn positions (these are directions, amounts to add to nextpos)
+  turndir =. ew |."1 (0 ,. 1 _1)  NB. If we are moving ew, turns are ns offsets
+  NB. The layer number corresponding to the OPPOSITE of the direction of movement after each turn
+  turnlayer =. dirtodistx -turndir
+  while. currdist > 0 do.  NB. we have just moved into currpos
 NB. Indicate that we have moved to the place we have just stepped into
-    routdist =. 0 (<currpos,dirtodistx -dir)} routdist
+    routdist =. 0 (<currpos,currlayer)} routdist
 NB. Note that also in the occupancy table
     occupancy =: (>: (<currpos,ew) { occupancy) (<currpos,ew)} occupancy
-NB. Find the direction of next movement.  If we can continue forward into an empty cell,
-NB. do so; otherwise see if we can turn; otherwise plow forward (must be a trial route with overlap)
-    
-NB. See if the current wire can be extended.  If so, do so and continue
-    if. currdist (> *. 0 <: ]) newdist =. (<(nextpos =. currpos + dir),dirtodistx -dir) { routdist do.
+
+NB. See whether we should go straight or turn.  We have to look at all the distances
+NB. and choose the smallest (straight if equal), after giving the straight move the benefit of no turn penalty.
+    straightdist =. (<(nextpos =. currpos + dir),currlayer) { routdist
+    turnpos =. nextpos +"1 turndir
+    turndist =. (turnpos ,"1 0 turnlayer) (<"1@[ { ]) routdist
+    if. (straightdist >: 0) *. straightdist <: turnpenalty + <./ (#~ >:&0) turndist do.
+NB. obsolete 
+NB. obsolete 
+NB. obsolete NB. Find the direction of next movement.  If we can continue forward into an empty cell,
+NB. obsolete NB. do so; otherwise see if we can turn; otherwise plow forward (must be a trial route with overlap)
+NB. obsolete     
+NB. obsolete NB. See if the current wire can be extended.  If so, do so and continue
+NB. obsolete     if. currdist (> *. 0 <: ]) newdist =. (<(nextpos =. currpos + dir),currlayer) { routdist do.
+      NB. Go straight.
       currpos =. nextpos
-      currdist =. newdist
+      currdist =. straightdist
     else.
-NB. Can't go straight, must be a turn.  Find the turn direction
-NB. Out the wire for the straight part, if any
+      NB. Can't go straight, must be a turn.  Find the turn direction
+      NB. Out the wire for the straight part, if any
       if. currpos -.@-: wirestart do. wires =. wires , (gridtoyx wirestart,currpos) , 0 end.
-      ew =. -. ew   NB. switch direction
-      turnpos =. (currpos + dir) +"1 ddir =. |."1^:ew 1 _1 ,. 0
-      turndist =. (turnpos ,"1 0 dirtodistx -ddir) (<"1@[ { ]) routdist
+NB. obsolete       ew =. -. ew   NB. switch direction
       olddir =. dir   NB. Save old direction for canonicalizing turn
-      dir =. (turnx =. >/ (turndist<0)} turndist ,: 1000000) { ddir
-NB. Out the wire for the turn.  Orient the lines so it is a CW 90-degree arc segment
-NB. Arc format here is centerpoint,cornerpoint of 90-degree CW arc.
-NB. The center is the from point in the old direction of motion, and the to point in the
-NB. new direction of motion
+      dir =. (turnx =. >/ (+  1000000 * 0&>) turndist) { turndir
+      NB. Out the wire for the turn.  Orient the lines so it is a CW 90-degree arc segment
+      NB. Arc format here is centerpoint,cornerpoint of 90-degree CW arc.
+      NB. The center is the from point in the old direction of motion, and the to point in the
+      NB. new direction of motion
       arccenter =. +/ (0 ~: olddir ,: dir) * currpos ,: (turnx { turnpos)
-NB. The startpoint is the 4th corner of the square made up of center, old, and new
+      NB. The startpoint is the 4th corner of the square made up of center, old, and new
       arccorner =. (currpos + (turnx { turnpos)) - arccenter
       wires =. wires , (gridtoyx arccenter,arccorner) , 1
       wirestart =. currpos =. turnx { turnpos
       currdist =. turnx { turndist
+
+      NB. Since we have changed the direction, refigure all the direction-related vars (copied from above)
+      currlayer =. dirtodistx -dir
+      ew =. 0={.dir
+      turndir =. ew |."1 (0 ,. 1 _1)
+      turnlayer =. dirtodistx -turndir
     end.
   end.
 NB. Out the last wire if any, after appending the true endpoint
@@ -3630,8 +3680,8 @@ NB. ****** tooltips *****
 NB. J602 emulation of ptimer.  On QT, or if tooltips disabled on J6, we will define as dissect_timer and immediately overwrite
 NB. On J6 with tooltip, this redefines the timer handler
 ((IFQT +. -. ALLOWNONQTTOOLTIP) {:: 'sys_timer_z_' ; 'dissect_timer') =: 3 : 0
+NB.?lintonly runningtimerloc_dissect_ =. <'dissect'
 l =. runningtimerloc_dissect_
-NB.?lintonly l =. <'dissect'
 try.
   dissect_timer__l ''
 catch.
@@ -3692,7 +3742,6 @@ NB. Copy the pixels we are about to overwrite
       ttpyx =. 0 >. _1 + ttipy,ttipx
       ttphw =. (2 + ttiph,ttipw) <. (ctly,ctlx) - ttpyx
       tooltippixels =: glqpixels 1 0 3 2 { , tooltippixpos =: ttpyx,:ttphw
-NB. obsolete QP'do=?>coname'''' a tooltippos $tooltippixels tooltippixels '
       (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;TOOLTIPFONTSIZE;TOOLTIPMARGIN) drawtext hstring;2 2 $ ttipy,ttipx,ttiph,ttipw
       glpaint''
 NB.?lintsaveglobals
@@ -3706,7 +3755,6 @@ hoverend =: 3 : 0
 hoverinitloc =: $0
 wdtimer 0
 if. 0 = 4!:0 <'tooltippixels' do.
-NB. obsolete QP'end=?>coname'''' copath@coname'''' tooltippos $tooltippixels tooltippixels '
   glpixels (1 0 3 2 { , tooltippixpos) , tooltippixels
   glpaint''
   4!:55 <'tooltippixels'
@@ -5229,8 +5277,6 @@ NB. obsolete NB. y is all the indexes that were selected by the selector
 NB. obsolete NB. Result is the selectors to display (a list), in order.  The atom count should match the frame returned by calcdispframe,
 NB. obsolete NB. unless there was an execution error.  If nothing executed, return empty
 NB. obsolete calcdispselx =: 3 : 0
-NB. obsolete SM'**dispselx**'
-NB. obsolete QP'y '
 NB. obsolete NB. If the frame is empty or 1, take the last result; otherwise drop the last result IF there are more results than the frame calls for
 NB. obsolete , {:`(}:^:(({.frame)<:#)) @.(1 < {.frame)^:(*@#) y
 NB. obsolete )
