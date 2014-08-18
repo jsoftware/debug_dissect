@@ -158,12 +158,15 @@ parse =: 3 : 0  NB. called in dissect locale
 QP^:DEBTIME'startparse=?6!:1'''' '
 if. #dissectinstance do. '' return. end.  NB. Return empty... which will bypass display
 dissectinstanceforregression =: dissectinstance =: '' conew 'dissect'   NB. global because must persist over return to user environment
-errormessage =: 'unknown error during parsing'
+errormessage =: ''
 try.
   parsemain__dissectinstance y
 catch.
-  smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
-  smoutput 13!:12''
+  if. 0 = #errormessage do.
+    NB. If the error was unexpected, display it
+    smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
+    smoutput 13!:12''
+  end.
 NB. obsolete
 NB. obsolete   NB.  Error encountered during parse.  We indicate this with an unboxed sentence.  We
 NB. obsolete   NB. destroy the locale, since we can't continue
@@ -237,17 +240,19 @@ defnames =. }. y  NB. table of names
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 try. queue =. ;: sentence catch. queue =. 0$a: end.
-NB. Get mask of words to discard: discard leading control words, or anything starting with a control word after a non-control
-dischdtl =. (*./\ ,: [: +./\ 0 , (2) </\ ]) iscw queue
-NB. Get the sentence in the form the user gave it, by deleting the nonblank characters corresponding
-NB. to the discarded words.
-ndiscardshdtl =. dischdtl (#@(-.&' ')@;@#)"1 queue
-usersentence =: ' ' (-@(i.&0@:= |.) }. i.&0@:= }. ]) sentence ((}.~ {.) }.~ -@{:@]) ndiscardshdtl i.~"0 1 (0) ,. (+/\ ,: +/\@|.) ' ' ~: sentence
-NB. keep the nondiscards in the tokenized version
-queue =. (+:/ dischdtl) # queue
+if. #queue do.  NB. following fails on no words
+  NB. Get mask of words to discard: discard leading control words, or anything starting with a control word after a non-control
+  dischdtl =. (*./\ ,: [: +./\ 0 , (2) </\ ]) iscw queue
+  NB. Get the sentence in the form the user gave it, by deleting the nonblank characters corresponding
+  NB. to the discarded words.
+  ndiscardshdtl =. dischdtl (#@(-.&' ')@;@#)"1 queue
+  usersentence =: ' ' (-@(i.&0@:= |.) }. i.&0@:= }. ]) sentence ((}.~ {.) }.~ -@{:@]) ndiscardshdtl i.~"0 1 (0) ,. (+/\ ,: +/\@|.) ' ' ~: sentence
+  NB. keep the nondiscards in the tokenized version
+  queue =. (+:/ dischdtl) # queue
+end.
 
 NB. If the sentence is empty, abort
-if. 0 = #queue do. failparse 'no sentence' return. end.
+if. 0 = #queue do. failparse 'No sentence' return. end.
 
 NB. Append an end-of-queue mark to the sentence, and initialize the stack.
 NB. The stack is type;value;tokennums where value is the locale of the object producing the result, for verb and noun;
@@ -297,7 +302,7 @@ NB. and 'verb' for modifier executions
   NB. This becomes an adverb type.  The value is the exeblock, which will be executed later
         stack =. ((subj i. 1){.stack),(adv;exeblock; ; 2 {"1 exeblock),((>:subj i: 1)}. stack)
       elseif. do.
-        failparse 'Invalid bident'
+        failparse 'Invalid sequence: ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj) 
         return.
       end.
     case. 7 do.  NB. assignment
@@ -586,9 +591,11 @@ MAXNOUNPCTCHOICESDEFAULT =: 1   NB. limit to 30% by default
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 NB. Either nodisplay or display is always called.  The clearing of dissectinstance is a way to prevent recursion.
+NB. y is the error message, which we pass through
 nodisplay =: 3 : 0
 destroy__dissectinstance ''
 dissectinstance =: 0$a:
+y
 )
 
 display =: 3 : 0   NB. called in dissect locale
@@ -5798,7 +5805,7 @@ inheritu (dol ,~ 0 {  x) traverse__uop (<0 1 2 {"1 rankhistory) 1} (((0 { selopi
 )
 
 
-NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ 3 : ''destroy__y 0'' dissectinstanceforregression_dissect_ [ ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ dissectinstanceforregression_dissect_ 4 : ''destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 NB. wd@('psel dissect;pclose'"_)"0 i. 100
 runtests_base_ =: 0 : 0
 dissect '2+''a'''
@@ -5967,8 +5974,10 @@ dissect '+/ i. 3 4'
 dissect '+/"1 i. 3 4'
 dissect '+/"1 i. 3 2'
 dissect '+/@,/"1 i. 3 2'
+dissect '3 ''a'''
+dissect '   '
 )
 
 
-NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ 3 : ''destroy__y 0 [ dissect_dissectisi_paint__y 0'' dissectinstanceforregression_dissect_ [ ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+NB. 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 
