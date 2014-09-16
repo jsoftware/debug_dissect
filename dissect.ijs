@@ -14,7 +14,6 @@ dissectvandnm
 dissectfork
 dissecthook
 dissectallnouns
-dissectexpandable
 dissectrighttoleft
 dissectirregularops
 dissectpowerexpansion
@@ -43,9 +42,10 @@ QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
-NB. Need an error type EINVALIDOP which is like ENOAGREE and used when invalid operand detected
-NB. move v to a second result layout; lay out results side by side with wires to connect
-NB. The expansion node should display only positive or negative results, depending on what result is selected
+NB. Test inheriting an error into expansion
+NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
+NB. dissect '(i. 2 3) +:@]^:(+:@[)"0 (5)'  does not display ^: on the expansion node.  The problem is that the ^: is in rankhistory
+NB.  for +:@], but it gets attached to ] which is then discarded.  Somehow the levrank in this case needs to carry over to the u
 NB. detect u@]^:[ & make power work for it; or have inverse system that looks at ], turning u&]^:_1 to u^:_1&]
 NB. faster addlog
 NB. Audit selection for in-bounds
@@ -54,8 +54,7 @@ NB. Display failing node of u/ as error cell; don't set to all fill
 NB. Need different text color for digits/text, and for nouns with leading 1s in the shape
 
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
-NB. routing: penalize overlap, including overlap of straight lines.  Also, think about forcing all nets of, say, 3 dests to use router.  Have height limit on direct routes.  Use router on all nets that have a routed portion.
-NB. better pn on grid
+NB. routing: if anything routed, the whole net must be
 NB. handle clicking on verb-name part to select tree
 NB. create pickrects for displayed sentence, and handle clicks there
 NB. plan: save preferences; debug globals
@@ -1094,11 +1093,15 @@ NB. they are not known until they are evaluated, and they haven't been evaluated
 NB. in the original locale.  Our treatment here means that the noun may be displayed in multiple places, with the
 NB. traverseup flags aliased together.  We'll worry about that later (solution might be a special noun-clone verb
 NB. that becomes a subclass of the original noun, but with the log removed)
-try.
-  uop =: clone__uop''
-  vop =: clone__vop''
-catch.
+for_l. proplocales _1 do.
+  loc =. ".@> l
+  (l) =: clone__loc ''
 end.
+NB. obsolete try.
+NB. obsolete   uop =: clone__uop''
+NB. obsolete   vop =: clone__vop''
+NB. obsolete catch.
+NB. obsolete end.
 NB. Return the new locale
 cl
 )
@@ -1289,7 +1292,10 @@ NB. Select the derived verb results, using the shape of the selector as the fram
     NB. It's a noun (either an SDT or the result of a verb exec).  It should have 1 result; if not, the exec failed
     qprintf^:DEBTRAVDOWN '#logvalues '
 NB. selector and selop already set, keep them
-    assert. 2 > #logvalues
+NB. obsolete     assert. 2 > #logvalues
+    NB. Since nouns are not cloned, they may be executed twice, resulting in extra values.
+    NB. discard all but the first one.
+    if. 1 < #logvalues do. logvalues =: 1 {. logvalues end.
     'selframe frame selresult' =: ($0);($0);<logvalues
     errorcode =: (*#logvalues) { ENOEXECD,ENOUN
   else.
@@ -1399,7 +1405,7 @@ NB. we detect the failure at the same point J would: so 1.5 u/ y would fail on u
 NB. Contoinue narrowing the search for the error
 NB. If there is a frame, select the first non-executing cell.  For us to get here, any selectable higher levels
 NB. must have selected, so we will be adding to a selection chain.
-          if. (*#frame) do.
+          if. (*#selframe) do.
 NB. we should have had errors at higher levels, which will have set the previous selectors
             assert. sellevel <: #selections  [ 'error in sniff'
 NB. During sniff, each error is propagated down separately.  We append the new error to the previous.
@@ -1412,7 +1418,7 @@ NB. wanted to select at the root, they could have.  But in the case of error, we
 NB. root to have the entire failing selector, so that it can display it; so we propagate
 NB. the selector back to the originating monad/dyad.
 NB. The error selector must have the correct structure for the current node
-            (propselup [ propsel) (sellevel {. selections) , < frame getfailingindex #selx
+            (propselup [ propsel) (sellevel {. selections) , < selframe getfailingindex #selx
             qprintf^:DEBTRAVDOWN 'edisp'''' selections '
           end.
         end.
@@ -1725,7 +1731,11 @@ inheritedto findinheritedtail__inheritedto x
 NB. Append locale x (default=current locale) to the chain ending in locale y
 NB. It is possible that y points to the middle of a chain, so we have to be careful
 NB. to add to the end
-NB. The chain start at u@v@w... and ends at u.  Info in the tail of the chain is most detailed.
+NB. The chain starts at u and ends at u"v"w....  Info in the root of the chain is most detailed.
+NB. inheritroot is the first locale inherited from (u above)
+NB. inheritfrom is pointer to locale inherited from (u"v points to u)
+NB. inheritto points to the locale above this (u points to u"v)
+NB. findinheritedtail finds the largest node (smallest sellevel)
 extendinheritchain =: 3 : 0
 (coname'') extendinheritchain y
 :
@@ -1749,7 +1759,7 @@ NB. locale did, the lower locale
 
 DISPINFO =: ;: 'displayhandlesin displayhandleout displaylevrank dispstealthoperand'
 inheritu =: 3 : 0
-'dol loc' =. y
+loc =. 1 {:: y
 NB. obsolete loc =. '' ($,) floc   NB. remove uninheritable flag
 SM^:DEBDOL 'inheritu: in ' , (>coname'') , ' ' , defstring 0
 QP^:DEBDOL'$floc >loc defstring__loc]0 edisp'''' edisp__loc'''' >selector selresult '
@@ -1775,8 +1785,7 @@ if. errorcode <: EOK do.
     assert. 0 e. frame  [ 'u failed but u@v succeeded'
   end.
   
-NB. If u has the error source then u@v should have failed short.  If u@v (or u/) has any results, then
-NB. copy any result from u as one more result (consider failure during u/ or +"1@v"2).  If u@v has no results,
+NB. If u has the error source then u@v should have failed short.   If u@v has no results,
 NB. inherit the u locale to replace it
 elseif. errorcode__loc e. EGENERR do.
   assert. errorcode e. EPROPERR [ 'u@v died but u@v was OK'  NB. if u died, u@v should be sick
@@ -1862,9 +1871,9 @@ NB. obsolete   NB. there is nothing to inherit.  But we must yet fix physreqandh
 NB. obsolete   NB. prh for @ will have been set for the dyad, but the u/ is a monad.  So we force prh to be a monad, full of empties to avoid a highlight
 NB. obsolete   physreqandhighlights =: ,: |: sellevel $ ,: EMPTYPRH
 NB. obsolete end.
-QP^:DEBDOL'endingecode=?edisp'''' '
+QP^:DEBDOL'endingecode=?edisp'''' defstring__resultloc]0 '
 
-dol ,&< resultloc
+(<resultloc) 1} y
 )
 
 NB. called in locale of an operand
@@ -2752,6 +2761,11 @@ NB. main form, because the isigraph may not be opened on the explorer yet
 wd 'psel ' , winhwnd__COCREATOR
 glsel 'dissectisi'
 
+NB. Get the locale at the end of the inheritance chain.  This is usually this locale, but if there
+NB. is an error we may be displaying data from a locale other than the end.  Even then, though, we want
+NB. to display all rank & selection info from the end-of-chain
+tailloc =. findinheritedtail''
+
 NB. Create the top line: name (if any), flanked by rank(s) (if any)
 NB. We are creating one box that will describe the top line
 NB. Get size of verb/name string, plus margin
@@ -2803,7 +2817,7 @@ statusdesc =. ALIGNSPREAD addalignmentrect thw
 NB. Create the shape/selector line if we can
 NB. The shape is the concatenation of the frames, so that in an expansion node it includes the expansion.
 NB. We also append the shape of the max result cell in the last node, to get the total shape of the result
-shapetouse =. (afflat accumframe'')
+shapetouse =. (afflat accumframe__tailloc'')
 NB. obsolete NB. We get this from the shape of the result, unless there is an error; then we get it from
 NB. obsolete NB. accumframe, which gets us the frame (we don't know the full shape)
 NB. obsolete NB. We create this line if there are selections (even if there is an error) or if
@@ -2815,20 +2829,20 @@ NB. obsolete   shapetouse =. selresultshape
 NB. obsolete else.
 NB. obsolete   shapetouse =. afflat accumframe''   NB. delete unexpanded detail
 NB. obsolete end.
-QP^:DEBDOvn 'defstring]0 $shapetouse shapetouse errorcode sellevel selections '
+QP^:DEBDOvn 'defstring]0 $shapetouse shapetouse errorcode sellevel selections defstring__inheritroot]0 sellevel__tailloc sellevel__inheritroot selections__inheritroot '
 NB. If we have no shape, either it's a scalar, or we have empty frame with unknown shape.
 NB. in both cases, it's OK to elide the shape/selector line.
-if. #shapetouse do.
+if. #shapetouse, maxcellresultshape__inheritroot do.
 NB. allocate the shape into boxes whose lengths match the lengths of the nonempty boxes of accumframe
 NB. The last box of DOshapes (possibly empty) is the part of the shape that is not in the frame,
 NB. in other words the shape of the (filled) result cell.  This will be drawn in a special color, and
 NB. no selection will be drawn below it.
 NB. assert. shapetouse >:&# ;accumframe  not valid, when extra internal ranks, such as from u/, are possible
-  DOshapes =: ,: (afkey afact accumframe'') ([ <;.1 ({.~ #)~) shapetouse  NB. Remove last box of accumframe if neg
+  DOshapes =: ,: (afkey accumframe__tailloc'') ([ <;.1 ({.~ #)~) shapetouse  NB. Remove last box of accumframe if neg
 NB. If there are selections, line them up under the boxes in the shape containing selectable values
 NB. (i. e. more than one cell)
-  if. sellevel < #selections do.
-    DOshapes =: DOshapes , (sellevel }. selections) (] #^:_1 ({.~ +/))"1 (1 < */)@> DOshapes
+  if. sellevel__tailloc < #selections__inheritroot do.
+    DOshapes =: DOshapes , (sellevel__tailloc }. selections__inheritroot) (] #^:_1 ({.~ +/))"1 (1 < */)@> DOshapes
   end.
 NB. append the result cell.  If there are selections this will be duplicated; no problem, since it is discarded for display
   DOshapes =: DOshapes ,. < maxcellresultshape__inheritroot
@@ -2841,7 +2855,7 @@ NB. obsolete     DOshapes =: DOshapes ,. <'...'
 NB. obsolete   end.
 NB. Convert the shapes to characters, and get the pixel extent of each string.  Start at the selection level
 NB. of this object
-  shapeext =. ((sellevel + i. {:$DOshapes) ((<. <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes =: ":&.> DOshapes
+  shapeext =. ((sellevel__tailloc + i. {:$DOshapes) ((<. <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes =: ":&.> DOshapes
 NB. Create a rect object for the shape/selections
   shapedesc =. (<ALIGNCENTER) addalignmentgroup (<ALIGNSPREAD)&addalignmentgroup@,."1@|: ALIGNSPREAD addalignmentrect shapeext
 else.
@@ -3046,20 +3060,21 @@ NB. result is face# 0-3,position
 displayhandletoposition =: (] ,. -) <.@:(0.5&+)
 
 NB. Join layouts left-to-right
-NB. x and y are layouts
-NB. Result is composite layout, with all wires & multiple results
-joinlayoutslr =: 4 : 0
-if. DEBLAYOUT do.
-  qprintf'Joinlayoutslr:x?x y '
-end.
-'ldol lyxhw lwir lres' =. x
-'rdol ryxhw rwir rres' =. y
+NB. y is layout1,:layout2
+NB. x (y offset for right box;
+NB. Result is composite layout, with all wires & multiple results; a LIST
+joinlayoutslr =: 3 : 0
+0 1 joinlayoutslr y
+:
+QP^:DEBLAYOUT'Joinlayoutslr:x?x y '
+'ldol lyxhw lwir lres rdol ryxhw rwir rres' =. ,y
+'rofsty floatok' =. x
 NB. If one of the blocks (or both) is a reference, don't bother moving anything;
 NB. just join the (empty) blocks and the results
 if. ldol *.&(0~:#) rdol do.
 NB. bottom-justify the blocks.  slacks is how much slack is left at the top of each block.  One
 NB. of these values is 0; round the other to an even number of grids
-  slacks =. <.@(0.5&+)&.(%&ROUTINGGRIDSIZE) (- <./) (>./ +/"1 {."1 lyxhw) , (>./ +/"1 {."1 ryxhw)
+  slacks =. <.@(0.5&+)&.(%&ROUTINGGRIDSIZE) (- <./) (>./ +/"1 {."1 lyxhw) , (rofsty + >./ +/"1 {."1 ryxhw)
   if. </ slacks do. lyxhw =. lyxhw +"2 (2 2) {. +/ slacks else. ryxhw =. ryxhw +"2 (2 2) {. +/ slacks end.
   
 NB. Calculate right profile of left block.  lss is the start/stop list, which is a table of
@@ -3082,8 +3097,8 @@ NB. starting position.  Actual start position is max of the differences.
 NB.
 NB. We do this computation for a range of vertical offsets, and take the one with smallest start position
 NB. Since the profiles coalesced identical points, we'd better do the same on out lists of important points
-  lssyrng =. (ROUTINGGRIDSIZE * i. MAXVERTFLOAT) +/ lssy =. ~. lssy   NB. left vert positions, shifted
-  rssyrng =. (ROUTINGGRIDSIZE * i. MAXVERTFLOAT) +/ rssy =. ~. rssy
+  lssyrng =. (ROUTINGGRIDSIZE * i. floatok} 1,MAXVERTFLOAT) +/ lssy =. ~. lssy   NB. left vert positions, shifted
+  rssyrng =. (ROUTINGGRIDSIZE * i. floatok} 1,MAXVERTFLOAT) +/ rssy =. ~. rssy
 NB. Each y value gives the valid x until the next higher y value; so we will keep the
 NB. y values in DESCENDING order and look up in that table, so that match on an interval means
 NB. that the corresponding x is valid.  We extend the table to handle searches that run off the
@@ -3121,7 +3136,7 @@ end.
 )
 
 NB. Entry point when dol and locale are joined together.  This is also called from original traversal,
-NB. thus needs to be in outer locale.  If the locale is an array, that means 'uninheritable'; we scrub that
+NB. thus needs to be in outer locale.
 NB. We create the DOL for the locale named in y, and then add the operand selections originating in that locale
 NB. to the places they come from
 NB.
@@ -3129,7 +3144,7 @@ NB. If the locale is
 joinlayoutsl_dissect_ =: 3 : 0
 1 joinlayoutsl y
 :
-'dol loc' =. y
+'dol loc right' =. 3 {. y , <0 2$a:
 NB.?lintonly loc =. <'dissectobj'
 NB. obsolete loc =. '' ($,) loc   NB. remove uninheritable flag
 NB. If there are operand selections, apply them to the input locales
@@ -3140,10 +3155,28 @@ NB. each operand, with one highlight request per sellevel.  Also, physreqandhigh
 NB. brought back so that it contains all the selections out to the last highlight request.
 NB. For each request, we take all the
 NB. physical selections before the highlight, and append the highlight
-  dol addselecttoDOL__inheritroot__loc physreqandhighlights__inheritroot__loc
+NB. obsolete   dol addselecttoDOL__inheritroot__loc physreqandhighlights__inheritroot__loc
+  dol addselecttoDOL physreqandhighlights__inheritroot__loc
 end.
+NB. if there are right-sided operands, highlight them too
 NB.?lintonly y =. <'dissectobj'
-dol joinlayouts__loc ''
+res =. dol joinlayouts__loc ''
+if. #right do.
+  NB. Install highlights
+  addselecttoDOL&>/"1 right
+  NB. Install wires from each of the right locales to a spot on the left locale
+  rightdols =. ; 0 {"1 right
+  rightoutputs =. ; 3 {"1 rightdols
+  leftinputs =. loc (,<)"0 1 displayhandletoposition 3 + _0.3 ^ #\ rightoutputs
+  newwires =. rightoutputs ,:"1 leftinputs
+  res =. (< ((<0 2) {:: res) , newwires) (<0 2)} res
+  NB. Remove the outputs from the rightdols so they won't appear again as outputs of the joined block
+  rightdols =. (<0 2$a:) (<a:;3)} rightdols
+  NB. Connect the right inputs, adjusted up to the top of the left, and with movement suppressed
+  res =. ,: (({. {."1 DOsize__loc),0)&joinlayoutslr@,:/ res , rightdols
+NB.displayhandlesin__loc =: displayhandlesin__loc , 2.7
+end.
+res
 )
 
 
@@ -3580,7 +3613,7 @@ NB. join layout(s) to the current object
 NB. x is table of input layout(s)
 NB. y is unused - we create the current object
 NB. We join the input objects, then append the DOL for the current object
-NB. Result is DOL for the combined layout:
+NB. Result is DOL for the combined layout, as a TABLE:
 NB.  locale of obj;(start,:size of object);internal wires;handles out
 NB.   wires are brick, where each 2x2 is a table of start,:end, each in the format (locale;face#,fractional position)
 NB.   handles in/out are a table of startpoints, (locale;single face#,fractional position)
@@ -3609,7 +3642,7 @@ NB. If there are no earlier layouts, this had better be a noun - just create its
   else.
 NB. Remove any layout (there can be only one) that has been marked as elided by stealth, by having its
 NB. output handles cleared.  Join the survivors
-    'upperdol upperyxhw upperwires upperresult' =. joinlayoutslr/ (#~    a: ~: 3&{"1) x
+    'upperdol upperyxhw upperwires upperresult' =. joinlayoutslr@,:/ (#~    a: ~: 3&{"1) x
     if. DEBLAYOUT do.
       qprintf'Joined upper objects:dol=?upperdol%yxhw=?upperyxhw%wires=?upperwires%$upperresult%res=?upperresult%'
     end.
@@ -4445,15 +4478,6 @@ QP^:DEBHLIGHT'opselin allh '
 
 )
 
-cocurrent 'dissectexpandable'  NB. locale for items that expand when name is clicked
-
-NB. This node (if displayed) will display the boxed selresult; selections at this node need to drop down a level (to inside the box) after the
-NB. selection has been made, to get the selection for the next level
-isexpansionnode =: 3 : 0
-NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
-(1 < {.frame) *. (sellevel < #selections)
-)
-
 cocurrent 'dissectrighttoleft'
 NB. y is the intervals for each ticket, expanded into an array using the shape of the frame
 NB. Result is the array reordered to natural order; reversed, since u/ processes in reverse order
@@ -4538,6 +4562,7 @@ NB. x is the selected indices that matched the selector
 NB. y is max size of a selresult as calculated by checkframe
 NB. Result is the shape we expect this result to have, for use in later traversal
 calcselresultshape =: 4 : 0
+NB.?lintonly logvalues =: 0$a:
 if. 0 = $x do. ($0);($0)   NB. error, immaterial
 else.
   ($ ({:x) {:: logvalues);y
@@ -4738,7 +4763,7 @@ auditstg '(' , (logstring '') , (exestring__uop '') , ' (' , (exestring__yop '')
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-uop,(yop #~ y > 1)
+(<^:(0=L.)@".@>^:(0 <: y) ;: 'uop'),(yop #~ y > 1)
 )
 
 NB. Traversal up and down the tree.
@@ -4807,7 +4832,7 @@ estheights =: , >./ , (estheights__xop ,: estheights__yop) combineheights ,. est
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-(xop #~ y > 1),uop,(yop #~ y > 1)
+(xop #~ y > 1),(<^:(0=L.)@".@>^:(0 <: y) ;: 'uop'),(yop #~ y > 1)
 )
 
 NB. Traversal up and down the tree.
@@ -5018,13 +5043,14 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') 
 
 NB. Return the locales for propsel.  If we got here through capped fork, we have to format accordingly
 proplocales =: 3 : 0
-if. 0 = 4!:0 <'vvv' do.
-NB. capped fork
-  ((y = 3) # <tokensource),uop,vop
-else.
-NB. normal operation
-  uop,((y = 3) # <tokensource),vop
+r =. (<^:(0=L.)@".@>^:(0 <: y) ;: 'uop vop')
+if. y = 3 do.
+  r =. (<tokensource) , r
+  if. 0 ~: 4!:0 <'vvv' do.  NB. NOT capped fork, use u@v form
+    r =. 1 0 2 { r
+  end.
 end.
+r
 )
 
 NB. Traversal up and down the tree.
@@ -5039,23 +5065,25 @@ NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. agreementerror x return. end.
-NB. Run v.
-if. 2 < #doll =. x traverse__vop a: travdownvops selector , (*./ selopinfovalid) # selopinfo do.
-  NB. If v returns extra info, it is part of an expansion node that decided not to display.
+NB. Run v.  The result is dol;code where code is either a locale os an initialselection
+select. L. loc =. 1 {:: doll =. x traverse__vop a: travdownvops selector , (*./ selopinfovalid) # selopinfo
+case. 1 do.
+  NB. v created a layout; show it
+  x =. joinlayoutsl doll
+  NB. execute u
+  inheritu x traverse__uop travdownuops vop
+case. 0 do.
+  NB. v is an expansion that is waiting for a click to expand.  We don't show v; we use the code as the
+  NB. initial selection
+  initialselection =: <loc
+  NB. execute u
+  inheritu x traverse__uop travdownuops vop
+case. 2 do.
+  NB. Double-boxed locale: an expansion node that decided not to display.
   NB. Example is u/ y when there are 2 items, which converts to a dyad.  In this case we treat the
   NB. entire u@v as if it were v: we don't evaluate u, and just pass on the result of v without the extra info
-  2 {. doll
-else.
-  NB. Normal case, where we run u
-  NB. If v is an expansion node, it may choose to produce nothing at all, in which case the 'locale' is a numeric
-  NB. initial value which we must get into the accumframe of the inherited result.  In this case u will create the
-  NB. result node
-  if. 32 = 3!:0 initsel =. 1 {:: doll do.
-  NB. If v created a layout, show it
-    x =. joinlayoutsl doll
-  else. initialselection =: <initsel  NB. Signal that this node (]@v) can actually take a click
-  end.
-  inheritu x traverse__uop travdownuops vop
+  NB. We remove the boxing and pass the result through, without executing u
+  loc 1} doll
 end.
 )
 
@@ -5135,7 +5163,11 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , '(' , (exestring__vo
 NB. Return the locales for propsel
 proplocales =: 3 : 0
 NB. For highlighting the sentence, we need only one clone.  Use the first
-uop,((y = 3) # <tokensource),vop0,(y ~: 3) # vop1
+if. y = 3 do.
+  uop,(<tokensource),vop0
+else. 
+  (<^:(0=L.)@".@>^:(0 <: y) ;: 'uop vop0 vop1')
+end.
 )
 
 NB. Traversal up and down the tree.
@@ -5215,7 +5247,11 @@ NB.?lintsaveglobals
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-(((verboperandx = 0) +. (y > 0)) # uop),((y = 3) # < tokensource),(((verboperandx = 1) +. (y > 0)) # vop)
+if. y = 3 do.
+  uop,(<tokensource),vop
+else.
+  (<^:(0=L.)@".@>^:(0 <: y) ((y>0) +. verboperandx = 0 1) # ;: 'uop vop')
+end.
 )
 
 NB. Traversal up and down the tree.
@@ -5324,7 +5360,7 @@ auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '')
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-uop,((y = 3) # < tokensource),(y > 0) # vop
+ <^:(0=L.)@".@>^:(0 <: y) (1 , (y=3) , y>0) # ;: 'uop tokensource vop'
 )
 
 NB. y is selector,operands for the next operation
@@ -5424,11 +5460,11 @@ enparen^:(y=3) (defstring__uop 2) jd cop
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-uop,(y=3) # <tokensource
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3)) # ;: 'uop tokensource'
 )
 
 NB. The monadic valence:
-startmonad 'dissectexpandable dissectrighttoleft dissectirregularops dissectselectshape dissectdisplaytwo'
+startmonad 'dissectrighttoleft dissectirregularops dissectselectshape dissectdisplaytwo'
 
 calcestheights =: 3 : 0
 NB. Since u is always a dyad, combine heights and add 1 for the expansion node
@@ -5475,8 +5511,8 @@ NB. obsolete   inheritu x traverse__uop bnsellevel , (}:rankhistory) ; rankcalcu
   extendinheritchain 1 {:: ures   NB. add u/ to display of u.  This locale cannot be a flag (those occur only in u@v)
 NB. obsolete  NB. We almost don't need to inheritu, because this locale plays no part in the display.  But there is the matter of the implied frame
 NB. obsolete  NB. (,1) which needs to be incorporated into the accumframe of the result so that selection will be valid.
-  NB. Add another box to result to signal that u@v (the final collector) should suppress its u, and use this result as the sole result
-  ures , a:
+  NB. Double-box locale to signal that u@v (the final collector) should suppress its u, and use this result as the sole result
+  (<1 { ures) 1} ures
 
 elseif. (1 < nitems =. {.frame) *. (sellevel < #selections) do.
 NB. We have a selector, and more than 2 possible selections.  Display the selector, and traverse u
@@ -5572,6 +5608,12 @@ NB. modify selopshapes to account for the selection
 <@(2 1&$)@<@,"0 rootsel + 0 1
 )
 
+NB. This node (if displayed) will display the boxed selresult; selections at this node need to drop down a level (to inside the box) after the
+NB. selection has been made, to get the selection for the next level
+isexpansionnode =: 3 : 0
+NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
+(1 < {.frame) *. (sellevel < #selections)
+)
 
 NB. The dyadic valence:
 startdyad ''
@@ -5672,7 +5714,7 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') 
 
 NB. Return the locales for propsel.  If we got here through capped fork, we have to format accordingly
 proplocales =: 3 : 0
-uop,((y = 3) # <tokensource),vop
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3), 1) # ;: 'uop tokensource vop'
 )
 
 NB. Traversal up and down the tree.
@@ -5680,7 +5722,7 @@ NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
 NB. traverse v, either as a noun or as a verb using the current selector
 if. visnoun do.
-  traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs here
+NB. obsolete   traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs here
   vdol =. NOLAYOUTS traverse__vop TRAVNOUN
   NB. If noun operand failed, pull the plug and display only that result
   if. errorcode__vop > EOK do. vdol return. end.  NB. If the noun failed, this node must have failed too
@@ -5699,8 +5741,7 @@ vlayo =. joinlayoutsl vdol
 NB. We need vval for calculating the selframe of u; but it may not be valid, in case vop failed.
 NB. We have fixed calcdispframe so that it doesn't look at vval if vop failed, so we just need to
 NB. get vval defined when it is valid
-if. errorcode__vop ~: ENOOPS do. vval =: 1 {:: fillmask__vop frameselresult__vop selresult__vop end.
-
+if. errorcode__vop -.@e. ENOOPS,ENOSEL do. vval =: 1 {:: fillmask__vop frameselresult__vop selresult__vop end.
 NB. Perform selections for u - needed for display whether v ran or not
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. agreementerror x return. end.
@@ -5709,6 +5750,7 @@ resdol =. x ,&< coname''
 
 NB. If v didn't run, there is really nothing we can do about u; just display it.  If v failed because it didn't select, there
 NB. is hope for a later traversal
+NB.?lintonly vval =: 0
 if. errorcode__vop > EOK do.
   'displayhandlesin displayhandleout displaylevrank' =: (valence { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
 NB. v ran. Get the actual result of v.  We know v collected successfully
@@ -5734,7 +5776,7 @@ elseif. do.
     NB. skeletal display, and make that the (v-type) result, with no expansion node.
 
     NB. If the selector is invalid and v has no positive values, there is no need to traverse u.  Open twice in case of boxed v
-    traverseu =. +./ 0&(+./@:<)@>@> logvalues__vop
+    traverseu =. +./ , 0&(+./@:<)@>@> logvalues__vop
 
     NB. If the v value for the current selection does not require an expansion (<_1, <0, or <1), we will traverse to get
     NB. a v-type display of u.  If the current selection is <0 or <_1, u^: will invalidate the selector to get a skeletal display of u.
@@ -5743,56 +5785,85 @@ elseif. do.
     NB. If all the v results are <1, we never need a selector and can simply expand the result as a u-type
     vis1 =. logvalues__vop *./@:= <1
 
-    NB. Calculate the expected frame/inversect: the number of results expected (including the 0 'result') and
-    NB. the number of negative results expected.  _ means 'don't know'.
-    expframeinv =. (>:@+)/\. (>./ , [: - <./) 0 , (- *)@>^:(1 = L.) vval
+    NB. Figure out what v value has been selected by the current selection.  If selection has not been performed,
+    NB. the expansion will not expand, so there must be a unique v value.  Pass that into the traversal: we will
+    NB. display only the powers whose sign matches the selection, and we will display only up to the selection.
+    if. ($0) -: $vval do. selectedpower =. (- *)@>^:(1 = L.) vval
+    elseif. sellevel < #selections do. selectedpower =. (- *)@>^:(1 = L.) (sellevel { selections) { vval
+    elseif. do. selectedpower =. 0
+    end.
 
-    initialselection =: (-. noexpansion) # <_1
-
+    NB. Create the initial selection to use when this result is clicked.
+NB. obsolete     initialselection =: (-. noexpansion) # <_1
+    if. (<_) = initialselection =: <|selectedpower do. initialselection =: <0 end.
     NB. Run the expansion node for u^: (as a v-type node); pass in the analysis of v.  The result is either
     NB.  nothing: no expansion, no u.  display will be just u@:v
     NB.  u: u expanded, but there is no expansion node.  If vis1, we treat this result as the u-type result; otherwise
     NB.   we treat it as a v-type result and realize it it, then connect it to u^:v (but if the selector is 0, we
     NB.   connect it to the y input instead
     NB. expansion: realize it as a v-type result 
-    if. 2 = #expdol =. x traverse__uop traverseu;skeletalu;noexpansion;vis1;expframeinv;visnoun;< a: travdownvops selector , (*./ selopinfovalid) # selopinfo do.
+    'expdol code' =. x traverse__uop traverseu;skeletalu;noexpansion;vis1;selectedpower;visnoun;< a: travdownvops selector , (*./ selopinfovalid) # selopinfo
+    select. code
+    NB. Return type: 0=vis1, 1=noexpansion, 2=skeletalu(unwired), 3=full u or expansion
+    case. 0 do.
       NB. vis1: u^: produced a u-type result, which becomes our result
-      resdol =. 2 {. expdol
-    elseif. 2 < #expdol do.
-      NB. Either the expansion ran, or it's a u that is simple enough to treat as its own expansion.  The extra box distinguishes
-      resdol =. joinlayoutsl 2 {. expdol
-      if. 2 {:: expdol do.
-        NB. skeletalu: u is there for show only; the actual value comes from y.  Create a reference to y and add it as the first input.
-        NB. Make the handle for the u result _1, meaning 'no wire'
-        resdol =. resdol , createreference _1 { x
-        'displayhandlesin displayhandleout displaylevrank' =: (0 _1);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
-      else.
-        NB. expansion node or u where the current selector is <1, use it as a v-type
-        'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
-      end.
+      resdol =. expdol
+    case. 1 do.
+      NB. If the expansion node did not expand, create the display result right here in this node (as a u-type).
+      'displayhandlesin displayhandleout displaylevrank' =: (valence{'';(,0);_0.3 0.3),1;< (<(defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+    case. 2 do.
+      NB. skeletalu: u is there for show only; the actual value comes from y.  Create a reference to y and add it as the first input.
+      NB. Make the handle for the u result _1, meaning 'no wire'
+      resdol =. joinlayoutsl expdol
+      resdol =. resdol , createreference _1 { x
+      'displayhandlesin displayhandleout displaylevrank' =: (0 _1);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
       NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
       NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
       physreqandhighlights__inheritroot =: NOPHYSREQ
       resdol =. resdol ,&< coname''
-
-    elseif. do.
-      NB. If the expansion node did not expand (single-box) create the display result right here in this node (as a u-type).
-      NB. Create the initial selection to use when this result is clicked.
-       'displayhandlesin displayhandleout displaylevrank' =: (valence{'';(,0);_0.3 0.3),1;< (<(defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+    case. 3 do.
+      NB. Expansion node executed with u attached, or just u by itself
+      resdol =. joinlayoutsl expdol
+      NB. expansion node or u where the current selector is <1, use it as a v-type
+      'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+      NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
+      NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
+      physreqandhighlights__inheritroot =: NOPHYSREQ
+      resdol =. resdol ,&< coname''
     end.
+
+NB. obsolete       NB. Either the expansion ran, or it's a u that is simple enough to treat as its own expansion.  The extra box distinguishes
+NB. obsolete       resdol =. joinlayoutsl 2 {. expdol
+NB. obsolete       if. 2 {:: expdol do.
+NB. obsolete         resdol =. resdol , createreference _1 { x
+NB. obsolete         'displayhandlesin displayhandleout displaylevrank' =: (0 _1);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+NB. obsolete       else.
+NB. obsolete         NB. expansion node or u where the current selector is <1, use it as a v-type
+NB. obsolete         'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+NB. obsolete       end.
+NB. obsolete       NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
+NB. obsolete       NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
+NB. obsolete       physreqandhighlights__inheritroot =: NOPHYSREQ
+NB. obsolete       resdol =. resdol ,&< coname''
+NB. obsolete 
+NB. obsolete     elseif. do.
+NB. obsolete     end.
   end.
 end.
-
 NB. resdol will be our u-type result.
 NB. Bring v in as a third input to the result, wherever it came from.
-'dol loc' =. resdol
-NB. Add a handlein, on the right side, but below the previous handle if any.  2.5 is the top of the right-hand edge
-displayhandlesin__loc =: displayhandlesin__loc , 0.8&*&.(-&3) (2.5 >. {: displayhandlesin__loc)
-NB. Repeat our no-highlight for the added result - only if there were highlights
-NB. Expand the list of highlights to the length of the operands (they may differ, or there may be no
-NB. highlights
-physreqandhighlights__inheritroot__loc =: (#dol) {.!.(<EMPTYPRH) physreqandhighlights__inheritroot__loc
-NB. Append a highlight for the v operand - using its selection if any
+NB. The v result (coming in from the right) is placed in a third box of
+NB. the result (present only when there is a right-hand oerand).  This box contains
+NB. a table of dol;highlights
+prevright =. 2 {:: resdol , < 0 2$a:  NB. default to empty
+NB. obsolete 'dol loc' =. resdol
+NB. obsolete NB. Add a handlein, on the right side, but below the previous handle if any.  2.5 is the top of the right-hand edge
+NB. obsolete displayhandlesin__loc =: displayhandlesin__loc , 0.8&*&.(-&3) (2.5 >. {: displayhandlesin__loc)
+NB. obsolete NB. Repeat our no-highlight for the added result - only if there were highlights
+NB. obsolete NB. Expand the list of highlights to the length of the operands (they may differ, or there may be no
+NB. obsolete NB. highlights
+NB. obsolete physreqandhighlights__inheritroot__loc =: (#dol) {.!.(<EMPTYPRH) physreqandhighlights__inheritroot__loc
+NB. Calculate a highlight for the v operand - using its selection if any
 NB. obsolete physreqandhighlights__inheritroot__loc =: (, {:)^:(*@#) physreqandhighlights__inheritroot__loc
 NB. If not an array v, no selection
 if. 0 = #selframe do.
@@ -5803,8 +5874,10 @@ else.
    NB. Turn it into a highlight record
   vselect =. < (2 1 $ vselect) , <0
 end.
-physreqandhighlights__inheritroot__loc =: physreqandhighlights__inheritroot__loc , vselect
-(dol,vlayo) ,&< loc
+NB. obsolete physreqandhighlights__inheritroot__loc =: physreqandhighlights__inheritroot__loc , vselect
+NB. obsolete (dol,vlayo) ,&< loc
+(2 {. resdol) , (<prevright , vlayo ,&< vselect)
+NB.?lintsaveglobals
 )
 
 
@@ -5828,6 +5901,34 @@ NB. If we need a selection and we have one, a:, otherwise 0 0 indicating pick-on
 ((*#selframe) *. (sellevel < #selections)) {:: (0$a:) ,&< 0 0 
 )
 
+NB. x is the frame of the full expected result
+NB. y is the number of results we actually got
+NB. result is index list of the failing location, in natural order
+NB. This turns ticket order to selection order
+getfailingindex =: 4 : 0
+NB. Calculating the failing index for ^: is a chore.  We have to figure out what failed - the forward
+NB. or the inverse - and then get an index to whichever failed.  That will set up the selector to find the
+NB. failure in the expansion.  To decide what failed, we have to nose around in the expansion data
+NB. First, we have to find the matching indexes in the expansion
+selx =. ; findselection__uop > selector
+NB. Calculate the expected frame/inversect: the number of results expected (including the 0 'result') and
+NB. the number of negative results expected.  _ means 'don't know'.  If there are both positive.  This is needed
+NB. so we can detect an error during sniff
+fi =. (>./ , [: - <./) 0 , flatvval =. , (- *)@>^:(1 = L.) vval
+NB. Count the number of forward and inverse executions
+fix =. -/\. (# , +/) selx { logvaluesd__uop
+NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
+NB.  or if there is a mix of forward and backward execs
+throwaway =. (1 1 -: * fi) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) (-.logvaluesd__uop) #&(selx&{) logvalues__uop 
+NB. correct the number of executions: forward includes the 0 value, and also counts a throwaway execution sometimes
+fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
+NB. Decide which direction failed - if any.  Infinities can only come up when we are going in one direction
+edir =. fi i.&1@:> fix
+NB. If neither direction failed, the error must have happened during framing.  Ignore that for the nonce
+NB. Find the member of vval that is the largest in the direction of error.  That will be the one we select
+x #: (i. >./) (edir { 1 _1 1) * flatvval
+)
+
 NB. y is the current selection (a: if forced)
 NB. We never generate a highlight.  This level deals only with selections.
 calcphysandhighlights =: 3 : 0
@@ -5840,7 +5941,7 @@ valence # < 2&{. EMPTYPRH
 
 NB. **** expansion node for ^: ****
 cocurrent 'dissectpowerexpansion'
-coinsert 'dissectexpandable dissectirregularops dissectdisplaytwo dissectselectshape dissectobj'
+coinsert 'dissectirregularops dissectdisplaytwo dissectselectshape dissectobj'
 
 create =: 3 : 0
 create_dissectobj_ f. '';$0   NB. no string, no tokens
@@ -5887,7 +5988,8 @@ auditstg '(' , (verblogstring '') , '(' , (logstring 0) , '@:' , (exestring__uop
 
 NB. Return the locales for propsel.  If we got here through capped fork, we have to format accordingly
 proplocales =: 3 : 0
-,uop
+<^:(0=L.)@".@>^:(0 <: y) ;: 'uop'
+
 )
 
 NB. Traversal up and down the tree.
@@ -5900,10 +6002,11 @@ NB. We do not display u: we pass its display information back so that it can eve
 NB. be displayed if it ever reaches a collector.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
-'traverseu skeletalu noexpansion vis1 expframeinv visnoun travy' =: y   NB. Unpack the added operands, info about v
-'expframe expinversect' =: expframeinv
+'traverseu skeletalu noexpansion vis1 selectedpower visnoun travy' =: y   NB. Unpack the added operands, info about v
+assert. (6 0$0) -: $@".@> ;: 'traverseu skeletalu noexpansion vis1 selectedpower visnoun'
+NB. obsolete 'expframe expinversect' =: expframeinv
 traversedowncalcselect travy
-if. errorcode e. EEARLYERROR do. agreementerror x return. end.
+if. errorcode e. EEARLYERROR do. (agreementerror x);0 return. end.
 
 NB. If the selector is invalid, and the totality of v has a positive value, traverse u to get a
 NB. skeletal display, and make that the (u-type) result, with no expansion node.
@@ -5921,19 +6024,20 @@ NB. node with no locale.  Traverse u to get a skeletal display, which becomes th
 
 NB. If a selection has been made, create the display for the expansion; traverse u and inherit it into the expansion node.
 NB. The expansion node becomes the (v-type) result
+
+NB. Return type: 0=vis1, 1=noexpansion, 2=skeletalu(unwired), 3=displayable u
 if. noexpansion do.
   NB. no expansion node ever (all the v results are <_1 <0 or <1)
   NB. Traverse u if called for; pass selection info unless disabled by skeletalu
   if. traverseu do.
     NB. Some positive values, so we may see u sometimes.  Traverse it.  If skeletalu, disable detail
     udol =. x traverse__uop bnsellevel , (< (<'^:1') (<_1 0)}^:vis1 rankhistory) , (-.skeletalu) # rankcalculus^:(-.*./selopinfovalid) selector , selopinfo
-    NB. If vis1, this result becomes the u result of u@:v - indicate that by returning just the 2 boxes
-    NB. Otherwise, append <1 to indicate that this is a v-type result that DOES NOT feed in to u@:v, so should
-    NB. not be wired.  <0 means v is <1 or an expansion, which should be wired to u@:v
-    udol , (-. vis1) # < skeletalu
+    NB. If vis1, this result becomes the u result of u@:v
+    NB. Otherwise, suppress wiring u if skeletalu
+    udol ; (#. vis1,skeletalu) { 3,2,0,0
   else.
     NB. No positive values in v, so no way ever to run u
-    0$a:   NB. no u at all - say so
+    0 1   NB. no u at all - say so
   end.
 else.
   NB. This node will be an expansion node, if it exists.  If no selection has been made, it doesn't.
@@ -5956,50 +6060,52 @@ else.
       NB.   x, if any
       NB.   selfref (if 1 < |sel), or y
       NB. Run u and inherit it into this node
-      'udol loc' =. inheritu x traverse__uop bnsellevel , (<rankhistory) , (-.skeletalu) # rankcalculus^:(-.*./selopinfovalid) selector , selopinfo
+      ures =. inheritu x traverse__uop bnsellevel , (<rankhistory) , (-.skeletalu) # rankcalculus^:(-.*./selopinfovalid) selector , selopinfo
     else.
       NB. No u.  Create the expansion, with input coming from y or self
-      'displayhandlesin displayhandleout displaylevrank' =: ((#x) { '';(,0);_0.3 0.3),1;< (<(defstring 0) , visnoun {'un') (<_1 0)} rankhistory
-      udol =. x
-      loc =. coname''
+      'displayhandlesin displayhandleout displaylevrank' =: ((#x) { '';(,0);_0.3 0.3),1;< (<(defstring 0) ,( visnoun {'un') , (selectedpower<0) # ' (inv)') (<_1 0)} rankhistory
+      ures =. x ,&< coname''
     end.
     NB. To make sure that the display of y doesn't disappear, we add it as another input, with a hidden wire, if it was replaced by a reference
     if. floatingy do.
-      udol =. udol , ydol
+      NB.?lintonly ydol =. 0 4$a:
+      ures =. (<(0 {:: ures) , ydol) 0} ures
       displayhandlesin =: displayhandlesin , _1
       NB. Add a compensating no-highlight, but only if there is a highlight.  If there is none, it means we didn't try to match the highlight to the DOL
-      if. #physreqandhighlights__inheritroot__loc do. physreqandhighlights__inheritroot__loc =: physreqandhighlights__inheritroot__loc , <3 0$a: end.
+      if. #physreqandhighlights__inheritroot do. physreqandhighlights__inheritroot =: physreqandhighlights__inheritroot , <3 0$a: end.
     end.
-    udol ; loc ; 0
-  else.  NB. no expansion.  Return the initial selection to use
-    if. 3 < #travy do.
-    NB. Start things off with whatever value is farthest from 0.  We have {. frame-inversect and -inversect as candidates
-      , < {. (\: |) +/\. (<: {. frame) , -inversect  NB. Return the initial selection
-    else.
-      NB. If selopinfo is not valid, we haven't computed inversect (and the expansion node must not be ready to
-      NB. expand either, but we have to return something)
-      0 $ a:
-    end.
+    ures ; 3   NB. Display expansion
+  else.  NB. no expansion.
+    0 1
+NB. obsolete     if. 3 < #travy do.
+NB. obsolete     NB. Start things off with whatever value is farthest from 0.  We have {. frame-inversect and -inversect as candidates
+NB. obsolete       , < {. (\: |) +/\. (<: {. frame) , -inversect  NB. Return the initial selection
+NB. obsolete     else.
+NB. obsolete       NB. If selopinfo is not valid, we haven't computed inversect (and the expansion node must not be ready to
+NB. obsolete       NB. expand either, but we have to return something)
+NB. obsolete       0 $ a:
+NB. obsolete     end.
   end.
 end.
-  
+NB.?lintsaveglobals
 )
 
 NB. **** pick support *****
 NB. y is the selection, a list of boxes each containing an index list
 NB. result is the selection to store in the node.  This will refer to the selected item but it might
 NB. be negative to suggest negative indexing
-selectiontodisplay =: 3 : 0
-NB. change only the selection for this node (we know we are selecting here).  We don't want to reformat
-NB. other selections, and beyond that, inversect may not be set, if we haven't traversed this before
-if. sellevel < #y do.
-  il =. sellevel {:: y  NB. index list
-  if. (({. frame) - inversect) > ({. frame) | il do. y =. (<({. frame)&| il) sellevel} y
-  else. y =. (< (- {. frame)&| il) sellevel} y
-  end.
-end.
-y
-)
+NB. obsolete selectiontodisplay =: 3 : 0
+NB. obsolete NB. change only the selection for this node (we know we are selecting here).  We don't want to reformat
+NB. obsolete NB. other selections, and beyond that, inversect may not be set, if we haven't traversed this before
+NB. obsolete if. sellevel < #y do.
+NB. obsolete   il =. sellevel {:: y  NB. index list
+NB. obsolete   if. (({. frame) - inversect) > ({. frame) | il do. y =. (<({. frame)&| il) sellevel} y
+NB. obsolete   else. y =. (< (- {. frame)&| il) sellevel} y
+NB. obsolete   end.
+NB. obsolete   y =. (selectedpower&|&.> sellevel { y) sellevel} y
+NB. obsolete end.
+NB. obsolete y
+NB. obsolete )
 
 
 NB. *** traversal support ***
@@ -6032,17 +6138,19 @@ NB. The number of valid values will become the frame.
 NB. If we know from v what should be produced, use that.  Otherwise figure it out by looking at the result
 if. noexpansion do.
   frm =. ''
-elseif. _ ~: expframe do.
-  inversect =: expinversect
-  frm =. , expframe
+NB. obsolete elseif. _ ~: expframe do.
+elseif. selectedpower -.@e. _ __  do.
+NB. obsolete   inversect =: expinversect
+NB. obsolete   frm =. , expframe
+  frm =. , >: | selectedpower  NB. Add 1 to include 0
 elseif. a: ~: selector do.
-  NB. Frame unknown, use whatever we actually did.  
+  NB. Frame unknown, use whatever we actually did, of the correct sign
   selx =. calcdispselx ; findselection > selector
-  inversect =: 1 +/@:= selx { logvaluesd   NB. Number of inverses executed
-  frm =. $selx
+NB. obsolete   inversect =: 1 +/@:= selx { logvaluesd   NB. Number of inverses executed
+  frm =. , (selectedpower<0) ([ + +/@:=) selx { logvaluesd  NB. Add 1 on inverse to include the 0 power
 elseif. do.
   NB. rank-calculus probe, return empty frame since we can't do rank-calculus
-  inversect =: 0
+NB. obsolete   inversect =: 0
   frm =. $0
 end.
 calcdispframe_dissectobj_ f. (-valence) {. <frm
@@ -6054,55 +6162,67 @@ NB. exists and there is an execution of the inverse.
 NB. If the expansion node is to be omitted, the only use of this node is no provide
 NB. an operand for u; that will be the unmodified y; so make that the only input
 calcdispselx =: 3 : 0
-throwaway =: 0 1 *./@:e. }. y { logvaluesd
-1 {.^:noexpansion (<<<1) {^:throwaway y
+keepmask =: (selectedpower<0) = y { logvaluesd
+keepmask =: 1 (0)} keepmask
+NB. obsolete throwaway =: 0 1 *./@:e. }. y { logvaluesd
+NB. If both valences were executed, the first execution (the second value) is bogus
+NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
+NB.  or if there is a mix of forward and backward execs
+throwaway =. ( 0 1 *./@:e. }. y { logvaluesd) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) }. (-.logvaluesd) #&(y&{) logvalues
+NB. obsolete if. 0 1 *./@:e. }. y { logvaluesd do. keepmask =: 0 (1)} keepmask end.
+if. throwaway do. keepmask =: 0 (1)} keepmask end.
+NB. obsolete 1 {.^:noexpansion (<<<1) {^:throwaway y
+1 {.^:noexpansion (>:|selectedpower) ((<. #) {. ]) keepmask # y
+NB.?lintsaveglobals
 )
 
 NB. y is #selx; result is 1 if it indicates that cells were executed.  The difference between no execs and some is significant
+NB. Here the first value comes from the input, & is not an execution
 cellswereexecuted =: >&1
 
-NB. y is the intervals for each ticket, expanded into an array using the shape of the frame
-NB. Result is the array reordered to natural order.  We reverse the order of the inverses
-tickettonatural =: 3 : 0
-if. inversect do.
-  ( (i. inversect -~ #y) , (+ i.) -inversect ) { y
-else. y
-end.
-)
+NB. obsolete NB. y is the intervals for each ticket, expanded into an array using the shape of the frame
+NB. obsolete NB. Result is the array reordered to natural order.  We reverse the order of the inverses
+NB. obsolete tickettonatural =: 3 : 0
+NB. obsolete if. inversect do.
+NB. obsolete   ( (i. inversect -~ #y) , (+ i.) -inversect ) { y
+NB. obsolete else. y
+NB. obsolete end.
+NB. obsolete )
 
 NB. x is limits of current selection interval
 NB. y is the indexes in logticket that matched the selection
 NB. Results is the intervals corresponding to each selection.  If we did a throwaway in calcdispselx we have to match it here
 selectticketintervals =: 4 : 0
-(<<<1) {^:throwaway x selectticketintervals_dissectobj_ f. y
+NB. obsolete (<<<1) {^:throwaway x selectticketintervals_dissectobj_ f. y
+(keepmask,1) # x selectticketintervals_dissectobj_ f. y
 )
 
 
-NB. y is boxed selection in natural order; result is boxed selection in execution order
-NB. We use negative numbers for all selections that select inverses (so that there is some
-NB. indication on the display that an inverse is selected)
-selectiontoticket =: 3 : 0
-NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
-NB. If the selection is in the inverse area, force it negative, then subtract from -1-inversect
-NB. So, if there are 12 results, 5 of which are inverses, a selection of 8 would turn into _4
-NB. and then to _6 - _4 = _2: u^:_4, which is at position _2 (since _5 is at position _1)
-NB. This code is actually unused for negative v, becuase we don't expand u for negative v and thus
-NB. don't inherit into u^: for negative v.
-if. (({. frame) - inversect) > ({. frame) | > y do. ({. frame)&|&.> y
-else. ((_1 - inversect) - (- {. frame)&|)&.> y
-end.
-)
-
-NB. x is the frame of the full expected result
-NB. y is the number of results we actually got
-NB. result is index list of the failing location, in natural order
-NB. This turns ticket order to selection order
-getfailingindex =: 4 : 0
-NB. If the failure is in the inverses section, subtract it from _1
-if. (({. frame) - inversect) > y do. y
-else. (y + inversect) + -. {. frame
-end.
-)
+NB. obsolete NB. y is boxed selection in natural order; result is boxed selection in execution order
+NB. obsolete NB. We use negative numbers for all selections that select inverses (so that there is some
+NB. obsolete NB. indication on the display that an inverse is selected)
+NB. obsolete selectiontoticket =: 3 : 0
+NB. obsolete NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
+NB. obsolete NB. If the selection is in the inverse area, force it negative, then subtract from -1-inversect
+NB. obsolete NB. So, if there are 12 results, 5 of which are inverses, a selection of 8 would turn into _4
+NB. obsolete NB. and then to _6 - _4 = _2: u^:_4, which is at position _2 (since _5 is at position _1)
+NB. obsolete NB. This code is actually unused for negative v, becuase we don't expand u for negative v and thus
+NB. obsolete NB. don't inherit into u^: for negative v.
+NB. obsolete if. (({. frame) - inversect) > ({. frame) | > y do. ({. frame)&|&.> y
+NB. obsolete else. ((_1 - inversect) - (- {. frame)&|)&.> y
+NB. obsolete end.
+NB. obsolete )
+NB. obsolete 
+NB. obsolete NB. x is the frame of the full expected result
+NB. obsolete NB. y is the number of results we actually got
+NB. obsolete NB. result is index list of the failing location, in natural order
+NB. obsolete NB. This turns ticket order to selection order
+NB. obsolete getfailingindex =: 4 : 0
+NB. obsolete NB. If the failure is in the inverses section, subtract it from _1
+NB. obsolete if. (({. frame) - inversect) > y do. y
+NB. obsolete else. (y + inversect) + -. {. frame
+NB. obsolete end.
+NB. obsolete )
 
 
 NB. y is the current selection
@@ -6130,6 +6250,7 @@ NB. But if the initial selection is 0, it doesn't really come from anywhere, so 
 <@(2 1&$)"0 (-valence) {. yhlight
 )
 
+isexpansionnode =: 1:
 
 NB. **** um`vn ****
 modlocale '`'
@@ -6166,7 +6287,7 @@ estheights =: ,0  NB. no input to this node
 )
 
 proplocales =: 3 : 0
-(y=3) # uop,(<tokensource),vop
+(y=3) # <^:(0=L.)@".@>^:(0 <: y) ;: 'uop tokensource vop'
 )
 
 NB. Set globals, then initialize display for the noun.  There must be no DOLs, and we
@@ -6232,7 +6353,7 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') 
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-uop,(y=3) # <tokensource
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3)) # ;: 'uop tokensource'
 )
 
 NB. Traversal up and down the tree.
@@ -6275,14 +6396,17 @@ NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
 end.
 NB. We will treat this as a generic verb, except for the overrides we have in this locale
 ((18!:2~    {. ,  'dissectverb' ; }.) 18!:2) coname''
-NB. Pass the token number of the modified in as the verb token number.  That will go into tokensource
+NB. Pass the token number of the modifier in as the verb token number.  That will go into tokensource
 create_dissectverb_ f. stg;0 0 0 0;(<1 2){y
 )
 
 NB. display height is always just 1
 
 proplocales =: 3 : 0
-(y = 3) # (<tokensource) 1} >&.> ucvlocs
+(y=3) # (<tokensource) 1} >&.> ucvlocs
+NB. obsolete r   =. <^:(0=L.)@".@>^:(0 <: y) (3 {. (y=3) 1} (y~:0) +. nonnoun) # ;: 'uop tokensource vop'
+NB. obsolete QP'y nonnoun r '
+NB. obsolete r
 )
 
 
@@ -6356,7 +6480,8 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop uops
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-(uop),cop,(vop)
+NB. Include u if we want non-nouns (including clone), or if it's a verb
+<^:(0=L.)@".@>^:(0 <: y) (((y~:0)+.vvv),1 1) # ;: 'uop cop vop'
 )
 
 NB. Traversal up and down the tree.
@@ -6439,7 +6564,7 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') 
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-uop,vop
+<^:(0=L.)@".@>^:(0 <: y) ;: 'uop vop'
 )
 
 NB. Traversal up and down the tree.
@@ -6674,6 +6799,23 @@ dissect '3&*^:(100&>)^:_"0 (1 2 3)'
 dissect '3 *^:(100 > ])^:_"0 (1 2 3)'
 dissect '<^:]"0 z' [ z =. 1 2 0
 dissect '+:^:]"0 (0 0.5 1)'  NB. here
+dissect '(i. 2 3) +:@]^:[ (5)'
+dissect '(i. 2 3) +:@]^:(+:@[)"0 (5)'
+dissect '(i. 2 3) +:@]^:(+:@[)"1 (5)'
+dissect '>:^:0 a:'
+dissect '>:^:1 a:'
+dissect '>:L:3@<^:0 1 2 3 4 (5)'
+dissect '>:L:_3@<^:0 1 2 3 4 (5)'
+dissect '>:L:_3@<^:1 2 3 4 (5)'
+dissect '>:L:_3@<^:1 2 3 4 5 (5)'
+dissect '-:@{:@i.^:8 (12)'
+dissect 'i."0"1 z' [ z =. 2 2 $ 1 1 1 0.5
+dissect 'i."0"1 z' [ z =. 2 2 $ 1 1 0.5 1
+dissect 'i."0"1 z' [ z =. 2 2 $ 1 0.5 1 1
+dissect 'i."0"1 z' [ z =. 2 2 $ 0.5 1 1 1
+dissect '+&>/ z' [ z =. 1;2;'a';4;5;6
+dissect '(] ,~ ([ - ] +/ .* %.)&.|:)&(,:^:(1 = #@$))/&.|: z' [ z =. 3 3 ?@$ 100
+dissect '1 2 +&+:&(1 = ]) 4 5'
 )
 
 0 : 0  NB. Testcases that fail
