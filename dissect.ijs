@@ -11,6 +11,7 @@ dissectnoun
 dissectverb
 dissectassign
 dissectvandnm
+dissectvandnmdyad
 dissectfork
 dissecthook
 dissectallnouns
@@ -42,11 +43,11 @@ QP_dissect_   =: qprintf
 SM_dissect_   =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
+NB. dissect '(1 2 3) 2&+ 5 6 7'  starts displaying " with no selection in u and thus no traversal.
 NB. Test inheriting an error into expansion
 NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
 NB. dissect '(i. 2 3) +:@]^:(+:@[)"0 (5)'  does not display ^: on the expansion node.  The problem is that the ^: is in rankhistory
 NB.  for +:@], but it gets attached to ] which is then discarded.  Somehow the levrank in this case needs to carry over to the u
-NB. detect u@]^:[ & make power work for it; or have inverse system that looks at ], turning u&]^:_1 to u^:_1&]
 NB. faster addlog
 NB. Audit selection for in-bounds
 NB. Display failing node of u/ as error cell; don't set to all fill
@@ -251,6 +252,41 @@ NB. distinguish them
 NB. Verb, returning 1 if a word is a control word
 iscw =: ('NB.' -: 3 {. >) +. e.&controlwords@(('_'&taketo)@}:&.>) *. ('.'={:)@>  NB. verb, applied to boxed word.  Any remaining comment must be a lint directive
 
+NB. Create a verb node.  y is (string form of the verb[;display form]);(token number)
+NB. if display form is not given, string form is not boxed
+NB. x is locale to use for COCREATOR (if omitted, we must be calling from the main instance, just use its name)
+NB. Result is result from create which is type;locale;token #
+createverb =: 3 : 0
+(coname'') createverb y
+:
+nobj =. conew 'dissectverb'
+COCREATOR__nobj =: x
+create__nobj y
+)
+
+NB. Create a noun node.  y is (string form of the verb[;display form]);(token number)
+NB. if display form is not given, string form is not boxed
+NB. x is locale to use for COCREATOR (if omitted, we must be calling from the main instance, just use its name)
+NB. Result is result from create which is type;locale;token #)
+createnoun =: 3 : 0
+(coname'') createnoun y
+:
+nobj =. conew 'dissectnoun'
+COCREATOR__nobj =: x
+create__nobj y
+)
+
+NB. Adverb.  u is 1 to assign COCREATOR (used only when called outside the main instance
+NB. Create a modifier node.  y is (string form of the verb[;display form]);(token number)
+NB. if display form is not given, string form is not boxed
+NB. x is locale to create.  This MUST NOT be called except from the main instance (COCREATOR not set)
+NB. Result is result from create which is type;locale;token #)
+createmodifier =: 1 : 0
+:
+nobj =. conew >x
+if. m do. COCREATOR__nobj =: COCREATOR end.
+create__nobj y
+)
 
 NB. Routine to parse and execute a block
 NB. inparms is the environment:
@@ -305,27 +341,23 @@ NB. and 'verb' for modifier executions
       
     case. 0;1 do.  NB. monad
   NB. Create a monad execution block for the operands, and put that on the stack
-      nobj =. conew 'dissectmonad'
-      stack =. ((subj i. 1){.stack),(create__nobj exeblock),((>:subj i: 1)}. stack)
+      stack =. ((subj i. 1){.stack),('dissectmonad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
       
     case. 2 do.  NB. dyad
   NB. Create a dyad execution block for the operands, and put that on the stack
-      nobj =. conew 'dissectdyad'
-      stack =. ((subj i. 1){.stack),(create__nobj exeblock),((>:subj i: 1)}. stack)
+      stack =. ((subj i. 1){.stack),('dissectdyad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
       
     case. 3;4 do.  NB. adverb/conjunction execution
       stack =. ((subj i. 1){.stack),(execmod exeblock),((>:subj i: 1)}. stack)
       
     case. 5 do.  NB. Trident N V V or V V V
   NB. Create a trident execution block for the operands, and put that on the stack
-      nobj =. conew 'dissectfork'
-      stack =. ((subj i. 1){.stack),(create__nobj exeblock),((>:subj i: 1)}. stack)
+      stack =. ((subj i. 1){.stack),('dissectfork' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
       
     case. 6 do.   NB. bident  A A, C VN, VN C, V V
   NB.?lintonly exetypes =. 0 0 [ exeblock =. '';'';''
       if. bwand/ verb , exetypes do.  NB. V V
-        nobj =. conew 'dissecthook'
-        stack =. ((subj i. 1){.stack),(create__nobj exeblock),((>:subj i: 1)}. stack)
+        stack =. ((subj i. 1){.stack),('dissecthook' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
       elseif. (bwand/ adv , exetypes) +. (conj = +/ conj bwand exetypes) do. NB. A A, C VN, NV C
   NB. This becomes an adverb type.  The value is the exeblock, which will be executed later
         stack =. ((subj i. 1){.stack),(adv;exeblock; ; 2 {"1 exeblock),((>:subj i: 1)}. stack)
@@ -335,8 +367,7 @@ NB. and 'verb' for modifier executions
       end.
     case. 7 do.  NB. assignment
   NB. Create an assignment block for the operands, and put that on the stack.
-      nobj =. conew 'dissectassign'
-      stack =. ((subj i. 1){.stack),(create__nobj exeblock),((>:subj i: 1)}. stack)
+      stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
   NB. See if we can analyze the assignment.  If so, add to the name table.
   NB. If the assignment is not a noun value, ignore it with a warning
       if. 0 = noun bwand 2 { exetypes do.
@@ -399,8 +430,9 @@ NB. and 'verb' for modifier executions
         stack =. ((qend;(#queue)) ;~ (lpar,rpar,2#asgn) {~  (;:'() =. =:') i. qendb) , stack
   NB. If self-defining term, create a noun block for it, mark as sdt
       elseif. (qend e. ;:'a. a: _.') +. (-. '.:' e.~ {: qend) *. ({. qend) e. '''_0123456789' do.
-        nobj =. conew 'dissectnoun'
-        stack =. stack ,~ (<sdt+noun) 0} create__nobj qend;'';(#queue)
+        stack =. stack ,~ (<sdt+noun) 0} createnoun qend;'';(#queue)
+NB. obsolete         nobj =. conew 'dissectnoun'
+NB. obsolete         stack =. stack ,~ (<sdt+noun) 0} create__nobj qend;'';(#queue)
       elseif. isname qend do.
   NB. Name.  Resolve the name to find part of speech.
   NB. split the name into (global part),(object locative).  If the name is absolute (ending in _),
@@ -452,15 +484,17 @@ NB. and 'verb' for modifier executions
   NB.?lintonly 'objtype objvalrank' =. 0;0 0 0 0
       select. objtype
         case. 0 do.
-          nobj =. conew 'dissectnoun'
-          ntypeval =. create__nobj qend;qend;(#queue)  NB. Keep name, and save name for display
+NB. obsolete           nobj =. conew 'dissectnoun'
+NB. obsolete           ntypeval =. create__nobj qend;qend;(#queue)  NB. Keep name, and save name for display
+          ntypeval =. createnoun qend;qend;(#queue)  NB. Keep name, and save name for display
         case. 1 do.
           ntypeval =. adv;qend;(#queue)
         case. 2 do.
           ntypeval =. conj;qend;(#queue)
         case. 3 do.
-          nobj =. conew 'dissectverb'
-          ntypeval =. create__nobj qend;objvalrank;(#queue)
+          ntypeval =. createverb qend;(#queue)
+NB. obsolete           nobj =. conew 'dissectverb'
+NB. obsolete           ntypeval =. create__nobj qend;objvalrank;(#queue)
         case. do.
           failparse 'undefined name: ' , qend
           return.
@@ -474,15 +508,17 @@ NB. Must be a primitive.  Get its type and stack it
       ". 'exeobj =. ' , qend
       select. 4!:0 <'exeobj'
         case. 0 do.
-          nobj =. conew 'dissectnoun'
-          ntypeval =. create__nobj qend;'';(#queue)
+NB. obsolete           nobj =. conew 'dissectnoun'
+NB. obsolete           ntypeval =. create__nobj qend;'';(#queue)
+          ntypeval =. createnoun qend;'';(#queue)
         case. 1 do.
           ntypeval =. adv;qend;(#queue)
         case. 2 do.
           ntypeval =. conj;qend;(#queue)
         case. 3 do.
-          nobj =. conew 'dissectverb'
-          ntypeval =. create__nobj qend;(rankinv qend);(#queue)
+          ntypeval =. createverb qend;(#queue)
+NB. obsolete           nobj =. conew 'dissectverb'
+NB. obsolete           ntypeval =. create__nobj qend;(rankinv qend);(#queue)
         case. do.
           failparse 'invalid type for primitive'
           return.
@@ -504,6 +540,8 @@ NB. This call will fill in all the verb-to-noun locale references
 resultroot =: (<1 1) {:: stack
 NB.?lintonly resultroot =: <'dissectmonad' [ scrollinglocale =: <'dissectobj'
 QP^:DEBTIME'endparse=?6!:1'''' '
+NB. Init the estheights in every object
+calcallestheights__resultroot $0
 sentence;EXE__ =: exestring__resultroot''
 NB.?lintsaveglobals
 )
@@ -536,15 +574,17 @@ NB. 3 b.   and 1!:1   and  1 : '...' .
     tokennums =. ; 2 {"1 exeblock
     select. 4!:0 <'exeobj'
       case. 0 do.
-        nobj =. conew 'dissectnoun'
-        ntypeval =. create__nobj (5!:5 <'exeobj');'';tokennums
+NB. obsolete         nobj =. conew 'dissectnoun'
+NB. obsolete         ntypeval =. create__nobj (5!:5 <'exeobj');'';tokennums
+        ntypeval =. createnoun (5!:5 <'exeobj');'';tokennums
       case. 1 do.
         ntypeval =. adv;(enparen defstg);tokennums
       case. 2 do.
         ntypeval =. conj;(enparen defstg);tokennums
       case. 3 do.
-        nobj =. conew 'dissectverb'
-        ntypeval =. create__nobj (5!:5 <'exeobj');(rankinv defstg);tokennums
+        ntypeval =. createverb (5!:5 <'exeobj');tokennums
+NB. obsolete         nobj =. conew 'dissectverb'
+NB. obsolete         ntypeval =. create__nobj (5!:5 <'exeobj');(rankinv defstg);tokennums
       case. do.
         failparse 'Invalid type while applying modifier'
         return.
@@ -552,9 +592,8 @@ NB. 3 b.   and 1!:1   and  1 : '...' .
   else.
 NB. Not sdt.  Look up the locale of the modifier, and execute it.  The executed modifier must correctly guess the
 NB. part of speech that is going to be produced.
-    nobj =. conew 'dissectmod' , ": ((<1 1) { exeblock) i.&1@:((e.>)"0) dissectmodindex
+    ntypeval =. exeblock (0 createmodifier)~ 'dissectmod' , ": ((<1 1) { exeblock) i.&1@:((e.>)"0) dissectmodindex
 NB.?lintonly nobj =. localedefault
-    ntypeval =. create__nobj exeblock
   end.
 end.
 ntypeval
@@ -678,8 +717,6 @@ initparentnodes__resultroot 0$a:
 NB. Init the SDT-detail indicator in every object
 NB.?lintonly resultissdt_dissectmonad_ =: 0
 initnounshowdetail__resultroot resultissdt__resultroot
-NB. Init the estheights in every object
-calcallestheights__resultroot $0
 NB. If we crashed, do an initial traversal to set selection flags to find the error
 maxnoundisplaysizes =: 2 2$0  NB. Init to small display for sniff, for speed
 if. crashed do.
@@ -956,24 +993,35 @@ traversedown =: 2 : 0
 assert. 'travdown monadic'
 :
 NB.?lintonly proplocales =: ]
-if. #nloc =. proplocales x do.
+NB. obsolete if. #nloc =. proplocales x do.
+if. #nloc =. x~ '' do.
   nloc ([:  v   (v (1&{::))`(u (2 : (':';'l ([ cocurrent)~ (u traversedown v)&>/ y [ (cocurrent x) [ l =. coname''''')) v)@.(2 = 3!:0@>@[)"0 _ ) x ,&< u y
 else.
   '' v u y
 end.
 )
 
+NB. The default branch-followers all vector through proplocales with a different y.
+NB. We split them into different names so that a locale can selectively override them.
+NB. Here are the defaults that vector through proplocales
+propselclones =: proplocales@_1:  NB. return locales that need to be cloned when this locale is cloned
+propselstopatnoun =: proplocales@0:  NB. return locales feeding into this one, but not including nouns
+propselstopatxy =: proplocales@1:  NB. return locales feeding into this one, including m/n but not verb ops x/y
+propselall =: proplocales@2:  NB. return all locales feeding into this one
+propseltokens =: proplocales@3:  NB. list of tokens for creating sentence display: locales of noun/verbs, plus strings as needed for modifiers
+
+
 
 NB. Propagate selection down the tree (root to leaves).  y is the value to propagate.  We propagate
 NB. selections to all verb operands; #selections to conjunction noun operands as well
 NB. The calls to traversedown must be named verbs!!
 NB. obsolete propsel0 =: 0&((3 : 'selections =: sellevel ({. , autoselection , }.)^:(<: #) y') traversedown 0:)
-propsel0 =: 0&((3 : 'y [ selections =: selectiontodisplay y') traversedown 0:)
-propsel1 =: 1&((3 : ('displaysellevel =: y')) traversedown 0:)
+propsel0 =: 'propselstopatnoun'&((3 : 'y [ selections =: selectiontodisplay y') traversedown 0:)
+propsel1 =: 'propselstopatxy'&((3 : ('displaysellevel =: y')) traversedown 0:)
 propsel =: propsel1@# [ propsel0
 
 NB. Clear scroll point (at nodes leafward from the starting node).  y is 1 to start, and the assignment is made only if <: 0
-propscroll =: 0&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
+propscroll =: 'propselstopatnoun'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
 
 
 NB. Propagate selection up the tree (leaves to root), until we hit a monad/dyad execution.  y is value to select
@@ -981,23 +1029,23 @@ propselup =: 3 : 'selections =: y if. -. ({. copath coname'''') e. ;: ''dissectm
 
 NB. init parent nodes in all objects.  This must be done in a separate verb because only a named verb resets the locale
 NB. Called in locale of the base of the tree
-initparentnodes =: 2&((3 : 'coname 0 # parent =: y') traversedown 0:)
+initparentnodes =: 'propselall'&((3 : 'coname 0 # parent =: y') traversedown 0:)
 
 NB. called after sniff to indicate which nodes can have an error display
-setdisplayerror =: 2&((3 : 'errorwasdisplayedhere =: {. ".''*#DOstatusstring''') traversedown 0:)
+setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: {. ".''*#DOstatusstring''') traversedown 0:)
 
 NB. init SDT-display flag in all objects.  y is the value to set
 NB. Called in locale of the base of the tree
-initnounshowdetail =: 2&((3 : 'y [ nounshowdetail =: y +. -. resultissdt') traversedown 0:)
+initnounshowdetail =: 'propselall'&((3 : 'y [ nounshowdetail =: y +. -. resultissdt') traversedown 0:)
 
 NB. calculate estheights for display.  We call estheights during the upwards traversal
 NB. Called in locale of the base of the tree
-calcallestheights =: 2&((3 : 'y [ dispstealthoperand =: {. stealthoperand -. y') traversedown (calcestheights@]))
+calcallestheights =: 'propselall'&((3 : 'y [ dispstealthoperand =: {. stealthoperand -. y') traversedown (calcestheights@]))
 
 NB. Return selection level for each token in the input string
 NB. Result is table of (token number(s));selection level
 NB. Called in locale at the base of the tree
-gettokenlevels =: 3&((3 : '<displaysellevel') traversedown (3 : ('<;y';':';'<,:x,y')))
+gettokenlevels =: 'propseltokens'&((3 : '<displaysellevel') traversedown (3 : ('<;y';':';'<,:x,y')))
 
 
 NB. common routines used by the object locales.  Objects are subclasses of dissectobj
@@ -1019,7 +1067,7 @@ NB. Object creation.  create the signaling variables used for communicating with
 NB. y is <the tokens that these values came from
 NB. Each verb-type object is responsible for creating:
 NB. titlestring: the name that will appear in the display at the top of a box
-NB. stealthoperand: at create time, this is set to 0 for normal verb, 1=], 2=[, 3=[:, 4=collection ]
+NB. stealthoperand: at create time, this is set to 0 for normal verb, 1=], 2=[, 3=[:, 5=] never displayed, 6=[ never displayed
 NB. valence: when the verb gets a valence (i. e. when its monad/dyad exec happens), that valence is saved.
 NB. estheights: number of blocks from the bottom of the noun node to the input(s) to this node.  This list has one atom per
 NB.  valid operand. Set during setvalence, when we know the valence etc.  Height of <:0 is special, and indicates a stealthoperand like ] [,
@@ -1093,7 +1141,7 @@ NB. they are not known until they are evaluated, and they haven't been evaluated
 NB. in the original locale.  Our treatment here means that the noun may be displayed in multiple places, with the
 NB. traverseup flags aliased together.  We'll worry about that later (solution might be a special noun-clone verb
 NB. that becomes a subclass of the original noun, but with the log removed)
-for_l. proplocales _1 do.
+for_l. propselclones '' do.
   loc =. ".@> l
   (l) =: clone__loc ''
 end.
@@ -1107,9 +1155,21 @@ cl
 )
 
 NB. Switch object processor.  y is the name of the new object processor.
-NB. We assume that the object locale is the top of the path, and we change it to the given y
+NB. Replace the current path with the path to y (including y)
 changeobjtypeto =: 3 : 0
-(copath~  (boxopen y) 0} copath) coname''
+NB. obsolete (copath~  (boxopen y) 0} copath) coname''
+((, copath) boxopen y) copath coname ''
+)
+
+NB. Insert override locales into the path
+NB. x, if given, is the name to insert the overrides before (default '', which means 'at front of search path')
+NB. y, if given, is the name(s) of the override locales (if empty, use current locale)
+insertoverride =: 3 : 0
+'' insertoverride y
+:
+iloc =. ,&.> boxopen x
+if. 0 = #oloc =. ;:^:(0=L.) y do. oloc =. coname'' end.
+(copath~   ~.@(({. , oloc , }.)~   # | i.&iloc)@copath) coname''
 )
 
 NB. Init the logging table.  if y is 1 (default 0), create the dyad logging table that saves an additional value
@@ -1292,10 +1352,10 @@ NB. Select the derived verb results, using the shape of the selector as the fram
     NB. It's a noun (either an SDT or the result of a verb exec).  It should have 1 result; if not, the exec failed
     qprintf^:DEBTRAVDOWN '#logvalues '
 NB. selector and selop already set, keep them
-NB. obsolete     assert. 2 > #logvalues
-    NB. Since nouns are not cloned, they may be executed twice, resulting in extra values.
-    NB. discard all but the first one.
-    if. 1 < #logvalues do. logvalues =: 1 {. logvalues end.
+    assert. 2 > #logvalues
+NB. obsolete     NB. Since nouns are not cloned, they may be executed twice, resulting in extra values.
+NB. obsolete     NB. discard all but the first one.
+NB. obsolete     if. 1 < #logvalues do. logvalues =: 1 {. logvalues end.
     'selframe frame selresult' =: ($0);($0);<logvalues
     errorcode =: (*#logvalues) { ENOEXECD,ENOUN
   else.
@@ -2751,10 +2811,11 @@ if. #y do. DOcfm =: y end.
 'cfmlabel cfmshape cfmstatus cfmdata' =. DOcfm
 QP^:DEBDOvn 'createDOvn:?> coname''''%defstring 0%'
 NB. If this node is a stealth operand, whether displayed or not, remember the fact so we can give the user the option of showing it
+assert. stealthoperand e. 0 1 2 3 5 6
 if. stealthoperand e. 1 2 do. stealthopencountered__COCREATOR =: 1 end.
 NB. If stealth verb, there is no display; but because of inheritance and suppressed detail, we might have the stealthoperand flag
 NB. set in a locale that is creating a noun; we'd better create that.  We detect nouns, as usual, by absence of handles in
-if. (dispstealthoperand e. 1 2 4) *. (*#displayhandlesin) do. dispstealthoperand return. end.
+if. (dispstealthoperand e. 1 2 5 6) *. (*#displayhandlesin) do. dispstealthoperand return. end.
 
 NB. We need a graphics object selected so we can check text sizes.  We use the
 NB. main form, because the isigraph may not be opened on the explorer yet
@@ -3634,7 +3695,7 @@ NB. If the input is a noun result that has had detail removed, it may contain no
 NB. if we pass it to a stealth operand it must make a layout for it  Example: z + ] 3.  If there are
 NB. layouts, only one of them will survive to take the place of the stealth operand; we make sure here
 NB. that it is the non-stealth operand
-  if. 0 = #x do. createlayout 0 0 else. (, dispstealthoperand { 0 _1 0 0 _1) { x end.
+  if. 0 = #x do. createlayout 0 0 else. (, dispstealthoperand { 0 _1 0 0 _1 _1 0) { x end.
 else.
 NB. If there are no earlier layouts, this had better be a noun - just create its layout
   if. 0 = #x do.
@@ -3820,7 +3881,7 @@ end.
 )
 
 NB. default verbs for hovering
-DOlabelpos DOshapepos DOstatuspos DOdatapos
+NB. obsolete DOlabelpos DOshapepos DOstatuspos DOdatapos
 hoverDOlabelpos =: 3 : 0
 'The name of the noun or verb, and any rank modifiers attached to it'
 )
@@ -3883,13 +3944,16 @@ NB. If the scrollpoint changed, remember the new value and call for a redraw of 
 else.
 NB. Not scrollbar.  Find the indexes of the clicked cell
 NB. Find the y,x position of the click and go process it
-  if. exp processdataclick y do.
+  if. 1 = selres =. exp processdataclick y do.
 NB. If the selection changed, redraw the screen.  If the selection was from the explorer, change the scroll in the main view
 NB. to show the selected cell at top-left
     if. exp = 1 do.
       scrollpoints =: (flatyxtopixel 1 pixeltoflatyx y) 0} scrollpoints
     end.
     dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
+  else.
+    NB. User tried to select, but we couldn't do it.  Give him a tooltip.
+    drawtooltip__COCREATOR (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { 'unselectable - no frame';'no further selection possible' 
   end.
 end.
 )
@@ -3966,29 +4030,34 @@ NB.?lintonly hoverinitloc =: 0 0
     pickloc =. l { picklocs
 NB.?lintonly pickloc =. <'dissectobj'
     hstring =. hoverDO__pickloc 0;yx
-    if. #hstring do.
-NB. There is a tooltip.  Display it.
-NB. Copy the pixels we are about to overwrite
-      'ctly ctlx' =. 3 2 { ". wdqchildxywh 'dissectisi'
-      'hovery hoverx' =. hoverinitloc
-      'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;TOOLTIPFONTSIZE;TOOLTIPMARGIN) sizetext <hstring
-      NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset.
-      NB. Get desired top position; if it's off the top of the screen, switch to below the hover
-      if. 0 > ttipy =. HOVEROFFSETY + hovery - ttiph do. ttipy =. hovery - HOVEROFFSETY end.
-      NB. Get desired left position, but if that goes offscreen right, move left; then if offscreen left, move right
-      ttipx =. 0 >. (+   0 <. ctlx - ttipw + ]) hoverx + HOVEROFFSETX
-      NB. That's the topleft of the tooltip.  Now calculate the rectangle that we will use to save the pixels
-      NB. We have to save an extra pixel all the way around (seeming glrect error), and we have to make sure
-      NB. that the rectangle is all onscreen, else QT will return all 0 pixels
-      ttpyx =. 0 >. _1 + ttipy,ttipx
-      ttphw =. (2 + ttiph,ttipw) <. (ctly,ctlx) - ttpyx
-      tooltippixels =: glqpixels 1 0 3 2 { , tooltippixpos =: ttpyx,:ttphw
-      (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;TOOLTIPFONTSIZE;TOOLTIPMARGIN) drawtext hstring;2 2 $ ttipy,ttipx,ttiph,ttipw
-      glpaint''
-NB.?lintsaveglobals
-    end.
+    if. #hstring do. drawtooltip hoverinitloc;hstring end.
   end.
 end.
+)
+
+NB. y is cursor position;string
+NB. Draw a tooltip there after saving the pixels
+drawtooltip =: 3 : 0
+'cpos string' =. y
+NB. There is a tooltip.  Display it.
+NB. Copy the pixels we are about to overwrite
+'ctly ctlx' =. 3 2 { ". wdqchildxywh 'dissectisi'
+'hovery hoverx' =. cpos
+'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;TOOLTIPFONTSIZE;TOOLTIPMARGIN) sizetext <string
+NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset.
+NB. Get desired top position; if it's off the top of the screen, switch to below the hover
+if. 0 > ttipy =. HOVEROFFSETY + hovery - ttiph do. ttipy =. hovery - HOVEROFFSETY end.
+NB. Get desired left position, but if that goes offscreen right, move left; then if offscreen left, move right
+ttipx =. 0 >. (+   0 <. ctlx - ttipw + ]) hoverx + HOVEROFFSETX
+NB. That's the topleft of the tooltip.  Now calculate the rectangle that we will use to save the pixels
+NB. We have to save an extra pixel all the way around (seeming glrect error), and we have to make sure
+NB. that the rectangle is all onscreen, else QT will return all 0 pixels
+ttpyx =. 0 >. _1 + ttipy,ttipx
+ttphw =. (2 + ttiph,ttipw) <. (ctly,ctlx) - ttpyx
+tooltippixels =: glqpixels 1 0 3 2 { , tooltippixpos =: ttpyx,:ttphw
+(TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;TOOLTIPFONTSIZE;TOOLTIPMARGIN) drawtext string;2 2 $ ttipy,ttipx,ttiph,ttipw
+glpaint''
+NB.?lintsaveglobals
 )
 
 NB. Nilad.  Turn off the hover timer.  If a tooltip is active, restore the pixels it covered
@@ -4148,15 +4217,18 @@ NB. Boxed noun.  Recur to look up the next level.  Offset the yx to within the s
 end.
 )
 
-recursiveselection_dissect_ =: 0:   NB. stop if we run off the end, declaring no change
+recursiveselection_dissect_ =: -@*@[   NB. x is sellevel at end: 0 if it is 0, _1 toehrwise
 NB. y is the selection list for the current cell (with higher-level selections removed)
 NB. The current locale is a node that is displayed in the current box.  We see if the
 NB. selection applies at this node; if so, we propagate it to all descendants.  If not,
 NB. we go to the next locale in the inheritance chain and give it a chance.  We have to
 NB. make sure rthat a selection in u in u@:v is not propagated to v; so it must be seen
 NB. as inapplicable to u@:v.
-NB. Result is 1 if we made a change and a redraw is needed, 0 otherwise
+NB. Result is 1 if we made a change and a redraw is needed, 0 if there was no frame at all
+NB. (i. e. sellevel = 0 at the end of the chain), _1 if there were selections but no more allowed
 recursiveselection =: 3 : 0
+0 recursiveselection y
+:
 QP^:DEBPICK'selecting in ?defstring]0%y%initialselection%sellevel%selections%selframe%frame%'
 selectionfound =. 0$a:
 NB. Ignore the frame contributed by a forced selection, since that doesn't show up in the display
@@ -4194,7 +4266,7 @@ NB. Clear the scroll point in all the nodes for which the selection has changed.
   1  NB. We made a change
 else.
 SM^:DEBPICK'recursion'
-  recursiveselection__inheritedfrom (#localf) }. y
+  (sellevel + *#selframe) recursiveselection__inheritedfrom (#localf) }. y
 end.
 )
 
@@ -4366,18 +4438,21 @@ NB. y is the locale of v.  Result is the result line for ]@v
 insertcollector =: 3 : 0
 NB. Create an object to handle ]@v
 NB. First, the verb ]
-nobj =. conew 'dissectverb'
-NB. We have to make the object look as if it was created in the main parser
-COCREATOR__nobj =: COCREATOR
+iop =: 1 {:: COCREATOR createverb ((']');defstring 0);($0)  NB. execute as ']', display as defstring
+NB. obsolete nobj =. conew 'dissectverb'
+NB. obsolete NB. We have to make the object look as if it was created in the main parser
+NB. obsolete COCREATOR__nobj =: COCREATOR
 NB. iop is public because we might have to change it later
-iop =: 1 {:: create__nobj ((,']');defstring 0);0 0 0 0;($0)  NB. The verb is ], but we display it in full form for inheritance
+NB. obsolete iop =: 1 {:: create__nobj ((,']');defstring 0);0 0 0 0;($0)  NB. The verb is ], but we display it in full form for inheritance
 NB.?lintonly iop =: <'dissectobj'
 stealthoperand__iop =: 0   NB. Mark the verb as displayable
 NB. Now create an object for ]@u
-nobj =. conew >localeat
-COCREATOR__nobj =: COCREATOR
+NB. obsolete nobj =. conew >localeat
+NB. obsolete COCREATOR__nobj =: COCREATOR
 NB. Remove the . from &.&.: and create vi@:u
-create__nobj _3 [\ verb;iop;($0); conj;'@';($0); verb;y;($0)
+NB. obsolete create__nobj _3 [\ verb;iop;($0); conj;'@';($0); verb;y;($0)
+localeat 1 createmodifier _3 [\ verb;iop;($0); conj;'@';($0); verb;y;($0)
+
 NB.?lintsaveglobals
 )
 
@@ -4626,16 +4701,17 @@ x ,&< coname''  NB. Return the empty DOLs
 
 cocurrent 'dissectverb'
 coinsert 'dissectobj'
-NB. y is (string form of the verb);rank;tokens it came from
+NB. y is (string form of the verb);tokens it came from
 NB. If the string form is boxed, it contains (string form);(title for display purposes)
 create =: 3 : 0
-create_dissectobj_ f. 2 { y
+create_dissectobj_ f. 1 { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand, as the display and executable form (we may modify the display form later)
-'execform titlestring' =: boxopen 0 {:: y
+'execform titlestring' =: ,&.> boxopen 0 {:: y
 NB. obsolete invok =: (1;3) {:: y
-stealthoperand =: 1 2 3 0 {~ (;:'][[:') i. <titlestring
+stealthoperand =: 1 2 3 4 5 6 0 {~ ((;:'][[:'),']';']]';'[[') i. <titlestring  NB. '[[' and ']]' are always-invisible forms
+titlestring =: stealthoperand {:: titlestring; ;: '][[:]][' 
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
 verb;(coname'');tokensource
@@ -4647,18 +4723,17 @@ destroy_dissectobj_ f. ''
 )
 
 NB. Save the number of operands for this invocation
-NB. Return value indicates which operands will be used
+NB. Return value is the locale name (possibly changed)
 NB. y is, for each operand, whether the operand is from SDTs
 setvalence =: 3 : 0
 valence =: #y
 resultissdt =: *./y
-NB. Height of a stealthoperand is 0 monadic, 0 _1 dyadic.  Others have height 1
-0 0$0
+coname''
 NB.?lintsaveglobals
 )
 
 calcestheights =: 3 : 0
-estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;0) ,: (1 1;_1 0;0 _1;0 0;0 0)
+estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;0;1;0) ,: (1 1;_1 0;0 _1;0 0;0 0;_1 0;0 _1)
 )
 
 NB. return string form of operands, not including instrumentation
@@ -4708,10 +4783,10 @@ assert. 1 2 e.~ #x
 traversedowncalcselect y  NB. Just to set error globals
 if. errorcode e. EEARLYERROR do. agreementerror x return. end.
 NB. If no vranks, this verb must have failed to execute owing to upstream error.  Leave no levrank then
-'displayhandlesin displayhandleout displaylevrank' =: ((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1 1);1;<rankhistory
+'displayhandlesin displayhandleout displaylevrank' =: ((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1 1 1 1);1;<rankhistory
 NB. Pass the DOLs through, but mark a stealthoperand for removal by deleting the output handles
-if. (valence = 2) *. dispstealthoperand e. 1 2 do.
-  x =. a: (<3 ,~ <:dispstealthoperand)} x
+if. (valence = 2) *. dispstealthoperand e. 1 2 5 6 do.
+  x =. a: (<3 ,~ <:3 bwand dispstealthoperand)} x
 end.
 x ,&< coname'' NB. no v, so no change to the DOLs
 )
@@ -4734,7 +4809,7 @@ NB.?lintonly uop =: <'dissectverb' [ yop =: coname''
 NB. Tell the verb its valence; the result is the operands that are needed for display.  Here, in this non-verb,
 NB. we save the operands needed by the first verb.  The rule is, we will pass to a verb ONLY the operands that
 NB. it says it can use.  For comp. ease we may compute an operand but then immediately discard it.
-setvalence__uop ,resultissdt__yop
+uop =: setvalence__uop ,resultissdt__yop
 resultissdt =: resultissdt__uop
 NB.?lintonly uop =: <'dissectverb' [ yop =: <'dissectnoun'
 noun;(coname'');''
@@ -4802,7 +4877,7 @@ newobj__COCREATOR coname''
 NB. Save the operands
 'xop uop yop' =: 1 {"1 y
 NB.?lintonly uop =: <'dissectverb' [ yop =: xop =: coname''
-setvalence__uop resultissdt__xop,resultissdt__yop
+uop =: setvalence__uop resultissdt__xop,resultissdt__yop
 resultissdt =: resultissdt__uop
 NB.?lintonly uop =: <'dissectverb' [ xop =: yop =: <'dissectnoun'
 noun;(coname'');''
@@ -4906,7 +4981,8 @@ estheights =: ,0  NB. height is immaterial: there is no input to this node
 
 NB. This will only be called if the rvalue is a verb; in that case, pass the call on
 setvalence =: 3 : 0
-setvalence__vop y
+vop =: setvalence__vop y
+coname''
 )
 
 NB. return string form of operands, including instrumentation
@@ -5018,11 +5094,11 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-setvalence__vop y
-setvalence__uop resultissdt__vop
+vop =: setvalence__vop y
+uop =: setvalence__uop resultissdt__vop
 resultissdt =: resultissdt__uop
 NB. Return the dispoperands from v
-0 0 $0
+coname''
 NB.?lintsaveglobals
 )
 
@@ -5129,19 +5205,18 @@ if. 1 = #y do.
   cop =: '@' 0} cop
 NB. Now that we have changed conjunctions, we need to go figure the valences based on the new conjunction
   setvalence y  NB. This will be in the new locale
-  return.
 else.
 NB. For dyad, we need to clone v.
   vop1 =: clone__vop ''
   vop0 =: vop
 NB.?lintonly vop0 =: vop1 =: coname''
   valence =: #y
-  setvalence__vop0 {. y
-  setvalence__vop1 {: y
-  setvalence__uop resultissdt__vop0 , resultissdt__vop1
+  vop0 =: setvalence__vop0 {. y
+  vop1 =: setvalence__vop1 {: y
+  uop =: setvalence__uop resultissdt__vop0 , resultissdt__vop1
   resultissdt =: resultissdt__uop
 end.
-0 0 $0
+coname''
 NB. We always get both operands for v, since we have cloned vop0/vop1 (it's not worth saving the operand).
 NB.?lintsaveglobals
 )
@@ -5189,6 +5264,20 @@ inheritu dol traverse__uop vop0 travdownuops vop1
 
 
 NB. **** u&n m&v ****
+cocurrent 'dissectvandnmdyad'
+NB. This locale contains the overrides needed to display dyad & properly
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+enparen^:(y=3) (defstring__uop__disploc 2) jd '&' jd (defstring__vop__disploc 3)
+)
+
+NB. Return the locales for propsel type 3
+propseltokens =: 3 : 0
+  uop__disploc,(<tokensource__disploc),vop__disploc
+)
+
+NB. This is called by ^: when the expansion is not used.  We need to remove the x operand,
+NB. which doesn't actually feed into the verb
 
 cocurrent 'dissectvandnm'
 coinsert 'dissectobj'
@@ -5215,12 +5304,31 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 NB. if dyad, switch to dyad routine
 setvalence =: 3 : 0
-valence =: #y
-assert. valence = 1 [ 'u&n m&v dyad not supported'
-'vl nl' =. <"0 verboperandx |. uop,vop
-NB.?lintonly vl =. nl =. coname''
-setvalence__vl verboperandx |. y , resultissdt__nl
-resultissdt =: resultissdt__vl
+NB. obsolete assert. 1 = #y [ 'u&n m&v dyad not supported'
+if. 2 = #y do.
+  NB. Dyad case.  Emulate as u&n@]^:["_ 0 _
+  NB. We will return the locale of the overall verb
+  rbkt =. 1 {:: COCREATOR createverb (']');($0)  NB. ']'
+  uatr =. 1 {:: localeat 1 createmodifier _3 [\ verb;(coname'');($0);  conj;'@:';($0);  verb;rbkt;$0  NB. u&m@]
+  lbkt =. 1 {:: COCREATOR createverb ('[');($0)  NB. '['
+  uatrpwrl =. 1 {:: localepower 1 createmodifier _3 [\ verb;uatr;($0);  conj;'';($0);  verb;lbkt;$0  NB. u&m@]^:[  don't display ^:
+  rank =. 1 {:: COCREATOR createnoun ('_ 0 _');'';($0)  NB. 0 1 0
+  final =. 1 {:: localerank 1 createmodifier _3 [\ verb;uatrpwrl;($0);  conj;'&';($0);  noun;rank;$0  NB. u&m@]^:["0 1 0  display & instead of "
+  setvalence__final y
+  '' insertoverride__uatrpwrl 'dissectvandnmdyad'
+  NB. Save the locale to use for display of this node in ^:
+  disploc__uatrpwrl =: coname''
+  '' insertoverride__uatr 'dissectvandnmdyad'
+  disploc__uatr =: coname''
+  final
+else.
+  valence =: #y
+  'vl nl' =. <"0 verboperandx |. uop,vop
+  NB.?lintonly vl =. nl =. coname''
+  (verboperandx { 'uop';'vop') =: setvalence__vl verboperandx |. y , resultissdt__nl
+  resultissdt =: resultissdt__vl
+  coname''
+end.
 NB.?lintsaveglobals
 )
 
@@ -5281,15 +5389,18 @@ NB. Register this object so we can clean up at end
 NB.?lintonly uop0 =: vop0 =: vop =: <'dissectverb' [ cop0 =: '&.:'
 NB. Create an object to handle v^:_1@:u
 NB. First, the verb v^:_1
-nobj =. conew 'dissectverb'
-NB. We have to make the object look as if it was created in the main parser
-COCREATOR__nobj =: COCREATOR
-iop =. 1 {:: create__nobj ((defstring__vop 2),'^:_1');0 0 0 0;($0)  NB. Verb for the inverse, no linenums
+iop =. 1 {:: COCREATOR createverb ((defstring__vop 2),'^:_1');($0)
+NB. obsolete nobj =. conew 'dissectverb'
+NB. obsolete NB. We have to make the object look as if it was created in the main parser
+NB. obsolete COCREATOR__nobj =: COCREATOR
+NB. obsolete iop =. 1 {:: create__nobj ((defstring__vop 2),'^:_1');0 0 0 0;($0)  NB. Verb for the inverse, no linenums
+NB. obsolete iop =. 1 {:: ntypeval
 NB. Now create an object for vi@:u
-nobj =. conew >localeat
-COCREATOR__nobj =: COCREATOR
+NB. obsolete nobj =. conew >localeat
+NB. obsolete COCREATOR__nobj =: COCREATOR
 NB. Remove the . from &.&.: and create vi@:u
-uop =: 1 {:: create__nobj (_3 [\ verb;iop;($0);conj;'@:';($0)) , 0 { y
+NB. obsolete uop =: 1 {:: create__nobj (_3 [\ verb;iop;($0);conj;'@:';($0)) , 0 { y
+uop =: 1 {:: localeat 1 createmodifier (_3 [\ verb;iop;($0);conj;'@:';($0)) , 0 { y
 NB.?lintonly uop =: <'dissectverb'
 
 NB. Now change this locale to &&: and create i&v
@@ -5308,6 +5419,7 @@ enparen^:(y=3) (defstring__uop0 2) jd cop0 jd (defstring__vop0 3)
 
 NB. **** u"n u"v m"n m"v****
 modlocale '"'
+localerank_dissect_ =: coname''
 
 create =: 3 : 0
 NB. Handle m"nv as a general verb
@@ -5338,8 +5450,9 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-setvalence__uop y
+uop =: setvalence__uop y
 resultissdt =: resultissdt__uop
+coname''
 NB.?lintsaveglobals
 )
 
@@ -5348,14 +5461,16 @@ estheights =: estheights__uop
 )
 
 NB. return string form of operands, not including instrumentation
+NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
 defstring =: 3 : 0
-enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
+enparen^:(y=3) (defstring__uop 2) jd '"' jd (defstring__vop 3)
 )
 
 NB. return string form of operands, including instrumentation
+NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
 exestring =: 3 : 0
 initloggingtable ''
-auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , cop , '(' , (exestring__vop '') , '))'
+auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , '"' , '(' , (exestring__vop '') , '))'
 )
 
 NB. Return the locales for propsel
@@ -5439,17 +5554,18 @@ NB. Set the valence used for executing this verb, and propagate to descendants
 NB. The descendant is always executed as a dyad
 setvalence =: 3 : 0
 valence =: #y
-setvalence__uop 2$y
+uop =: setvalence__uop 2$y
 resultissdt =: resultissdt__uop
 NB. Kludge.  We have converted u/ to ]@(u/) and marked ] as non-stealth so that it will produce
 NB. a display for monad u/.  For dyad, the ] is unwanted.  We should do something to prevent
-NB. @ from forcing out the v; but for the nonce, just makew the ] stealth
+NB. @ from forcing out the v; but for the nonce, just make the ] stealth
 if. valence = 2 do.
 NB. Dyad u/  unset what we set for the monad
-  stealthoperand__iop =: 1   NB. Hide the ]
+  stealthoperand__iop =: 5   NB. Hide the ]
   titlestring =: cop   NB. This is the rank-stack version of /
 end.
 separatevalences''
+coname''
 NB.?lintsaveglobals
 )
 
@@ -5648,6 +5764,7 @@ inheritu x traverse__uop bnsellevel , rankhistory ; rankcalculus^:(-.*./selopinf
 
 NB. **** ^: ****
 modlocale '^:'
+localepower_dissect_ =: coname''
 
 create =: 3 : 0
 create_dissectobj_ f. (<1 2) { y
@@ -5660,13 +5777,14 @@ NB. the expansion node and selection of powers.  We create a new
 NB. node that looks like a modifier, i. e. u*^:v where * is the expansion.
 NB. The display of the result of u^:v (as an inheritable u) comes from
 NB. this locale; the expansion (as a v) comes from *.
-uop =: conew 'dissectpowerexpansion'
-NB. We have to make the object look as if it was created in the main parser
-COCREATOR__uop =: COCREATOR
-NB. All we need to pass in is the locale of u
-create__uop (<0 1) {:: y
-NB. Save the locale of v
-vop =: (<2 1) {:: y
+NB. obsolete uop =: conew 'dissectpowerexpansion'
+NB. obsolete NB. We have to make the object look as if it was created in the main parser
+NB. obsolete COCREATOR__uop =: COCREATOR
+NB. All we need to pass in is the locale of u and the title string (which may be different from '^:'
+uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
+NB. Save the display form of the conjunction and the locale of v.
+NB. If the display form of the conjunction is not '^:', we are acting as a surrogate for another function like dyad u&m
+'cop vop' =: (<1 2;1) { y
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
 NB. Ignore ]@ etc.
 NB. Set resultissdt for modifier processing
@@ -5682,15 +5800,15 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-setvalence__uop y
+uop =: setvalence__uop y
 if. visnoun do.
   resultissdt =: resultissdt__uop
 else.
-  setvalence__vop y
+  vop =: setvalence__vop y
   resultissdt =: resultissdt__uop *. resultissdt__vop
 end.
 NB. Return the dispoperands from v
-0 0 $0
+coname''
 NB.?lintsaveglobals
 )
 
@@ -5747,25 +5865,36 @@ traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. agreementerror x return. end.
 NB. In case we are formatting this node (the usual case), save the input DOLs to it
 resdol =. x ,&< coname''
-
 NB. If v didn't run, there is really nothing we can do about u; just display it.  If v failed because it didn't select, there
 NB. is hope for a later traversal
 NB.?lintonly vval =: 0
 if. errorcode__vop > EOK do.
-  'displayhandlesin displayhandleout displaylevrank' =: (valence { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
+  if. cop -.@-: '^:' do.
+    resdol =. ((estheights__uop > 0) # x) ,&< coname''
+    physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
+  end.
+  'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
 NB. v ran. Get the actual result of v.  We know v collected successfully
 elseif. isgerund vval  do.
   NB. If v produced a gerund, give up and display the value of this node
   NB. Replace the end of the rank stack with the whole mess
-  'displayhandlesin displayhandleout displaylevrank' =: (valence { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
+  'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
 elseif. do.
   NB. No gerund.
 
   NB. Inspecting ALL the results from v, if every selection is either <0 or <_1, we will have no need for u^:
   if. logvalues__vop *./@:e. 0;_1 do.
     NB. One-line request: create request, with appropriate labeling, depending on the possible values of v
-    labelstg =. (#. 0 _1 e. ; logvalues__vop) {:: '()';'_1';'0';'(0 or _1)'
-    'displayhandlesin displayhandleout displaylevrank' =: (valence { ($0);(,0);_0.3 0.3),1;< (<(defstring__uop 2) , labelstg) (<_1 0)} rankhistory
+    NB. But if this node is not displaying as '^:', it must be coming from dyad u&m; format the overall verb and
+    NB. remove the x operand
+    if. cop -: '^:' do.
+      labelstg =. (defstring__uop 2) , (#. 0 _1 e. ; logvalues__vop) {:: '()';'_1';'0';'(0 or _1)'
+    else.
+      labelstg =. defstring 0
+      resdol =. ((estheights__uop > 0) # x) ,&< coname''
+      physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
+    end.
+    'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<labelstg) (<_1 0)} rankhistory
   else.
     NB. Otherwise, we will run u^:.  It will possibly create a display for u, or possibly an expansion node.
 
@@ -5810,13 +5939,20 @@ NB. obsolete     initialselection =: (-. noexpansion) # <_1
       resdol =. expdol
     case. 1 do.
       NB. If the expansion node did not expand, create the display result right here in this node (as a u-type).
-      'displayhandlesin displayhandleout displaylevrank' =: (valence{'';(,0);_0.3 0.3),1;< (<(defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+      NB. If u doesn't use one of the operands, there will be a confusing extra wire connecting that operand to u
+      NB. (if u were expanded, the wire would be removed).  We remove the wire here in that case.  It is most
+      NB. important for u&m dyad, where we added the @] unbeknownst to the user
+      if. (2 = #x) do.
+        resdol =. ((estheights__uop > 0) # x) ,&< coname''
+        physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
+      end.
+      'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol){'';(,0);_0.3 0.3),1;< (<(defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
     case. 2 do.
       NB. skeletalu: u is there for show only; the actual value comes from y.  Create a reference to y and add it as the first input.
       NB. Make the handle for the u result _1, meaning 'no wire'
       resdol =. joinlayoutsl expdol
       resdol =. resdol , createreference _1 { x
-      'displayhandlesin displayhandleout displaylevrank' =: (0 _1);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+      'displayhandlesin displayhandleout displaylevrank' =: (0 _1);1;< (<'Final ' , (defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
       NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
       NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
       physreqandhighlights__inheritroot =: NOPHYSREQ
@@ -5825,7 +5961,7 @@ NB. obsolete     initialselection =: (-. noexpansion) # <_1
       NB. Expansion node executed with u attached, or just u by itself
       resdol =. joinlayoutsl expdol
       NB. expansion node or u where the current selector is <1, use it as a v-type
-      'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< (<'Final ' , (defstring__uop 2) , visnoun {'un') (<_1 0)} rankhistory
+      'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< (<'Final ' , (defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
       NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
       NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
       physreqandhighlights__inheritroot =: NOPHYSREQ
@@ -5943,17 +6079,17 @@ NB. **** expansion node for ^: ****
 cocurrent 'dissectpowerexpansion'
 coinsert 'dissectirregularops dissectdisplaytwo dissectselectshape dissectobj'
 
+NB. y is locale of u;titlestring to display in rank stack
 create =: 3 : 0
 create_dissectobj_ f. '';$0   NB. no string, no tokens
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the locale of u
-uop =: y
+'uop titlestring' =: y
 NB.?lintonly uop =: <'dissectverb'
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
-titlestring =: '^:'
-verb;(coname'');$0
+coname''
 NB.?lintsaveglobals
 )
 
@@ -5964,10 +6100,10 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-setvalence__uop y
+uop =: setvalence__uop y
 resultissdt =: resultissdt__uop
 NB. Return the dispoperands from v
-0 0 $0
+coname''
 NB.?lintsaveglobals
 )
 
@@ -5977,13 +6113,15 @@ estheights =: estheights__uop combineheights ,1     NB. add 1 for expansion node
 
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
-enparen^:(y=3) (defstring__uop 2) , '^:'
+enparen^:(y=3) (defstring__uop 2) , titlestring
 )
 
 NB. return string form of operands, including instrumentation within u but not within inverse of u
 exestring =: 3 : 0
 initloggingtable 1
-auditstg '(' , (verblogstring '') , '(' , (logstring 0) , '@:' , (exestring__uop '') , ') :. ( ' , (logstring 1), '@:(' , (defstring__uop 2) , '^:_1)))'
+NB. If u has an unused operand, we should put @] or @[ after the inverse, because Roger can't handle x u@[^:_1 y but he can handle x u@[^:_1@[ y
+monadstring =. ('@]';'@[';'') {::~ estheights__uop i.&0@:>: 0
+auditstg '(' , (verblogstring '') , '(' , (logstring 0) , '@:' , (exestring__uop '') , ') :. ( ' , (logstring 1), '@:(' , (defstring__uop 2) , '^:_1',monadstring,')))'
 )
 
 NB. Return the locales for propsel.  If we got here through capped fork, we have to format accordingly
@@ -6330,9 +6468,9 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-setvalence__uop 2$y
+uop =: setvalence__uop 2$y
 resultissdt =: resultissdt__uop
-0 0$0
+coname''
 NB.?lintsaveglobals
 )
 
@@ -6395,9 +6533,11 @@ NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
   stg =. (defstring__uop 2) jd cop jd (defstring__vop 3)
 end.
 NB. We will treat this as a generic verb, except for the overrides we have in this locale
-((18!:2~    {. ,  'dissectverb' ; }.) 18!:2) coname''
+changeobjtypeto 'dissectverb'
+insertoverride localedefault
+NB. obsolete ((18!:2~    {. ,  'dissectverb' ; }.) 18!:2) coname''
 NB. Pass the token number of the modifier in as the verb token number.  That will go into tokensource
-create_dissectverb_ f. stg;0 0 0 0;(<1 2){y
+create_dissectverb_ f. stg;(<1 2){y
 )
 
 NB. display height is always just 1
@@ -6445,17 +6585,17 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-setvalence__vop y
+vop =: setvalence__vop y
 if. vvv do.
-  setvalence__uop y
-  setvalence__cop resultissdt__uop , resultissdt__vop
+  uop =: setvalence__uop y
+  cop =: setvalence__cop resultissdt__uop , resultissdt__vop
 NB. We have to ensure that any stealthoperand produces a _1 height for all it contributes to,
 NB. so we don't assign a label to a stealthoperand
 else.
-  setvalence__cop resultissdt__uop , resultissdt__vop
+  cop =: setvalence__cop resultissdt__uop , resultissdt__vop
 end.
 resultissdt =: resultissdt__cop
-0 0$0
+coname''
 NB.?lintsaveglobals
 )
 
@@ -6531,11 +6671,11 @@ destroy_dissectobj_ f. ''
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-setvalence__vop {: y
-setvalence__uop 2$y
+vop =: setvalence__vop {: y
+uop =: setvalence__uop 2$y
 NB. dispoperands is set from u
 resultissdt =: resultissdt__uop
-0 0$0
+coname''
 NB.?lintsaveglobals
 )
 
@@ -6816,10 +6956,15 @@ dissect 'i."0"1 z' [ z =. 2 2 $ 0.5 1 1 1
 dissect '+&>/ z' [ z =. 1;2;'a';4;5;6
 dissect '(] ,~ ([ - ] +/ .* %.)&.|:)&(,:^:(1 = #@$))/&.|: z' [ z =. 3 3 ?@$ 100
 dissect '1 2 +&+:&(1 = ]) 4 5'
+dissect '_2 2 +:@]^:[ 8'
+dissect '(1) 2&+ 5 6 7'
+dissect '(0) 2&+ 5 6 7'
+dissect '(_1) 2&+ 5 6 7'
+dissect '(1 2 3) 2&+ 5 6 7'
+dissect '(1 2 3) 2&[ 5 6 7'
 )
 
 0 : 0  NB. Testcases that fail
-dissect '_2 2 +:@]^:[ 8'
 )
 
 0 : 0
