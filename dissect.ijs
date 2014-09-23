@@ -1158,7 +1158,9 @@ NB. Switch object processor.  y is the name of the new object processor.
 NB. Replace the current path with the path to y (including y)
 changeobjtypeto =: 3 : 0
 NB. obsolete (copath~  (boxopen y) 0} copath) coname''
-((, copath) boxopen y) copath coname ''
+afteroldobj =. (<'dissectobj') (i.~ }. ]) copath coname''
+beforenewobj =. (<'dissectobj') (i.~ {. ]) (, copath) boxopen y
+(beforenewobj , afteroldobj) copath coname ''
 )
 
 NB. Insert override locales into the path
@@ -2809,7 +2811,7 @@ createDOvn =: 3 : 0
 NB.?lintonly DOcfm =: 4 # <1 4$a: [ valueformat =: 4$a: [ DOyx =: 0 0 [ DOrankcfm =: 2 0 $ a:
 if. #y do. DOcfm =: y end.
 'cfmlabel cfmshape cfmstatus cfmdata' =. DOcfm
-QP^:DEBDOvn 'createDOvn:?> coname''''%defstring 0%'
+QP^:DEBDOvn 'createDOvn:?> coname''''%defstring 0%stealthoperand%y%'
 NB. If this node is a stealth operand, whether displayed or not, remember the fact so we can give the user the option of showing it
 assert. stealthoperand e. 0 1 2 3 5 6
 if. stealthoperand e. 1 2 do. stealthopencountered__COCREATOR =: 1 end.
@@ -2995,7 +2997,6 @@ NB. Force the scrollpoint to 0 in any dimension that doesn't have a scrollbar.  
 NB. a scrolled display and the user enlarges the max datasize; then the scrollbar would be removed with data not
 NB. on the screen
 scrollpoints =: displayscrollbars * scrollpoints
-
 NB.?lintonly 'DOlabelpos DOshapepos DOstatuspos DOdatapos' =: <2 2 $ 0
 NB.?lintonly 'DOranks DOranklevels DOshapes' =: ($0);($0);<0$a:
 0  NB. object created, say so
@@ -3847,6 +3848,7 @@ initscrollpoints =: 3 : 0
 
 NB. Create DO
 createDO =: 3 : 'createDOvn (*#displayhandlesin) {"1 nouncfm,.verbcfm'
+
 NB. Draw DO.  y is yx of DO
 drawDO =: 3 : 'drawDOvnall y'
 
@@ -6962,6 +6964,7 @@ dissect '(0) 2&+ 5 6 7'
 dissect '(_1) 2&+ 5 6 7'
 dissect '(1 2 3) 2&+ 5 6 7'
 dissect '(1 2 3) 2&[ 5 6 7'
+dissect '   (<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
 )
 
 0 : 0  NB. Testcases that fail
@@ -6970,3 +6973,4 @@ dissect '(1 2 3) 2&[ 5 6 7'
 0 : 0
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
+   
