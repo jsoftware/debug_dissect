@@ -45,10 +45,12 @@ QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
+NB. Move highlighting from drawDOL (where is is suppressed on recursion) to drawDOvn
+NB. make all margins 1 more on low side, to leave room for the line
 NB. highlighting inside dropdowns is misaligned
+NB. highlighting boxes doesn't include the boxing margin
 NB. Test &.> throroughly
 NB. Display of executing a gerund has no data
-NB. highlighting boxes doesn't include the boxing margin
 NB. Test inheriting an error into expansion
 NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
 NB. faster addlog
@@ -2767,7 +2769,8 @@ SELECTIONBORDERSTYLE =: 0 0 0,HIGHLIGHTLINEWIDTH,PS_SOLID  NB. color,width of li
 
 WIRECOLOR =: 0 0 0   NB. Color of wires
 
-BOXMARGIN =: 2   NB. Space to leave around boxed results
+BOXMARGIN =: 2 ($,) 2   NB. Space to leave around boxed results
+BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
 
 EMPTYEXTENT =: <@,"0 ] 5 5   NB. Size to use for displaying empty
 
@@ -2919,11 +2922,13 @@ end.
 
 NB. y is a dol (i. e. valueformat)
 NB. result is hw of the DOL.  This is the maximum of x and y, plus a margin if
-NB. the data is boxed
-extractDOLsize =: (((+:BOXMARGIN) * 3 < #) + {:@>@(1 2&{))"1
+NB. the data is boxed (the left and right margins, plus the closing line)
+extractdatasize =: {:@>@(1 2&{)"1
+addboxmargin =: (BOXLINEWIDTH + +: BOXMARGIN)&(+"1)
+extractDOLsize =: addboxmargin@]^:(3 < {:@$@[) extractdatasize  NB. Extracts size of each DOL separately
 NB. similar, but x gives the sizes of a block in yx, result is size needed to display the largest
 NB. contiguous blocks of that size
-extractDOLsizelimited =: (((+:BOXMARGIN) * 3 < #@]) + (>./@(+/\   [: +/\^:_1 (0&,))&>  1 2&{))"1
+extractDOLsizelimited =: ]  addboxmargin@]^:(3 < {:@$@[)  (>./@(+/\   [: +/\^:_1 (0&,))&>  1 2&{)"1
 
 
 NB. Create the display object layout (DOL) for a noun
@@ -2970,8 +2975,10 @@ if. 0 e. $value do.
   'subDOLs rcextents' =. (0$a:);<EMPTYEXTENT
 else.
 NB. If the noun is boxed, get a DOL for each box; extract the height/width from it
+NB. and add left/right margin and left line; if the CONTENTS
+NB. was also boxed, add the right margin for its closing line
   if. 32 = 3!:0 value do.
-    hw =. extractDOLsize@> > subDOLs =. < createDOL&y&.> value
+    hw =. (BOXLINEWIDTH + +: BOXMARGIN) +"1 (extractdatasize + BOXLINEWIDTH * 3 < #)@> > subDOLs =. < createDOL&y&.> value
   else.
 NB. If the noun is not boxed, just get the height/width for each atom
 NB. We also come here for the top level, which is boxed because it might not collect
@@ -3376,7 +3383,7 @@ if. (#remainingcsf) *. (3 < #x) do.
   end.
   NB. We have the rectangle for the selection, relative to the start of the box.  Add the box position, and
   NB. include offset to contents
-  (tl+BOXMARGIN)&+"1^:(INVALIDRECT -.@-: ]) selrect
+  (tl + BOXLINEWIDTH + BOXMARGIN)&+"1^:(INVALIDRECT -.@-: ]) selrect
 elseif. # ; remainingcsf -. SFOPEN do.
   NB. Surplus selector with nothing to select from: return invalid rectangle
   NB. If there are only drop-down and empty selections, that's OK, it's opening an open noun and we ignore the excess
@@ -3750,6 +3757,12 @@ if. datapresent do.
   
 NB. Calculate the cliprect for the data portion, as tlhw
   cliptlhw =. (DOyx,:0) + DOdatapos   NB. startpos + tlhw rect
+NB. Convert cliprect to tlbr form, and calculate the starting (y,x), which is the window position, plus boxing margin if
+NB. the data is boxed, but all backed up by the scroll offset
+  boxyx =. BOXMARGIN +^:(3<#valueformat) ({. cliptlbr =. +/\ cliptlhw) - scrollpoint
+NB. Reduce the cliprect to the data window (including scrollbars, which are drawn last).
+  glclipreset''
+  glclip 0 0 1 1 + , |."1 -~/\ cliptlbr
 NB. obsolete NB. Create the coloring mask for the selection: it might be inside a box, if the fillmask is boxed
 NB. obsolete   sel =. (<:#cfmdata) checkerboardfillmask fillmask
 NB. We must always extend the data to match the frame, so that we show the full operand in case there were
@@ -3757,17 +3770,47 @@ NB. unexecuted cells.  If the fill atom is nonnull, it means that the result is 
 NB. not, we have to show the boxed atoms.
 NB. obsolete   'frameok dispvalue' =. fillmask frameselresult selresult
   dispvalue =. fillmask frameselresult selresult
+NB. position the start point so that the selected scroll data starts in the window.
+NB. y here is tlbr of the clip window;screen startpoint of the data
+NB. If the data is boxed, insert the box margin
+  (valueformat;dispvalue;fillmask;0;0;<cfmdata) drawDOL cliptlbr ; boxyx
+
 NB. After the data is drawn, draw a highlighting rectangle for the item selection(s), if any.
 NB. We take all the selectors there are, up the length of the frame of this level; but if there aren't enough, we don't highlight.  Discard
 NB. selectors for higher levels.  The only way we can get more selectors than frame is during sniff, where the lower
 NB. selection is propagated up automatically
   QP^:DEBHLIGHT'drawDO:defstring=?defstring]0 opselin '
   QP^:DEBHLIGHT'hlightforselection]inheritroot ~.hlightforoperands]opselin '
-  highlightrects =. (SELECTIONBORDERSTYLE ;< ~. hlightforselection inheritroot) ,: HIGHLIGHTBORDERSTYLE ;< ~. hlightforoperands opselin
-  QP^:DEBHLIGHT'highlightrects '
-NB. position the start point so that the selected scroll data starts in the window.
-NB. y here is tlbr of the clip window;screen startpoint of the data
-  (valueformat;dispvalue;fillmask;0;highlightrects;<cfmdata) drawDOL scrollpoint (] ; (-~ {.)) +/\ cliptlhw
+  hlights =. (SELECTIONBORDERSTYLE ;< ~. hlightforselection inheritroot) ,: HIGHLIGHTBORDERSTYLE ;< ~. hlightforoperands opselin
+  QP^:DEBHLIGHT'hlights '
+NB. Draw accumulated highlight rects
+NB. Convert from style;(level;rect) to style;level;rect
+  hlights =. ; <@({. ,. >@{:)"1 hlights
+  if. # hlights do.
+    QP^:DEBHLIGHT2'drawhighlights:defstring=?defstring]0 hlights vf (vf)hlighttotlbr{:"1]hlights '
+    mesh =. (boxyx +"2 |:"2) valueformat hlighttotlbr 2&{"1 hlights
+    if. +./ meshvalid =. INVALIDRECT -.@:-:"2 mesh do. NB. create top,bottom,:left,right, adjust for rectangle origin
+NB. Expand the cliprect to allow for the width of the highlight, which is centered on the edge of the rectangle
+NB. and therefore projects outside
+      glclipreset''
+      glclip (((>. -: HIGHLIGHTLINEWIDTH) * _1 _1 2 2) + 0 0 1 1) + , |."1  -~/\ cliptlbr
+      
+NB. Expand to size of axisshapes, split into y and x axes
+NB. Create delta-y and delta-x
+NB. create indexes of ymin ymax ,: xmin xmax
+NB. Convert to pixel numbers
+NB. Adjust for rectangle origin
+NB. Create (ystart,yend);(xstart,xend),:(xstart,xend);(ystart,yend)
+NB. Draw mesh
+NB. Install the highlight color for the rects into the border
+      hlightstyles =. (HIGHLIGHTCOLORS {~ 1&{"1 hlights) (<a:;0 1 2)} > 0&{"1 hlights
+      hlightstyles (drawmesh    [: (,: |.) ;/)"1 2&(meshvalid&#) mesh
+NB. y is (list of starting y);(list of starting x),:(x start/end positions for y lines);(y start/endpositions for x lines)
+NB. Restore cliprect to just the data area
+      glclipreset''
+      glclip 0 0 1 1 + , |."1 -~/\ cliptlbr
+    end.
+  end.
   
 NB. If there are scrollbars, draw them
   if. +./ displayscrollbars do.
@@ -3805,7 +3848,7 @@ if. #presentx do.
   ((<'') ,. (<presentx;1) { FRINGECOLOR) drawrect"1 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
 end.
 
-NB. Draw a rectangle for the object, just to get the border.  Color is used to show (no data,NA,all drawn,explorable)
+NB. Draw a hollow rectangle for the object, just to get the border line.  Color is used to show (no data,NA,all drawn,explorable)
 ('';((#.datapresent,explorable) { DOBORDERCOLORS),1) drawrect DOyx ,: DOsize
 
 
@@ -3844,7 +3887,7 @@ NB. For selection nodes, selection and boxmesh are boxed.  In this case we suppr
 NB. selection (which fills in rectangles) and force the action of boxmesh (which draws rectangle boundaries).
 NB. We then pass the contents of the boxes to recursion, which will open them and use them
 drawDOL =: 4 : 0"1
-'vf data sel unused hlights cfmdata' =. x
+'vf data sel unused unused cfmdata' =. x
 'shapeused ysizes xsizes' =. 3 {. vf
 'cliptlbr dataorigin' =. y
 SM^:DEBDOL 'drawDOL: ' , > coname''
@@ -3853,12 +3896,10 @@ NB. of the empty was accounted for when the block was created
 if. 0 e. $data do.
   0   NB.  valid return
 else.
-NB. Reduce the cliprect to the data window (including scrollbars, which are drawn last).
-  glclipreset''
-  glclip 0 0 1 1 + , |."1 -~/\ cliptlbr
   
 NB.  If there are subDOLs, adjust the rects to leave a box margin
-  boxyx =. dataorigin + BOXMARGIN * 3 < #vf
+NB. obsolete   boxyx =. dataorigin + BOXMARGIN * 3 < #vf
+  boxyx =. dataorigin
   if. DEBOBJ do.
     'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' printf (<"0 |. y),xsizes;ysizes
   end.
@@ -3919,7 +3960,8 @@ NB. If there are subDOLs, process each of them.  The operand was boxed.
 NB. obsolete     sdol =. (2 {. $ rects) ($,) (;axes) |: shapeused {. 3 {:: vf
     sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
 NB. obsolete     (sdol ,"0 1 usedd ,"0 1 (<"0^:(0=L.) sel) ,"0 boxmesh) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 {."2 rects  NB. No highlights
-    (sdol ,"0 1 usedd ,"0 1 (<"0^:(0=L.) sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 {."2 rects  NB. No highlights
+    NB.  Adjust each inner box position
+    (sdol ,"0 1 usedd ,"0 1 (<"0^:(0=L.) sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects  NB. No highlights
 NB. Draw mesh for the rectangles - unless the boxing is because of collection error
     if. -. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel do.
       (BOXBORDERCOLOR,1) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
@@ -3944,32 +3986,6 @@ NB. are left with internal boundaries.  Back up the position by the width of the
 NB. zero boundaries
   if. +/ #@> startwidth =. bdynos (*@[ # ,.~)&.> (<<<0 _1)&{&.> yxpositions do.
     (RANKCOLOR ,"1 (0) ,.~ {:"1 ; startwidth) drawmesh ({."1&.> startwidth) ,: |.   0 _1&{&.> yxpositions
-  end.
-  
-NB. Draw accumulated highlight rects
-NB. Convert from style;(level;rect) to style;level;rect
-  hlights =. ; <@({. ,. >@{:)"1 hlights
-  if. # hlights do.
-    QP^:DEBHLIGHT2'drawhighlights:defstring=?defstring]0 hlights vf (vf)hlighttotlbr{:"1]hlights '
-    mesh =. (boxyx +"2 |:"2) vf hlighttotlbr 2&{"1 hlights
-    if. +./ meshvalid =. INVALIDRECT -.@:-:"2 mesh do. NB. create top,bottom,:left,right, adjust for rectangle origin
-NB. Expand the cliprect to allow for the width of the highlight, which is centered on the edge of the rectangle
-NB. and therefore projects outside
-      glclipreset''
-      glclip (((>. -: HIGHLIGHTLINEWIDTH) * _1 _1 2 2) + 0 0 1 1) + , |."1  -~/\ cliptlbr
-      
-NB. Expand to size of axisshapes, split into y and x axes
-NB. Create delta-y and delta-x
-NB. create indexes of ymin ymax ,: xmin xmax
-NB. Convert to pixel numbers
-NB. Adjust for rectangle origin
-NB. Create (ystart,yend);(xstart,xend),:(xstart,xend);(ystart,yend)
-NB. Draw mesh
-NB. Install the highlight color for the rects into the border
-      hlightstyles =. (HIGHLIGHTCOLORS {~ 1&{"1 hlights) (<a:;0 1 2)} > 0&{"1 hlights
-      hlightstyles (drawmesh    [: (,: |.) ;/)"1 2&(meshvalid&#) mesh
-NB. y is (list of starting y);(list of starting x),:(x start/end positions for y lines);(y start/endpositions for x lines)
-    end.
   end.
   
   0
@@ -4537,7 +4553,8 @@ NB. If there is no lower boxing level, indexlist is the result
 if. 3 < #x do.
   NB. Boxed noun.  Recur to look up the next level.  Offset the yx to within the subbox
   NB. Start by selecting at this level and dropping down, followed by the later levels
-  < (indexlist , SFOPEN) ; > ((3;indexlist) {:: x) yxtopath y - flatrc ({ 0&,)&> 1 2 { x
+  NB. Offset within the inner box by the margin plus the leading linewidth
+  < (indexlist , SFOPEN) ; > ((3;indexlist) {:: x) yxtopath y - (BOXLINEWIDTH + BOXMARGIN) + flatrc ({ 0&,)&> 1 2 { x
 else.
   NB. Return the indexlist as a boxed CSF (rank-3)
   <,<indexlist
@@ -4652,7 +4669,10 @@ NB. x is view number, y is y,x position
 NB. We process a click on that cell.  We convert the y,x to a cell address, change the selectors for the click,
 NB. and redraw the screen.  Result is 1 if the selection was changed, and the screen therefore needs to be redrawn
 processdataclick =: 4 : 0
-selx =. ; > valueformat yxtopath (x{scrollpoints) + y
+NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
+NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
+NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
+selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + y
 QP^:DEBPICK 'y selx '
 QP^:DEBPICK 'sellevel #selections selections '
 NB. obsolete assert. (# ; SFOPEN -.~ selx) >: afcount accumframe''  [  'pick rank error'
@@ -7645,6 +7665,12 @@ dissect '>:&.>@:i.&.> 3 + i. 4'
 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;'a'  NB. frame highlighting in error path
 dissect '(3 3 $ 0 1 2 3 4 5 6 7 7.5) ;&:(i."0) 0 1'
+dissect '(<<"0 i. 6) ,.&.> <"1 <"0 ''abcdef'''
+dissect '(<<"0 i. 6) ,"0&.> <"1 <"0 ''abcdef'''
+dissect '(< <"0 i. 3 2) #&.>&.> < ''four five six'' ,.&;: ''one two three'''
+dissect '(<2) +&.>&.>&.>&.> <"4 (8)'
+dissect '(<2) +&.>&.>&.>&.> <^:4 (3 8)'
+dissect '(<2) +&.> <8'
 )
 
 0 : 0  NB. Testcases that fail
