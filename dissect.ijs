@@ -21,6 +21,10 @@ dissectpowerexpansion
 dissectdisplaytwo
 dissectselectshape
 dissecteach
+dissectpartitionselector
+dissectpartition
+dissectpartitionadverb
+dissectpartitionconjunction
 )
 
 NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).  In J6 tooltips
@@ -45,11 +49,8 @@ QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
-NB. Move highlighting from drawDOL (where is is suppressed on recursion) to drawDOvn
-NB. make all margins 1 more on low side, to leave room for the line
-NB. highlighting inside dropdowns is misaligned
-NB. highlighting boxes doesn't include the boxing margin
-NB. Test &.> throroughly
+NB. getfailingindex in righttoleft adds unwanted SFOPEN
+NB. handle m\ etc as generic verb
 NB. Display of executing a gerund has no data
 NB. Test inheriting an error into expansion
 NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
@@ -105,6 +106,24 @@ NB. Maximum line length that we will try to display in a grid cell
 MAXSENTENCEWIDTH =: 0.5  NB. max frac of screenwidth that we allow for sentence display
 
 ifdefined =: 0 <: [: 4!:0 <
+
+NB. ******************* code for function keys ******************
+finddissectline =: 3 : 0
+NB.?lintonly  WinText_jqtide_ =: WinSelect_jqtide_ =: 0 0
+NB. y tells what kind of run: 0=line under cursor, 1=last error
+if. y = 0 do.
+  ft =. WinText_jqtide_
+  fs =. WinSelect_jqtide_
+  NB. If a single value is selected, take the whole line; otherwise the selected region
+  if. 1 < # ~. fs do.
+    (-~/\ fs) (];.0~ ,.)~ ft 
+  else.
+    (LF taketo&.|. ({.fs) {. ft) , LF taketo ({.fs) }. ft
+  end.
+else.
+  ''  NB. empty line means 'last error'
+end.
+)
 
 NB. ********************** from here on is devoted to parsing J sentences ***************
 NB.
@@ -235,9 +254,9 @@ NB.?lintsaveglobals
 )
 
 NB. Add new object to the list of objects
-NB. We make the newset object first to solve a subtle problem: certain locales (like assignments) coinsert an
+NB. We make the newest object first to solve a subtle problem: certain locales (like assignments) coinsert an
 NB. existing locale to resolve undefined names.  If a locale in the path is destroyed, it will make names
-NB. like codestroy unresolvable.  So, we order the locales here so be destroy in the opposite order of creation.
+NB. like codestroy unresolvable.  So, we order the locales here to be destroyed in the opposite order of creation.
 newobj =: 3 : 0
 objtable =: y , objtable
 )
@@ -259,6 +278,8 @@ NB. For multiple blocks on the same line (caused by control words), give them fr
 NB. distinguish them
 NB. Verb, returning 1 if a word is a control word
 iscw =: ('NB.' -: 3 {. >) +. e.&controlwords@(('_'&taketo)@}:&.>) *. ('.'={:)@>  NB. verb, applied to boxed word.  Any remaining comment must be a lint directive
+
+NB. **** verbs to create nodes.  DO NOT USE CONEW because it doesn't set COCREATOR properly
 
 NB. Create a verb node.  y is (string form of the verb[;display form]);(token number)
 NB. if display form is not given, string form is not boxed
@@ -284,10 +305,11 @@ COCREATOR__nobj =: x
 create__nobj y
 )
 
-NB. Adverb.  u is 1 to assign COCREATOR (used only when called outside the main instance
-NB. Create a modifier node.  y is (string form of the verb[;display form]);(token number)
+NB. Adverb.  u is 1 to assign COCREATOR (used only when called outside the main instance)
+NB. Create a modifier node.  y is whatever is needed by the modifier
+NB. for normal nodes, (string form of the verb[;display form]);(token number)
 NB. if display form is not given, string form is not boxed
-NB. x is locale to create.  This MUST NOT be called except from the main instance (COCREATOR not set)
+NB. x is locale to create.
 NB. Result is result from create which is type;locale;token #)
 createmodifier =: 1 : 0
 :
@@ -624,10 +646,12 @@ pc dissect;
 xywh 3 19 20 20;cc dissectisi isigraph;
 xywh 4 2 54 60;cc fmfontsize combolist;
 xywh 60 4 24 11;cc lbl01 static;cn "Font";
-xywh 88 2 42 60;cc fmmaxnounsize combolist;
-xywh 131 4 69 11;cc fmmaxnounsizelbl static;cn "Max Noun (% of scrn)";
-xywh 202 4 49 12;cc fmshowstealth button;cn "Show ][";
-xywh 254 4 65 12;cc fmshowerror button;cn "Show Err";
+xywh 88 2 42 60;cc fmmaxnounsizex combolist;
+xywh 131 4 69 11;cc fmmaxnounsizexlbl static;cn "Max Noun Width (% of scrn)";
+xywh 203 2 42 60;cc fmmaxnounsizey combolist;
+xywh 246 4 69 11;cc fmmaxnounsizeylbl static;cn "Max Noun Height (% of scrn)";
+xywh 317 4 49 12;cc fmshowstealth button;cn "Show ][";
+xywh 369 4 65 12;cc fmshowerror button;cn "Show Err";
 pas 0 0;
 rem form end;
 )
@@ -636,10 +660,13 @@ DISSECT =: 0 : 0 [^:IFQT DISSECT
 pc dissect;
 bin vh;
 minwh 54 60;cc fmfontsize combolist;
-minwh 24 11;cc lbl00 static;cn "Min Font";
+minwh 24 12;cc lbl00 static;cn "Min Font";
 bin s;
-minwh 42 60;cc fmmaxnounsize combolist;
-minwh 42 60;cc fmmaxnounsizelbl static;cn "Max Noun (% of scrn)";
+minwh 42 60;cc fmmaxnounsizex combolist;
+minwh 80 12;cc fmmaxnounsizexlbl static;cn "Max Noun Width (% of scrn)";
+bin s;
+minwh 42 60;cc fmmaxnounsizey combolist;
+minwh 80 12;cc fmmaxnounsizeylbl static;cn "Max Noun Height (% of scrn)";
 bin s;
 minwh 49 12;cc fmshowstealth button;cn "Show ][";
 minwh 65 12;cc fmshowerror button;cn "Show Error";
@@ -670,8 +697,8 @@ wd 'timer ' , ": y
 )
 
 FONTSIZECHOICES =: 8 10 12 14 16
-MAXNOUNPCTCHOICES =: 20 30 40 50 60 70 80
-MAXNOUNPCTCHOICESDEFAULT =: 1   NB. limit to 30% by default
+MAXNOUNPCTCHOICES =: 5 10 20 30 40 50 60 70 80
+MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 NB. Either nodisplay or display is always called.  The clearing of dissectinstance is a way to prevent recursion.
@@ -725,7 +752,7 @@ winhwnd =: wd 'qhwndp'
 NB. Initialize the user selection
 'fmfontsize' wdsetitems ; (LF ,~ ":)&.> FONTSIZECHOICES
 'fmfontsize' wdsetselect ": minimumfontsizex =: 2
-maxnoundisplaysizex =: MAXNOUNPCTCHOICESDEFAULT
+maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
 maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 calccfms minimumfontsizex { FONTSIZECHOICES
 displaystealth =: 0
@@ -808,7 +835,7 @@ NB.?lintsaveglobals
 NB. lay out the grid.  Should be called in the locale of the major instance
 calcplacement =: 3 : 0
 NB. Check the current screensize, and calculate the box sizes in characters
-maxnoundisplaysizes =: <. (maxnoundisplayfrac , MAXEXPLORERDISPLAYFRAC) */ screensize
+maxnoundisplaysizes =: <. (maxnoundisplayfrac ,: MAXEXPLORERDISPLAYFRAC) *"1 screensize
 
 NB. Select our drawing control, so we have something to check sizes with
 wd 'psel ',winhwnd
@@ -849,17 +876,24 @@ NB. Draw the revised placement and wiring.  Save the placement to speed scrollin
 NB. Set the user-option buttons based on the display results
 NB. If the largest noun on the display is bigger than our smallest display option,
 NB. give the user the option of changing the display size
-  actualpctused =. >. 100 * >./ maxactualnounsize % screensize
+NB. obsolete   actualpctused =. >. 100 * >./ maxactualnounsize % screensize
+  actualpctused =. >. 100 * maxactualnounsize % screensize
 NB. Keep all the choices less than the actual, and append the actual too, but don't
 NB. ever allow a choice larger than our wired-in maximum
-  choicestooffer =. MAXNOUNPCTCHOICES ([ (<.&# {. ]) ] ,~ I. {. [) actualpctused
-  if. therearechoices =.  1 < #choicestooffer do.
-    'fmmaxnounsize' wdsetitems ; (LF ,~ ":)&.> choicestooffer
-    'fmmaxnounsize' wdsetselect ": maxnoundisplaysizex <. <:#choicestooffer
+  choicestooffer =. MAXNOUNPCTCHOICES&([ (<.&# {. ]) ] ,~ I. {. [)&.> actualpctused
+  if. therearechoices =.  1 < # choices =. 0 {:: choicestooffer do.
+    'fmmaxnounsizey' wdsetitems ; (LF ,~ ":)&.> choices
+    'fmmaxnounsizey' wdsetselect ": (0 { maxnoundisplaysizex) <. <:#choices
   end.
-  'fmmaxnounsize' wdsetshow ": therearechoices
-  'fmmaxnounsizelbl' wdsetshow ": therearechoices
-  
+  'fmmaxnounsizey' wdsetshow ": therearechoices
+  'fmmaxnounsizeylbl' wdsetshow ": therearechoices
+   if. therearechoices =.  1 < # choices =. 1 {:: choicestooffer do.
+    'fmmaxnounsizex' wdsetitems ; (LF ,~ ":)&.> choices
+    'fmmaxnounsizex' wdsetselect ": (1 { maxnoundisplaysizex) <. <:#choices
+  end.
+  'fmmaxnounsizex' wdsetshow ": therearechoices
+  'fmmaxnounsizexlbl' wdsetshow ": therearechoices
+ 
 NB. If there are stealth operands on the display, enable the nutton and caption it
 NB. according to whether we are displaying them
   if. stealthopencountered do.
@@ -922,9 +956,16 @@ calccfms minimumfontsizex { FONTSIZECHOICES
 dissect_dissectisi_paint 1
 )
 
-dissect_fmmaxnounsize_select =: 3 : 0
-NB.?lintonly fmmaxnounsize_select =. '0'
-maxnoundisplayfrac =: 0.01 * MAXNOUNPCTCHOICES {~  maxnoundisplaysizex =: 0 ". fmmaxnounsize_select
+dissect_fmmaxnounsizex_select =: 3 : 0
+NB.?lintonly fmmaxnounsizex_select =. '0'
+maxnoundisplaysizex =: (0 ". fmmaxnounsizex_select) 1} maxnoundisplaysizex
+maxnoundisplayfrac =: 0.01 * MAXNOUNPCTCHOICES {~  maxnoundisplaysizex
+dissect_dissectisi_paint 1
+)
+dissect_fmmaxnounsizey_select =: 3 : 0
+NB.?lintonly fmmaxnounsizey_select =. '0'
+maxnoundisplaysizex =: (0 ". fmmaxnounsizey_select) 0} maxnoundisplaysizex
+maxnoundisplayfrac =: 0.01 * MAXNOUNPCTCHOICES {~  maxnoundisplaysizex
 dissect_dissectisi_paint 1
 )
 
@@ -974,7 +1015,7 @@ NB. Get the size of the rectangles.
 rectsize =. (cfms =. satzcfm {~ (_2 + #satzcfm) <. > 1 {"1 utokspacelevel) sizetext ,. txts =. 0 {"1 utokspacelevel
 NB. Box them into sections that fit within the allowed part of the screen, one box per line
 scrwid =. <. MAXSENTENCEWIDTH * {: screensize
-boxhw =. , (((}.~) (, $:)~^:(*@#@[) <@{.~)   scrwid I.~ (+/\@:({:"1))) rectsize
+boxhw =. , (((}.~) (, $:)~^:(*@#@[) <@{.~)   1 >. scrwid I.~ (+/\@:({:"1))) rectsize
 NB. Get the height of each line
 lh =. >./@:({."1)@> boxhw
 NB. Get the start of each line, which is zero here for left justification
@@ -1459,9 +1500,9 @@ NB. selopshapes will be the shapes passed into the next selection level applied 
 NB. This is provisional, and invalid for u/ and u^:, as well as selections that use a level.  All these
 NB. are valid only if there is a selection, where selopshapes will be refigured later.
 NB. The selopshapes calculated here is useful only for rank-calculus purposes
-    'selframe frame frames resultlevel arglevel' =: selopshapes calcdispframe execdframes
+  'selframe frame frames resultlevel arglevel' =: selopshapes calcdispframe execdframes
 NB. obsolete     frame =: >./ > frames  NB. The common "frame"
-    (-.@-: <.) frame do.
+  (-.@-: <.) frame do.
 NB. Here for verb with invalid frame - an early error
     'errorcode selector selopinfovalid selresult' =: EINVALIDOP;(0$a:);(0:"0 physreqandhighlights);(0$a:)
   elseif. a: -: selector do.
@@ -1601,16 +1642,7 @@ NB. obsolete       selopinfovalid =: rankcalculussupported *. ($selopinfo) $ 1 >
       NB. If this execution produces a single result, we need to keep the map structure of the operand valid, since we will continue processing it.
       NB. Otherwise there will be no further selections and it is inadmissible to look inside multiple boxes at once,
       NB. we can lose the map structure of selopshapes, it it has any
-      if. selopinfovalid do.
-        levelct =. (#frames) {. arglevel   NB. number of levels to drop down
-        framel =. levelct (_1:^:(0<[) #)&> frames   NB. length of frame, but _1 if we are dropping down a level - keep map intact then
-        NB. If the frame is empty, don't disturb the map.  If we are passing the operand through structural modifiers,
-        NB. we want the whole map available when we get down to executing verbs
-NB. obsolete         selopshapes =:  framel (}. $^:(0<L.))^:(0<:[)&.>     levelct (>@{.@]^:(* 0<L.) )&.> selopshapes
-        selopshapes =:  framel (}. $^:(0<L.))^:(0<[)&.>     levelct (>@{.@]^:(* 0<L.) )&.> selopshapes
-      else.
-        selopshapes =: ($^:(0<L.)&.> selopshapes) (}.~ #)&.> frames
-      end.
+      selopshapes =: calcunselectedshapes selopshapes
     else.
       NB. if there is a selection, even a forced one, use it to calculate highlighting and the operand shapes after selection
       physreqandhighlights =: physreqandhighlights  (($&.|.~ #) ,"1&.> ]) ,&(<sellevel)&.> calcphysandhighlights thissel
@@ -1696,7 +1728,7 @@ end.
 NB. Calculate the shape of the result of this execution.  This comes from looking at the results, unless this
 NB. is an expansion node, in which case selresult contains extraneous information and we need to examine the actual
 NB. result of the verb.  In that case the overall verb may have failed, in which case selresultshape is immaterial,
-NB. since nothing closer to the root will execute.  If 
+NB. since nothing closer to the root will execute.
 selresultshape =: selx calcselresultshape maxcellresultshape;<fillatom
 
 NB. If this level is selectable, increment the selector level to use for this and subsequent levels - whether
@@ -3250,12 +3282,19 @@ SFOPEN =: <,'>'  NB. This element in a CSF or ISF means 'drop down a level'
 NB. The highlight system puts highlights into canonical selection form.
 NB. standard selection form is a box containing a list of boxes
 NB. Each box contains a list of boxes, where each nonempty box specifies
-NB. selection and each empty box specifies dropping down a boxing level.
+NB. selection and each SFOPEN specifies dropping down a boxing level.
+
+NB. y is a box containing selectors, or SFOPEN
+NB. Result is 0 if it contains unboxed selectors,
+NB. _1 if it is SFOPEN, 1 if boxed selectors
+classsel =: <:@L.`_1:@.(-:&SFOPEN)"0
 
 NB. y is an ISF, a box which contains either an array of axes of a list of boxes with selections.
-NB. We convert any rank-1 boxes (containing the array of selections) to rank 2, by converting each
+NB. We convert any level-1 boxes (containing the array of selections) to level 2, by converting each
 NB. list to a list of 1 boxed atom.  We are careful to make sure that any boxed ISF is a list at least.
 isftorank2 =: ,^:(''-:$)@(,@<"1^:(0=L.))&.>
+NB. y is ISF, which convert to level 3 by boxing any level-2 contents.  Result is in one-box-per-axis form
+isftolevel3 =: <"0&.>^:(0=classsel)"0&.>@isftorank2
 NB. y is a rank-2 ISF.  Make sure it starts with a selection, by prepending a null selection if it starts with SFOPEN
 isfensureselection =: (<0$0)&,^:(SFOPEN={.)&.>
 NB. selections themselves are in initial selection form, which is like CSF without the outer box,
@@ -3267,7 +3306,49 @@ NB. does a selection without going down a level (in other words, ends with a sel
 NB. y is list of ISFs, result is boxed CSF
 NB. First bring any rank-1 contents to ranks 2.  Then cut on SFOPEN, combining all boxes found between them.
 NB. If there are no boxes between SFOPEN, don't create one (that would change the boxing levels)
-isftocsf =: <@(;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:isftorank2)"1
+NB. obsolete isftocsf =: <@(;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:isftorank2)"1
+NB. obsolete isftocsf =: <@(;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:isftolevel3)"1
+isftocsf =: ;@:(<@(3 : 0)"1)
+NB. Bring the list of ISFs up to level 3, where each box contains selections from one axis
+NB. Collect all the selections at the same boxing level into one list.  This produces a sequence
+NB. of boxes containing lists of boxes, one per axis, interspersed with SFOPENs
+NB. Remove empties, which select nothing.  They have been needed till now to distinguish highlighting
+NB. a scalar (which selects nothing) from no highlight at all.  But here we know we have a highlight
+if. #highlightblocks =. a: -.~ ;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:isftolevel3 y do.
+  NB. Convert each list of selections to a list of highlights, where a highlight is a boxed 2-row table
+  NB. of top-left index,:bottom-right index.  For the last two axes only, collect contiguous indexes
+  NB. into a single highlight.  For other axes, make each index a separate highlight
+  NB. Before the last drop-down, there must be no multiple selection
+  pathx =. (SFOPEN,highlightblocks) i: SFOPEN  NB. number of boxes including last SFOPEN
+  path =. pathx {. highlightblocks
+  assert. 1 > >./ #@$@> ; path -. SFOPEN  NB. no multipleselects before last dropdown
+  NB. Convert the selections in the path, now a list of boxes containing atoms, to a one-row table
+  path =. ,:@;&.>^:(-.@-:&SFOPEN)"0 path
+  NB. Turn each box of the path after the dropdown into a box containing boxed tables, which can then be
+  NB. catalogued and run together.  Each axis (now an axis containing one or more selections) will turn into a box
+  NB. containing boxes, where each box holds a 1x2 table describing the selection.  For the last 2 axes,
+  NB. the box holds (start,end+1), one for each interval; for preceding axes, it holds (sel,sel), one for each
+  NB. selection.
+  if. #lastsel =. pathx }. highlightblocks do.
+    NB. There is a selection after the dropdown
+    last2 =. ({.~   [: - 2 <. #) > lastsel
+    prev =. (-#last2) }. > lastsel
+    prev =. 1 2&$&.>&.> prev
+    last2 =. (<@,:@({. , >:@{:);.1~     (~:   |.!._1@:>:))&.> last2
+    <"1 path ,"1 0 , |:@;&.> { prev , last2
+  else.
+    NB. No selection after dropdown.  Just use the path to the dropdown
+    < path
+  end.
+else.
+  NB. No selections at all: must be highlighting a scalar.  Create a selection with no axes
+  < ,<2 0$0
+end.
+NB. Create the cartesian product of the highlight requests
+NB. roll up each row into a table, transpose it, make it a single box
+NB. Prepend the selection before the last dropdown
+NB. Box each request
+)
 
 NB. Create highlight rect for the current selection.
 NB. y is the locale of the base of the inheritance chain; that's the finest highlight, so that's what we use
@@ -3280,7 +3361,7 @@ hlightforselection =: 3 : 0
 NB.?lintonly y =. <'dissectobj'
 NB. obsolete (<0) ,. (,@<^:(*@#) (>: afcount accumframe'') ((I.~ +/\@:(#@>)) {. ]) sellevel ((< #) # ;@}.) selections__y)
 NB. obsolete (<0) ,"0 , isftocsf^:(*@#) sellevel }. (sellevel__y+*#selframe__y) (] }.~ 0 <. (- #)) selections__y
-(<0) ,"0 , isftocsf^:(*@#) sellevel }. (sellevel__y+selectable__y) (] }.~ 0 <. (- #)) selections__y
+(<0) ,"0 , isftocsf^:(*@#) sels   =. sellevel }. (sellevel__y+selectable__y) (] }.~ 0 <. (- #)) selections__y
 )
 
 NB. Create highlight rects for the operands that have been selected from this node
@@ -3306,35 +3387,57 @@ NB. bring them up to rank 2
 NB. If there is nothing to highlight, return empty.  We must test explicitly because isftorank2 behaves oddly on empty
 if. 0 e. $y do. 0 2$a:
 else.
-  (<x) ,. , isftocsf > chainISFs&.>/&.|. isftorank2 y
+  (<x) ,. , isftocsf > chainISFs&.>/&.|. a: , isftorank2 y
 end.
 NB. obsolete rects =. ((}."1~ <:@#@$) ,~"1 ] {~ ({:@$@[ <. <:@#@$@]) <@{."1 [)&.>/&.|. y
 NB. obsolete ; x ;"0&.> ,@:(<"1)&.> rects
 )
-NB. x and y are contents of a single box of (an ISF that has been brought to level 2); i. e. x and y have boxing level 1
+NB. x and y are contents of a single box of (an ISF that has been brought to level 2); i. e. x and y have boxing level at least 1
 NB.  and are to be interpreted as (an array of) lists of selections
-NB. Result is the joined lists (y,x), with the first axes of x taken for use in selecting from y, to the extent axes of x exist
+NB. Each box in xy contains either a list of axes or a boxed list of alternatives for successive axes.  For simplicity here we demand that
+NB. any level-3 operand (one that is a boxed list of alternatives) must be last in a sequence
+NB. Result is the joined lists (y,x), flattened so that each axis is in one box
 chainISFs =: dyad define
-ranky =. <: # $ y  NB. number of axes of x that can select
 NB. get the first box of selections from x.  If there are others, they will be SFOPEN, which we can't handle here, so one box is enough
-lenselx =. {: $ selx =. > {."1 x
-NB. take selections from x, for as many axes as y can handle.  These will select from y.  There may be surplus y shape
-usableselx =. (selrank =. lenselx <. ranky) {."1 selx
-NB. get the selection from y for each x.  This may select an array of y, if y has surplus frame
-ysel =. usableselx (<"1@[ { ]) y
-NB. Now delete the ranks we used from x, and replace the first box(es) of x with the remainder.  BUT if we delete all the ranks
-NB. from x, that leaves an empty box which looks like SFOPEN, so delete the first box in that case
-NB. obsolete replx1 =. <^:(*@#)"1 selrank }."1 selx
-replx1 =. <"1 selrank }."1 selx
-NB. replace the first box of x, and join it to the selected y.  If y has surplus rank this will copy the surpls rank to the result
-ysel ,"1 replx1 ,"_1 1 }."1 x
+NB. Turn the selections into a box for each axis
+selx =. <"0&.>^:(0=classsel)"0@>@{."1 x
+if. #ysel =. y do.
+  ranky =. <: # $ y  NB. number of axes of x that can select
+  NB. take selections using x, for as many axes as y can handle.  These will select from y.  There may be surplus y shape
+  usableselx =. (selrank =. ({: $ selx) <. ranky) {."1 selx
+  NB. get the selection from y for each x.  This may select an array of y, if y has surplus frame
+  ysel =. usableselx (<"1@[ { ]) ysel
+  NB. Now delete the ranks we used from x.
+  if. {:$selx =. selrank }."1 selx do.
+    NB. Repeat the procedure, now using remaining axes of x to select from the trailing boxes of y that contain multiple values
+    NB. See how many trailing boxes of y contain multiple values
+    NB. We look at one (must be representative) row of y; within that, we look at only the first box within each box,
+    NB. because others must be SFOPEN
+    assert. 1 = #$ysel  NB. If there is selecting, we should have applied it to y first
+    if. ranky =. 1 i.&1@:~: |. classsel@{.@> ysel do.
+      NB. Remove x axes used and replace the first box(es) of x with the remainder.
+      usableselx =. (selrank =. ({: $ selx) <. ranky) {."1 selx
+      if. selrank do.
+        NB. There are selections to make.  They should not include SFOPEN
+        assert. -. SFOPEN e. ; (-selrank) {."1 ysel
+        ysel =. (-selrank) (}."1 ,"1 usableselx {&.>L:1"1 {."1) ysel
+        NB. obsolete   BUT if we delete all the ranks
+        NB. obsolete NB. from x, that leaves an empty box which looks like SFOPEN, so delete the first box in that case
+        NB. obsolete replx1 =. <^:(*@#)"1 selrank }."1 selx
+        selx =. selrank }."1 selx
+      end.
+    end.
+  end.
+end.
+NB. replace the first box of x (if there is any residual x after selexction), and join it to the selected y.  If y has surplus rank this will copy the surplus rank to the result
+NB. obsolete ysel ,"1 (<"1 selx) ,"_1 1 }."1 x
+ysel ,"1 selx (,~ <)~"1^:(*@{:@$@[) }."1 x
 )
 
 NB. Convert highlight rectangle(s) to rectangles (tl,:br) unboxed (never empty)
 NB. x is shape;yendpos;xendpos[;subDOLs], y is boxed CSF
-NB. Each rectangle contains a series of indexes
-NB. We get the border of the rectangle by adding 0/1 to the bottom 2 indexes, then extending with 0
-NB. to full shape, then converting to cell number, then looking that up in the row/column ending table
+NB. Each box of y is either SFOPEN or a 2-row table where the first row is the index of top-left and the
+NB. bottom row is the index of bottom-right; or, if before the last dropdown, a one-row table
 NB. Result is table of top,left,:bottom,right
 NB. We drop down through the boxing hierarchy according to the occurrences of SFOPEN
 NB. It is possible that this routine will be called with an invalid rectangle: to wit, when, during sniff,
@@ -3344,35 +3447,44 @@ INVALIDRECT =: 2 2 $ 0 0 _1 _1
 
 hlighttotlbr =: (4 : 0"1 0)`((2 2$0)"0)@.(0=#@])
 NB. We must start with a selection; if it's a drop-down, prepend empty selection
-if. SFOPEN -: {. >y do. y =. a:&,&.> y end.
-firstcsf =. {. remainingcsf =. >y
-remainingcsf =. }. remainingcsf
-sel =. 0 0 , > firstcsf
+NB. obsolete if. SFOPEN -: {. >y do. y =. a:&,&.> y end.
+if. SFOPEN -: {. >y do. y =. (<2 0$0)&,&.> y end.
+sel =. (0 0,:1 1) (]  ,"1~  -@{:@$@]  |.!.0"1  ({.~ #)) > {. > y
+remainingcsf =. }. > y
+NB. obsolete sel =. 0 0 , tlsel
 axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@# shapeused =. 0 0 , 0 {:: x  NB. axes: 1;0 2   or 0 2;1 3
 NB. obsolete   NB. axisshapes is the lengths of each axis assigned to y/x.  sizes is the total size of y/x
 NB. obsolete   assert. sel <:&# shapeused  NB. should not try to select past size of operand
 NB. Normally, the selection does not exceed the size of the displayed result, since it came from a click on the display.
 NB. But if there is an error, we will select further to sniff out the error, and that may leave us with
 NB. undisplayable selections.  So we discard them
-sel =. shapeused (<.&# {. ]) sel
+NB. obsolete sel =. shapeused (<.&# {. ]) sel
+sel =. shapeused (<.&({:@$) {."1 ]) sel
 NB. To handle <2 axes, we will add 2 leading 0 axes to the highlight selector.
 NB. We compensate by adding 2 to all the axis numbers, and inserting a leading axis.
 NB. If there are no axes to add to, there are 2 cases: 1 axis, which is ($0);,0: we turn that
 NB. into 1;0 2 - and 0 axis, which we turn into 1;1 - repetition is OK, since the repeated axis is the
 NB. added axis.  We add leading 0 (actual value immaterial) to axisshapes to match the shape
 NB. obsolete   localsel =. shapeused ([ (({.~ #) | ]) <.&# {. ]) sel   NB. amount of selector valid at this boxing level, forced nonnegative
-localsel =. shapeused (({.~ #) | ]) sel   NB. amount of selector valid at this boxing level, forced nonnegative
-tlx =. (<"0 axes) (#./@:({"1))"0 _ shapeused ,: localsel   NB. extend localsel with lower 0; pull the y and x values to get indexes of top-left
-tl =. tlx ({ 0&,)&> 1 2 { x  NB. fetch yx of topleft from input positions
-NB. We have top-left.  
+NB. obsolete  localsel =. shapeused (({.~ #) | ]) sel   NB. amount of selector valid at this boxing level, forced nonnegative
+NB. obsolete localsel =. shapeused (({.~ {:@$) |"1 ]) sel   NB. amount of selectors valid at this boxing level, forced nonnegative
+NB. obsolete tlx =. (<"0 axes) (#./@:({"1))"0 _ shapeused ,: localsel   NB. extend localsel with lower 0; pull the y and x values to get indexes of top-left
+NB. obsolete tlx =. (<"0 axes) (({. #. }.)@:({"1))"0 _ shapeused , localsel   NB. extend localsel with lower 0; pull the y and x values to get indexes of top-left
+NB. Get selection for each axis, producing a 2x(1 or 2) table of indexes
+tlx =. (<"0 axes) (({. #. }.)@:({"1))"0 _ shapeused , sel   NB. extend localsel with lower 0; pull the y and x values to get indexes of top-left
+NB. obsolete tl =. tlx ({ 0&,)&> 1 2 { x  NB. fetch yx of topleft from input positions
+tlbr =. |: tlx {&>"1 0 (0)&,&.> (1 2) { x  NB. fetch yx of topleft from input positions (and bottom-right, if after last dropdown)
+NB. We have corners.  
 NB. If the next instruction is to enter the box, do so
 NB. If there is more to do after entering the box, recur to get the position of the next-level rectangle
 NB. If nothing to do after entering the box, get the full size of the opened operand
 NB. and add the tl to produce the result
 if. (#remainingcsf) *. (3 < #x) do.
   assert. SFOPEN -: {. remainingcsf  NB. in CSF, selection must be followed by open
-  assert. sel =&# shapeused  NB. selection to end of shape required before open
-  openedDOL =. (3;2 }. sel) {:: x
+NB. obsolete   assert. sel =&# shapeused  NB. selection to end of shape required before open
+  assert. sel =&({:@$) shapeused  NB. selection to end of shape required before open
+NB. obsolete  openedDOL =. (3;2 }. sel) {:: x
+  openedDOL =. (3;(<0;<<0 1) { sel) {:: x
   if. 1 = #remainingcsf do.
     NB. The selection ended by dropping into the last selection box.  Treat that as a selection of the entire
     NB. opened operand, and create a rectangle from the top-left (implied 0) and bottom-right
@@ -3383,15 +3495,15 @@ if. (#remainingcsf) *. (3 < #x) do.
   end.
   NB. We have the rectangle for the selection, relative to the start of the box.  Add the box position, and
   NB. include offset to contents
-  (tl + BOXLINEWIDTH + BOXMARGIN)&+"1^:(INVALIDRECT -.@-: ]) selrect
+  (({.  tlbr) + BOXLINEWIDTH + BOXMARGIN)&+"1^:(INVALIDRECT -.@-: ]) selrect
 elseif. # ; remainingcsf -. SFOPEN do.
   NB. Surplus selector with nothing to select from: return invalid rectangle
   NB. If there are only drop-down and empty selections, that's OK, it's opening an open noun and we ignore the excess
   INVALIDRECT
 elseif. do.
-  NB. No further selection.  Get the index list of the bottom-right and fetch its position; prepend the
-  NB. top-left previously calculated
-  tl ,: ((<"0 axes) (#./@:({"1))"0 _ shapeused ,: localsel ([ + -@#@[ {. ]) 1 1) ({ 0&,)&> 1 2 { x
+  NB. No further selection. 
+NB. obsolete tl,:((<"0 axes)(#./@:({"1))"0 _ shapeused,:localsel([+-@#@[{.])1 1)({0&,)&>1 2{x
+  tlbr
 end.
 NB. obsolete if. sel >&# shapeused do.   NB. surplus selection
 NB. obsolete   if. 3 < #x do.
@@ -4522,7 +4634,7 @@ if. newspt ~: (<exp,scrollingaxis) { scrollpoints do.
   exp drawDOvnall ''
   if. 0 = exp do. glpaint'' end.
 end.
-NILRET
+i. 0 0
 )
 
 
@@ -4895,6 +5007,23 @@ selectticketintervals =: 4 : 0
 2 ]\ x enclosing y { logticket
 )
 
+NB. y is selopshapes.  The current level has no selection.
+NB. Result is our prediction of what the shape of the selected operands 
+calcunselectedshapes =: 3 : 0
+if. selopinfovalid do.
+  NB. There is only one item, so assume we are selecting it and calculate its shape, including dropdown if any
+  levelct =. (#frames) {. arglevel   NB. number of levels to drop down
+  framel =. levelct (_1:^:(0<[) #)&> frames   NB. length of frame, but _1 if we are dropping down a level - keep map intact then
+  NB. If the frame is empty, don't disturb the map.  If we are passing the operand through structural modifiers,
+  NB. we want the whole map available when we get down to executing verbs
+NB. obsolete         selopshapes =:  framel (}. $^:(0<L.))^:(0<:[)&.>     levelct (>@{.@]^:(* 0<L.) )&.> selopshapes
+  framel (}. $^:(0<L.))^:(0<[)&.>     levelct (>@{.@]^:(* 0<L.) )&.> selopshapes
+else.
+  NB. Multiple items.  All we can do is discard the frame from the shape
+  ($^:(0<L.)&.> y) (}.~ #)&.> frames
+end.
+)
+
 NB. y is the current selection in isf form
 NB. result is new value to use for selopshapes
 calcselectedshapes =: 3 : 0
@@ -4972,7 +5101,10 @@ assert. valence = #frames
 NB. default selection: that part of the selection in the frame, shaped into a table
 NB. If this selection includes a level, give that many drop-downs at the end of it
 NB. obsolete <@(2 1&$)"0 ({.&.> isfensureselection isftorank2 y) ({.~ #)&.> frames
-bsel =. ({.&.> isfensureselection isftorank2 y) <@({.~ #)&.> frames
+NB. obsolete bsel =. ({.&.> isfensureselection isftorank2 y) <@({.~ #)&.> frames
+NB. Extend the selection to rank 2, then make sure it starts with a selection (possibly null), then
+NB. extract that single selection.  Then take leading elements of that, for as long as the frame is
+bsel =. ({.@> isfensureselection isftorank2 y) <@({.~ #)&.> frames
 if. #arglevel do.
   bsel =. bsel ,&.> (0 >. arglevel) <@#"0 SFOPEN
 end.
@@ -5074,6 +5206,11 @@ cocurrent 'dissectirregularops'
 NB. If this verb has no selector, we flag the selops as invalid, both as to shape (which is not fatal)
 NB. and valence (which is)
 rankcalculussupported =: 0
+
+calcunselectedshapes =: 3 : 0
+selopinfovalid =: 0:"0 y
+y
+)
 
 cocurrent 'dissectselectshape'
 NB. Used for ops, like u/ and u^:, whose result shape depends on the selection
@@ -5506,23 +5643,25 @@ cocurrent@(0&cocreate)@([ coerase) newloc =. <'dissectmod' , ": <: # dissectmodi
 NB.?lintmsgson
 coinsert x , ' dissectobj'
 18!:4 newloc   NB. No named verb from here to the end!
-i. 0 0
+newloc
 )
 
 cocurrent 'dissectobj'
 NB. Append x to the current locale name.  Used when a modifier is so dissimilar
 NB. between monad & dyad as to require different locales.  Executed inline during load
 NB. y is list of attribute class to include after the common class
-NB. MAJOR SIDE EFFECT: locale is changed
+NB. The path for the valence is set to the bivalent locale, followed by locales given in y, followed by the
+NB.  path for the bivalent locale
+NB. Major side effect: locale is changed
 startvalence =: 4 : 0
 NB.?lintmsgsoff
 cocurrent@(0&cocreate)@([ coerase) newloc =. ,&x&.> baseloc =. <'dissectmod' , ": <: # dissectmodindex_dissect_
 NB.?lintmsgson
-((,    (;:y) , 18!:2) baseloc) 18!:2 newloc
+((/: =&(<,'z')) ~. (,    (;:y) , 18!:2) baseloc) 18!:2 newloc
 newloc   NB. Return locale name, which we will switch to
 )
-startmonad =: 18!:4@('monad'&startvalence)
-startdyad =: 18!:4@('dyad'&startvalence)
+startmonad =: ([ 18!:4)@('monad'&startvalence)
+startdyad =: ([ 18!:4)@('dyad'&startvalence)
 
 NB. Nilad.  Executed at setvalence time.  Inserts the monad/dyad locale and its path at the top of the search path
 NB. of the current object, depending on the valence.
@@ -5536,10 +5675,8 @@ newtype =. ((valence=2) { 'monad';'dyad') ,~&.> oldtype =. {. oldpath =. 18!:2 l
 )
 
 NB. **** @ @: ****
-modlocale '@@:'
-
 NB. Save the name of the locale that handles @@: - we use it in &&: and also in fork
-localeat_dissect_ =: coname''
+localeat_dissect_ =: modlocale '@@:'
 
 create =: 3 : 0
 create_dissectobj_ f. (<1 2) { y
@@ -5654,10 +5791,8 @@ end.
 
 
 NB. **** & &: ****
-modlocale '&&:'
-
 NB. Save the name of the locale that handles &&: - we use it in &. and &.:
-localecompose_dissect_ =: coname''
+localecompose_dissect_ =: modlocale '&&:'
 
 NB. When we find out the valence, we change this to be like @@: if monad, and proceed here only for the dyad
 
@@ -5940,8 +6075,7 @@ enparen^:(y=3) (defstring__uop0 2) jd cop0 jd (defstring__vop0 3)
 
 
 NB. **** u"n u"v m"n m"v****
-modlocale '"'
-localerank_dissect_ =: coname''
+localerank_dissect_ =: modlocale '"'
 
 create =: 3 : 0
 NB. Handle m"nv as a general verb
@@ -6314,8 +6448,7 @@ inheritu x traverse__uop travops a:;1;(vopval selopinfovalid);<selopshapes
 
 
 NB. **** ^: ****
-modlocale '^:'
-localepower_dissect_ =: coname''
+localepower_dissect_ =: modlocale '^:'
 
 create =: 3 : 0
 create_dissectobj_ f. (<1 2) { y
@@ -7094,10 +7227,498 @@ NB. obsolete inheritu (|. x) traverse__uop bnsellevel , (0 1 _1 2 {"1 rankhistor
 inheritu (|. x) traverse__uop travops 0 1 _1 2;_2 0;(vopval selopinfovalid);< _1 0 {^:(*@#@]) selopshapes
 )
 
+NB. **** partitions ****
+NB. A partition such as u/. is represented internally as u/.S where S is an adverb locale included simply
+NB. for the purpose of selecting from the result, in case the arguments have a rank that cause the partition to
+NB. be executed more than once.  In the executed sentence, u saves the result of each execution of u, and /.
+NB. saves all the u-results for a given partition.  S holds the results for all the partitions.
+NB.
+NB. S inherits the display of /. into its result.  /. creates a display for u, and also acts as a verb in
+NB. displaying its own result.  An x operand of /. is brought in to the left side of the display for /., and an n
+NB. operand (which must be constant) is subsumed into the verb line, which is created in /. and shows the whole
+NB. partition verb, prefixed by 'Final ' if there is a selection (which would cause u to expand).
+NB.
+NB. The action of S is simple and does not depend on any characteristic of /. except its rank, which it find by looking
+NB. inside /. .  S merely selects, if selection is possible.  It passes its argument x to /.
+
+cocurrent 'dissectpartitionselector'
+coinsert 'dissectobj'
+
+NB. y is the locale of the partitioning modifier
+create =: 3 : 0
+create_dissectobj_ f. a:
+NB. Register this object so we can clean up at end
+uop =: y
+newobj__COCREATOR coname''
+NB. result is the locale of the created object
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop
+coname''
+NB.?lintsaveglobals
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+defstring__uop y
+)
+
+NB. Return the locales for propsel
+proplocales =: 3 : 0
+<^:(0=L.)@".@>^:(0 <: y) ,<'uop'
+)
+
+NB. Set the valence used for executing this verb, and propagate to descendants
+NB. The descendant is always executed as a monad
+setvalence =: 3 : 0
+valence =: #y
+uop =: setvalence__uop y
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop
+coname''
+NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+NB. No display here, so just use uop's height
+estheights =: estheights__uop
+)
+
+NB. return string form of operands, including instrumentation
+exestring =: 3 : 0
+initloggingtable ''
+auditstg '(' , (verblogstring '') , (logstring '') , '@(' , (exestring__uop '') , '))'
+)
+
+traverse =: 4 : 0
+traversedowncalcselect y
+if. errorcode e. EEARLYERROR do. agreementerror x return. end.
+NB. If the partition is dyadic, it will need the VALUE of x.  We will extract that
+NB. now.  We need the value of x after applying any selection given here.
+if. 1 < #x do.
+  NB. Dyadic valence
+  xop =. < (0 3;0 0) {:: x  NB. locale of x operand
+  NB.?lintonly xop =. <'dissectobj'
+  if. errorcode__xop > EOK do.
+    partitionx =: ''
+  else.
+    partitionx =: fillmask__xop frameselresult__xop selresult__xop
+    NB. If there is a selection at this level, apply it to find the correct x value
+    if. selectable *. sellevel < #selections do.
+      partitionx =: (sellevel{selections) { partitionx
+    end.
+  end.
+  NB.?lintsaveglobals
+end.
+inheritu x traverse__uop travops a:;1;(vopval selopinfovalid);<selopshapes
+)
+
+NB. ********** the partitioning modifiers themselves *****************
+
+NB. These routines are shared by all partition processing
+cocurrent 'dissectpartition'
+coinsert 'dissectobj'  NB. for lint
+
+destroy =: 3 : 0
+destroy_dissectobj_ f. ''
+)
+
+NB. Set the valence used for executing this verb, and propagate to descendants
+NB. The descendant is always executed as a monad
+setvalence =: 3 : 0
+valence =: #y
+NB.?lintonly uop =: <'dissectverb'
+uop =: setvalence__uop , *./y
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop
+separatevalences''
+coname''
+NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+NB. Since u is always a monad, use its height for the y height and add 1 for the expansion node.
+NB. x, if given, feeds into u\ directly, and so has a height of 1
+estheights =: (-valence) {.!.1 estheights__uop combineheights ,1
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. Since u is always a monad, we will calculate the shape for y only
+NB. For all partitions, we can use the highlights as an indication of which items are selected
+NB. Extract the array of boxes, each contaiing an isf, as <sel[,dropdowns]
+yhlight =. (_1;1 _1) {:: physreqandhighlights
+NB. Get the selections, as an array whose 1-cells are selectors
+yhlight =. ('';0) {::"1 0 yhlight
+NB. If y is boxed, select its boxes; if not, replace its leading shape with the shape of the array of 1-cells.
+NB. The 'leading shape' is given by the length of each individual highlight
+selopshapes _1}~ < yhlight (}:@$@[ , (}.~ {:@$)~)`(<"1@[ { ])@.(1<L.@]) _1 {:: selopshapes
+)
+
+
+NB. adverb partitions \ \. /.
+cocurrent 'dissectpartitionadverb'
+coinsert 'dissectpartition'  NB. for lint
+
+create =: 3 : 0
+NB. Handle noun left  op as a general verb
+if. noun bwand (<0 0) {:: y do.
+  changeobjtypeto localedefault
+  create y
+  return.
+end.
+create_dissectobj_ f. (<1 2) {  y
+NB. Register this object so we can clean up at end
+newobj__COCREATOR coname''
+NB. Save the operands - locale of the verb, and string form of the adv
+'uop cop' =: 1 {"1 y
+NB.?lintonly uop =: <'dissectverb' [ cop =: ''
+titlestring =: cop
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop
+NB. Create a selector, which will be the first entry point for this sequence
+verb;(xop =: 'dissectpartitionselector' 1 createmodifier coname'');tokensource
+NB.?lintsaveglobals
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+enparen^:(y=3) (defstring__uop 2) jd cop
+)
+
+NB. Return the locales for propsel
+proplocales =: 3 : 0
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3)) # ;: 'uop tokensource'
+)
+
+NB. return string form of operands, including instrumentation
+exestring =: 3 : 0
+initloggingtable ''
+NB. Use unadorned verb on empty operand to get neutral.  Save every result of verb execution.  Also save overall result.
+NB. obsolete auditstg '((' , (logstring '') , '@:(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop 0 1 0) , ')/`(' , (defstring__uop 2), '/)@.(0=#))))'
+auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , cop , ')'
+)
+
+NB. Traversal up and down the tree.
+NB.
+NB. The result is the DOL, up through the result of u
+traverse =: 4 : 0
+traversedowncalcselect y
+if. errorcode e. EEARLYERROR do. agreementerror x return. end.
+NB. Create a display for u (as a v-type).  It may or may not have detail, depending on whether anything was selected here
+NB. u is always a monad, so we pass in only the last argument
+udol =. joinlayoutsl  (_1 {. x) traverse__uop travops a:;(,_2);(vopval selopinfovalid);selopshapes;_1
+
+NB. Create a display for this node, as if it were a u-type verb.  This display will be inherited into te selector.
+NB. We initialize the rank stack, and it is that that will give the label for this display.
+NB. The /. node always displays the entire partitioning verb, with 'Final' prepended when the /. is selectable
+NB. and there has been a selection.
+rankstack =. ,: (('Final ' #~ selectable *. sellevel < #selections) , defstring 0) ; <"0 sellevel , |. vranks
+'displayhandlesin displayhandleout displaylevrank' =: (valence {:: ($0);(,0);_0.3 0.3);1;<rankstack
+NB. The highlights for x (if any) are preserved, but the ones for y are reset, since there is no selection from u/. into u
+physreqandhighlights =: (<EMPTYPRH) _1} physreqandhighlights
+NB. The result of u becomes the last argument to the display of this node, along with the original x operand if
+NB. there was one.
+((_1 }. x) , udol) ,&< coname''
+)
+
+NB. conjunction partitions ;.
+cocurrent 'dissectpartitionconjunction'
+coinsert 'dissectpartition'  NB. for lint
+
+create =: 3 : 0
+NB. Handle noun left op as a general verb
+if. noun bwand (<0 0) {:: y do.
+  changeobjtypeto localedefault
+  create y
+  return.
+end.
+create_dissectobj_ f. (<1 2) {  y
+NB. Register this object so we can clean up at end
+newobj__COCREATOR coname''
+NB. Save the operands - locale of the verb, and string form of the adv
+'uop cop vop' =: 1 {"1 y
+NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
+titlestring =: cop
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop
+verb;(xop =: 'dissectpartitionselector' 1 createmodifier coname'');tokensource
+NB.?lintsaveglobals
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+enparen^:(y=3) (defstring__uop 2) jd cop jd defstring__vop 3
+)
+
+NB. Return the locales for propsel
+proplocales =: 3 : 0
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3)) # ;: 'uop tokensource vop'
+)
+
+NB. return string form of operands, including instrumentation
+exestring =: 3 : 0
+initloggingtable ''
+NB. Use unadorned verb on empty operand to get neutral.  Save every result of verb execution.  Also save overall result.
+NB. obsolete auditstg '((' , (logstring '') , '@:(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop 0 1 0) , ')/`(' , (defstring__uop 2), '/)@.(0=#))))'
+auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , cop , '(' , (exestring__vop '') , '))'
+)
+
+
+NB. ************** The individual partitioning modifiers *****************
+cocurrent 'dissectobj'
+
+NB. *** \ ***
+
+'dissectpartitionadverb dissectpartition' modlocale '\'
+
+NB. The monadic valence u\ y:
+localebslashmonad_dissect_ =: startmonad ''
+
+
+NB. *** traversal support ***
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb
+NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglevel
+calcdispframe =: 4 : 0
+itemctiny =: '' ($,) ($^:(0<L.))@> {: x  NB. needed for \.
+NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
+NB. call to u.  So make that the frame
+ny =. '' ($,) ($^:(0<L.))@> {: x
+ny ; ny ; (,<ny) ; a: , a:
+)
+
+NB. y is the current selection (a: if forced)
+NB. For the normal verb, the selector and the highlight are identical.
+calcphysandhighlights =: 3 : 0
+NB. There is only one argument, and we create selections for from selection to end
+, < 2 1&$ < <@,@<@< i. >: > y
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. Keep the rank of selopshapes, but use the size from the selection
+NB. If selopshapes is a map, we have to get the right part
+if. 1 = L. selopshapes do.
+  (>: {. > y) (0} ,)&.> selopshapes
+else.
+  (>: {. > y) {.&.> selopshapes
+end.
+)
+
+localebslashdyad_dissect_ =: startdyad ''
+NB. The dyad x u\ y:
+
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb
+NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglevel
+calcdispframe =: 4 : 0
+NB.?lintonly xop =: <'dissectpartitionselector'
+itemctiny =: '' ($,) ($^:(0<L.))@> {: x
+NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
+NB. call to u.  So make that the frame.  The number of partitions is:
+NB. if x is nonnegative, (the number of items of y + 1) - x, but never negative
+NB. if x is negative, (the number of items of y) % |x, rounded up
+if. partitionx__xop >: 0 do. ny =. , 0 >. (>: itemctiny) - partitionx__xop
+else. ny =. , >. itemctiny % -partitionx__xop
+end.
+ny ; ny ; (($0);ny) ; a: , a:
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection (a: if forced)
+calcphysandhighlights =: 3 : 0
+NB. The starting point is given by the current selection, if x is nonnegative; or selection * length if x is negative.
+NB. The length is |x, but we have to limit the range to the length of the input
+NB. There is never a highlight from x; use an empty
+(< 2 0$a:) , < 2 1&$ < <@,@<@< itemctiny (> # ]) (({.>y) [`(*-)@.(0>]) partitionx__xop) + i. |partitionx__xop
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. Keep the rank of selopshapes, but use the partition size: x if positive (even if > itemct)
+NB. If x is negative, |x unless that would run off the end
+if. partitionx__xop >: 0 do. ps =. partitionx__xop
+else. ps =. (|partitionx__xop) <. itemctiny - ({.>y) * -partitionx__xop
+end.
+NB. The shape of x is immaterial since u is always invoked as a monad
+NB. If selopshapes is a map, we have to get the right part
+if. 1 = L. {: selopshapes do.
+  a: , ps (0} ,)&.> {: selopshapes
+else.
+  a: , (({.>y) + i. ps)&{&.> {: selopshapes
+end.
+
+)
+calcunselectedshapes =: 3 : 0
+NB. For negative x, shape is unpredictable; otherwise it's like a selection from 0
+if. partitionx__xop < 0 do. calcunselectedshapes_dissectirregularops_ f. 0
+else. calcselectedshapes 0
+end.
+)
+
+NB. *** \. ***
+
+'dissectpartitionadverb dissectpartition' modlocale '\.'
+
+NB. The monadic valence u\. y:
+startmonad >localebslashmonad
+
+
+NB. calcdispframe comes from \
+
+NB. y is the current selection (a: if forced)
+NB. For the normal verb, the selector and the highlight are identical.
+calcphysandhighlights =: 3 : 0
+NB.?lintonly itemctiny =: 0
+NB. There is only one argument, and we create selections for from selection to end
+, < 2 1&$ < <@,@<@< (> y) }. i. itemctiny
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. Keep the rank of selopshapes, but use the size from the selection
+NB. If selopshapes is a map, we have to get the right part
+if. 1 = L. selopshapes do.
+  (itemctiny - {. > y) (0} ,)&.> selopshapes
+else.
+  (>: {. > y) }.&.> selopshapes
+end.
+
+)
+
+startdyad >localebslashdyad
+NB. The dyad x u\. y:
+
+NB. calcdispframe comes from \
+
+NB. y is the current selection (a: if forced)
+calcphysandhighlights =: 3 : 0
+NB.?lintonly itemctiny =: 0
+NB.?lintonly xop =: <'dissectpartitionselector'
+NB. The starting point is given by the current selection, if x is nonnegative; or selection * length if x is negative.
+NB. The length is |x, but we have to limit the range to the length of the input
+NB. There is never a highlight from x; use an empty
+(< 2 0$a:) , < 2 1&$ < <@,@<@< (i. itemctiny) -. itemctiny (> # ]) (({.>y) [`(*-)@.(0>]) partitionx__xop) + i. |partitionx__xop
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. Keep the rank of selopshapes, but use the partition size: x if positive (even if > itemct)
+NB. If x is negative, |x unless that would run off the end
+if. partitionx__xop >: 0 do. ps =. itemctiny <. partitionx__xop
+else. ps =. (|partitionx__xop) <. itemctiny - ({.>y) * -partitionx__xop
+end.
+NB. The shape of x is immaterial since u is always invoked as a monad
+NB. If selopshapes is a map, we have to get the right part
+if. 1 = L. {: selopshapes do.
+  a: , (itemctiny - ps) (0} ,)&.> {: selopshapes
+else.
+  a: , (<<<({.>y) + i. ps)&{&.> {: selopshapes
+end.
+)
+calcunselectedshapes =: 3 : 0
+NB. For negative x, shape is unpredictable; otherwise it's like a selection from 0
+if. partitionx__xop < 0 do. calcunselectedshapes_dissectirregularops_ f. 0
+else. calcselectedshapes 0
+end.
+)
+
+NB. *** /. ***
+
+'dissectirregularops dissectpartitionadverb dissectpartition' modlocale '/.'
+
+NB. The monadic valence u/. y:
+startmonad ''
+
+
+NB. *** traversal support ***
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb
+NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglevel
+calcdispframe =: 4 : 0
+yitemshape =: (($,)~   2 <. #) ($^:(0<L.))@> {: x
+NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
+NB. call to u.  So make that the frame.
+NB. We extend the itemshape with 1s to 2 atoms; then the frame is the sum - 1; unless the shape contains
+NB. 0: then the frame is 0
+ny =. (0&(-.@e.) * [: <: +/) _2 {.!.1 yitemshape
+ny ; ny ; (,<ny) ; a: , a:
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection (a: if forced)
+NB. For the normal verb, the selector and the highlight are identical.
+calcphysandhighlights =: 3 : 0
+NB. the selections are the (ysize) disgonal elements starting at (0,sel) and going down and to the left.
+NB. But we must discard leading items that are not in the object: that is ((sel+1)-xsize), if positive;
+NB. and we must discard trailing items not in the object: (ysize-(sel+1)) if positive
+'ysize xsize' =. _2 {.!.1 yitemshape
+diagonaleles =: (-#yitemshape) {."1 (0,sel =. > y) +"1 (i. ysize) */ 1 _1
+diagonaleles =: ,. <"1 (- 0 >. ysize - >:sel) }. (0 >. sel - <:xsize) }. diagonaleles
+, < 2 1&$ < < ,"1 diagonaleles
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. We have calculated the selected elements in diagonaleles; use that to get the shape
+if. 1 = L. selopshapes do.
+  (#diagonaleles) (, 2&}.)&.> selopshapes
+else.
+  diagonaleles&{.&.> selopshapes
+end.
+)
+
+startdyad ''
+NB. The dyad x u/. y:
+
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb
+NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglevel
+calcdispframe =: 4 : 0
+NB.?lintonly xop =: <'dissectpartitionselector'
+NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
+NB. call to u.  So make that the frame.  The number of partitions is
+NB. the number of unique elements of x
+ny =. # ~. partitionx__xop
+ny ; ny ; (($0);ny) ; a: , a:
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection (a: if forced)
+calcphysandhighlights =: 3 : 0
+NB. Find the indexes that match the selected item of the nub of x
+NB. We highlight the items of x and y
+2 # < 2 1&$ < <@,@<@< selitems =: ({.>y) (({ ~.) I.@:= ]) i.~ partitionx__xop
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. The shape of x is immaterial since u is always invoked as a monad
+NB. If selopshapes is a map, we have to get the right part
+if. 1 = L. {: selopshapes do.
+  a: , (#selitems) (0} ,)&.> {: selopshapes
+else.
+  a: , selitems&{&.> {: selopshapes
+end.
+
+)
+
+
+
 
 NB. **** default ****
-modlocale ''
-localedefault_dissect_ =: coname''
+localedefault_dissect_ =: modlocale ''
 NB. Remove the last element in the search, to make this the 'search failed' locale
 dissectmodindex_dissect_ =: }: dissectmodindex_dissect_
 
@@ -7131,7 +7752,6 @@ NB. display height is always just 1
 proplocales =: 3 : 0
 (y=3) # (<tokensource) 1} >&.> ucvlocs
 NB. obsolete r =. <^:(0=L.)@".@>^:(0 <: y) (3 {. (y=3) 1} (y~:0) +. nonnoun) # ;: 'uop tokensource vop'
-NB. obsolete QP'y nonnoun r '
 NB. obsolete r
 )
 
@@ -7659,7 +8279,6 @@ dissect '(<5) +&.> 4'
 dissect '5 +&.> 4'
 dissect '(<2) +&.> <3 4 5'
 dissect '(100;200) +&.> <"0 i. 2 3'
-dissect '   (<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
 dissect '+/&.> 0 1 2;3 4 5 6'
 dissect '>:&.>@:i.&.> 3 + i. 4' 
 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
@@ -7668,15 +8287,44 @@ dissect '(3 3 $ 0 1 2 3 4 5 6 7 7.5) ;&:(i."0) 0 1'
 dissect '(<<"0 i. 6) ,.&.> <"1 <"0 ''abcdef'''
 dissect '(<<"0 i. 6) ,"0&.> <"1 <"0 ''abcdef'''
 dissect '(< <"0 i. 3 2) #&.>&.> < ''four five six'' ,.&;: ''one two three'''
-dissect '(<2) +&.>&.>&.>&.> <"4 (8)'
+dissect '(<2) +&.>&.>&.>&.> <^:4 (8)'
 dissect '(<2) +&.>&.>&.>&.> <^:4 (3 8)'
 dissect '(<2) +&.> <8'
+dissect '(<i. 3 2 3) +"2&.> <"1 i. 2 2 3'
+dissect'((* -> *) -> * -> *.) i:9'  NB. display tester
+dissect '+:\ i. 4'
+dissect '+:\\ i. 3 4'
+dissect '3 +:\ i. 5'
+dissect '3 +:\ i. 4 5'
+dissect '4 +:\ i. 4 5'
+dissect '_3 +:\ i. 5'
+dissect '5 +:\ i. 4 5'
+dissect '0 +:\ i. 4 5'
+dissect '_3 +:\ i. 6'
+dissect '2 3 +:\ i. 7'
+dissect '+:\. i. 4'
+dissect '+:\\. i. 3 4'
+dissect '+:\.\. i. 3 4'
+dissect '3 +:\. i. 5'
+dissect '3 +:\. i. 4 5'
+dissect '4 +:\. i. 4 5'
+dissect '_3 +:\. i. 5'
+dissect '5 +:\. i. 4 5'
+dissect '0 +:\. i. 4 5'
+dissect '_3 +:\. i. 6'
+dissect '2 3 +:\. i. 7'
+dissect '_3 (_2&(+\.))\. i. 7'
+dissect '+:/. i. 3 3'
+dissect '1 1 +//.@(*/) 1 2 1' 
+dissect '+:/. i. 4'
+dissect '+:/. i. 0'
+dissect '1 1 2 3 2 1 4 3 1 2 3 <@,/. ;:''The quick brown fox jumped over the lazy dog and slept'''
 )
 
 0 : 0  NB. Testcases that fail
+NB. no dyad yet dissect '   (<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
 )
 
 0 : 0
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
-   
