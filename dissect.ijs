@@ -40,7 +40,8 @@ DEBVERB_dissect_ =: 0   NB. set for travdown printout
 DEBLAYOUT_dissect_ =: 0   NB. display grid details
 DEBGRAF_dissect_ =: 0   NB. display all drawn graphics
 DEBOBJ_dissect_ =: 0  NB. display drawn-object details
-DEBDOL_dissect_ =: 0  NB. display drawing locales and inheritu
+DEBDOL_dissect_ =: 0  NB. display drawing locales
+DEBINHU_dissect_ =: 0  NB. display inheritu
 DEBDOL2_dissect_ =: 0  NB. display drawing locales
 DEBDOvn_dissect_ =: 0  NB. display object headers
 DEBPICK_dissect_ =: 0  NB. display pick progress
@@ -49,7 +50,12 @@ QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
-NB. getfailingindex in righttoleft adds unwanted SFOPEN
+NB. dissect '#&.>\. ''abcd'''  incorrectly highlights clicks to expander.  Prob is that cells before SFOPEN have just a start rather than start/end,
+NB.  and if there is no internal detail we never get an end
+NB. figure out why crash requires reload of dissect
+NB. need something like forced selection for ;.0
+NB. collect descending selections into one interval
+NB. support axis permutations for display, for u;.
 NB. handle m\ etc as generic verb
 NB. Display of executing a gerund has no data
 NB. Test inheriting an error into expansion
@@ -1501,6 +1507,8 @@ NB. This is provisional, and invalid for u/ and u^:, as well as selections that 
 NB. are valid only if there is a selection, where selopshapes will be refigured later.
 NB. The selopshapes calculated here is useful only for rank-calculus purposes
   'selframe frame frames resultlevel arglevel' =: selopshapes calcdispframe execdframes
+  assert. 1 = #$frame
+  assert. 1 = #$selframe
 NB. obsolete     frame =: >./ > frames  NB. The common "frame"
   (-.@-: <.) frame do.
 NB. Here for verb with invalid frame - an early error
@@ -1524,7 +1532,7 @@ NB. If we get to here, the operand being presented will be collected, as in u@:v
     errorcode =: EOK
 NB. Also, the number of results should match the number of cells in the frame, except
 NB. when the frame contains 0, in which case there will be 0 or 1 result.
-    qprintf^:DEBTRAVDOWN '$selopshapes selopshapes $frames frames $frame frame resultlevel arglevel $selx '
+    qprintf^:DEBTRAVDOWN '$selopshapes $&.>selopshapes selopshapes $frames frames $frame frame resultlevel arglevel $selx '
     if. 0 e. frame do.
 NB. Execution on a cell of fills.  We should have 0 or 1 result.  If 0, it means that the
 NB. execution on the cell of fills failed, and we will use a scalar numeric as the replacement
@@ -1618,9 +1626,9 @@ NB. If forced selection, don't apply thissel, because it would result in multipl
 NB. the selector we had.  Here we select for the unforced selection
 NB. Calculate the selection interval corresponding to each selected result.  Put result intervals into selection order, then choose one
 NB. obsolete         selector =: < thissel { tickettonatural frame $ 2 ]\ (,>selector) enclosing selx { logticket
-      selector =: < thissel selectusingisf tickettonatural frame $ (,>selector) selectticketintervals rawselx
-      assert. (,2) -: $ > selector   NB. until we get multiple selections
+      selector =: < thissel selectusingisf tickettonatural frame $ a   =. (,>selector) selectticketintervals rawselx
       assert. *./ ({.@> isfensureselection isftorank2 thissel) (>:&#)&> frames
+      assert. (,2) -: $ > selector [ 'forced selection'  NB. until we get multiple selections
 NB. No action for type 3, which is pick-only selection
     end.
 NB. The number of operands can change during traversal: monad u/ turns into a dyad, and dyad u\ turns into a monad.
@@ -1651,6 +1659,7 @@ NB. recalculate selopshapes now that we have the selection
       selopshapes =: calcselectedshapes thissel
       selopinfovalid =: 1:"0 selopshapes  NB. Selection means input shapes are valid for next v
     end.
+    assert. ((0<L.) +. (1=#@$))@> selopshapes
   end.
   
 NB. obsolete NB. reconstitute selopinfo from its component bits
@@ -1739,7 +1748,7 @@ NB. Set the indicator that this node can take a selector.  It can if
 NB. this verb has a selection frame OR a level
 bnsellevel =: < sellevel + selectable
 
-qprintf^:DEBTRAVDOWN 'edisp'''' frame selframe $selresult selresult selresultshape selector selopinfovalid fillmask selections rankhistory selectable '
+qprintf^:DEBTRAVDOWN 'edisp'''' frame selframe $selresult selresult $selresultshape selresultshape selector selopinfovalid fillmask selections rankhistory selectable '
 NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
 NB.?lintsaveglobals
 )
@@ -1959,8 +1968,8 @@ DISPINFO =: ;: 'displayhandlesin displayhandleout displaylevrank dispstealthoper
 inheritu =: 3 : 0
 loc =. 1 {:: y
 NB. obsolete loc =. '' ($,) floc   NB. remove uninheritable flag
-SM^:DEBDOL 'inheritu: in ' , (>coname'') , ' ' , defstring 0
-QP^:DEBDOL'$floc >loc defstring__loc]0 edisp'''' edisp__loc'''' >selector selresult '
+SM^:DEBINHU 'inheritu: in ' , (>coname'') , ' ' , defstring 0
+QP^:DEBINHU'$floc >loc defstring__loc]0 edisp'''' edisp__loc'''' >selector selresult '
 QP^:DEBDOL2'physreqandhighlights physreqandhighlights__loc '
 NB. The display information is always inherited from the last u, which creates it.
 NB. The only time we wouldn't inherit is if the error is detected before the last u, example 1.5 u/ y which
@@ -2026,6 +2035,7 @@ NB. also failed in the middle of execution.  Insert the fillmask as in the no-er
 NB.  If the higher verb had no operands, it must be a monad/dyad execution;
 NB. it will perforce have no selection, so just pick up the fillmask from the u
 NB. obsolete  if. (*#selframe) *. (sellevel < #selections) do.
+QP^:DEBINHU'fillmask fillmask__loc selresult selresult__loc selectable sellevel<#selections resultlevel '
   if. selectable *. (sellevel < #selections) do.
     sel1 =. {. > isfensureselection isftorank2 sellevel { selections  NB. first level of selection, boxed
 NB. If the current fillmask is boxed, this node represents an added selector node, and we
@@ -2052,8 +2062,8 @@ NB. Perhaps we should modify selresult here too?
     if. #resultlevel do.
       NB. If this node has a boxing level, it means (1) there is no possible selection from this level (else
       NB. there would be no valid fillmask); (2) the info from the lower level must be fixed to account for the fact
-      NB. that we will add a boxing level to the data and will expect a boxed fillmask
-      fillmask =: < fillmask__loc
+      NB. that we will add a boxing level to the data and will expect a boxed fillmask.  We have to preserve the shape of the fillmask
+      fillmask =: ($fillmask) $ < fillmask__loc
       selresult =: ,< fillmask__loc frameselresult__loc selresult__loc
     else.
       NB. This node does not change the boxing level, so just copy mask and result
@@ -2084,7 +2094,7 @@ NB. obsolete   NB. there is nothing to inherit.  But we must yet fix physreqandh
 NB. obsolete   NB. prh for @ will have been set for the dyad, but the u/ is a monad.  So we force prh to be a monad, full of empties to avoid a highlight
 NB. obsolete   physreqandhighlights =: ,: |: sellevel $ ,: EMPTYPRH
 NB. obsolete end.
-QP^:DEBDOL'endingecode=?edisp'''' defstring__resultloc]0 '
+QP^:DEBINHU'endingecode=?edisp'''' defstring__resultloc]0 '
 
 (<resultloc) 1} y
 )
@@ -3033,7 +3043,6 @@ NB. which will become the first of the next rank - except for the last, which do
 NB. Since the 1-pixel-wide line seems too narrow, add 1 extra space to each nonzero boundary
   bdynos =. rcshapes (+ *)@(1&(|.!.0))@:(0&(i.&1@:~:)@|."1)@(#: i.@#)&.> rcextents
   rcextents =. +/\&.> bdynos +&.> rcextents
-  
 end.
 NB. Assemble final result
 ($value);rcextents,subDOLs
@@ -3220,6 +3229,7 @@ NB. Stack vertically: string/rank,shape,status,data
 
 NB. Find the sizes to display: main, and explorer if allowed.  A table of 1 or 2 rows
   hwtable =. calcformsize valueformat =: createDOL ((<_1;2 3 4) { cfmdata)
+QP^:DEBDOL'valueformat '
 NB. Keep track of the size of the largest noun encountered
   maxactualnounsize__COCREATOR =: maxactualnounsize__COCREATOR >. extractDOLsize valueformat
 NB. If data doesn't fit in the allocated area, append scrollbars as needed.  We install the
@@ -3322,8 +3332,8 @@ if. #highlightblocks =. a: -.~ ;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:i
   pathx =. (SFOPEN,highlightblocks) i: SFOPEN  NB. number of boxes including last SFOPEN
   path =. pathx {. highlightblocks
   assert. 1 > >./ #@$@> ; path -. SFOPEN  NB. no multipleselects before last dropdown
-  NB. Convert the selections in the path, now a list of boxes containing atoms, to a one-row table
-  path =. ,:@;&.>^:(-.@-:&SFOPEN)"0 path
+  NB. Convert the selections in the path, now a list of boxes containing atoms, to a two-row table of start,:end+1
+  path =. (,: >:)@;&.>^:(-.@-:&SFOPEN)"0 path
   NB. Turn each box of the path after the dropdown into a box containing boxed tables, which can then be
   NB. catalogued and run together.  Each axis (now an axis containing one or more selections) will turn into a box
   NB. containing boxes, where each box holds a 1x2 table describing the selection.  For the last 2 axes,
@@ -3437,7 +3447,7 @@ ysel ,"1 selx (,~ <)~"1^:(*@{:@$@[) }."1 x
 NB. Convert highlight rectangle(s) to rectangles (tl,:br) unboxed (never empty)
 NB. x is shape;yendpos;xendpos[;subDOLs], y is boxed CSF
 NB. Each box of y is either SFOPEN or a 2-row table where the first row is the index of top-left and the
-NB. bottom row is the index of bottom-right; or, if before the last dropdown, a one-row table
+NB. bottom row is the index of bottom-right
 NB. Result is table of top,left,:bottom,right
 NB. We drop down through the boxing hierarchy according to the occurrences of SFOPEN
 NB. It is possible that this routine will be called with an invalid rectangle: to wit, when, during sniff,
@@ -7403,6 +7413,7 @@ NB. Traversal up and down the tree.
 NB.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
+yop =: < (_1 3;0 0) {:: x  NB. locale of y operand, needed for u;.1
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. agreementerror x return. end.
 NB. Create a display for u (as a v-type).  It may or may not have detail, depending on whether anything was selected here
@@ -7439,7 +7450,7 @@ newobj__COCREATOR coname''
 NB. Save the operands - locale of the verb, and string form of the adv
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
-titlestring =: cop
+NB. titlestring is set during traversal, when we know n
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(xop =: 'dissectpartitionselector' 1 createmodifier coname'');tokensource
@@ -7453,7 +7464,7 @@ enparen^:(y=3) (defstring__uop 2) jd cop jd defstring__vop 3
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3)) # ;: 'uop tokensource vop'
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3) , 1) # ;: 'uop tokensource vop'
 )
 
 NB. return string form of operands, including instrumentation
@@ -7464,6 +7475,14 @@ NB. obsolete auditstg '((' , (logstring '') , '@:(' , (verblogstring '') , (logs
 auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , cop , '(' , (exestring__vop '') , '))'
 )
 
+NB. For traversal, we extract the string value of n and append that to the conjunction name;
+NB. then we complete the traversal using the adverb form
+traverse =: 4 : 0
+NB. Traverse n.  It's a noun, and so must produce a single result
+NOLAYOUTS traverse__vop TRAVNOUN
+titlestring =: cop,":partitionn =: >{.logvalues__vop
+x traverse_dissectpartitionadverb_ f. y
+)
 
 NB. ************** The individual partitioning modifiers *****************
 cocurrent 'dissectobj'
@@ -7475,8 +7494,6 @@ NB. *** \ ***
 NB. The monadic valence u\ y:
 localebslashmonad_dissect_ =: startmonad ''
 
-
-NB. *** traversal support ***
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
 NB. y is natural frame(s) of the executed verb
 NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglevel
@@ -7484,7 +7501,7 @@ calcdispframe =: 4 : 0
 itemctiny =: '' ($,) ($^:(0<L.))@> {: x  NB. needed for \.
 NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
 NB. call to u.  So make that the frame
-ny =. '' ($,) ($^:(0<L.))@> {: x
+ny =. 1 ($,) ($^:(0<L.))@> {: x
 ny ; ny ; (,<ny) ; a: , a:
 )
 
@@ -7506,6 +7523,7 @@ else.
   (>: {. > y) {.&.> selopshapes
 end.
 )
+calcunselectedshapes =: calcunselectedshapes_dissectirregularops_ f.
 
 localebslashdyad_dissect_ =: startdyad ''
 NB. The dyad x u\ y:
@@ -7554,7 +7572,7 @@ end.
 )
 calcunselectedshapes =: 3 : 0
 NB. For negative x, shape is unpredictable; otherwise it's like a selection from 0
-if. partitionx__xop < 0 do. calcunselectedshapes_dissectirregularops_ f. 0
+if. partitionx__xop < 0 do. calcunselectedshapes_dissectirregularops_ f. y
 else. calcselectedshapes 0
 end.
 )
@@ -7586,7 +7604,7 @@ NB. If selopshapes is a map, we have to get the right part
 if. 1 = L. selopshapes do.
   (itemctiny - {. > y) (0} ,)&.> selopshapes
 else.
-  (>: {. > y) }.&.> selopshapes
+  ({. > y) }.&.> selopshapes
 end.
 
 )
@@ -7625,7 +7643,7 @@ end.
 )
 calcunselectedshapes =: 3 : 0
 NB. For negative x, shape is unpredictable; otherwise it's like a selection from 0
-if. partitionx__xop < 0 do. calcunselectedshapes_dissectirregularops_ f. 0
+if. partitionx__xop < 0 do. calcunselectedshapes_dissectirregularops_ f. y
 else. calcselectedshapes 0
 end.
 )
@@ -7648,7 +7666,7 @@ NB. The pseudoframe (# of partitions) is already in the stored data, since we lo
 NB. call to u.  So make that the frame.
 NB. We extend the itemshape with 1s to 2 atoms; then the frame is the sum - 1; unless the shape contains
 NB. 0: then the frame is 0
-ny =. (0&(-.@e.) * [: <: +/) _2 {.!.1 yitemshape
+ny =. , (0&(-.@e.) * [: <: +/) _2 {.!.1 yitemshape
 ny ; ny ; (,<ny) ; a: , a:
 NB.?lintsaveglobals
 )
@@ -7673,7 +7691,8 @@ NB. We have calculated the selected elements in diagonaleles; use that to get th
 if. 1 = L. selopshapes do.
   (#diagonaleles) (, 2&}.)&.> selopshapes
 else.
-  diagonaleles&{.&.> selopshapes
+  NB. Each diagonal element is a row by itself, so we have to flatten them to select just the selected elements as an array
+  (,diagonaleles)&{&.> selopshapes
 end.
 )
 
@@ -7688,7 +7707,7 @@ NB.?lintonly xop =: <'dissectpartitionselector'
 NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
 NB. call to u.  So make that the frame.  The number of partitions is
 NB. the number of unique elements of x
-ny =. # ~. partitionx__xop
+ny =. , # ~. partitionx__xop
 ny ; ny ; (($0);ny) ; a: , a:
 NB.?lintsaveglobals
 )
@@ -7714,8 +7733,118 @@ end.
 
 )
 
+NB. *** ;. ***
+
+'dissectirregularops dissectpartitionconjunction dissectpartition' modlocale ';..'
+
+NB. We handle monads by creating a synthetic x and then handling as dyads.  So both valences
+NB. come through here
 
 
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb
+NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglevel
+calcdispframe =: 4 : 0
+NB.?lintonly xop =: <'dissectpartitionselector'
+NB.?lintonly partitionn =: 0
+shapeofy =: ($^:(0<L.))@> {: x
+select. partitionn
+case. 0 do.
+  canonx =: 0 ,:^:(2>#@$) partitionx__xop
+  usedyshape =: ({:@$ canonx) {. shapeofy
+  ny =. $0
+case. 1;_1;2;_2 do.
+  NB. canonize x: convert to list of boxes; then within each box, convert atom to full list, or empty to list of one partition
+  canonx =: shapeofy ((<.&# {. [) ((#^:(''-:$@])) [^:(0=#@])~ ({. 1:))&.> (<.&# {. ])) <^:(0=L.) partitionx__xop
+  usedyshape =: ({:@$ canonx) {. shapeofy
+  NB. Get shape of result partitions
+  ny =. +/@> canonx
+case. 3;_3 do.
+  NB. convert list to table; replace values bigger than axis by signed length of axis
+  canonx =: 1 ,:^:(2>#@$) partitionx__xop
+  usedyshape =: ({:@$ canonx) {. shapeofy
+  canonx =: ({. canonx) , (usedyshape<|)`(,:  usedyshape * *)} {: canonx
+  NB. Calculate the number of start positions: floor of (length of axis/movement vector) for 3,
+  NB. or floor of (1+length-size/movement vector) for _3; but 1 if movement vector is 0
+  ny =. (0 ~: 0{canonx)} 1 ,: <. (|0{canonx) %~ (-.usedyshape) +^:(partitionn=_3) | 1 { canonx
+case. do.
+  NB.?lintonly canonx =: usedyshape =: $0
+  NB.?lintonly ny =. 0
+end.
+NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
+NB. call to u.  So make that the frame.
+ny ; ny ; (($0);ny) ; a: , a:
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection (a: if forced)
+calcphysandhighlights =: 3 : 0
+NB. This comes up with a sequence of boxes, one per axis processed, where each box holds the
+NB. selected indexes
+select. partitionn
+case. 0 do.
+  hlit =: ((usedyshape | {. canonx) + 0 <. {: canonx) +&.> (i.&.> {: canonx)
+case. 1;_1;2;_2 do.
+  hlit =: (>y) {&> (<;.partitionn~ i.@#)&.> canonx
+case. 3;_3 do.
+  hlit =: usedyshape (> # ])&.> ((>y) * ({. canonx)) +&.> (i.&.> {: canonx)
+case. do.
+  NB.?lintonly hlit =: $0
+end.
+NB. There is never a highlight in x; use an empty
+(< 2 0$a:) , < 2 1&$ < <@<"0 ,hlit
+NB.?lintsaveglobals
+)
+
+NB. y is the current selection in isf form
+NB. result is new value to use for selopshapes
+calcselectedshapes =: 3 : 0
+NB. Keep the rank of selopshapes, but apply the highlight selection to the leading axes
+NB. The shape of x is immaterial since u is always invoked as a monad
+NB. If selopshapes is a map, we have to get the right part
+if. 1 = L. {: selopshapes do.
+  a: , ((#&> hlit) (i.#hlit)} ,)&.> {: selopshapes
+else.
+  a: , (<hlit)&{&.> {: selopshapes
+end.
+)
+
+
+NB. The monadic valence u;. y:
+startmonad ''
+
+
+NB. *** traversal support ***
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb
+NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglevel
+calcdispframe =: 4 : 0
+NB.?lintonly partitionn =: 0
+NB.?lintonly yop =: <'dissectobj'
+shapeofy =. ($^:(0<L.))@> {: x
+NB. Synthesize the x value that describes this monad, and then transfer to the dyadic code
+select. partitionn
+case. 0 do.
+  partitionx__xop =: (0 _1 */shapeofy) 
+case. 1;_1;2;_2 do.
+  if. errorcode__yop > EOK do.
+    partitionx__xop =: ,0
+  else.
+    yval =. ,^:(''-:$) fillmask__yop frameselresult__yop selresult__yop
+    fret =. (- partitionn e. 2 _2) { yval
+    partitionx__xop =: fret -:"_ _1 yval
+  end.
+case. 3;_3 do.
+  partitionx__xop =: ($shapeofy)$<./shapeofy
+end.
+)
+
+NB. the rest handled in the common locale
+
+startdyad ''
+NB. The dyad x u;.n y:
+
+NB. all handled in the common locale
 
 NB. **** default ****
 localedefault_dissect_ =: modlocale ''
@@ -8319,6 +8448,13 @@ dissect '1 1 +//.@(*/) 1 2 1'
 dissect '+:/. i. 4'
 dissect '+:/. i. 0'
 dissect '1 1 2 3 2 1 4 3 1 2 3 <@,/. ;:''The quick brown fox jumped over the lazy dog and slept'''
+dissect 'i.\ 0 1 2 3.5'
+dissect 'i.&.> ]each 0 1 2 3.5'
+dissect '#&.>\ ;: ''The quick brown fox'''
+dissect '#&.>/. ;: ''The quick brown fox'''
+dissect '#&.>\. ;: ''The quick brown fox'''
+dissect '#&.>\. ''abcd'''
+dissect '+:;.0 i. 3 3'
 )
 
 0 : 0  NB. Testcases that fail
