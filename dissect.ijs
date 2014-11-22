@@ -50,11 +50,11 @@ QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 NB. TODO:
-NB. dissect '#&.>\. ''abcd'''  incorrectly highlights clicks to expander.  Prob is that cells before SFOPEN have just a start rather than start/end,
-NB.  and if there is no internal detail we never get an end
-NB. figure out why crash requires reload of dissect
-NB. need something like forced selection for ;.0
-NB. collect descending selections into one interval
+NB. need a way to remove an expansion
+NB. figure out why crash requires reload of dissect.  (just requires restart.  prob is that traverse (called from calcplacement or before)
+NB.   fails, outside of any try., and leaves the form up & presumably other vars.  Need a way to throw this error back to
+NB.   main cleanup.  Example: (1) dissect '1 2 3 1 2 <;.1 ''abcde''' (2) cancel dissect window (3) dissect '1 0 0 1 0 <;.1 ''abcde'''    gives locale error
+NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
 NB. support axis permutations for display, for u;.
 NB. handle m\ etc as generic verb
 NB. Display of executing a gerund has no data
@@ -1611,7 +1611,7 @@ NB. obsolete NB. NB. 1 = forcedselection as described above, we propagate the va
 NB. obsolete NB. NB. normally a: for the forced selection
 NB. obsolete     if. (*#frame) *. (sellevel < #selections) do.   NB. kludge use 1 < */ frame?
     'seltype thissel' =. getselection''  NB. classify the type of selection
-    select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only
+    select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 4=autoselect of node with no frame
 NB. obsolete       if. 1 < #thissel do.   NB. kludge use 1 < */ frame?
 NB. obsolete NB. special operation.  Avoid the selection, do the special op
 NB. obsolete         'type thissel' =. thissel   NB. Redefine thissel for use down below
@@ -3344,7 +3344,9 @@ if. #highlightblocks =. a: -.~ ;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:i
     last2 =. ({.~   [: - 2 <. #) > lastsel
     prev =. (-#last2) }. > lastsel
     prev =. 1 2&$&.>&.> prev
-    last2 =. (<@,:@({. , >:@{:);.1~     (~:   |.!._1@:>:))&.> last2
+NB. obsolete     last2 =. (<@,:@({. , >:@{:);.1~     (~:   |.!._1@:>:))&.> last2
+    NB. Take first, last+1 of each sequence of consecutive values, whether ascending or descending
+    last2 =. (<@,:@(<./ , >:@(>./));.1~     (1 , 1 < [: | 2&(-/\)))&.> last2
     <"1 path ,"1 0 , |:@;&.> { prev , last2
   else.
     NB. No selection after dropdown.  Just use the path to the dropdown
@@ -3405,12 +3407,13 @@ NB. obsolete ; x ;"0&.> ,@:(<"1)&.> rects
 NB. x and y are contents of a single box of (an ISF that has been brought to level 2); i. e. x and y have boxing level at least 1
 NB.  and are to be interpreted as (an array of) lists of selections
 NB. Each box in xy contains either a list of axes or a boxed list of alternatives for successive axes.  For simplicity here we demand that
-NB. any level-3 operand (one that is a boxed list of alternatives) must be last in a sequence
+NB. any level-3 operand (one that is a boxed list of alternatives) must be in a box by itself
 NB. Result is the joined lists (y,x), flattened so that each axis is in one box
 chainISFs =: dyad define
 NB. get the first box of selections from x.  If there are others, they will be SFOPEN, which we can't handle here, so one box is enough
 NB. Turn the selections into a box for each axis
-selx =. <"0&.>^:(0=classsel)"0@>@{."1 x
+NB. obsolete selx =. <"0&.>^:(0=classsel)"0@>@{."1 x
+selx =. <"0^:(0=L.)@>@{."1 x
 if. #ysel =. y do.
   ranky =. <: # $ y  NB. number of axes of x that can select
   NB. take selections using x, for as many axes as y can handle.  These will select from y.  There may be surplus y shape
@@ -3421,25 +3424,29 @@ if. #ysel =. y do.
   if. {:$selx =. selrank }."1 selx do.
     NB. Repeat the procedure, now using remaining axes of x to select from the trailing boxes of y that contain multiple values
     NB. See how many trailing boxes of y contain multiple values
-    NB. We look at one (must be representative) row of y; within that, we look at only the first box within each box,
-    NB. because others must be SFOPEN
     assert. 1 = #$ysel  NB. If there is selecting, we should have applied it to y first
-    if. ranky =. 1 i.&1@:~: |. classsel@{.@> ysel do.
+    NB. Since we are perforce down to a single list for ysel, run all the selections into a single level-2 list
+    ysell2 =. ; ysel
+    NB. There may be multiple boxes of y containing boxes with multiple values, BUT: these boxes must
+    NB. be trailing boxes of y.  See how many there are.  This is the number of axes of x we can index
+NB. obsolete     if. ranky =. 1 i.&1@:~: |. classsel@{.@> ysel do.
+    if. ranky =. 1 i.&1@:~: |. classsel ysell2 do.
       NB. Remove x axes used and replace the first box(es) of x with the remainder.
       usableselx =. (selrank =. ({: $ selx) <. ranky) {."1 selx
       if. selrank do.
         NB. There are selections to make.  They should not include SFOPEN
-        assert. -. SFOPEN e. ; (-selrank) {."1 ysel
-        ysel =. (-selrank) (}."1 ,"1 usableselx {&.>L:1"1 {."1) ysel
+NB. obsolete         assert. -. SFOPEN e. ; (-selrank) {."1 ysel
+        ysell2 =. (-selrank) (}."1 ,"1 usableselx {&.>L:1"0"1 {."1) ysell2
         NB. obsolete   BUT if we delete all the ranks
         NB. obsolete NB. from x, that leaves an empty box which looks like SFOPEN, so delete the first box in that case
         NB. obsolete replx1 =. <^:(*@#)"1 selrank }."1 selx
         selx =. selrank }."1 selx
       end.
     end.
+    ysel =. < ysell2
   end.
 end.
-NB. replace the first box of x (if there is any residual x after selexction), and join it to the selected y.  If y has surplus rank this will copy the surplus rank to the result
+NB. replace the first box of x (if there is any residual x after selection), and join it to the selected y.  If y has surplus rank this will copy the surplus rank to the result
 NB. obsolete ysel ,"1 (<"1 selx) ,"_1 1 }."1 x
 ysel ,"1 selx (,~ <)~"1^:(*@{:@$@[) }."1 x
 )
@@ -3902,7 +3909,6 @@ NB. We take all the selectors there are, up the length of the frame of this leve
 NB. selectors for higher levels.  The only way we can get more selectors than frame is during sniff, where the lower
 NB. selection is propagated up automatically
   QP^:DEBHLIGHT'drawDO:defstring=?defstring]0 opselin '
-  QP^:DEBHLIGHT'hlightforselection]inheritroot ~.hlightforoperands]opselin '
   hlights =. (SELECTIONBORDERSTYLE ;< ~. hlightforselection inheritroot) ,: HIGHLIGHTBORDERSTYLE ;< ~. hlightforoperands opselin
   QP^:DEBHLIGHT'hlights '
 NB. Draw accumulated highlight rects
@@ -4703,7 +4709,7 @@ recursiveselection =: 3 : 0
 'inslevel prevcellrank' =. x
 QP^:DEBPICK'selecting in ?defstring]0%x%y%initialselection%sellevel%selections%selframe%frame%level%'
 selectionfound =. 0$a:
-NB. If y is empty (possible if we are running to end, make it an empty list
+NB. If y is empty (possible if we are running to end), make it an empty list
 if. 0 = #y do. y =. ,a: end.
 if. #resultlevel do.
   assert. resultlevel > 0
@@ -4734,7 +4740,7 @@ else.
   NB. the frame concatenated with the max-size result cell.
   if. prevcellrank < 0 do. prevcellrank =. frame +&# maxcellresultshape end.
   NB. prevcellrank tells how big a filled cell of the previous level is.  That will be filled at this level
-  NB. by 3 things: (A: leading axes added by f ill at the previous level),(B: frame at this level),(C: cell result at this level).
+  NB. by 3 things: (A: leading axes added by fill at the previous level),(B: frame at this level),(C: cell result at this level).
   NB. We need to pull the axes from y that correspond to B to be this level's selection, and to discard
   NB. A and B from the axes passed on to the next selection level.
   NB. If selframe is larger than frame (happens for u^:n), it means that the selection actually reaches inside the cell.
@@ -4772,7 +4778,7 @@ end.
 NB. If we found a selection, propagate it to the end and declare a change.  If not,
 NB. try again at the next spot in the inheritance chain
 if. #selectionfound do.
-  QP^:DEBPICK'selectionfound%initialselection%propagating:?(sellevel {. selections) , selectionfound%localf%frame1%'
+  QP^:DEBPICK'selectionfound%initialselection%propagating:?(sellevel {. selections) , selectionfound%localf%frame1%thisverbframelen%prevcellrank%filledframe%thiscellrank%maxcellresultshape%'
   propsel (sellevel {. selections) , selectionfound
 NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
   propscroll 1   NB. 1 causes the scroll to be unchanged in THIS node, cleared to the leaves
@@ -4782,6 +4788,7 @@ else.
 NB. obsolete   (sellevel + *#selframe) recursiveselection__inheritedfrom residualy
   NB. get locale to use next; if empty, use our closer locale
   if. 0 = #recurloc =. getnextpickloc'' do. recurloc =. <'dissect' end.
+  QP^:DEBPICK'localf%frame1%thisverbframelen%prevcellrank%filledframe%thiscellrank%maxcellresultshape%residualy%'
   NB.?lintonly recurloc =. <'dissect'
   ((sellevel + selectable),thiscellrank) recursiveselection__recurloc residualy
 end.
@@ -7735,7 +7742,7 @@ end.
 
 NB. *** ;. ***
 
-'dissectirregularops dissectpartitionconjunction dissectpartition' modlocale ';..'
+dissectlocalesemidot_dissect_ =: 'dissectirregularops dissectpartitionconjunction dissectpartition' modlocale ';.'
 
 NB. We handle monads by creating a synthetic x and then handling as dyads.  So both valences
 NB. come through here
@@ -7750,7 +7757,7 @@ NB.?lintonly partitionn =: 0
 shapeofy =: ($^:(0<L.))@> {: x
 select. partitionn
 case. 0 do.
-  canonx =: 0 ,:^:(2>#@$) partitionx__xop
+  canonx =: 0&,:^:(2>#@$) partitionx__xop
   usedyshape =: ({:@$ canonx) {. shapeofy
   ny =. $0
 case. 1;_1;2;_2 do.
@@ -7761,12 +7768,17 @@ case. 1;_1;2;_2 do.
   ny =. +/@> canonx
 case. 3;_3 do.
   NB. convert list to table; replace values bigger than axis by signed length of axis
-  canonx =: 1 ,:^:(2>#@$) partitionx__xop
-  usedyshape =: ({:@$ canonx) {. shapeofy
-  canonx =: ({. canonx) , (usedyshape<|)`(,:  usedyshape * *)} {: canonx
-  NB. Calculate the number of start positions: floor of (length of axis/movement vector) for 3,
-  NB. or floor of (1+length-size/movement vector) for _3; but 1 if movement vector is 0
-  ny =. (0 ~: 0{canonx)} 1 ,: <. (|0{canonx) %~ (-.usedyshape) +^:(partitionn=_3) | 1 { canonx
+  canonx =: 1 ,:^:(2>#@$@]) partitionx__xop
+  NB. Trailing axes of ;.3 are included in the partitioning, so extend them by assuming a 'take everything'.
+  NB. We can't just omit them from canonx and leave them in the frame, because then the selection would be
+  NB. longer than canonx
+  canonx =: canonx ,. (0 >. (#shapeofy) - ({:$canonx)) #"0 (0 _)
+  usedyshape =: ({:@$ canonx) {. shapeofy   NB. Now always same as shapeofy
+  canonx =: ({. canonx) ,: (usedyshape<|)`(,:  usedyshape * *)} {: canonx
+  NB. Calculate the number of start positions: ceiling of (length of axis/movement vector) for 3,
+  NB. or ceiling of (length-size/movement vector) for _3; but 1 if movement vector is 0
+  ny =. (0 ~: 0{canonx)} 1 ,: >. (|0{canonx) %~ (| 1 { canonx) -~^:(partitionn=_3) usedyshape
+  ny =. (#shapeofy) {.!.1 ny
 case. do.
   NB.?lintonly canonx =: usedyshape =: $0
   NB.?lintonly ny =. 0
@@ -7777,22 +7789,55 @@ ny ; ny ; (($0);ny) ; a: , a:
 NB.?lintsaveglobals
 )
 
+NB. y is raw selections, result is selections to use
+NB. There is a quirk in u;.3, probably in the special code, such that the computation may be restarted
+NB. depending on the result shape, and the changing shapes of the individual results
+findselection =: 3 : 0
+r =. findselection_dissectobj_ f. y
+if. partitionn e. 3 _3 do.
+  NB. We can't figure out what really happened, if there was an error.  If there is no error we will
+  NB. recover by keeping the expected number of elements (the most recent ones).  This is a kludge, and an
+  NB. even bigger one is that we have to tighten the selector to avoid having results in repeated lower
+  NB. verbs match.  The value to use is the ticket of the last rejected execution, if any
+  or =. ;r
+  if. (#or) > maxvalid =. 1 >. */frame do.
+    r =. < (-maxvalid) {. or
+    NB.?lintonly maxvalid =. ''   NB. avoids index error in next line
+    selector =: (logticket {~ - >: maxvalid)&(0})&.> selector
+  end.
+end.
+r
+)
+
+NB. For ;.0, we generate an automatic selection (type 4, which bypasses the selection and does just the highlighting)
+NB. Others follow the usual selection route using the frame
+getselection =: 3 : 0
+select. partitionn
+case. 0 do.
+  4 0
+case. do.
+  getselection_dissectobj_ f. y
+end.
+)
+
 NB. y is the current selection (a: if forced)
 calcphysandhighlights =: 3 : 0
 NB. This comes up with a sequence of boxes, one per axis processed, where each box holds the
 NB. selected indexes
 select. partitionn
 case. 0 do.
-  hlit =: ((usedyshape | {. canonx) + 0 <. {: canonx) +&.> (i.&.> {: canonx)
+  hlit =: (usedyshape | ([ - (({"0 1 (0 ,. <:@:|))~ 0&>)~)/ canonx) +&.> (i.&.> {: canonx)
 case. 1;_1;2;_2 do.
-  hlit =: (>y) {&> (<;.partitionn~ i.@#)&.> canonx
+  hlit =: (>y) {&> (<;.partitionn i.@#)&.> canonx
 case. 3;_3 do.
   hlit =: usedyshape (> # ])&.> ((>y) * ({. canonx)) +&.> (i.&.> {: canonx)
 case. do.
   NB.?lintonly hlit =: $0
 end.
 NB. There is never a highlight in x; use an empty
-(< 2 0$a:) , < 2 1&$ < <@<"0 ,hlit
+NB. obsolete (-valence) {. (< 2 0$a:) , < 2 1&$ < <@,@< ,hlit
+NB. obsolete (-valence) {. (< 2 0$a:) , < 2 1&$ < <@<"0 ,hlit
+(-valence) {. (< 2 0$a:) , < 2 1&$ < ,@<@:(<"0) ,hlit
 NB.?lintsaveglobals
 )
 
@@ -7803,9 +7848,9 @@ NB. Keep the rank of selopshapes, but apply the highlight selection to the leadi
 NB. The shape of x is immaterial since u is always invoked as a monad
 NB. If selopshapes is a map, we have to get the right part
 if. 1 = L. {: selopshapes do.
-  a: , ((#&> hlit) (i.#hlit)} ,)&.> {: selopshapes
+(-valence) {.   a: , ((#&> hlit) (i.#hlit)} ,)&.> {: selopshapes
 else.
-  a: , (<hlit)&{&.> {: selopshapes
+(-valence) {.   a: , (<hlit)&{&.> {: selopshapes
 end.
 )
 
@@ -7837,6 +7882,7 @@ case. 1;_1;2;_2 do.
 case. 3;_3 do.
   partitionx__xop =: ($shapeofy)$<./shapeofy
 end.
+x calcdispframe__dissectlocalesemidot f. y
 )
 
 NB. the rest handled in the common locale
@@ -8455,6 +8501,47 @@ dissect '#&.>/. ;: ''The quick brown fox'''
 dissect '#&.>\. ;: ''The quick brown fox'''
 dissect '#&.>\. ''abcd'''
 dissect '+:;.0 i. 3 3'
+dissect '(1 2,:2 3) +:;.0 i. 4 5'
+dissect '(1 3,:2 _2) +:;.0 i. 4 5'
+dissect '(1 _3,:2 2) +:;.0 i. 4 5'
+dissect '(1 _3,:2 _2) +:;.0 i. 4 5'
+dissect '(1,:2) +:;.0 i. 4 5'
+dissect '<;.1 ''every little thing'''
+dissect '<;.1 ;: ''a man a plan a canal panama'''
+dissect '(+/ % #);.1 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+dissect '<;._1 ''every little thing'''
+dissect '<;._1 ;: ''a man a plan a canal panama'''
+dissect '(+/ % #);._1 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+dissect '<;.2 ''every little thing'''
+dissect '<;.2 ;: ''a man a plan a canal panama'''
+dissect '(+/ % #);.2 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+dissect '<;._2 ''every little thing'''
+dissect '<;._2 ;: ''a man a plan a canal panama'''
+dissect '(+/ % #);._2 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+dissect '1 0 0 1 0 <;.1 ''abcde'''
+dissect '1 0 0 1 0 <;.2 ''abcde'''
+dissect '(1 0 1 0;1 0 1 1 0) +:;.1 i. 4 5'
+dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'   NB. fails on selection
+dissect '(3 4 ,: 2 3) <;.3 i. 10 10'
+dissect '(3 4 ,: 2 3) <;._3 i. 10 10'
+dissect '(3 4 ,: _2 3) <;.3 i. 10 10'
+dissect '(3 4 ,: _2 3) <;._3 i. 10 10'
+dissect '(3 6 ,: 2 3) <;.3 i. 10 10'
+dissect '(3 6 ,: 2 3) <;._3 i. 10 10'
+dissect '(3 6 ,: _2 3) <;.3 i. 10 10'
+dissect '(3 6 ,: _2 3) <;._3 i. 10 10'
+dissect '(0 4 ,: 2 3) <;.3 i. 10 10'
+dissect '(0 4 ,: 2 3) <;._3 i. 10 10'
+dissect '(0 0 ,: 2 3) <;.3 i. 10 10'
+dissect '(0 0 ,: 2 3) <;._3 i. 10 10'
+dissect '(3 4 ,: 2 3) +:;.3 i. 10 10'
+dissect '(3 4 ,: 2 3) +:;._3 i. 10 10'
+dissect '(3 4 ,: _2 3) +:;.3 i. 10 10'
+dissect '(3 4 ,: _2 3) +:;._3 i. 10 10'
+dissect '(3 ,: 2) <;.3 i. 10 10'
+dissect '(3 ,: 2) <;._3 i. 10 10'
+dissect '(0 ,: 2) <;.3 i. 10 10'
+dissect '(0 ,: 2) <;._3 i. 10 10'
 )
 
 0 : 0  NB. Testcases that fail
@@ -8464,3 +8551,4 @@ NB. no dyad yet dissect '   (<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
 0 : 0
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
+
