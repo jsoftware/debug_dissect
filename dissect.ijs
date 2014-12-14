@@ -124,8 +124,9 @@ ifdefined =: 0 <: [: 4!:0 <
 NB. ******************* code for function keys ******************
 finddissectline =: 3 : 0
 NB.?lintonly  WinText_jqtide_ =: WinSelect_jqtide_ =: 0 0
-NB. y tells what kind of run: 0=line under cursor, 1=last error
-if. y = 0 do.
+NB. y tells what kind of run: 0=line under cursor, 1=last error, 2=clipboard
+select. y
+case. 0 do.
   ft =. WinText_jqtide_
   fs =. WinSelect_jqtide_
   NB. If a single value is selected, take the whole line; otherwise the selected region
@@ -134,8 +135,12 @@ if. y = 0 do.
   else.
     (LF taketo&.|. ({.fs) {. ft) , LF taketo ({.fs) }. ft
   end.
-else.
+case. 1 do.
   ''  NB. empty line means 'last error'
+case. 2 do.
+  {.^:(0=#) wd 'clippaste'   NB. fail 'no sentence' if nothing on clipboard
+case. do.
+  ' '  NB. Will fail with 'no sentence'
 end.
 )
 
@@ -2416,12 +2421,6 @@ NB. Append each quadrilateral point with the following hull points and run toget
 ; (<"1 }: ccwminmax) ,&.> hullpts
 )
 
-NB. Utility for scanned routedeblog
-NB. y is a tlbr, result is the boxes of routedeblog, culled to that window
-culldeblog =: 3 : 0
-(2 2 $,y)&(] #~ (([: *./"1 [: >/"1 <:"1"2 1)  2&{."1) )&.>  routedeblog
-)
-
 NB. Angle ranges for allowable lines, startpoint to endpoint, in the screen's upside-down y coordinates
 angleranges =: 12 o. _10j_1 _1j_10 1j_10 10j_1 10j1 1j10 _1j10 _10j1
 NB. OK range values for each type of first face
@@ -2493,7 +2492,7 @@ currdist =. 1
 ndestsfound =. 1  NB. the starting point has automatically been routed
 if. DEBROUTE do.
 routedeblog =: 0$a:
-end.
+end.   NB.?lintonly routedeblog =: 0$a:
 while. ndestsfound < #routend do.
   NB. Activate points that were put in the penalty box for being close to another route.
   NB. When they come back into play they are allowed to turn.
@@ -2638,7 +2637,15 @@ NB. Append wires to connect the true endpoints to the routing endpoints
 wires =. wires , (gridtoyx routend) ,. trueroutend ,. 0
 NB. Return the lines
 wires
+NB.?lintsaveglobals
 )
+
+NB. Utility for scanned routedeblog
+NB. y is a tlbr, result is the boxes of routedeblog, culled to that window
+culldeblog =: 3 : 0
+(2 2 $,y)&(] #~ (([: *./"1 [: >/"1 <:"1"2 1)  2&{."1) )&.>  routedeblog
+)
+
 
 NB. display occupancy
 occ =: 3 : 0
