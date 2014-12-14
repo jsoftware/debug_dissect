@@ -32,6 +32,9 @@ NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).
 NB. take over the timer interrupt
 ALLOWNONQTTOOLTIP_dissect_ =: 0
 
+NB. set SINGLESELECTION to clear previous selections when a new selection branch is opened
+SINGLESELECTION_dissect_ =: 1
+
 CLEANUP_dissect_ =: 1  NB. set to 0 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
@@ -56,13 +59,12 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 )
 NB. TODO:
 NB. fix pas in 803
+NB. fwd/back button for selection
 NB. dissect '>:L:0"0 (1;''a'';3;4)'   doesn't crosshatch unexecd cells
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
 NB. dissect '(* $:@:<:)^:(1&<) 7'    select result 1 - no detail displayed inside ^:
 NB.  this is because there are multiple possible results, so we skeletalu.  But should the wiring bypass the skeletalu?
-NB. need a way to remove an expansion
-NB. should remove a selection when a selection in a different path?  Or have a way to remove a selection?  Use dissect '4 1 2 3 +//.@(*/) _1 4 0 2 6' for example
-NB.  solution: propsel from the PARENT of the selecting node
+NB. should we show leading singleton axes?  Should we shoe datatype, for chars at least?
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
 NB. support axis permutations for display, for u;.
 NB. Display of executing a gerund has no data
@@ -380,6 +382,10 @@ NB. We keep track of $: verbs encountered, and insert an expansion node if there
 NB. is before the monad/dyad execution containing the $: .  We clear the flag indicating recursion to begin with, and after any monad/dyad.
 recursionencountered =: 0
 
+NB. In case of parse failure, we remember whether we executed a user modifier.  If we did, our assumption that it produced
+NB. a verb may have caused the failure, and we give a suitably couched error message
+usermodifierencountered =: 0
+
 NB. Process the sentence through the stack
 while. do.
 NB. If the stack contains an executable combination, execute it
@@ -541,14 +547,15 @@ NB. and 'verb' for modifier executions
           ntypeval =. createnoun qend;qend;(#queue)  NB. Keep name, and save name for display
         case. 1 do.
           NB. adverb: handle the special code (currently only &.>)
-          NB. If the user name matches special code, expand it on the stack
+          NB. If the value of the user name matches special code, expand it on the stack
           if. objval -: '&.>' do.
             ntypeval =. (conj;'&.';(#queue)) ,: createverb (,'>');(0$0)
           else.
-            ntypeval =. adv;qend;(#queue)
+            NB. If the value of the user name matches a supported primitive, replace the name by the supported value
+            ntypeval =. adv;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
           end.
         case. 2 do.
-          ntypeval =. conj;qend;(#queue)
+          ntypeval =. conj;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
         case. 3 do.
           ntypeval =. createverb qend;(#queue)
         case. do.
@@ -583,7 +590,7 @@ NB. Must be a primitive.  Get its type and stack it
 end.   NB. End of loop processing stack.  top of stack is a mark
 NB. verify that the sentence has a valid finish: 1 noun.
 if. 1 1 -.@-: * (noun,mark) bwand >(<1 2;0){stack do.
-  failparse 'Sentence did not produce a noun result'
+  failparse usermodifierencountered {:: 'Sentence did not produce a noun result';'Sentence does not seem to produce a noun result.  Dissect assumes that user modifiers produce verb results.'
   return.
 end.
 
@@ -618,29 +625,32 @@ if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
       ntypeval =. execmod (execmod ({.exeblock),:{.modblock) ,: {: modblock
   end.
 else.
-NB. If all the operands are self-defining terms, execute the modifier, figure out the resulting
+NB. If the modifier and all the operands are self-defining terms, execute the modifier, figure out the resulting
 NB. part of speech, and create an appropriate type/value for it.  This will handle things like
 NB. 3 b.   and 1!:1   and  1 : '...' .
-  if. bwand/ sdt 1} exetypes do.
+NB. obsolete   if. bwand/ sdt 1} exetypes do.
+  if. bwand/ sdt , exetypes do.
     ". 'exeobj =. ' , defstg =. ; 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. enparen y end.'&.> (1) {"1 exeblock
     tokennums =. ; 2 {"1 exeblock
     select. 4!:0 <'exeobj'
-      case. 0 do.
-        ntypeval =. createnoun (5!:5 <'exeobj');'';tokennums
-      case. 1 do.
-        ntypeval =. adv;(enparen defstg);tokennums
-      case. 2 do.
-        ntypeval =. conj;(enparen defstg);tokennums
-      case. 3 do.
-        ntypeval =. createverb (5!:5 <'exeobj');tokennums
-      case. do.
-        failparse 'Invalid type while applying modifier'
-        return.
+    case. 0 do.
+      ntypeval =. createnoun (5!:5 <'exeobj');'';tokennums
+    case. 1 do.
+      ntypeval =. adv;(enparen defstg);tokennums
+    case. 2 do.
+      ntypeval =. conj;(enparen defstg);tokennums
+    case. 3 do.
+      ntypeval =. createverb (5!:5 <'exeobj');tokennums
+    case. do.
+      failparse 'Invalid type while applying modifier'
+      return.
     end.
   else.
-NB. Not sdt.  Look up the locale of the modifier, and execute it.  The executed modifier must correctly guess the
-NB. part of speech that is going to be produced.
-    ntypeval =. exeblock (0 createmodifier)~ 'dissectprim' , ": ((<1 1) { exeblock) i.&1@:((e.>)"0) dissectprimindex
+    NB. Not sdt.  Look up the locale of the modifier, and execute it.  The executed modifier must correctly guess the
+    NB. part of speech that is going to be produced.
+    ntypeval =. exeblock (0 createmodifier)~ 'dissectprim' , ": ifound =. ((<1 1) { exeblock) i.&1@:((e.>)"0) dissectprimindex
+    NB. If the modifier was not one that we recognize, remember that, in case of parse failure
+    usermodifierencountered =: usermodifierencountered >. ifound = #dissectprimindex
 NB.?lintonly nobj =. localedefault
   end.
 end.
@@ -747,6 +757,11 @@ if. -. -:/ y do.
   qprintf'y '
   return.
 end.
+
+NB. For forced tooltips (clicks on unexpandable data), we enforce a minimum display time so that
+NB. the user has a chance to see that there is a tooltip there.  This value is the session-timer value
+NB. at which the display can be withdrawn.
+hoversessmin =: 0
 
 NB. save the crash indicator
 if. crashed =: 0 = #0 {:: y do.
@@ -1113,13 +1128,17 @@ propsel =: propsel1@# [ propsel0
 NB. Clear scroll point (at nodes leafward from the starting node).  y is 1 to start, and the assignment is made only if <: 0
 propscroll =: 'propselstopatnoun'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
 
-
-NB. Propagate selection up the tree (leaves to root), until we hit a monad/dyad execution.  y is value to select
-propselup =: 3 : 'selections =: y if. -. ({. copath coname'''') e. ;: ''dissectmonad dissectdyad'' do. propselup__parent y end.'
-
+NB. obsolete 
+NB. obsolete NB. Propagate selection up the tree (leaves to root), until we hit a monad/dyad execution.  y is value to select
+NB. obsolete propselup =: 3 : 'selections =: y if. -. ({. copath coname'''') e. ;: ''dissectmonad dissectdyad'' do. propselup__parent y end.'
+NB. obsolete 
 NB. init parent nodes in all objects.  This must be done in a separate verb because only a named verb resets the locale
 NB. Called in locale of the base of the tree
 initparentnodes =: 'propselall'&((3 : 'coname 0 # parent =: y') traversedown 0:)
+
+NB. Discard old selections.  Called in the locale of the base of the tree.
+NB. Selections in nodes at level y and above have any selections past number y removed
+discardselectionsabovelevel =: 'propselall'&((3 : 'if. sellevel >: y do. selections =: (y + (sellevel = y) *. ((sellevel+selectable) < #selections)) (] {.~ (<. #)) selections end. y ') traversedown 0:)
 
 NB. called after sniff to indicate which nodes can have an error display
 setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: {. ".''*#DOstatusstring''') traversedown 0:)
@@ -1150,7 +1169,7 @@ NB. Defaults for switches set only in certain paths
 rankcalculussupported =: 1
 
 NB. The following names must be redefined when an object is cloned
-clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel explorer errorwasdisplayedhere pointoffailure sellevel stealthoperand'
+clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel explorer errorwasdisplayedhere pointoffailure sellevel selectable stealthoperand'
 
 NB. Object creation.  create the signaling variables used for communicating with the grid.
 NB. y is <the tokens that these values came from
@@ -1174,7 +1193,7 @@ NB. The following names are guaranteed modified in the clone after this object i
 
 NB. The following names are possibly modified after cloning.  Therefore, they must be copied into the clone
 NB. when the clone is created, so that a mod to the original doesn't affect the clone.
-(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;($0);_;0
+(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;($0);_;0;0
 
 NB.?lintonly valence =: errorlevel =: snifferror =: 1
 NB.?lintonly defstring =: ":
@@ -1890,7 +1909,7 @@ NB. to add to the end
 NB. The chain starts at u and ends at u"v"w....  Info in the root of the chain is most detailed.
 NB. inheritroot is the first locale inherited from (u above)
 NB. inheritedfrom is pointer to locale inherited from (u"v points to u)
-NB. inheritto points to the locale above this (u points to u"v)
+NB. inheritedto points to the locale above this (u points to u"v)
 NB. findinheritedtail finds the largest node (smallest sellevel)
 extendinheritchain =: 3 : 0
 (coname'') extendinheritchain y
@@ -4247,6 +4266,8 @@ hoverDOstatuspos =: 3 : 0
 'Explanation of error'
 )
 
+FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
+
 NB. For all these verbs, x is (button flags,view number), y is the yx position of the click relative to start of pickrect
 
 picklDOdatapos =: 4 : 0
@@ -4309,6 +4330,7 @@ NB. to show the selected cell at top-left
   else.
 NB. User tried to select, but we couldn't do it.  Give him a tooltip.
     drawtooltip__COCREATOR (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { 'unselectable - no frame';'no further selection possible'
+    hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''
   end.
 end.
 )
@@ -4421,6 +4443,8 @@ hoverinitloc =: $0
 NB.?lintonly wdtimer =: wd
 wdtimer 0
 if. 0 = 4!:0 <'tooltippixels' do.
+  NB. if the tooltip has a minimum lifetime, delay until that lifetime has been exceeded (kludge).  Should be short
+  if. 0.01 < reqddelay =. hoversessmin - 6!:1'' do. 6!:3 reqddelay end.
   glpixels (1 0 3 2 { , tooltippixpos) , tooltippixels
   glpaint''
   4!:55 <'tooltippixels'
@@ -4598,7 +4622,7 @@ NB. First, try custom selection, and if it made a change, return fast since it f
 if. selectionoverride'' do. 1 return. end.
 'inslevel prevcellrank' =. x
 QP^:DEBPICK'selecting in ?defstring]0%coname''''%x%y%initialselection%sellevel%selections%selframe%frame%resultlevel%'
-selectionfound =. 0$a:
+selectionfound =. 0    NB. scalar = no selection
 NB. If y is empty (possible if we are running to end), make it an empty list
 if. 0 = #y do. y =. ,a: end.
 if. #resultlevel do.
@@ -4617,8 +4641,8 @@ if. #resultlevel do.
     assert. localf <:&# y
   end.
   NB. See if this is a new selection
-  if. sellevel >: #selections do. selectionfound =. <localf   NB. should never be >
-  elseif. localf -.@-: sellevel {:: selections do. selectionfound =. <localf
+  if. sellevel >: #selections do. selectionfound =. ,<localf   NB. should never be >
+  elseif. localf -.@-: sellevel {:: selections do. selectionfound =. ,<localf
   end.
   residualy =. (#localf) }. y
   NB. The result cells of this verb are boxes, but we will be dropping down into one, so we really don't know what the cell looks like
@@ -4643,14 +4667,20 @@ else.
   localf =. (- thisverbframelen) {. filledframe {. frame1 =. 0 {:: y
   NB. We append the initial selection (if any) of the FIRST click that activates the expansion node.  If
   NB. this node has no selframe, the first click is recognized by non-existence of later selection.
-  NB. If this node has selframe, the first click is one that sets DOES NOT set selectionfound, provided
-  NB. no later selection exists (this means the first click selected at this node, and we will let this
+  NB. If this node has selframe, the first click is one that DOES NOT set selectionfound, provided
+  NB. no later selection exists (this means the first click selected at this node, and we will let this next
   NB. click send on the initialselection). We have to
   NB. do it this way because the initialselection may be in a v-type rather than a u-type, and the v-type
   NB. is not in the inheritance chain.
+  NB. If this node has an initialselection and also a selection, that means that it has triggered an expansion
+  NB. already.  In that case, a click on it REMOVES the expansion.  We detect this when the selection here
+  NB. has values beyond this selection level
   if. 0 = #selframe do.
   NB. If this node has no frame, it has nothing to add to the conversation; but the initialselection might
-    if. sellevel >: #selections do. selectionfound =. initialselection end.
+      if. sellevel >: #selections do.
+        if. #initialselection do. selectionfound =. ,initialselection end.
+      else. selectionfound =. 0$a:
+      end.
   else.
     NB. This node has frame.  Look at the leading elements of y.  If they don't match the current
     NB. selection (or if there is no current selection), we've seen enough: the selection starts
@@ -4658,9 +4688,10 @@ else.
     if. 0 = #localf do.
     NB. Forced selection.  It was propagated when first detected, so we just ignore the node and
     NB. keep looking
-    elseif. sellevel >: #selections do. selectionfound =. <localf   NB. should never be >
-    elseif. localf -.@-: sellevel {:: selections do. selectionfound =. <localf
+    elseif. sellevel >: #selections do. selectionfound =. ,<localf   NB. should never be >
+    elseif. localf -.@-: sellevel {:: selections do. selectionfound =. ,<localf
     elseif. (sellevel = <:#selections) *. (*#initialselection) do. selectionfound =. ({: selections) , initialselection
+    elseif. sellevel < <:#selections do. selectionfound =. 0$a:   NB. remove expansion
     end.
   end.
   NB. Get the list of remaining frame - but remove it if empty, if we diminished it (if we didn't diminish it, leave it
@@ -4671,8 +4702,16 @@ else.
 end.
 NB. If we found a selection, propagate it to the end and declare a change.  If not,
 NB. try again at the next spot in the inheritance chain
-if. #selectionfound do.
+if. #$selectionfound do.
   QP^:DEBPICK'selectionfound%initialselection%propagating:?(sellevel {. selections) , selectionfound%localf%frame1%thisverbframelen%prevcellrank%filledframe%thiscellrank%maxcellresultshape%'
+  if. SINGLESELECTION do.
+    NB. To avoid confusion, we confine the selection to a single path.  We enforce this by clearing any selections in the tree that are
+    NB. at the level we are about to select.  So, if we are at sellevel=2, we will limit all selections in nodes of level 2 or higher to 2 values; then we will
+    NB. propagate our selection (which may have more than one added value, if it includes an initialselection).  By not looking at
+    NB. nodes below level 2 we will not disturb an initialselection in the level-1 node that is our parent.
+    discardselectionsabovelevel__resultroot__COCREATOR sellevel
+  end.
+  NB. Now propagate the new selection
   propsel (sellevel {. selections) , selectionfound
 NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
   propscroll 1   NB. 1 causes the scroll to be unchanged in THIS node, cleared to the leaves
@@ -7122,7 +7161,7 @@ NB. rank-calculus probe, return empty frame since we can't do rank-calculus
   frm =. $0
 end.
 NB. Level 1 (output only) if we have an expansion
-(< (*#frm) # 1) _2} x calcdispframe_dissectobj_ f. (-valence) {. <frm
+((*#frm) { ($0);1) _2} x calcdispframe_dissectobj_ f. (-valence) {. <frm
 )
 
 NB. y is the indexes that matched; result is the indexes to use, in execution order.
@@ -8163,7 +8202,7 @@ NB.?lintonly uop =. <'dissectverb' [ cop =. ''
 else.
   'uop cop vop' =. ucvlocs
 NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
-  stg =. (defstring__uop 2) jd cop jd (defstring__vop 3)
+  stg =. (defstring__uop 2) jd '(' jd cop jd ')' jd (defstring__vop 3)
 end.
 NB. We will treat this as a generic verb, except for the overrides we have in this locale
 changeobjtypeto 'dissectverb'
@@ -8847,6 +8886,7 @@ dissect '>:&.>L:1"0 ((<<''a''));1;(<<2);(<<3)'
 dissect '(($:@(<#[) , (=#[) , $:@(>#[)) ({~ ?@#)) ^: (1<#) a' [ a =. 20 ? 50
 dissect '4 1 2 3 +//.@(*/) _1 4 0 2 6'
 dissect '5 ($: <:)^:(1<]) 6'
+dissect '+: powconj 4 [ 6' [ ](powconj=:^:)0 (1)
 )
 
 0 : 0  NB. Testcases that fail
@@ -8856,4 +8896,3 @@ NB. no dyad yet dissect '   (<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
 0 : 0
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
-
