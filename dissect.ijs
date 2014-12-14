@@ -352,6 +352,8 @@ defnames =. }. y  NB. table of names
 'options loc sentence' =. {. y
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
+NB. Discard anything past the first LF, and remove CR
+sentence =. CR -.~ ({.~ i.&LF) sentence
 try. queue =. ;: sentence catch. queue =. 0$a: end.
 if. #queue do.  NB. following fails on no words
 NB. Get mask of words to discard: discard leading control words, or anything starting with a control word after a non-control
