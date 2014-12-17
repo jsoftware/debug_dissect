@@ -1,6 +1,6 @@
 NB. Copyright (c) Henry H. Rich, 2012-2014.  All rights reserved.
 
-NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since the hold mostly verb-names
+NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
 NB. The 2 1 gives the name-table sizes: 2 1 0 0 0 ...
 ((cocreate ([ coerase))"0~   2 1 {.~ #) (coname'') -.~ <;._2 (0 : 0)
 dissect
@@ -58,7 +58,6 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
 NB. TODO:
-NB. check propscroll after selection.  needs to be global?
 NB. fix pas in 803
 NB. dissect '>:L:0"0 (1;''a'';3;4)'   doesn't crosshatch unexecd cells.  Seems that it should: fillmask is right for it   rectcolorfromfillmask neexds to insert stippling
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
@@ -1124,13 +1123,7 @@ propselall =: proplocales@2:  NB. return all locales feeding into this one
 propseltokens =: proplocales@3:  NB. list of tokens for creating sentence display: locales of noun/verbs, plus strings as needed for modifiers
 
 
-
-NB. Propagate selection down the tree (root to leaves).  y is the value to propagate.  We propagate
-NB. selections to all verb operands; #selections to conjunction noun operands as well
-NB. The calls to traversedown must be named verbs!!
-propsel0 =: 'propselstopatnoun'&((3 : 'y [ selections =: selectiontodisplay y') traversedown 0:)
-propsel1 =: 'propselstopatxy'&((3 : ('displaysellevel =: y')) traversedown 0:)
-propsel =: propsel1@# [ propsel0
+cocurrent 'dissect'
 
 NB. Clear scroll point (at nodes leafward from the starting node).  y is 1 to start, and the assignment is made only if <: 0
 propscroll =: 'propselstopatnoun'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
@@ -1148,7 +1141,7 @@ NB. obsolete NB. Selections in nodes at level y and above have any selections pa
 NB. obsolete discardselectionsabovelevel =: 'propselall'&((3 : 'if. sellevel >: y do. selections =: (y + (sellevel = y) *. ((sellevel+selectable) < #selections)) (] {.~ (<. #)) selections end. y') traversedown 0:)
 NB. obsolete 
 NB. Clear all selections.  Called in the locale of the base of the tree.
-clearselections =: 'propselall'&((3 : 'selections =: y') traversedown 0:)
+clearselections =: 'propselall'&((3 : 'selections =: 0$a: [ ishighlightnode =: 0') traversedown 0:)
 
 NB. called after sniff to indicate which nodes can have an error display
 setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: {. ".''*#DOstatusstring''') traversedown 0:)
@@ -1179,7 +1172,7 @@ NB. Defaults for switches set only in certain paths
 rankcalculussupported =: 1
 
 NB. The following names must be redefined when an object is cloned
-clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel explorer errorwasdisplayedhere pointoffailure sellevel selectable stealthoperand'
+clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel explorer errorwasdisplayedhere pointoffailure sellevel selectable stealthoperand ishighlightnode endhighlightnode'
 
 NB. Object creation.  create the signaling variables used for communicating with the grid.
 NB. y is <the tokens that these values came from
@@ -1203,7 +1196,7 @@ NB. The following names are guaranteed modified in the clone after this object i
 
 NB. The following names are possibly modified after cloning.  Therefore, they must be copied into the clone
 NB. when the clone is created, so that a mod to the original doesn't affect the clone.
-(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;($0);_;0;0
+(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;($0);_;0;0;0;0
 
 NB.?lintonly valence =: errorlevel =: snifferror =: 1
 NB.?lintonly defstring =: ":
@@ -1335,6 +1328,28 @@ conjlogstring =: 3 : 0
 'conjex_' , (>coname'') , '_ =: '
 )
 
+cocurrent 'dissectobj'
+NB. Propagate selection down the tree (root to leaves).  y is the value to propagate.  We propagate
+NB. selections to all verb operands; #selections to conjunction noun operands as well
+NB. The calls to traversedown must be named verbs!!
+installsel =: 3 : 0
+NB. Get the value to set
+newsel =. selectiontodisplay y
+NB. If we are changing the selection coming into this node (not the selection here: the user is looking at that),
+NB. clear the scrollpoints so they will be refigured
+if. newsel -.@-:&(sellevel&{.) selections do. scrollpoints =: 0 2$0 end.
+NB. If we encounter the highlight node, change it so we know we touched it
+endhighlightnode =: +: endhighlightnode
+selections =: newsel
+NB. Return the selection value to be passed down to next level
+y
+)
+NB.propsel0 =: 'propselstopatnoun'&((3 : 'y [ selections =: selectiontodisplay y') traversedown 0:)
+propsel0 =: 'propselstopatnoun'&(installsel traversedown 0:)
+propsel1 =: 'propselstopatxy'&((3 : ('displaysellevel =: y')) traversedown 0:)
+propsel =: propsel1@# [ propsel0
+
+
 NB. ************ fwd/bwd buttons **************
 cocurrent 'dissect'
 
@@ -1375,40 +1390,33 @@ applyselection__COCREATOR ''
 
 cocurrent 'dissect'
 
-NB. Look at the undo list and establish the state indicated there.  We look back
-NB. for the most recent selection at each level, and apply each one as it is found.
-NB. We also set the button enables according to the 
+NB. Look at the undo list and establish the state indicated there.  We process each selection
+NB. starting at the beginning.  The last selection will be the node that gets the highlight.
+NB. We process each selection in turn.  If the selection went through the endhighlightnode, we
+NB. mark the locale of the selection as an inhighlightnode (which will enable highlighting for it)
 applyselection =: 3 : 0   NB. runs in instance locale
-NB. The monad initializes.  Start with the whole undo list
-clearselections__resultroot 0$a:
-'' applyselection selectionct {. selectionsqueue
+clearselections__resultroot 0
+if. selectionct do.
+  NB. Get the locale of the last selection.  This node, and selectors contributing to it, will be enabled for highlighting
+  NB.?lintmsgsoff
+  lastsel =. (<(<:selectionct),2) {:: selectionsqueue
+  NB.?lintmsgson
+  NB.?lintonly lastsel =. <'dissectobj'
+  for_s. selectionct {. selectionsqueue do.
+    endhighlightnode__lastsel =: 1
+    'lvl sel loc' =. s
+    NB.?lintonly loc =. <'dissectobj'
+    propsel__loc (sellevel__loc {. selections__loc) , sel
+    if. endhighlightnode__lastsel ~: 1 do. ishighlightnode__loc =: 1 end.
+  end.
+  NB. Tidy up for next time, leaving no endhighlightnode set
+  endhighlightnode__lastsel =: 0
+end.
 NB. Set button enables
 wd 'psel ',winhwnd
 'fmfwd' wdsetenable ": selectionct < #selectionsqueue
 'fmbwd' wdsetenable  ": selectionctatinitialerror < selectionct
 'fmshowerror' wdsetenable  ": selectionctatinitialerror < selectionct
-0 0$0
-:
-NB. The dyad does the work.  x is unused.  The first element of y should
-NB. have the smallest sellevel in y.  We find the last occurrence of that level, select it,
-NB. and then recur using the subsequent selections.  We do some audits along the way
-NB. empty input is OK, nothing to select
-if. 0 = #y do. 0 0$0 return. end.
-NB. The first sellevel should be the smallest in the list
-allsels =. > 0&{"1 y   NB. all sellevels
-assert. ({. = <./) allsels [ 'ill-formed undo list'
-NB. Find the last position containing that sellevel
-selpos =. ({. allsels) i:&1@:= allsels
-NB. Apply the selection in its locale
-'lvl sel loc' =. selpos { y
-NB.?lintonly loc =. <'dissectobj'
-assert. sellevel__loc = lvl  [ 'sellevel changed unexpectedly'
-propsel__loc (sellevel__loc {. selections__loc) , sel
-NB. recur on the selections after the one we just processed
-if. #rem =. (>: selpos) }. y do.
-  assert. (>:lvl) = (>: selpos) { allsels
-  '' applyselection rem
-end.
 0 0$0
 )
 
@@ -1790,9 +1798,13 @@ NB. based on frame, so we suppress lower analysis
       NB. we can lose the map structure of selopshapes, it it has any
       selopshapes =: selopinfovalid calcunselectedshapes selopshapes
     else.
-      NB. if there is a selection, even a forced one, use it to calculate highlighting and the operand shapes after selection
-      physreqandhighlights =: physreqandhighlights  (($&.|.~ #) ,"1&.> ]) ,&(<sellevel)&.> calcphysandhighlights thissel
-      qprintf^:DEBHLIGHT'physreqandhighlights '
+      NB. if highlighting is enabled, even a forced one, use it to calculate highlighting and the operand shapes after selection
+      NB. Some of the objects require calcphys to run always (to set globals), so we do that before we see if we will use the highlight
+      newp =. calcphysandhighlights thissel
+      if. ishighlightnode do.
+        physreqandhighlights =: physreqandhighlights (($&.|.~ #) ,"1&.> ]) ,&(<sellevel)&.> newp
+        qprintf^:DEBHLIGHT'physreqandhighlights '
+      end.
 NB. recalculate selopshapes now that we have the selection
       selopshapes =: calcselectedshapes thissel
       selopinfovalid =: 1:"0 selopshapes  NB. Selection means input shapes are valid for next v
@@ -2066,18 +2078,21 @@ NB. locale did, the lower locale
 DISPINFO =: ;: 'displayhandlesin displayhandleout displaylevrank dispstealthoperand'
 inheritu =: 3 : 0
 loc =. 1 {:: y
+NB.?lintonly loc =. <'dissectobj'
 SM^:DEBINHU 'inheritu: in ' , (>coname'') , ' ' , defstring 0
 QP^:DEBINHU'$floc >loc defstring__loc]0 edisp'''' edisp__loc'''' >selector selresult '
-QP^:DEBINHU'fillmask fillmask__loc selresult selresult__loc selectable sellevel<#selections resultlevel resultlevel__loc '
+QP^:DEBINHU'fillmask fillmask__loc selresult selresult__loc selectable sellevel selections resultlevel resultlevel__loc '
 QP^:DEBDOL2'physreqandhighlights physreqandhighlights__loc '
 NB. The display information is always inherited from the last u, which creates it.
 NB. The only time we wouldn't inherit is if the error is detected before the last u, example 1.5 u/ y which
 NB. would detect it on u/.  We detect that by the error-point codes
 if. errorcode -.@e. EABORTED,EEXEC do. (DISPINFO) =: ".@(,&'__loc')&.> DISPINFO end.
+NB. If any node contributing to this display is highlightable, enable the highlight.  The flag
+NB. may not be at the end (if not enough selections) or at the beginning (it is unselectable).
+ishighlightnode =: ishighlightnode +. ishighlightnode__loc
 NB. If the new dol is uninheritable (it is a selector node added by u/ or u^:v and its fillmask etc
 NB. is incommensurate with the selector for the current node), inherit nothing and display the current locale
 replaceresult =. 0
-NB.?lintonly loc =. <'dissectobj'
 NB. If the u was uncollectable, or if it executed no cells, it can't contribute to the fillmask
 NB. and its fillmask is guaranteed undefined.  Likewise, if there was no selector, there will be no fillmask
 NB. Append the frame of u to the ranks calculated at this level.  If u lacked selectors, the frame
@@ -2204,7 +2219,7 @@ NB. should replace the selected portion with the fillmask and data that was calc
       NB. Normal fillmasks, which may or may not be boxed (they will be boxed if they contained some boxed detail such as
       NB. L: or each)
       NB. We install the lower fillmask directly into the upper.  No change is made to selresult.
-      NB. We expand the flower fillmask to the size of a cell of the upper.
+      NB. We expand the lower fillmask to the size of a cell of the upper.
       NB. If the fillmasks have different boxing status, we box atoms of whichever is unboxed
       NB. The value to use for filling cells in the u fillmask depends on the errorcode for u.  If there
       NB. is no error, it's just normal fill
@@ -2212,6 +2227,7 @@ NB. should replace the selected portion with the fillmask and data that was calc
       case. 1 0 do. fillmask__loc =: <"0 fillmask__loc
       case. 0 1 do. fillmask =: <"0 fillmask
       end.
+      sel1 =. {. sel1   NB. only 1 atom allowed; make it an atom
       fillval =. <^:(*L.fillmask__loc) (FILLMASKSELLEVEL * sellevel) + (FILLMASKUNEXECD,(2#FILLMASKERROR),FILLMASKFILL) {~ (EUNEXECD,EEXEC,EFRAMINGEXEC) i. errorcode__loc
       fillmask =: (((#>sel1) }. $fillmask) ([ {.!.fillval (({.!.1 $)~ -@#)~ ($,) ]) fillmask__loc) sel1} fillmask
     end.
@@ -3460,7 +3476,11 @@ NB.
 NB. Result is table of (selection type (0 here));(boxed highlight in CSF (if any)), or empty table if no selection
 hlightforselection =: 3 : 0
 NB.?lintonly y =. <'dissectobj'
-(<0) ,"0 , isftocsf^:(*@#) sellevel }. (sellevel__y+selectable__y) (] }.~ 0 <. (- #)) selections__y
+NB. If the coarsest node is not highlightable, make no highlight
+if. ishighlightnode do.
+  (<0) ,"0 , isftocsf^:(*@#) sellevel }. (sellevel__y+selectable__y) (] }.~ 0 <. (- #)) selections__y
+else. 0 2$a:
+end.
 )
 
 NB. Create highlight rects for the operands that have been selected from this node
@@ -4855,8 +4875,8 @@ NB. obsolete   end.
   NB. Now propagate the new selection
 NB. obsolete   propsel (sellevel {. selections) , selectionfound
   makeselection , selectionfound
-NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
-  propscroll 1   NB. 1 causes the scroll to be unchanged in THIS node, cleared to the leaves
+NB. obsolete NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
+NB. obsolete   propscroll 1   NB. 1 causes the scroll to be unchanged in THIS node, cleared to the leaves
   1  NB. We made a change
 else.
   SM^:DEBPICK'recursion'
@@ -9035,6 +9055,7 @@ dissect '(($:@(<#[) , (=#[) , $:@(>#[)) ({~ ?@#)) ^: (1<#) a' [ a =. 20 ? 50
 dissect '4 1 2 3 +//.@(*/) _1 4 0 2 6'
 dissect '5 ($: <:)^:(1<]) 6'
 dissect '+: powconj 4 [ 6' [ ](powconj=:^:)0 (1)
+dissect '(>: 2 */&i. 3) + (+:@>: i. 2 3)'
 )
 
 0 : 0  NB. Testcases that fail
