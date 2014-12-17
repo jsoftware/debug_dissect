@@ -32,9 +32,9 @@ NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).
 NB. take over the timer interrupt
 ALLOWNONQTTOOLTIP_dissect_ =: 0
 
-NB. set SINGLESELECTION to clear previous selections when a new selection branch is opened
-SINGLESELECTION_dissect_ =: 1
-
+NB. obsolete NB. set SINGLESELECTION to clear previous selections when a new selection branch is opened
+NB. obsolete SINGLESELECTION_dissect_ =: 1
+NB. obsolete 
 CLEANUP_dissect_ =: 1  NB. set to 0 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
@@ -58,9 +58,9 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
 NB. TODO:
+NB. check propscroll after selection.  needs to be global?
 NB. fix pas in 803
-NB. fwd/back button for selection
-NB. dissect '>:L:0"0 (1;''a'';3;4)'   doesn't crosshatch unexecd cells
+NB. dissect '>:L:0"0 (1;''a'';3;4)'   doesn't crosshatch unexecd cells.  Seems that it should: fillmask is right for it   rectcolorfromfillmask neexds to insert stippling
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
 NB. dissect '(* $:@:<:)^:(1&<) 7'    select result 1 - no detail displayed inside ^:
 NB.  this is because there are multiple possible results, so we skeletalu.  But should the wiring bypass the skeletalu?
@@ -661,17 +661,19 @@ ntypeval
 NB. After the sentence has been executed, return here to display
 
 
-DISSECT =: 0 : 0
+DISSECT=: 0 : 0
 pc dissect;
+xywh 3 4 20 12;cc fmshowerror button;cn "<<";
+xywh 26 4 20 12;cc fmbwd button;cn "<";
+xywh 48 4 20 12;cc fmfwd button;cn ">";
 xywh 3 19 20 20;cc dissectisi isigraph;
-xywh 4 2 54 60;cc fmfontsize combolist;
-xywh 60 4 24 11;cc lbl01 static;cn "Font";
-xywh 88 2 42 60;cc fmmaxnounsizex combolist;
-xywh 131 4 69 11;cc fmmaxnounsizexlbl static;cn "Max Noun Width (% of scrn)";
-xywh 203 2 42 60;cc fmmaxnounsizey combolist;
-xywh 246 4 69 11;cc fmmaxnounsizeylbl static;cn "Max Noun Height (% of scrn)";
-xywh 317 4 49 12;cc fmshowstealth button;cn "Show ][";
-xywh 369 4 65 12;cc fmshowerror button;cn "Show Err";
+xywh 71 3 54 60;cc fmfontsize combolist;
+xywh 127 3 24 11;cc lbl01 static;cn "Font";
+xywh 155 3 42 60;cc fmmaxnounsizex combolist;
+xywh 199 3 90 12;cc fmmaxnounsizexlbl static;cn "Max Noun Width (% of scrn)";
+xywh 295 3 42 60;cc fmmaxnounsizey combolist;
+xywh 339 3 95 12;cc fmmaxnounsizeylbl static;cn "Max Noun Height (% of scrn)";
+xywh 439 3 49 12;cc fmshowstealth button;cn "Show ][";
 pas 0 0;
 rem form end;
 )
@@ -679,6 +681,10 @@ rem form end;
 DISSECT =: 0 : 0 [^:IFQT DISSECT
 pc dissect;
 bin vh;
+minwh 20 12;cc fmshowerror button;cn "<<";
+minwh 20 12;cc fmbwd button;cn "<";
+minwh 20 12;cc fmfwd button;cn ">";
+bin s;
 minwh 54 60;cc fmfontsize combolist;
 minwh 24 12;cc lbl00 static;cn "Min Font";
 bin s;
@@ -689,7 +695,6 @@ minwh 42 60;cc fmmaxnounsizey combolist;
 minwh 80 12;cc fmmaxnounsizeylbl static;cn "Max Noun Height (% of scrn)";
 bin s;
 minwh 49 12;cc fmshowstealth button;cn "Show ][";
-minwh 65 12;cc fmshowerror button;cn "Show Error";
 bin z;
 minwh 20 20;cc dissectisi isidraw flush;
 bin z;
@@ -702,6 +707,7 @@ wdsetitems =: ([: wd 'set ', [ , ' *' , ])`([: wd 'set ', [ , ' items *' , ])@.I
 wdsetselect =: ([: wd 'setselect ', [ , ' ' , ])`([: wd 'set ', [ , ' select ' , ])@.IFQT
 wdsetcaption =: ([: wd 'setcaption ', [ , ' *' , ])`([: wd 'set ', [ , ' caption *' , ])@.IFQT
 wdsetshow =: ([: wd 'setshow ', [ , ' ' , ])`([: wd 'set ', [ , ' show ' , ])@.IFQT
+wdsetenable =: ([: wd 'setenable ', [ , ' ' , ])`([: wd 'set ', [ , ' enable ' , ])@.IFQT
 wdsetxywh =: ([: wd 'setxywhx ', [ , ' ' , ":@])`([: wd 'set ', [ , ' wh ' , [: ": _2 {. ])@.IFQT
 wdqform =: ([: wd 'qformx'"_)`([: wd 'qform'"_)@.IFQT
 wdqchildxywh =: ([: wd 'qchildxywhx ' , ])`([: wd 'qchildxywh ' , ])@.IFQT
@@ -720,6 +726,9 @@ FONTSIZECHOICES =: 8 10 12 14 16
 MAXNOUNPCTCHOICES =: 5 10 20 30 40 50 60 70 80
 MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
+
+
+NB. ************** start of the display section (after the parse is over) ****************
 
 NB. Either nodisplay or display is always called.  The clearing of dissectinstance is a way to prevent recursion.
 NB. y is the error message, which we pass through
@@ -777,8 +786,9 @@ TRAVNOUN =: 0;NORANKHIST;(0$a:);0 , >:ticket
 
 NB. The argument of $0 indicates that we want to set the crash variables
 NB. debug wd :: 0: 'psel dissect;pclose'
-NB. If we didn't crash, remove the show error button
-wd ; <@(#~ -.@('fmshowerror'&(+./@:E.)));.2^:(-. crashed) DISSECT
+NB. obsolete NB. If we didn't crash, remove the show error button
+NB. obsolete wd ; <@(#~ -.@('fmshowerror'&(+./@:E.)));.2^:(-. crashed) DISSECT
+wd DISSECT
 winhwnd =: wd 'qhwndp'
 
 NB. Initialize the user selection
@@ -798,6 +808,9 @@ NB. If we crashed, do an initial traversal to set selection flags to find the er
 maxnoundisplaysizes =: 2 2$0  NB. Init to small display for sniff, for speed
 
 wd 'pshow'  NB. On QT, you can't calculate the size of graphics unless you are showing the form
+
+NB. Initialize selection history.  This sets enables for the buttons too.
+initselections''
 
 if. crashed do.
   joinlayoutsl traverse 1   NB. Don't forget the final display!
@@ -975,12 +988,6 @@ codestroy''
 y
 )
 
-NB. The 'show error' button displayes the error state
-dissect_fmshowerror_button =: 3 : 0
-traverse 1
-dissect_dissectisi_paint 1
-)
-
 NB. Toggle the state of stealth display
 dissect_fmshowstealth_button =: 3 : 0
 displaystealth =: -. displaystealth
@@ -1136,9 +1143,12 @@ NB. init parent nodes in all objects.  This must be done in a separate verb beca
 NB. Called in locale of the base of the tree
 initparentnodes =: 'propselall'&((3 : 'coname 0 # parent =: y') traversedown 0:)
 
-NB. Discard old selections.  Called in the locale of the base of the tree.
-NB. Selections in nodes at level y and above have any selections past number y removed
-discardselectionsabovelevel =: 'propselall'&((3 : 'if. sellevel >: y do. selections =: (y + (sellevel = y) *. ((sellevel+selectable) < #selections)) (] {.~ (<. #)) selections end. y ') traversedown 0:)
+NB. obsolete NB. Discard old selections.  Called in the locale of the base of the tree.
+NB. obsolete NB. Selections in nodes at level y and above have any selections past number y removed
+NB. obsolete discardselectionsabovelevel =: 'propselall'&((3 : 'if. sellevel >: y do. selections =: (y + (sellevel = y) *. ((sellevel+selectable) < #selections)) (] {.~ (<. #)) selections end. y') traversedown 0:)
+NB. obsolete 
+NB. Clear all selections.  Called in the locale of the base of the tree.
+clearselections =: 'propselall'&((3 : 'selections =: y') traversedown 0:)
 
 NB. called after sniff to indicate which nodes can have an error display
 setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: {. ".''*#DOstatusstring''') traversedown 0:)
@@ -1325,7 +1335,122 @@ conjlogstring =: 3 : 0
 'conjex_' , (>coname'') , '_ =: '
 )
 
+NB. ************ fwd/bwd buttons **************
+cocurrent 'dissect'
+
+NB. When we make a selection, we add it to a list of selections.  The list is a table of
+NB. level;selection;locale.  The list, and the verbs that manage it, are in the instance locale (which is the same as the
+NB. locale of the form).  The entry point for propagating a selection, which is called from any object locale, switches to
+NB. the  instance locale.
+
+NB. Initialize
+initselections =: 3 : 0   NB. called in instance locale
+NB. The selections we have made, and those that we have undone
+selectionsqueue =: 0 3$a:
+NB. The number of selections currently displayed
+selectionct =: 0
+NB. The number of selections that get us to the error, if one was found.  When we go back to the beginning,
+NB. this is how many selections we will have
+selectionctatinitialerror =: 0
+NB. Disable buttons until there has been a selection
+('fmfwd';'fmbwd';'fmshowerror') wdsetenable&> '0'
+0 0$0
+NB.?lintsaveglobals
+)
+
+cocurrent 'dissectobj'
+
+NB. Add a selection (and propagate it to descendants)
+NB. y is list of selections
+NB. Called from object locales
+makeselection =: 3 : 0
+NB.?lintonly COCREATOR =. <'dissect'
+NB. When we add a selection, it invalidates redo
+selectionct__COCREATOR =: #selectionsqueue__COCREATOR =: (selectionct__COCREATOR {. selectionsqueue__COCREATOR) , sellevel ; y ;< coname''
+NB. If we are still looking for errors, mark this selection as one we will keep when the user says 'way back'
+if. 1=snifferror__COCREATOR do. selectionctatinitialerror__COCREATOR =: selectionct__COCREATOR end.
+applyselection__COCREATOR ''
+0 0$0
+)
+
+cocurrent 'dissect'
+
+NB. Look at the undo list and establish the state indicated there.  We look back
+NB. for the most recent selection at each level, and apply each one as it is found.
+NB. We also set the button enables according to the 
+applyselection =: 3 : 0   NB. runs in instance locale
+NB. The monad initializes.  Start with the whole undo list
+clearselections__resultroot 0$a:
+'' applyselection selectionct {. selectionsqueue
+NB. Set button enables
+wd 'psel ',winhwnd
+'fmfwd' wdsetenable ": selectionct < #selectionsqueue
+'fmbwd' wdsetenable  ": selectionctatinitialerror < selectionct
+'fmshowerror' wdsetenable  ": selectionctatinitialerror < selectionct
+0 0$0
+:
+NB. The dyad does the work.  x is unused.  The first element of y should
+NB. have the smallest sellevel in y.  We find the last occurrence of that level, select it,
+NB. and then recur using the subsequent selections.  We do some audits along the way
+NB. empty input is OK, nothing to select
+if. 0 = #y do. 0 0$0 return. end.
+NB. The first sellevel should be the smallest in the list
+allsels =. > 0&{"1 y   NB. all sellevels
+assert. ({. = <./) allsels [ 'ill-formed undo list'
+NB. Find the last position containing that sellevel
+selpos =. ({. allsels) i:&1@:= allsels
+NB. Apply the selection in its locale
+'lvl sel loc' =. selpos { y
+NB.?lintonly loc =. <'dissectobj'
+assert. sellevel__loc = lvl  [ 'sellevel changed unexpectedly'
+propsel__loc (sellevel__loc {. selections__loc) , sel
+NB. recur on the selections after the one we just processed
+if. #rem =. (>: selpos) }. y do.
+  assert. (>:lvl) = (>: selpos) { allsels
+  '' applyselection rem
+end.
+0 0$0
+)
+
+NB. Undo one selection, moving it to the redo list
+dissect_fmbwd_button =: 3 : 0   NB. runs in instance locale
+NB. If nothing to undo, do nothing
+if. selectionctatinitialerror >: selectionct do. 0 0$0 return. end.
+selectionct =: <:selectionct
+applyselection''
+NB. Refresh the display
+traverse 0
+dissect_dissectisi_paint 1
+)
+
+NB. Move one selection from the redo list to the undo list, and execute it
+dissect_fmfwd_button =: 3 : 0   NB. runs in instance locale
+if. selectionct = #selectionsqueue do. 0 0$0 return. end.
+selectionct =: >:selectionct
+applyselection''
+NB. Refresh the display
+traverse 0
+dissect_dissectisi_paint 1
+)
+
+NB. obsolete NB. The 'show error' button displayes the error state
+NB. obsolete dissect_fmshowerror_button =: 3 : 0
+NB. obsolete traverse 1
+NB. obsolete dissect_dissectisi_paint 1
+NB. obsolete )
+NB. obsolete 
+NB. Cut back to the initial selection: none or starting error
+dissect_fmshowerror_button =: 3 : 0   NB. runs in instance locale
+if. selectionctatinitialerror >: selectionct do. 0 0$0 return. end.
+selectionct =: selectionctatinitialerror
+applyselection''
+NB. Refresh the display
+traverse 0
+dissect_dissectisi_paint 1
+)
+
 NB. ***************** traverse down ****************
+cocurrent 'dissectobj'
 
 NB. utilities for traversal and selection
 NB. These are overridden as needed by individual modifiers.  The versions here work for simple verbs
@@ -1406,7 +1531,7 @@ NB. selopinfovalid - set if there is no frame, or if there is a local selection.
 NB.   has been selected, and can therefore be used by a subsequent v verb.
 NB. fillmask - this has the shape of the open of frame $ result, and gives status for each atom thereof.  This status is the selection
 NB.  level of this node (in the upper bits), and validity information in the lower bits.  The validity is
-NB.  0=normal 1=fill 2=first unexecuted cell (presumably error, but that may depend on what happened elsewhere) 3=later unexecd cell
+NB.  0=normal 1=fill 3=first unexecuted cell (presumably error, but that may depend on what happened elsewhere) 2=later unexecd cell
 NB.  error is calculated per result cell & propagated to atoms; fill is calculated per atom.  fillmask is valid only for nouns, or if the
 NB.  unselected result has a frame with multiple cells, and is undefined otherwise
 'FILLMASKNORMAL FILLMASKFILL FILLMASKUNEXECD FILLMASKERROR' =: i. 4
@@ -1601,8 +1726,9 @@ NB. In normal debugging, selectors are added from the root outward.  If a select
 NB. the root, we don't propagate the selection back to the root, on the theory that if the user
 NB. wanted to select at the root, they could have.
 NB. The error selector must have the correct structure for the current node
-            propsel (sellevel {. selections) , < selframe getfailingisf #selx
-            qprintf^:DEBTRAVDOWN 'edisp'''' selections '
+NB. obsolete             propsel (sellevel {. selections) , < selframe getfailingisf #selx
+            makeselection , < selframe getfailingisf #selx
+            qprintf^:DEBTRAVDOWN 'edisp'''' $selections selections '
           end.
         end.
 NB. Set the errorcode: if we are at the failure point, indicate the appropriate type of error; otherwise
@@ -1625,19 +1751,24 @@ NB. We also ignore a forced selection (ex: u/ when y has 2 items), which shows u
 NB. we get predictable sellevels, but it is known not to be needed (i. e. it is created only when we have seen that the current
 NB. selection is forced, on a previous traversal).  If we get a change of selection this gets reexamined.
     'seltype thissel' =. getselection rawselx  NB. classify the type of selection.  Selections not normally needed (recursion uses them)
-qprintf^:DEBTRAVDOWN'seltype thissel '
+qprintf^:DEBTRAVDOWN'seltype thissel sellevel selections '
     select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 4=autoselect of node with no frame
     case. 2 do.
 NB. Forced selection: if this is the first time we see it, perform the forced selection, propagating it to lower nodes
-      if. unforcedselection'' do. propsel (sellevel {. selections) , thissel end.
+NB. obsolete       if. unforcedselection'' do. propsel (sellevel {. selections) , thissel end.
+      if. unforcedselection'' do. makeselection , thissel end.
     case. 1 do.
 NB. If forced selection, don't apply thissel, because it would result in multiple ranges.  Just keep
 NB. the selector we had.  Here we select for the unforced selection
 NB. Calculate the selection interval corresponding to each selected result.  Put result intervals into selection order, then choose one
-      selector =: <^:(0=L.) thissel selectusingisf tickettonatural frame $ selector selectticketintervals rawselx
-      assert. <:/"1 > selector
-      assert. *./ ({.@> isfensureselection isftorank2 thissel) (>:&#)&> frames
-      assert. 2 = {: $ > selector [ 'malformed selection'
+NB. But if there is 0 in the frame (meaning we ran on a cell of fills), selection is perfunctory and we will simply
+NB. keep the old selector
+      if. -. 0 e. frame do.
+        selector =: <^:(0=L.) thissel selectusingisf tickettonatural frame $ selector selectticketintervals rawselx
+        assert. <:/"1 > selector
+        assert. *./ ({.@> isfensureselection isftorank2 thissel) (>:&#)&> frames
+        assert. 2 = {: $ > selector [ 'malformed selection'
+      end.
 NB. No action for type 3, which is pick-only selection
     end.
 NB. The number of operands can change during traversal: monad u/ turns into a dyad, and dyad u\ turns into a monad.
@@ -2023,7 +2154,8 @@ if. replaceresult do.
       NB. If the lower node does not have resultshape, its result shape matches its fillmask, and we box that value
       NB. to be the sole value for the final result (it will be filled when this result is collected)
       NB. We box the lower fillmask (in case it has structure) and extend it with UNEXECDs
-      selresult =: , < fillmask__loc frameselresult__loc selresult__loc
+NB. obsolete      selresult =: , < fillmask__loc frameselresult__loc selresult__loc
+      selresult =: selresult__loc
     end.
   end.
 elseif. errorcode *.&(e.&(EHASFILLMASK)) errorcode__loc do.
@@ -3266,6 +3398,7 @@ NB. y is ISF, which convert to level 3 by boxing any level-2 contents.  Result i
 isftolevel3 =: <"0&.>^:(0=classsel)"0&.>@isftorank2
 NB. y is a rank-2 ISF.  Make sure it starts with a selection, by prepending a null selection if it starts with SFOPEN
 isfensureselection =: (<0$0)&,^:(SFOPEN={.)&.>
+
 NB. selections themselves are in initial selection form, which is like CSF without the outer box,
 NB. and also allows the contents of a box to be a (nonempty) list which specifies selection only.
 NB. Unboxed contents should be combined together and merged into the first nonempty box of the
@@ -3302,7 +3435,7 @@ if. #highlightblocks =. a: -.~ ;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:i
     prev =. (-#last2) }. > lastsel
     prev =. 1 2&$&.>&.> prev
     NB. Take first, last+1 of each sequence of consecutive values, whether ascending or descending
-    last2 =. (<@,:@(<./ , >:@(>./));.1~     (1 , 1 < [: | 2&(-/\)))&.> last2
+    last2 =. (<@,:@(<./ , >:@(>./));.1~     (-@# {.!.1 (1) < [: | 2&(-/\)))&.> last2
     <"1 path ,"1 0 , |:@;&.> { prev , last2
   else.
     NB. No selection after dropdown.  Just use the path to the dropdown
@@ -3415,6 +3548,9 @@ NB. case manifests as surplus shape with no corresponding subDOLs.  We return IN
 INVALIDRECT =: 2 2 $ 0 0 _1 _1
 
 hlighttotlbr =: (4 : 0"1 0)`((2 2$0)"0)@.(0=#@])
+NB. If the data is empty, we don't have any good way to highlight it, and it will generate an error here
+NB. when we ultimately try to select two axes.  So we reject it early
+if. 0 e. 0 {:: x do. INVALIDRECT return. end.
 NB. We must start with a selection; if it's a drop-down, prepend empty selection
 if. SFOPEN -: {. >y do. y =. (<2 0$0)&,&.> y end.
 sel =. (0 0,:1 1) (]  ,"1~  -@{:@$@]  |.!.0"1  ({.~ #)) > {. > y
@@ -3908,7 +4044,8 @@ NB.?lintsaveglobals
 NB. x is text-color info, a la cfmdata
 NB. y is fillmask codes
 NB. result is the value to use for drawtext, with stippling added to the rect color
-rectcolorfromfillmask =: ({~      [: < 0 ;~ (- <. 2 ^. FILLMASKCHECKER)&bwlsl)
+NB. obsolete rectcolorfromfillmask =: ({~      [: < 0 ;~ (- <. 2 ^. FILLMASKCHECKER)&bwlsl)
+rectcolorfromfillmask =: (<:FILLMASKNOCOLLECT)&bwand@] ,~&.> ({~      [: < 0 ;~ (- <. 2 ^. FILLMASKCHECKER)&bwlsl)
 
 NB. x is text-color info, a la cfmdata
 NB. y is fillmask codes
@@ -3982,12 +4119,12 @@ NB. one atom per data cell.  The data may be truncated, though, so we bring sel 
 NB. rank of the shapeused, and then truncate it to shapeused size (using sel as a fill, in case sel
 NB. was an atom).  Then shape to 2D, and trim to the displayable part
 NB. But if this is a selection node, suppress rectangles, force lines, leave rectangles for next level
-  if. 0 = L. sel do.
+   if. sel -:&$ usel =. ''"_`>@.(2>L.) sel do.
     sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |: shapeused {.!.({.,sel) ((-$shapeused) {.!.1 $sel) ($,) sel
 NB. Before filling the cells the first time, initialize the rectangles to the colors given by the fillmask.  This
 NB. is to give the right color to cells that are not drawn at all (empty contents) or whose contents do not fill
 NB. the cell, because of other larger values.
-    (cfmdata rectcolorfromfillmask sel) drawrect"0 2 rects
+    (cfmdata rectcolorfromfillmask >sel) drawrect"0 2 rects
   else.
 NB. Selector node
 NB. usedd has been converted to a table - do the same for sel
@@ -3997,7 +4134,7 @@ NB. If there are subDOLs, process each of them.  The operand was boxed.
   if. 3 < #vf do.
     sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
     NB.  Adjust each inner box position
-    (sdol ,"0 1 usedd ,"0 1 (<"0^:(0=L.) sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects  NB. No highlights
+    (sdol ,"0 1 usedd ,"0 1 (<"0^:(0=L.) sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
 NB. Draw mesh for the rectangles - unless the boxing is because of collection error
     if. -. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel do.
       (BOXBORDERCOLOR,1) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
@@ -4328,8 +4465,8 @@ NB. to show the selected cell at top-left
     end.
     dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
   else.
-NB. User tried to select, but we couldn't do it.  Give him a tooltip.
-    drawtooltip__COCREATOR (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { 'unselectable - no frame';'no further selection possible'
+NB. User tried to select, but we couldn't do it.  Give him a tooltip.  0=no frame, _1=no further selection, _2=empty operand
+    drawtooltip__COCREATOR (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { 'unselectable - no frame';'empty value is not selectable';'no further selection possible'
     hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''
   end.
 end.
@@ -4613,7 +4750,8 @@ NB. we go to the next locale in the inheritance chain and give it a chance.  We 
 NB. make sure rthat a selection in u in u@:v is not propagated to v; so it must be seen
 NB. as inapplicable to u@:v.
 NB. Result is 1 if we made a change and a redraw is needed, 0 if there was no frame at all
-NB. (i. e. sellevel = 0 at the end of the chain), _1 if there were selections but no more allowed
+NB. (i. e. sellevel = 0 at the end of the chain), _1 if there were selections but no more allowed,
+NB. _2 if selection not allowed because of empty in frame
 NB. x is (sellevel of this node);(rank of cell of previous verb)
 recursiveselection =: 3 : 0
 0 _1 recursiveselection y
@@ -4685,6 +4823,9 @@ else.
     NB. This node has frame.  Look at the leading elements of y.  If they don't match the current
     NB. selection (or if there is no current selection), we've seen enough: the selection starts
     NB. at this level.
+    NB. But: if the frame contains 0, no selection can be valid (it will perforce contain an index error)
+    NB. and we must abort with a status code indicating the fact
+    if. 0 e. selframe do. _2 return. end.
     if. 0 = #localf do.
     NB. Forced selection.  It was propagated when first detected, so we just ignore the node and
     NB. keep looking
@@ -4704,15 +4845,16 @@ NB. If we found a selection, propagate it to the end and declare a change.  If n
 NB. try again at the next spot in the inheritance chain
 if. #$selectionfound do.
   QP^:DEBPICK'selectionfound%initialselection%propagating:?(sellevel {. selections) , selectionfound%localf%frame1%thisverbframelen%prevcellrank%filledframe%thiscellrank%maxcellresultshape%'
-  if. SINGLESELECTION do.
-    NB. To avoid confusion, we confine the selection to a single path.  We enforce this by clearing any selections in the tree that are
-    NB. at the level we are about to select.  So, if we are at sellevel=2, we will limit all selections in nodes of level 2 or higher to 2 values; then we will
-    NB. propagate our selection (which may have more than one added value, if it includes an initialselection).  By not looking at
-    NB. nodes below level 2 we will not disturb an initialselection in the level-1 node that is our parent.
-    discardselectionsabovelevel__resultroot__COCREATOR sellevel
-  end.
+NB. obsolete   if. SINGLESELECTION do.
+NB. obsolete     NB. To avoid confusion, we confine the selection to a single path.  We enforce this by clearing any selections in the tree that are
+NB. obsolete     NB. at the level we are about to select.  So, if we are at sellevel=2, we will limit all selections in nodes of level 2 or higher to 2 values; then we will
+NB. obsolete     NB. propagate our selection (which may have more than one added value, if it includes an initialselection).  By not looking at
+NB. obsolete     NB. nodes below level 2 we will not disturb an initialselection in the level-1 node that is our parent.
+NB. obsolete     discardselectionsabovelevel__resultroot__COCREATOR sellevel
+NB. obsolete   end.
   NB. Now propagate the new selection
-  propsel (sellevel {. selections) , selectionfound
+NB. obsolete   propsel (sellevel {. selections) , selectionfound
+  makeselection , selectionfound
 NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
   propscroll 1   NB. 1 causes the scroll to be unchanged in THIS node, cleared to the leaves
   1  NB. We made a change
@@ -4736,12 +4878,17 @@ NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed valu
 selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + y
 QP^:DEBPICK 'y selx '
 QP^:DEBPICK 'sellevel #selections selections '
-assert. sellevel <: #selections
-NB. Process the cells mapped to this block, to see which one gets the selection.  Start the search in
-NB. the highest containing locale for the block, even if we displayed the value from a different one (because of error)
-tail =. findinheritedtail''
-NB.?lintonly tail =. <'dissectobj'
-recursiveselection__tail selx
+NB. If sellevel exceeds the number of selections, there's nothing really here - it must be an empty
+NB. operand that display a boundary.  Don't pick then
+if. sellevel <: #selections do.
+  NB. Process the cells mapped to this block, to see which one gets the selection.  Start the search in
+  NB. the highest containing locale for the block, even if we displayed the value from a different one (because of error)
+  tail =. findinheritedtail''
+  NB.?lintonly tail =. <'dissectobj'
+  recursiveselection__tail selx
+else.
+  0
+end.
 )
 
 NB. **************** end display objects ************************
@@ -5681,7 +5828,8 @@ NB. Find the last ticket below the input value; this is our return from that rec
 NB. Since the recursions are ordered on completion, we simply count the number of ends
 NB. before that one
 NB. propagate that selection, after adding a dropdown.  We know we are at selection level 0
-propsel ,< SFOPEN ,~ <, endforstart i. <: (endlocs { logticket) I. y
+NB. obsolete propsel ,< SFOPEN ,~ <, endforstart i. <: (endlocs { logticket) I. y
+makeselection ,< SFOPEN ,~ <, endforstart i. <: (endlocs { logticket) I. y
 )
 
 NB. **** assignment ****
