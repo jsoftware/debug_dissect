@@ -37,10 +37,8 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
 NB. TODO:
-NB. dissect '</."2 i. 2 3 4'  select down to result highlights the wrong cells; selecting so in bottom row crashes
 NB. can simplify combineyxsels
 NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?
-NB. dissect '*@+/ i. 3 4'  select, select; then select a result of * - no shape for (unselectable) *; confusing
 NB. change rank stack in partitions (test /."0), don't dup /.
 NB. Re-select of selected cell of @. should remove expansion
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
@@ -264,9 +262,11 @@ NB.?lintsaveglobals
 )
 restoreJenvirons =: 3 : 0   NB. called AFTER removing instance from the list
 9!:39 Jenvirons
-if. (0 = #dissectionlist_dissect_) *. (ALLOWNONQTTOOLTIP *. -. IFQT) *. (<'sys_timer_dissect_') -: 5!:1 <'sys_timer_z_' do.
-  NB. If we created a timer, remove it
-  4!:55 <'sys_timer_z_'
+if. (0 = #dissectionlist_dissect_) *. (ALLOWNONQTTOOLTIP *. -. IFQT) do.
+  if. (<'sys_timer_dissect_') -: 5!:1 <'sys_timer_z_' do.
+    NB. If we created a timer, remove it
+    4!:55 <'sys_timer_z_'
+  end.
 end.
 0 0$0 
 )
@@ -714,7 +714,7 @@ pas 0 0;
 rem form end;
 )
 
-DISSECT =: (((,&LF&.> 'rem font;';'rem sizex;';'rem sizey;') ,. fontlines;sizexlines;sizeylines) stringreplace 0 : 0) [^:IFQT DISSECT
+DISSECT =: (((,&LF&.> 'rem font;';'rem ttfont;';'rem sizex;';'rem sizey;') ,. fontlines;ttfontlines;sizexlines;sizeylines) stringreplace 0 : 0) [^:IFQT DISSECT
 pc dissect;
 menupop "&Preferences";
 menupop "&Font Size";
@@ -3412,7 +3412,7 @@ statusdesc =. ALIGNSPREAD addalignmentrect thw
 NB. Create the shape/selector line if we can
 NB. The shape is the concatenation of the frames, so that in an expansion node it includes the expansion.
 NB. We also append the shape of the max result cell in the last node, to get the total shape of the result
-NB. Create displayable frame for each selection
+NB. Create displayable frame for each selection.  This is a list of boxed strings
 DOshapes =: <@;@(": L:0)@;/./ |: accumframe__inheritedtailforselectinfo''
 QP^:DEBDOvn'defstring]0 $shapetouse shapetouse errorcode sellevel selectable selections '
 QP^:DEBDOvn'defstring__inheritroot]0 sellevel__inheritedtailforselectinfo sellevel__inheritroot selections__inheritroot '
@@ -3443,15 +3443,26 @@ NB. (i. e. more than one cell)
     NB. Get the selections, convert to rank-2 ISF, then convert each box to displayable.  Add as second row
     DOshapes =: DOshapes , ;&.> ": L:0 isftorank2 currselections
   end.
-NB. Convert the shapes to characters, and get the pixel extent of each string.  Start at the selection level
-NB. of this object
+elseif. (0 < #selresult) *. (errorcode e. EHASVALIDFILLMASK) *. (0 ~: #fillatom) do.
+  NB. The value, which has no shape, is a valid data value, viz an atom.  Display that shape to distinguish it
+  NB. from an unselected value.  Since the last box in the row gets the 'cell' color, add on an empty so that this shape
+  NB. has the color for the selection level.
+  DOshapes =: ,: 'atom';''
+elseif. do.
+  NB. No display because no selection
+  DOshapes =: 0 0 $ <''
+end.
+if. #DOshapes do.
+  NB. Convert the shapes to characters, and get the pixel extent of each string.  Start at the selection level
+  NB. of this object
   shapeext =. ((sellevel__inheritedtailforselectinfo + i. {:$DOshapes) ((<. <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes
-NB. Create a rect object for the shape/selections
+  NB. Create a rect object for the shape/selections
   shapedesc =. (<ALIGNCENTER) addalignmentgroup (<ALIGNSPREAD)&addalignmentgroup@,."1@|: ALIGNSPREAD addalignmentrect shapeext
 else.
   shapedesc =. 0 addalignmentrect 0 0
 end.
 QP^:DEBDOL'defstring]0 >coname'''' shapetouse sellevel DOshapes selections resultlevel fillmask selresult '
+
 NB. Early error is special: it formats the status above the verb, it aborts traversal,
 NB. and it suppresses the display of data.  Go ahead and
 NB. handle that here.
@@ -3487,6 +3498,7 @@ elseif. do.
   picknames =: 'DOlabelpos DOshapepos DOstatuspos'
   arects =. ,: , alignrects > (ALIGNLEFT;ALIGNCENTER) addalignmentgroup namedesc , shapedesc ,: statusdesc
 end.
+
 NB. pickrects and picknames contain info for picking.  pickrects is a table, picknames is a list
 NB. arects is a TABLE of info, one for each size
 pickrects =: brect@> arects
@@ -3600,12 +3612,15 @@ if. #highlightblocks =. a: -.~ ;@(<@(SFOPEN ,~ <@;^:(*@#));._2)&.(,&SFOPEN)@;@:i
   NB. selection.
   if. #lastsel =. pathx }. highlightblocks do.
     NB. There is a selection after the dropdown
-    last2 =. ({.~   [: - 2 <. #) > lastsel
-    prev =. (-#last2) }. > lastsel
-    prev =. 1 2&$&.>&.> prev
+    NB. See how many items in each row are collectable into a larger blocks.  Max 2.  Take the neg since we take/drop from the end
+    ncollectable =. - 2 <. {: $ > lastsel
+    last2 =. ncollectable {."1 > lastsel
+    prev =. ncollectable }."1 > lastsel  NB. Now boxing level 1
+    prev =. 1 2&$&.>&.> prev  NB. Now boxing level 2
     NB. Take first, last+1 of each sequence of consecutive values, whether ascending or descending
     last2 =. (<@,:@(<./ , >:@(>./));.1~     (-@# {.!.1 (1) < [: | 2&(-/\)))&.> last2
-    <"1 path ,"1 0 , |:@;&.> { prev , last2
+    assert. ((,1) = }:$prev) *. ((,1) = }:$last2)   NB. higher ranks untested
+    <"1 path ,"1 0 , |:@;&.> { prev ,"1 last2
   else.
     NB. No selection after dropdown.  Just use the path to the dropdown
     < path
@@ -3714,7 +3729,7 @@ NB. y is a ysel, x is a selx.  Result is list of (new ysel);(new selx)
 combineyxsels =: 4 : 0"1
 NB. Since we are perforce down to a single list for ysel, run all the selections into a single level-2 list.
 NB. Preserve single boxes, including SFOPENs, intact
-ysell2 =. ; <^:(1=L.)"0 y
+ysell2 =. , ; <^:(1=L.)"0 y
 NB. There may be multiple boxes of y containing boxes with multiple values, BUT: these boxes must
 NB. be trailing boxes of y.  See how many there are.  This is the number of axes of x we can index.
 NB. We take the LEADING x axes among the eligible ones, so that successive axes go in order
@@ -3732,7 +3747,7 @@ if. ranky =. 1 i.&1@:~: |. classsel ysell2 do.
     x =. selrank }."1 x
   end.
 end.
-(< ysell2);<x
+(,< ysell2);<x
 )
 
 NB. Convert highlight rectangle(s) to rectangles (tl,:br) unboxed (never empty)
@@ -3974,7 +3989,7 @@ gllines ,"2 |."1 y
 NB. x is color,width[,pen] either a list or a table for each line
 NB. y is (list of starting y);(list of starting x),:(x start/end positions for y lines);(y start/endpositions for x lines)
 drawmesh =: 4 : 0
-x drawline"1 3 (, |."1)&>/ ,."0 1&.>/ y
+x drawline"1 2 (, |."1)&>/ ,."0 1&.>/ y
 )
 
 STIPWIDTH =: 10
@@ -4371,7 +4386,7 @@ NB. value for the first cell) and the last point of sizes (gives position of the
 NB. are left with internal boundaries.  Back up the position by the width of the boundary, and discard
 NB. zero boundaries
   if. +/ #@> startwidth =. bdynos (*@[ # ,.~)&.> (<<<0 _1)&{&.> yxpositions do.
-    (RANKCOLOR ,"1 (0) ,.~ {:"1 ; startwidth) drawmesh ({."1&.> startwidth) ,: |.   0 _1&{&.> yxpositions
+    (RANKCOLOR ,"1 PS_SOLID ,.~ {:"1 ; startwidth) drawmesh ({."1&.> startwidth) ,: |.   0 _1&{&.> yxpositions
   end.
   
   0
@@ -4572,6 +4587,9 @@ exegesisindefinite =: (,~   'a' , 'n ' }.~ 'aeiou8' -.@e.~ {.)
 NB. x is Boolean, y is a string, result is string with s possibly added
 exegesisplural =: ('s',~])^:(*@[)
 
+NB. y is a list, like 2 3 4, result is '2x3x4'
+exegesisshapewithx =: }.@;@:(('x' , ":)&.>)
+
 NB. y is shape/frame, result is '2x3x... array of' or the like
 exegesisshapex =: 3 : 0
 select. #y
@@ -4580,7 +4598,7 @@ case. 0 do.
 case. 1 do.
   'list of ' , ":y
 case. do.
-  (}.@;@:(('x' , ":)&.>) y) , ' array of'
+  (exegesisshapewithx y) , ' array of'
 end.
 )
 
@@ -4589,7 +4607,7 @@ exegesisfmtcell =: 3 : 0
 'shape frame' =. y
 NB. Convert from operand shape to cell shape
 shape =. (#frame) }. shape
-(1 < */ frame) exegesisplural (4 <. #shape) {:: ('atom';((":shape) , '-atom list')) , (exegesisshapex shape)&,&.> ' table';' brick';' subarray'
+(1 < */ frame) exegesisplural (4 <. #shape) {:: ('atom';((":shape) , '-atom list')) , (exegesisshapewithx shape)&,&.> ' table';' brick';' subarray'
 )
 
 NB. y is (shape of a cell),(frame), result is string describing the frame; always singular
@@ -4604,7 +4622,10 @@ NB.  in a monad, but that monad fed into one side of a larger dyad; we will desc
 NB.  and note which side the click was in); 2 means & was never encountered and the valence never changed
 NB. Result is table of (retcode;LF-delimited string, empty if there is no frame)
 NB.  retcode means: 0=non-verb, 1=no shapes, 2=no frame, 3=frame exists
-3 : '(y) =: i. # y' 'EXEGESIS'&,&.> ;:'FRAMENONNOUN FRAMENOSHAPE FRAMENOFRAME FRAMEVALID FRAMESURROGATE FRAMENUGATORY RANKSTACKEXPLAIN RANKOVERALLEXPLAIN RANKSTACKPOWERSTART RANKSTACKPARTITIONSTART'
+framecodes =. 'FRAME'&,&.> ;: 'NONNOUN NOSHAPE NOFRAME VALID SURROGATE NUGATORY'
+rankcodes =. 'RANK'&,&.> ;: 'STACKEXPLAIN OVERALLEXPLAIN STACKPOWERSTART STACKPARTITIONSTART'
+datacodes =. 'DATA'&,&.> ;: 'SOURCE PATH SHAPE ARRANGEMENT'
+3 : '(y) =: i. # y' 'EXEGESIS'&,&.> framecodes,rankcodes,datacodes
 exegesisframe =: 3 : 0
 'labelloc opno' =. y
 res =. 0 2$a:  NB. Init empty return
@@ -4770,6 +4791,8 @@ else. ''
 end.
 )
 
+NB. For all these hover verbs, x is (view number), y is the yx position of the click relative to start of pickrect
+
 NB. y is the child of the locale that this verb is being executed in
 NB. Return the nearest ancestor (including this node itself) that
 NB. has operands, and which operand(s) this node represents.
@@ -4821,7 +4844,7 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     tt =. (#~   EXEGESISFRAMENOFRAME ~: [: > {."1) tt
   end.
   NB. Collect all the text into one string.  Remove extra trailing LF
-  text =. ({.~ 2 + LF i:&0@:= ]) ; 1  {"1 tt
+  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; 1  {"1 tt
 else.
   text =. 'The name of the noun or verb, and any rank or level modifiers attached to it'
 end.
@@ -4834,6 +4857,58 @@ hoverDOshapepos =: 4 : 0
 )
 hoverDOstatuspos =: 4 : 0
 'Explanation of error'
+)
+
+hoverDOdatapos =: 4 : 0
+exp =. x
+hoveryx =. y
+NB. Ignore hover in the scrollbar
+NB. If the click is in the scrollbar, handle scrolling
+NB. See which scrollbar, if any, the click is in
+dhw =. (<exp,1) { DOdatapos
+if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
+  NB. Start accumulating the display
+  disp =. ,: EXEGESISDATASOURCE ; 'The result of the verb:',LF,(defstring 0),CR,LF
+  if. sellevel <: #selections do.
+    NB. Display the shape of the result
+    rshape =. 0{::valueformat
+    disp =. disp , EXEGESISDATASHAPE ; 'This is ',(exegesisindefinite exegesisfmtcell rshape;''),'.',LF,LF
+
+    if. 1 < */ rshape do.
+      NB. If there are selection options, display the path
+
+      NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
+      NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
+      NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
+      selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
+
+      NB. Convert the isf to a path.  Put SFOPEN at the end, then cut on SFOPEN and run boxes together.
+      NB. If the last box is empty, remove it
+      selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
+      if. 1 >: #selpath do.
+        disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose index list is ' , (": ; selpath),'.',LF,LF
+      else.
+        disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath),'.',LF,LF
+      end.
+
+      NB. If this has rank higher than 2, explain the display
+      if. 2 < #rshape do.
+        if. 2 | #rshape do.
+          NB. Odd number of axes
+          t =. 'This array is displayed as a list of ', (":{.rshape) , ' ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ }.rshape) , '.'
+        else.
+          t =. 'This array is displayed as a ', ((":@{. , 'x' , ":@{:) 2{.rshape) , ' table of ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ 2 }.rshape) , '.'
+        end.
+        disp =. disp , EXEGESISDATAARRANGEMENT ; t,LF,'Boundaries above rank 2 are indicated by blue lines, with wider lines used for higher boundaries.',LF,LF
+      end.
+    end.
+  end.
+  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; 1 {"1 disp
+else.
+  NB. Hover in the scrollbars, ignore
+  text =. ''
+end.
+(TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 2 { 0 ". wdqchildxywh 'dissectisi') reflowtooltip text
 )
 
 FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
@@ -5358,7 +5433,7 @@ selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints)
 QP^:DEBPICK 'y selx '
 QP^:DEBPICK 'sellevel #selections selections '
 NB. If sellevel exceeds the number of selections, there's nothing really here - it must be an empty
-NB. operand that display a boundary.  Don't pick then
+NB. operand that displays a boundary.  Don't pick then
 if. sellevel <: #selections do.
   NB. Process the cells mapped to this block, to see which one gets the selection.  Start the search in
   NB. the highest containing locale for the block, even if we displayed the value from a different one (because of error)
@@ -10020,6 +10095,7 @@ dissect 'i.^:] ] _2 _1 0 1'
 dissect '+:^:] ] _2 _1 0 1'
 dissect '3 </. ''a'''
 dissect '(<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
+dissect '<@i./."2 (0.5) (<1 1 1)} i. 2 3 4'
 )
 
 0 : 0  NB. Testcases that fail
