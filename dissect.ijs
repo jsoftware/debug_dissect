@@ -37,6 +37,11 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 )
 NB. TODO:
+NB. debug
+NB. dissecting value error fails quietly
+NB. failure when an explicit local verb is used in a line, from debug - we don't reconstruct the value correctly
+NB.   and there is no 'parse' error message
+NB. explain different types of error
 NB. can simplify combineyxsels
 NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?
 NB. change rank stack in partitions (test /."0), don't dup /.
@@ -80,14 +85,18 @@ NB. [options] dissect [sentence]
 NB. where sentence is a string to be executed.  The sentence is parsed and modified so that every verb execution creates
 NB. looging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
 NB. dissect verb), and then the results are displayed in 2d form.  If sentence is omitted, the sentence from the last error is used.
+NB.
+NB. If y is boxed, it should be a table ready for use in parse, i. e. nx3 where the first line gives
+NB. parameters;locale;text of sentence
+NB. and the remaining lines are the local names defined in the running explicit definition, as described in z458095869 below
 
-dissect_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`nodisplay_dissect_@.(2=3!:0)  [: parse_dissect_ (0&# : [ (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_)) ])@getsentence_dissect_
+dissect_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`nodisplay_dissect_@.(2=3!:0)  [: parse_dissect_ (0&# : [    (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_))   ])@getsentence_dissect_`]@.(0<L.@])
 
 NB. The locale dissectnopath is used to find local names.  Its path is empty.  The locale contains only one name, z458095869
 cocurrent 'dissectnopath'
 copath ''
 NB. The verb z458095869 returns a table of defined local names.  It is a table of (name;(type from 4!:0);(numeric ranks, invertible if verb/value if noun, '' if other))
-z458095869 =: (([ ,. <"0@] ,. (".@[`[`[`(rankinv_dissect_@[))@.]&.>) (4!:0)) @ ((<'z458095869') -.~ 4!:1@i.@4:)
+z458095869 =: (([ ,. <"0@] ,. (".@[`(rankinv_dissect_@[)`(rankinv_dissect_@[)`(rankinv_dissect_@[))@.]&.>) (4!:0)) @ ((<'z458095869') -.~ 4!:1@i.@4:)
 
 require 'strings gl2'
 require '~addons/format/printf/printf.ijs'
@@ -361,9 +370,12 @@ NB. Result is the string form of the instrumented sentence, ready to execute
 NB. As a side effect, many objects are created indicating the parse structure
 NB. In paticular, resultroot is the boxed locale of the sentence result.
 NB. If there is an error, resultroot is empty
+NB. The only option is 'sandbox', in which case we create an explicit definition to run the
+NB. sentence in, and define all the user names in it, before running it
 parsemain =: 3 : 0   NB. runs in object locale
 defnames =. }. y  NB. table of names
 'options loc sentence' =. {. y
+sandbox =. {.!.0 options
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 NB. Discard anything past the first LF, and remove CR
@@ -613,8 +625,38 @@ NB.?lintonly resultroot =: <'dissectmonad' [ scrollinglocale =: <'dissectobj'
 QP^:DEBTIME'endparse=?6!:1'''' '
 NB. Init the estheights in every object
 calcallestheights__resultroot $0
-sentence;EXE__ =: exestring__resultroot''
+NB. Create the string to execute.  If we have to create a sandbox, do so
+execsentences_dissect_ =: sentence;exestring__resultroot''
+if. sandbox do.
+  NB. create the sandbox verb in the user's locale
+  (sandname_dissect_ =: 'sandbox4768539054_',(>loc),'_') =: sandboxtemplate f.
+  defnounmask =. (<0) = 1 {"1 defnames
+  NOUNNAMES_dissect_ =: defnounmask # 0 {"1 defnames
+  NOUNVALUES_dissect_ =: defnounmask # 2 {"1 defnames
+  ARNAMES_dissect_ =: (-. defnounmask) # 0 {"1 defnames
+  ARVALUES_dissect_ =: (-. defnounmask) # 2 {"1 defnames
+  if. 0 < #ARNAMES_dissect_ do.
+    if. 1 = #ARNAMES_dissect_ do.
+      ARNAMES_dissect_ =: 2 # ARNAMES_dissect_
+      ARVALUES_dissect_ =: 2 # ARVALUES_dissect_
+    end.
+    ARNAMES_dissect_ =: '`' , ;:^:_1 ARNAMES_dissect_
+    ARVALUES_dissect_ =: 3 : ('0!:100 ''y =. '' , y';'5!:1 <''y''')&.> ARVALUES_dissect_
+  end.
+  (sandname_dissect_ , ' 0');(sandname_dissect_ , ' 1')
+else.
+  execsentences_dissect_
+end.
 NB.?lintsaveglobals
+)
+
+sandboxtemplate =: 3 : 0
+if. 1 = y do. 4!:55 <sandname_dissect_ end.
+v4768539054_dissect_ =. y
+4!:55 <,'y'
+if. #NOUNNAMES_dissect_ do. (NOUNNAMES_dissect_) =. (NOUNVALUES_dissect_) end.
+if. #ARNAMES_dissect_ do. (ARNAMES_dissect_) =. (ARVALUES_dissect_) end.
+". v4768539054_dissect_ {:: execsentences_dissect_
 )
 
 NB. Here to execute a modifier.  We do that when we encounter a modified verb.
@@ -803,11 +845,14 @@ end.
 NB. y is the results from running the user's original sentence and our instrumented version.
 displaymain =: 3 : 0  NB. called in dissectinstance locale
 NB. Make sure the results are the same
-NB. If the sentence ran correctly for the user, make sure we get the same result
-if. -. -:/ y do.
-  smoutput 'dissect error: internal result does not match the result from the J session!  Aborting.'
-  qprintf'y '
-  return.
+NB. If the sentence ran correctly for the user, make sure we get the same result.
+NB. If there is only one result, we don't compare
+if. 1 < #y do.
+  if. -.@-:/ y do.
+    smoutput 'dissect error: internal result does not match the result from the J session!  Aborting.'
+    qprintf'y '
+    return.
+  end.
 end.
 
 NB. For forced tooltips (clicks on unexpandable data), we enforce a minimum display time so that
@@ -4855,6 +4900,34 @@ NB. default verbs for other hovering
 hoverDOshapepos =: 4 : 0
 'The shape of the noun, followed by any selection'
 )
+
+errorlookup =: 0 : 0
+?agreement
+?framing
+?invalid verb
+?error
+?non-atomic v
+?attention interrupt
+?break
+?domain
+?file name
+?file number
+?index
+?interface
+?length
+?locale
+?limit
+?NaN
+?nonce
+?out of memory
+?rank
+?security violation
+?stack
+?syntax
+?time limit
+?value
+)
+
 hoverDOstatuspos =: 4 : 0
 'Explanation of error'
 )
@@ -10096,6 +10169,8 @@ dissect '+:^:] ] _2 _1 0 1'
 dissect '3 </. ''a'''
 dissect '(<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
 dissect '<@i./."2 (0.5) (<1 1 1)} i. 2 3 4'
+dissect 2 3 $ 1;(<'base');'qqq+3'  ; 'qqq';0;<,'6'
+dissect 2 3 $ 1;(<'base');'qqq+3'  ; 'qqq';0;<6
 )
 
 0 : 0  NB. Testcases that fail
