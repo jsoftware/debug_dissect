@@ -44,9 +44,8 @@ testsandbox_base_ 1
 )
 NB. TODO:
 NB. Use morpheme logic for displaying data
-NB. describe errors
+NB. hover and tooltips don't work in explorer
 NB. hovering over data: note if explorer allowed or already existent; if big, mention menu to change size; allow clicking in low-right of scrollbare to change individual size
-NB. Make 'atom' the cell-shape, always blue; remove trailing blue box
 NB. Hover over verb should show definition (& script), if short
 NB. Explain a primitive verb in a line of the overall
 NB. Hovering on shape/sel: show the verb at that level, and the input shape/selection/output shape
@@ -610,7 +609,8 @@ NB. and 'verb' for modifier executions
         case. 2 do.
           ntypeval =. conj;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
         case. 3 do.
-          ntypeval =. createverb qend;(#queue)
+           NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
+          ntypeval =. createverb (qend;(#queue)) , (-. LF e. objval)#<objval
         case. do.
           failparse 'undefined name: ' , qend
           return.
@@ -658,7 +658,9 @@ NB. Create the string to execute.  If we have to create a sandbox, do so
 execsentences_dissect_ =: sentence;exestring__resultroot''
 if. sandbox do.
   NB. create the sandbox verb in the user's locale
+  NB.?lintmsgsoff
   (sandname_dissect_ =: 'sandbox4768539054_',(>loc),'_') =: sandboxtemplate f.
+  NB.?lintmsgson
   defnounmask =. (<0) = 1 {"1 defnames
   NOUNNAMES_dissect_ =: defnounmask # 0 {"1 defnames
   NOUNVALUES_dissect_ =: defnounmask # 2 {"1 defnames
@@ -676,6 +678,7 @@ NB. obsolete     ARVALUES_dissect_ =: 3 : ('0!:100 ''y =. '' , y';'5!:1 <''y''')
 NB. obsolete   end.
   '01' ([ , ' ' , sandname_dissect_ , ' ' , ''''&,@(,&'''')@(#~ >:@(=&''''))@])&.> execsentences_dissect_
 NB. obsolete   (sandname_dissect_ , ' 0');(sandname_dissect_ , ' 1')
+  NB.?lintsaveglobals
 else.
   execsentences_dissect_
 end.
@@ -3530,9 +3533,8 @@ NB. (i. e. more than one cell)
   end.
 elseif. (0 < #selresult) *. (errorcode e. EHASVALIDFILLMASK) *. (0 ~: #fillatom) do.
   NB. The value, which has no shape, is a valid data value, viz an atom.  Display that shape to distinguish it
-  NB. from an unselected value.  Since the last box in the row gets the 'cell' color, add on an empty so that this shape
-  NB. has the color for the selection level.
-  DOshapes =: ,: 'atom';''
+  NB. from an unselected value.  This is perforce the cell color, so make it the last thing in the list
+  DOshapes =: ,: ,<'atom'
 elseif. do.
   NB. No display because no selection
   DOshapes =: 0 0 $ <''
@@ -4712,9 +4714,12 @@ EXEGESISRANKSTACKPOWERSTART
 EXEGESISRANKSTACKPARTITIONSTART
 EXEGESISRANKOVERALLEXPLAIN
 EXEGESISDATASOURCE
-EXEGESISDATAPATH
 EXEGESISDATASHAPE
+EXEGESISDATAPATH
 EXEGESISDATAARRANGEMENT
+EXEGESISDATAEXPLORABLE
+EXEGESISVERBDESC
+EXEGESISONELINEDESC
 )
 (exegesismorphemes) =: i. # exegesismorphemes
 
@@ -4943,16 +4948,17 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     NB. If the display was text, we will pass that text into the overall for the node
     tt =. exegesisrankoverall displaylevrank
   end.
-  NB. The 'no frame' line is provided only to prevent dead air.  Delete it if there is anything else to say.
-  if. 1 < #tt do.
-    tt =. (#~   EXEGESISFRAMENOFRAME ~: [: > {."1) tt
-  end.
   NB. Order the lines according to the order of morphemes in our list
-  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; (1 {"1 tt) /: > 0 {"1 tt
+  tt =. tt /: > 0 {"1 tt
+  NB. The 'no frame' line is provided only to prevent dead air.  Delete it if there is anything else to say about frame.
+  if. (EXEGESISFRAMENOFRAME = 0 0 {:: tt) *. (EXEGESISFRAMENUGATORY,EXEGESISFRAMENOSHAPE,EXEGESISFRAMENONNOUN,EXEGESISFRAMEVALID,EXEGESISFRAMESURROGATE) +./@:e. > 0 {"1 tt do.
+    tt =. }. tt
+  end.
+  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; (1 {"1 tt)
 else.
   text =. 'The name of the noun or verb, and any rank or level modifiers attached to it'
 end.
-(TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 2 { 0 ". wdqchildxywh 'dissectisi') reflowtooltip text
+reflowtoscreensize text
 )
 
 NB. default verbs for other hovering
@@ -4960,7 +4966,7 @@ hoverDOshapepos =: 4 : 0
 'The shape of the noun, followed by any selection'
 )
 
-errorlookup =: 0 : 0
+errorlookup =: (LF&taketo ; LF&takeafter);._1 (0 : 0)
 ?agreement
 This dyadic verb has x and y operands that cannot be matched up cell-for-cell.  Look through the rank stack to see where the error occurs.
 
@@ -4972,9 +4978,9 @@ This error is reported as 'domain error' in the J session.
 ?invalid verb
 This combination was rejected before it was even executed on its arguments.
 ?error
-This execution resulted in an error, but execution continued.
+This execution resulted in an error, but overall execution continued.
 
-If this verb is being executed on a cell of fills, an error result is treated as if it were 0.
+If this verb is being executed on a cell of fills, the error result is treated as if it were 0.
 
 If this verb is executed in the combination u :: v, execution continues with the v side.
 ?non-atomic v
@@ -5022,7 +5028,8 @@ Execution of this verb attempted to use a name that has not been assigned.
 )
 
 hoverDOstatuspos =: 4 : 0
-'Explanation of error'
+origemsg =. (<<<0 _1)&{^:('('={.) DOstatusstring
+reflowtoscreensize ((1 {"1 errorlookup) , <'') {::~ (0 {"1 errorlookup) i. <origemsg 
 )
 
 hoverDOdatapos =: 4 : 0
@@ -5069,12 +5076,22 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
       end.
     end.
   end.
+  NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
+  if. 1 < #DOsize do.
+    if. 0=#explorer do.
+      disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can change the limit on the Sizes menu. You can also right-click the data to open a separate window for exploring the value.',LF
+    elseif. exp=0 do.
+      disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to bring up the explorer window.',LF
+    elseif. do.
+      disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to destrpy the explorer window.',LF
+    end.
+  end.
   text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; 1 {"1 disp
 else.
   NB. Hover in the scrollbars, ignore
   text =. ''
 end.
-(TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 2 { 0 ". wdqchildxywh 'dissectisi') reflowtooltip text
+reflowtoscreensize text
 )
 
 FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
@@ -5267,6 +5284,11 @@ NB. Reflow each string, getting the count of words/line for each output line
 intervals =. (x,spacewidth)&reflowwords&.> sizeword
 NB. Combine the blocks, with spaces between, and LF after each group
 ; intervals ([: ; 1:`[`(0 #~ #@])} <@(LF ,~ ;:^:_1);.1 ])&.> bw
+)
+
+NB. Get the max width from the screen info
+reflowtoscreensize =: 3 : 0
+(TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 2 { 0 ". wdqchildxywh 'dissectisi') reflowtooltip y
 )
 
 NB. y is cursor position;string
@@ -6105,6 +6127,8 @@ stealthoperand =: 1 2 3 4 5 6 0 {~ ((;:'][[:'),']';']]';'[[') i. <titlestring  N
 titlestring =: stealthoperand {:: titlestring; ;: '][[:]]['
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
+NB. If this verb has a one-line description, save it
+onelinedesc =: 2 {:: y , <''
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -6168,15 +6192,233 @@ if. execform -.@:-: titlestring do.
   NB. If this is a final node (execform not the same as titlestring), explain the expansion
   NB. We will know that the node has expanded if its initialselection is present
   if. (selectable+sellevel) < #selections do.  NB. expansion selected
-    ,: EXEGESISRANKSTACKEXPLAIN ; 'This block displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'The block feeding into this one shows the details of the computation. Select this result again to hide the details.',LF
+    r =. ,: EXEGESISRANKSTACKEXPLAIN ; 'This block displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'The block feeding into this one shows the details of the computation. Select this result again to hide the details.',LF
   else.
-    ,: EXEGESISRANKSTACKEXPLAIN ; 'This block displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'To see the details of the computation, select the result to see a block containing the intermediate results.',LF
+    r =. ,: EXEGESISRANKSTACKEXPLAIN ; 'This block displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'To see the details of the computation, select the result to see a block containing the intermediate results.',LF
   end.
 elseif.  '^:_1' -: _4 {. execform do.
   NB. If this was an inverse added by &.&.:, explain that
-  ,: EXEGESISRANKSTACKEXPLAIN ; 'This inverse was added to complete an operation started by &. or &.:',LF
-elseif. do. 0 2$a:
+  r =. ,: EXEGESISRANKSTACKEXPLAIN ; 'This inverse was added to complete an operation started by &. or &.:',LF
+elseif. do. r =. 0 2$a:
 end.
+if. #onelinedesc do.
+  r =. r , EXEGESISONELINEDESC ; LF,'The definition of this verb is:',LF,onelinedesc,CR
+end.
+if. (#verbexplains) > tx =. (0{"1 verbexplains) i. <titlestring do.
+  r =. r , EXEGESISVERBDESC ; LF,((<tx,valence) {:: verbexplains),LF
+end.
+r
+)
+
+NB. Quick descriptions of all primitive verbs
+verbexplains =: _3 ]\ <;._2 (0 : 0)
+=
+=y indicates, for each item in the nub of y, whether it matches each item of y
+x=y is 1 if the atoms x and y are tolerantly equal
+<
+<y boxes y
+x<y is 1 if the atom x is tolerantly less than the atom y
+<.
+<.y is the largest integer not exceeding y
+x<.y is the smaller of the atoms x and y
+<:
+<:y is y-1
+x<:y is 1 if the atom x is tolerantly less than or equal to the atom y
+>
+>y unboxes each atom of y
+x>y is 1 if the atom x is tolerantly greater than the atom y
+>.
+>.y is the smallest integer not less than y
+x>.y is the larger of the atoms x and y
+>:
+>:y is y+1
+x>:y is 1 if the atom x is tolerantly greater than or equal to the atom y
+_:
+_:y is infinity, regardless of y
+x_:y is infinity, regardless of x and y
++
++y is the complex conjugate of y
+x+y is x plus y
++.
++.y is a 2-atom list of the real and imaginary parts of the atom y
+x+.y is x OR y if x and y are Boolean; generally, the greatest common divisor of x and y
++:
++:y is 2*y
+x+:y is the negation of x OR y
+*
+*y is signum(y): _1 if y<0, 0 if y tolerantly=0, 1 if y>0
+x*y is x times y
+*.
+*.y is a 2-atom list of the length and angle of the atom y, in the complex plane
+x*.y is x AND y if x and y are Boolean; generally, the least common multiple of x and y
+*:
+*:y is y^2
+x*:y is the negation of x AND y
+-
+-y is the negative of y
+x-y is x minus y
+-.
+-.y is 1-y
+x-.y is x, with any items removed that match cells of y
+-:
+-:y is y%2
+x-:y is 1 if the arrays x and y match, in shape and values
+%
+%y is 1%y
+x%y is x divided by y
+%.
+%.y is the matrix inverse of y (pseudoinverse if y is not square)
+x%.y is ((%. y) +/ . * x)
+%:
+%:y is the square root of y
+x%:y is the xth root of y
+^
+^y is e^y
+x^y is x raised to the power y
+^.
+^.y is ln(y)
+x^.y is the logarithm of y, using base x
+$
+$y is the shape of y
+x$y is an array made by using items of y, with the frame given by x
+$.
+$.y creates a sparse matrix from y
+x$.y performs a sparse-matrix operation
+~.
+~.y is the unique items of y, in their original order
+
+~:
+~:y is a Boolean for each item of y, 1 if no previous item matches it
+x~:y is 1 if the atoms x and y are not tolerantly equal
+|
+|y is the magnitude of y
+x|y is y(mod x), the remainder after dividing y by x
+|.
+|.y is y, in reversed item order
+x|.y is y, with the items rotated left x positions
+|:
+|:y is the transpose of y, y with the axes running in reversed order
+x|:y is y with the axes x moved to the end
+,
+,y is a list of all the atoms of y
+x,y joins x and y into a single array, with the items of x followed by the items of y
+,.
+,.y is a table where each row is a list of the atoms from one item of y
+x,.y is x,"_1 y, and joins corresponding items of x and y
+,:
+,:y is y with a leading axis of length 1 added
+x,:y is an arfay with two items, the first coming from x and the second from y
+#
+#y is the number of items of y
+x#y is an array in which each atom of x tells how many times the corresponding item of y appears
+#.
+#.y is 2 #. y
+x#.y converts the list y to a single number, using x as the place values of the representation
+#:
+#:y is the binary representation of y
+x#:y converts the number y to a list, using x as the place values of the representation
+!
+!.y is factorial(y)
+x!.y if the number of combinations of y things taken x at a time
+/:
+/:y is the permutation that would put y into ascending order
+x/:y is x sorted into ascending order using the corresponding values of y as keys
+\:
+/:y is the permutation that would put y into descending order
+x/:y is x sorted into descending order using the corresponding values of y as keys
+[
+[y is y
+x[y is x
+]
+]y is y
+x]y is y
+{
+{y is the Cartesian product of the contents of boxes of y
+x{y is a selection from y, using x to control the selection
+{.
+{.y is the first item of y
+x{.y takes the first x items of y (last items if x is megative)
+{:
+{:y is the last item of y
+
+}.
+}.y is all the items of y except the first
+x}.y drops the first x items of y (last items if x is megative)
+}:
+}:y is all the items of y except the last
+
+".
+".y executes the sentence y, giving its result (if a noun)
+x".y converts the string y to numeric, using x as default in case of invalid values
+":
+":y converts y to string form using default conversions
+x":y converts y to string form using conversions specified by x
+?
+?y is a random number (between 0 and 1 if y=0, a nonnegative integer less than y otherwise)
+x?y is x distinct nonnegative random integers less than y
+?.
+?.y is like ?y but uses a fixed starting value
+x?.y is like x?y but uses a fixed starting value
+A.
+A.y is the permutation number of the permutation y
+x A.y reorders the items of y using the permtation whose number is x
+C.
+C.y converts the permutation y between direct and cycle form
+x C.y  reorders the items of y using the permtation x
+e.
+e.y gives, for each opened atom of y, a list indicating which items of ;y are in it
+x e.y is 1 for each cell of x that is an item of y, 0 for cells of x not in y
+E.
+
+x E.y a Boolean array, of shapes the same as that of y, with 1s at the starting points of subarrays that match x
+i.
+i.y is an array of consecutive natural numbers of shape y
+x i.y for each cell of y, the index of the first matching item of x, or #x if there is no match
+i:
+i:y equally-spaced numbers between -y and +y
+x i:y for each cell of y, the index of the last matching item of x, or #x if there is no match
+I.
+I.y for Boolean y, a list of the indexes of 1s
+x I.y the index within y before which x could be inserted keeping the list in order
+j.
+j.y is 0j1*y
+xj.y is x + 0j1 y
+L.
+L.y is the boxing level of y, 0 if unboxed
+
+o.
+o.y is 1p1*y
+x o.y is a trigonometric function of y depending on x
+p.
+p.y converts polynomial y between coefficient and product-of-roots form
+x p.y evaluates the polynomial x and y
+p..
+p..y is the first derivative of polynomial y
+x p..y is the integral of polynomial y, with x the integration constant
+p:
+p:y is the yth prime number (2 is the 0th)
+x p:y is a prime-related function of y depending on x
+q:
+q:y is the prime factorization of y, in ascending order
+x q:y is the exponents of the prime factorization of y
+r.
+r.y is a complex number on the unit circle, with angle y
+x r.y is the complex number with length x and angle y
+s:
+s:y creates a symbol to stand for the string y
+x s:y is a symbol-related function of y depending on x
+u:
+u:y is the Unicode character corresponding to y
+x u:y is a Unicode-conversion function of y depending on x
+x:
+x:y converts y to extended precision
+x x:y is a precision-conversion function of y depending on x
+;
+;y is the items of the contents of y, assembled in order
+x;y boxes x (and y, if y is unboxed), and joins the boxes into a list
+;:
+;:y is a boxed list containing the words in the string y
+x;:y executes the sequential machine x on the data y
 )
 
 
@@ -9463,7 +9705,7 @@ else.
     end.
   end.
 end.
-,: EXEGESISOVERALLEXPLAIN;t
+,: EXEGESISRANKOVERALLEXPLAIN;t
 )
 
 'dissectverb' primlocale '$:'
