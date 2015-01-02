@@ -43,6 +43,7 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. dissect '+/ z + i. 3 3' [ z =. 100 200 300   should suppress the 3 3 node for lack of variable input
 NB. hover and tooltips don't work in explorer
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Hovering on shape/sel: show the verb at that level, and the input shape/selection/output shape
@@ -772,11 +773,16 @@ MINIMUMISISIZE =: 80 400     NB. minimum size for graphics, needed to allow room
 TOOLTIPMAXPIXELS =: 450  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.8  NB. Max tooltip width, as frac of isigraph width
 
+TOOLTIPDELAYCHOICES =: ('immed';'250';'500';'1000') ,. ('immediate';'0.25 sec';'0.5 sec';'1 sec') ,. <"0 (1 250 500 1000)
+TOOLTIPDETAILCHOICES =: ('0';'1') ,. ('laconic';'verbose') ,. <"0 (0 1)
+
 fontlines =. ; <@('menu fmfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 FONTSIZECHOICES
 ttfontlines =. ; <@('menu fmttfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 TOOLTIPFONTSIZECHOICES
 sizexlines =. ; <@('menu fmmaxnounsizex' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
 sizeylines =. ; <@('menu fmmaxnounsizey' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
-DISSECT=: ((,&LF&.> 'rem font;';'rem ttfont;';'rem sizex;';'rem sizey;') ,. fontlines;ttfontlines;sizexlines;sizeylines) stringreplace 0 : 0
+ttdlines =. ; ('menu fmtooltipdelay' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {."1 TOOLTIPDELAYCHOICES
+ttdetlines =. ; ('menu fmtooltipdetail' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {."1 TOOLTIPDETAILCHOICES
+DISSECT=: ((,&LF&.> 'rem font;';'rem ttfont;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0
 pc dissect;
 menupop "&Preferences";
 menupop "&Font Size";
@@ -793,6 +799,15 @@ rem sizex;
 menupopz;
 menupop "Max &Height as % of Screen";
 rem sizey;
+menupopz;
+menupopz;
+menupop "&Tooltips";
+menupop "Delay";
+rem ttdlines;
+menupopz;
+menupop "Detail";
+rem ttdetlines;
+menupopz;
 menupopz;
 xywh 3 4 20 12;cc fmshowerror button;cn "<<";
 xywh 26 4 20 12;cc fmbwd button;cn "<";
@@ -802,7 +817,7 @@ pas 0 0;
 rem form end;
 )
 
-DISSECT =: (((,&LF&.> 'rem font;';'rem ttfont;';'rem sizex;';'rem sizey;') ,. fontlines;ttfontlines;sizexlines;sizeylines) stringreplace 0 : 0) [^:IFQT DISSECT
+DISSECT =: (((,&LF&.> 'rem font;';'rem ttfont;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0) [^:IFQT DISSECT
 pc dissect;
 menupop "&Preferences";
 menupop "&Font Size";
@@ -819,6 +834,15 @@ rem sizex;
 menupopz;
 menupop "Max &Height as % of Screen";
 rem sizey;
+menupopz;
+menupopz;
+menupop "&Tooltips";
+menupop "Delay";
+rem ttdlines;
+menupopz;
+menupop "Detail";
+rem ttdetlines;
+menupopz;
 menupopz;
 bin vh0;
 minwh 10 28;cc fmshowerror button;cn "<<";
@@ -950,6 +974,8 @@ NB. obsolete 'fmfontsize' wdsetselect ": minimumfontsizex =: 2
 maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '1'
 ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '1'
+('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0 ,~ tooltipdelayx =: 2) wdsetvalue '1'
+('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0 ,~ tooltipdetailx =: 1) wdsetvalue '1'
 maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 calccfms minimumfontsizex { FONTSIZECHOICES
 displaystealth =: 0
@@ -1182,7 +1208,6 @@ dissect_dissectisi_paint 1
 )
 
 dissect_fmttfontsize_button =: 3 : 0
-NB.?lintonly fmttfontsize_select =. '0'
 NB. obsolete minimumfontsizex =: 0 ". fmfontsize_select
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '0'
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex =: y) wdsetvalue  '1'
@@ -1204,7 +1229,6 @@ NB. obsolete maxnoundisplayfrac =: 0.01 * MAXNOUNPCTCHOICES {~  maxnoundisplaysi
 NB. obsolete dissect_dissectisi_paint 1
 NB. obsolete )
 dissect_fmmaxnounsize_button =: 4 : 0
-NB.?lintonly fmmaxnounsizey_select =. '0'
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '0'
 ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '0'
 maxnoundisplaysizex =: y x} maxnoundisplaysizex
@@ -1216,6 +1240,22 @@ dissect_dissectisi_paint 1
 (4 : 0"0 i.@#) MAXNOUNPCTCHOICES
 ". 'dissect_fmmaxnounsizey' , (":x) , '_button =: 0&dissect_fmmaxnounsize_button@(', (":y) ,'"_)'
 ". 'dissect_fmmaxnounsizex' , (":x) , '_button =: 1&dissect_fmmaxnounsize_button@(', (":y) ,'"_)'
+)
+
+dissect_fmtooltipdelay_button =: 3 : 0
+('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx) wdsetvalue  '0'
+('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx =: y) wdsetvalue  '1'
+)
+(4 : 0&> i.@#) 0 {"1 TOOLTIPDELAYCHOICES
+". 'dissect_fmtooltipdelay' , x , '_button =: dissect_fmtooltipdelay_button@(', (":y) ,'"_)'
+)
+
+dissect_fmtooltipdetail_button =: 3 : 0
+('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx) wdsetvalue  '0'
+('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx =: y) wdsetvalue  '1'
+)
+(4 : 0&> i.@#) 0 {"1 TOOLTIPDETAILCHOICES
+". 'dissect_fmtooltipdetail' , x , '_button =: dissect_fmtooltipdetail_button@(', (":y) ,'"_)'
 )
 
 NB. Draw the user's sentence at the top, showing highlighting
@@ -4311,7 +4351,7 @@ NB. Convert from style;(level;rect) to style;level;rect
   hlights =. ; <@({. ,. >@{:)"1 hlights
   if. # hlights do.
     QP^:DEBHLIGHT2'drawhighlights:defstring=?defstring]0 hlights vf (vf)hlighttotlbr{:"1]hlights '
-    mesh =. (boxyx +"2 |:"2) valueformat hlighttotlbr 2&{"1 hlights
+    mesh =. ((boxyx + 2 2 $ 1 _1 1 _1) +"2 |:"2) valueformat hlighttotlbr 2&{"1 hlights
     if. +./ meshvalid =. INVALIDRECT -.@:-:"2 mesh do. NB. create top,bottom,:left,right, adjust for rectangle origin
 NB. Expand the cliprect to allow for the width of the highlight, which is centered on the edge of the rectangle
 NB. and therefore projects outside
@@ -5066,7 +5106,16 @@ NB. See which scrollbar, if any, the click is in
 dhw =. (<exp,1) { DOdatapos
 if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
   NB. Start accumulating the display
-  disp =. ,: EXEGESISDATASOURCE ; 'The result of the verb:',LF,(defstring 0),CR,LF
+  if. 2 = 3!:0 DOranks do.
+    t =. 'This is a ',((*#DOranks) # 'named '),'noun.'
+    if. nounhasdetail *. -. nounshowdetail do.
+      t =. ' The value shown is the result of a computation that does not depend on any names.  To see the details of this computation, click anywhere in the value.'
+    end.
+    t =. t,LF
+  else.
+    t =. 'The result of the verb:',LF,(defstring 0),CR
+  end.
+  disp =. ,: EXEGESISDATASOURCE ; t , LF
   if. sellevel <: #selections do.
     NB. Display the shape of the result
     rshape =. 0{::valueformat
@@ -5245,7 +5294,7 @@ NB. is called when the timer expires: we then see where the cursor is and call t
 NB. y is the mouse position yx.  Start/continue a hover timer, clearing an old one if the mouse has moved
 hoverinitloc =: $0   NB. Init no hover active
 MAXHOVERMOVEMENT =: 1   NB. Allow this much movement from start-of-hover position
-HOVERTIME =: 1000  NB. time to hover, in msec
+NB. obsolete HOVERTIME =: 1000  NB. time to hover, in msec
 'HOVEROFFSETY HOVEROFFSETX' =: _8 5  NB. amount to offset tooltip from the hover
 hoverstart =: 3 : 0
 if. #hoverinitloc do.  NB. We are hovering.  Does this continue the same hover?
@@ -5253,7 +5302,7 @@ if. #hoverinitloc do.  NB. We are hovering.  Does this continue the same hover?
 end.
 if. 0 = #hoverinitloc do.   NB. If no hover running (and perhaps we just cleared it), start one
 NB.?lintonly wdtimer =: wd
-  wdtimer HOVERTIME  NB. start the hover timer
+  wdtimer (tooltipdelayx,2) {:: TOOLTIPDELAYCHOICES  NB. start the hover timer
   hoverinitloc =: y
 end.
 )
@@ -6533,6 +6582,7 @@ end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
 NB. If detail is turned off, display only the final result
+QP'nounhasdetail nounshowdetail '
 if. -. nounshowdetail do.
   'displayhandlesin displaylevrank nounhasdetail physreqandhighlights__inheritroot' =: ($0);NORANKHISTNOUN;1;<NOPHYSREQ
   NOLAYOUTS ,&< coname''
