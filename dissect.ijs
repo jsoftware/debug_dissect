@@ -7,6 +7,10 @@ NB. The dissectionlist thing is to preserve the list over reloads, for debugging
 NB. Don't delete a locale that we have switched to, to prevent interaction unpleasantness
 3 : 'dissectionlist_dissect_ =: d [ ((cocreate ([ coerase))"0~   2 1 {.~ #) y [ d =. ".''dissectionlist_dissect_''' (coname'') -.~ locales
 
+NB. DISSECTLEVEL is updated from time to time whenever there is a change to an external interface, indicating the dissect release level
+NB. at the time of the change
+DISSECTLEVEL_dissect_ =: 3 7
+
 NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).  In J6 tooltips
 NB. take over the timer interrupt
 ALLOWNONQTTOOLTIP_dissect_ =: 1
@@ -34,14 +38,29 @@ QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 0 : 0
-0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:1 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+testsandbox_base_ 1
 )
 NB. TODO:
-NB. debug
-NB. dissecting value error fails quietly
-NB. failure when an explicit local verb is used in a line, from debug - we don't reconstruct the value correctly
-NB.   and there is no 'parse' error message
+NB. Use morpheme logic for displaying data
+NB. describe errors
+NB. hovering over data: note if explorer allowed or already existent; if big, mention menu to change size; allow clicking in low-right of scrollbare to change individual size
+NB. Make 'atom' the cell-shape, always blue; remove trailing blue box
+NB. Hover over verb should show definition (& script), if short
+NB. Explain a primitive verb in a line of the overall
+NB. Hovering on shape/sel: show the verb at that level, and the input shape/selection/output shape
+NB. Support u :: v
+NB.  Distinguish between the two previous on 'error'
 NB. explain different types of error
+NB. 2 dissect '+(a =. /) 3 4 5'  fails
+NB. Enforce a recursion limit to help debug stack error
+NB. Add 'About' box for dissect
+NB. clicking on vbname (if tacit) should launch sandbox for that name
+NB. Give pn for main & explorer windows
+NB. Highlight net on a click/hover of a wire
+NB. Hovering over selected cell to detail computation there?
+NB. Test display of fill-cells incl errors
 NB. can simplify combineyxsels
 NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?
 NB. change rank stack in partitions (test /."0), don't dup /.
@@ -86,11 +105,19 @@ NB. where sentence is a string to be executed.  The sentence is parsed and modif
 NB. looging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
 NB. dissect verb), and then the results are displayed in 2d form.  If sentence is omitted, the sentence from the last error is used.
 NB.
+NB. Options are (bitmask) where
+NB.  bit 0 is 1 to use a sandbox for executing the sentence
+NB.  bit 1 is 1 to return the locale of the dissect window
+NB.
 NB. If y is boxed, it should be a table ready for use in parse, i. e. nx3 where the first line gives
 NB. parameters;locale;text of sentence
 NB. and the remaining lines are the local names defined in the running explicit definition, as described in z458095869 below
+NB.
+NB. Result is a string containing an error message if a window couldn't be created, otherwise an empty string EXCEPT when the
+NB. dissect locale was requested: in that case return it if it was created
 
-dissect_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`nodisplay_dissect_@.(2=3!:0)  [: parse_dissect_ (0&# : [    (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_))   ])@getsentence_dissect_`]@.(0<L.@])
+NB. obsolete dissect_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`nodisplay_dissect_@.(2=3!:0)  [: parse_dissect_ (0: : [    (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_))   ])@getsentence_dissect_`]@.(0<L.@])
+dissect_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`nodisplay_dissect_@.(2=3!:0)  [: parse_dissect_ ((0: : [)    (([ ; 18!:5@(''"_) ; ]) , z458095869_dissectnopath_@(''"_))  getsentence_dissect_@])^:(0=L.@])
 
 NB. The locale dissectnopath is used to find local names.  Its path is empty.  The locale contains only one name, z458095869
 cocurrent 'dissectnopath'
@@ -229,7 +256,7 @@ NB. intercept.  We return empty, which will cause nodisplay to be called for the
 NB. clear dissectinstance, so that display for the original dissect call will find no dissectinstance, which it
 NB. interprets as a recursion request, exiting with an appropriate message and everything reset.
 if. #dissectinstance do. '' return. end.  NB. Return empty... which will bypass display
-dissectinstanceforregression =: dissectinstance =: '' conew 'dissect'   NB. global because must persist over return to user environment
+dissectinstance =: '' conew 'dissect'   NB. global because must persist over return to user environment
 errormessage =: ''
 try.
   parsemain__dissectinstance y
@@ -238,6 +265,7 @@ catch.
 NB. If the error was unexpected, display it
     smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
     smoutput 13!:12''
+    errormessage =: 'error during parsing'
   end.
   errormessage
 end.
@@ -375,7 +403,8 @@ NB. sentence in, and define all the user names in it, before running it
 parsemain =: 3 : 0   NB. runs in object locale
 defnames =. }. y  NB. table of names
 'options loc sentence' =. {. y
-sandbox =. {.!.0 options
+sandbox =.  * 1 bwand {.!.0 options
+returnobject_dissect_ =: * 2 bwand {.!.0 options
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 NB. Discard anything past the first LF, and remove CR
@@ -633,30 +662,34 @@ if. sandbox do.
   defnounmask =. (<0) = 1 {"1 defnames
   NOUNNAMES_dissect_ =: defnounmask # 0 {"1 defnames
   NOUNVALUES_dissect_ =: defnounmask # 2 {"1 defnames
-  ARNAMES_dissect_ =: (-. defnounmask) # 0 {"1 defnames
-  ARVALUES_dissect_ =: (-. defnounmask) # 2 {"1 defnames
-  if. 0 < #ARNAMES_dissect_ do.
-    if. 1 = #ARNAMES_dissect_ do.
-      ARNAMES_dissect_ =: 2 # ARNAMES_dissect_
-      ARVALUES_dissect_ =: 2 # ARVALUES_dissect_
-    end.
-    ARNAMES_dissect_ =: '`' , ;:^:_1 ARNAMES_dissect_
-    ARVALUES_dissect_ =: 3 : ('0!:100 ''y =. '' , y';'5!:1 <''y''')&.> ARVALUES_dissect_
-  end.
-  (sandname_dissect_ , ' 0');(sandname_dissect_ , ' 1')
+  DEFSTRING_dissect_ =: (*#NOUNNAMES_dissect_) # '(NOUNNAMES_dissect_) =. NOUNVALUES_dissect_',LF
+  DEFSTRING_dissect_ =: DEFSTRING_dissect_ , ; ([ , ' =. ' , LF ,~ ])&.>/"1 (0 2) {"1 (-. defnounmask) # defnames
+NB. obsolete   ARNAMES_dissect_ =: (-. defnounmask) # 0 {"1 defnames
+NB. obsolete   ARVALUES_dissect_ =: (-. defnounmask) # 2 {"1 defnames
+NB. obsolete   if. 0 < #ARNAMES_dissect_ do.
+NB. obsolete     if. 1 = #ARNAMES_dissect_ do.
+NB. obsolete       ARNAMES_dissect_ =: 2 # ARNAMES_dissect_
+NB. obsolete       ARVALUES_dissect_ =: 2 # ARVALUES_dissect_
+NB. obsolete     end.
+NB. obsolete     ARNAMES_dissect_ =: '`' , ;:^:_1 ARNAMES_dissect_
+NB. obsolete     ARVALUES_dissect_ =: 3 : ('0!:100 ''y =. '' , y';'5!:1 <''y''')&.> ARVALUES_dissect_
+NB. obsolete   end.
+  '01' ([ , ' ' , sandname_dissect_ , ' ' , ''''&,@(,&'''')@(#~ >:@(=&''''))@])&.> execsentences_dissect_
+NB. obsolete   (sandname_dissect_ , ' 0');(sandname_dissect_ , ' 1')
 else.
   execsentences_dissect_
 end.
 NB.?lintsaveglobals
 )
 
-sandboxtemplate =: 3 : 0
-if. 1 = y do. 4!:55 <sandname_dissect_ end.
+sandboxtemplate =: 4 : 0
+if. x do. 4!:55 <sandname_dissect_ end.
 v4768539054_dissect_ =. y
-4!:55 <,'y'
-if. #NOUNNAMES_dissect_ do. (NOUNNAMES_dissect_) =. (NOUNVALUES_dissect_) end.
-if. #ARNAMES_dissect_ do. (ARNAMES_dissect_) =. (ARVALUES_dissect_) end.
-". v4768539054_dissect_ {:: execsentences_dissect_
+4!:55 ;: 'x y'
+NB. obsolete if. #NOUNNAMES_dissect_ do. (NOUNNAMES_dissect_) =. (NOUNVALUES_dissect_) end.
+NB. obsolete if. #ARNAMES_dissect_ do. (ARNAMES_dissect_) =. (ARVALUES_dissect_) end.
+0!:100 DEFSTRING_dissect_
+". v4768539054_dissect_
 )
 
 NB. Here to execute a modifier.  We do that when we encounter a modified verb.
@@ -776,10 +809,13 @@ rem sizey;
 menupopz;
 bin vh0;
 minwh 10 28;cc fmshowerror button;cn "<<";
+set fmshowerror tooltip Go back to initial selection;
 bin s;
 minwh 10 28;cc fmbwd button;cn "<";
+set fmbwd tooltip Undo selection;
 bin s;
 minwh 10 28;cc fmfwd button;cn ">";
+set fmfwd tooltip Redo selection;
 bin s;
 bin z;
 minwh 400 80;cc dissectisi isidraw flush;
@@ -828,17 +864,21 @@ QP^:DEBTIME'startdisplay=?6!:1'''' '
 if. #dissectinstance do.
   try.
     displaymain__dissectinstance y
+    if. returnobject do. ret =. dissectinstance else. ret =. 0 0 $0 end.
     dissectinstance =: 0$a:
     QP^:DEBTIME'enddisplay=?6!:1'''' '
+    NB. Normal return: quiet return, unless user asked for the object id
+    ret
   catch.
     NB. If error during initial display, display the error and clean up
     smoutput 'error in initial display'
     smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
     smoutput 13!:12''
     destroy__dissectinstance''
+    'Error in dissect.'
   end.
-  0 0$0
 else.   NB. user tried recursive execution
+  destroy__dissectinstance''
   'Vivisection is illegal.'
 end.
 )
@@ -849,8 +889,8 @@ NB. If the sentence ran correctly for the user, make sure we get the same result
 NB. If there is only one result, we don't compare
 if. 1 < #y do.
   if. -.@-:/ y do.
-    smoutput 'dissect error: internal result does not match the result from the J session!  Aborting.'
-    qprintf'y '
+QP^:(-.CLEANUP)'y '
+    'dissect error: internal result does not match the result from the J session!  Aborting.' 13!:8 (1)
     return.
   end.
 end.
@@ -4658,6 +4698,26 @@ shape =. (#frame) }. shape
 NB. y is (shape of a cell),(frame), result is string describing the frame; always singular
 exegesisfmtframe =: exegesisfmtcell@:(1&(|.!.a:))
 
+NB. These are the morphemes we use, in the order they should appear in the final result.
+NB. Some may be entended with selection levels when they are created.
+exegesismorphemes =. <;._2 (0 : 0)
+EXEGESISFRAMENOFRAME
+EXEGESISFRAMENUGATORY
+EXEGESISFRAMENONNOUN
+EXEGESISFRAMENOSHAPE
+EXEGESISFRAMEVALID
+EXEGESISFRAMESURROGATE
+EXEGESISRANKSTACKEXPLAIN
+EXEGESISRANKSTACKPOWERSTART
+EXEGESISRANKSTACKPARTITIONSTART
+EXEGESISRANKOVERALLEXPLAIN
+EXEGESISDATASOURCE
+EXEGESISDATAPATH
+EXEGESISDATASHAPE
+EXEGESISDATAARRANGEMENT
+)
+(exegesismorphemes) =: i. # exegesismorphemes
+
 NB. Explain the frame of the verb.
 NB. Called in the locale in which the operands and string form are defined
 NB. y is (origlocale;opno) where origlocale is the locale of the original click, which might be
@@ -4667,10 +4727,6 @@ NB.  in a monad, but that monad fed into one side of a larger dyad; we will desc
 NB.  and note which side the click was in); 2 means & was never encountered and the valence never changed
 NB. Result is table of (retcode;LF-delimited string, empty if there is no frame)
 NB.  retcode means: 0=non-verb, 1=no shapes, 2=no frame, 3=frame exists
-framecodes =. 'FRAME'&,&.> ;: 'NONNOUN NOSHAPE NOFRAME VALID SURROGATE NUGATORY'
-rankcodes =. 'RANK'&,&.> ;: 'STACKEXPLAIN OVERALLEXPLAIN STACKPOWERSTART STACKPARTITIONSTART'
-datacodes =. 'DATA'&,&.> ;: 'SOURCE PATH SHAPE ARRANGEMENT'
-3 : '(y) =: i. # y' 'EXEGESIS'&,&.> framecodes,rankcodes,datacodes
 exegesisframe =: 3 : 0
 'labelloc opno' =. y
 res =. 0 2$a:  NB. Init empty return
@@ -4743,12 +4799,15 @@ NB. obsolete     vstring =. '.'
       else.
         ftext =. ftext , 'y is a single cell that will be replicated for use with each cell of x.',LF
       end.
+      if. (i.&0@:=/ > frames) < <./ #@> frames do.
+        ftext =. ftext , 'This is an agreement error.',LF
+      elseif.
       surplusframe =. 0 -.~ bwxor/ > frames  NB. extend shorter frame with 0, XOR, remove common frame (we know no 0 in any frame)
-      if. (0~:#surplusframe) *. 0 -.@e. #@> frames do.
+      (0~:#surplusframe) *. 0 -.@e. #@> frames do.
         NB. cells of the short operand must be replicated, and not just a single cell.
-        'short long' =. (>&#&> frames) |. 'x';'y'
-        ftext =. ftext , 'Each cell of ' , short , ' are replicated into ' , (exegesisindefinite exegesisfmtframe '';surplusframe) ,' of identical cells, and then corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
-      else.
+        'short long' =. (>&#&>/ frames) |. 'x';'y'
+        ftext =. ftext , 'Each cell of ' , short , ' is replicated into ' , (exegesisindefinite exegesisfmtframe '';surplusframe) ,' of identical cells, and then corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
+      elseif. do.
         ftext =. ftext , 'Corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
       end.
     end.
@@ -4877,7 +4936,7 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     NB. appears in this stack.
     tt =. tt , exegesisrankstack__labelloc (1 < labelloc +/@:= 1 {"1 displaylevrank),(ix = <:#DOranklocales)
     NB. Finally, any explanation for the node in general.  Expansions and Finals are explained here.  Every line contributes.
-    NB. We pass the title string into the line as y, and a flag aset to 1 if this locale appears twice in the stack, as x.
+    NB. We pass the title string into the line as y, and a flag set to 1 if this locale appears twice in the stack, as x.
     NB. We process bottom-up to leave explanations in reverse order, at the top of the tooltip
     if. ix = <:#DOranklocales do. tt =. tt ,~ ; (4 : '(1 < y +/@:= 1 {"1 displaylevrank) exegesisrankoverall__y&.> x')/"1 |. 2 {."1 displaylevrank end.
   else.
@@ -4888,8 +4947,8 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
   if. 1 < #tt do.
     tt =. (#~   EXEGESISFRAMENOFRAME ~: [: > {."1) tt
   end.
-  NB. Collect all the text into one string.  Remove extra trailing LF
-  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; 1  {"1 tt
+  NB. Order the lines according to the order of morphemes in our list
+  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; (1 {"1 tt) /: > 0 {"1 tt
 else.
   text =. 'The name of the noun or verb, and any rank or level modifiers attached to it'
 end.
@@ -4903,29 +4962,63 @@ hoverDOshapepos =: 4 : 0
 
 errorlookup =: 0 : 0
 ?agreement
+This dyadic verb has x and y operands that cannot be matched up cell-for-cell.  Look through the rank stack to see where the error occurs.
+
+This error is reported as a 'length error' in the J session.
 ?framing
+The verb completed correctly on each cell, but the result-cells are of different types and cannot be assembled into a single result.
+
+This error is reported as 'domain error' in the J session.
 ?invalid verb
+This combination was rejected before it was even executed on its arguments.
 ?error
+This execution resulted in an error, but execution continued.
+
+If this verb is being executed on a cell of fills, an error result is treated as if it were 0.
+
+If this verb is executed in the combination u :: v, execution continues with the v side.
 ?non-atomic v
+In m@.v, the execution of v must result in a numeric atom.
 ?attention interrupt
+You interrupted execution with JBreak.
 ?break
+You interrupted execution with JBreak.
 ?domain
+The arguments to this verb are invalid.
 ?file name
+You are operating on a nonexistent device or file.
 ?file number
+There is no file open with that number. 
 ?index
+You are accessing outside the bounds of your array.
 ?interface
+You have an ill-formed filename, or are making an illegal request.
 ?length
+Your argument has a length that this verb can't handle.
 ?locale
+You have tried to reuse a numeric locale number.
 ?limit
+An argument exceeds an internal limit in J.
 ?NaN
+The computation produced a non-numeric (NaN) value, represented in J by _. .
 ?nonce
+The operation you requested is not supported yet.
 ?out of memory
+A value was so large that the computer ran out of memory.  This is signaled when J needs more memory to store a value and the operating system refuses to supply it.
 ?rank
+Your argument has a rank that this verb can't handle.
 ?security violation
+You have requested heightened security, and this verb would be insecure.
 ?stack
+You have exceeded J's generous recursion limit, probably because of an infinite recursion.
 ?syntax
+This verb either executes an illegal sentence or attempts to return a result that is not a noun.
+
+The usual cause is an undefined name in the definition of the verb.
 ?time limit
+Execution took too long.
 ?value
+Execution of this verb attempted to use a name that has not been assigned.
 )
 
 hoverDOstatuspos =: 4 : 0
@@ -6187,10 +6280,10 @@ exegesisrankoverall =: 4 : 0
 if. recursionhere do.
   if. y -: '' do.
     NB. Result has not expanded
-    res =. ,: EXEGESISRANKOVERALLEXPLAIN ; 'This is the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
+    res =. ,: (EXEGESISRANKOVERALLEXPLAIN,0) ; 'This is the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
   else.
     NB. Result has expanded
-    res =. ,: EXEGESISRANKOVERALLEXPLAIN ; 'This is the final result of a recursive verb. The block feeding into this shows the results from each recursion.',LF
+    res =. ,: (EXEGESISRANKOVERALLEXPLAIN,0) ; 'This is the final result of a recursive verb. The block feeding into this shows the results from each recursion.',LF
   end.
 else.
   res =. 0 2$a:
@@ -6291,10 +6384,10 @@ exegesisrankoverall =: 4 : 0
 if. recursionhere do.
   if. y -: '' do.
     NB. Result has not expanded
-    res =. ,: EXEGESISRANKOVERALLEXPLAIN ; 'This is the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
+    res =. ,: (EXEGESISRANKOVERALLEXPLAIN,0) ; 'This is the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
   else.
     NB. Result has expanded
-    res =. ,: EXEGESISRANKOVERALLEXPLAIN ; 'This is the final result of a recursive verb. The block feeding into this shows the results from each recursion.',LF
+    res =. ,: (EXEGESISRANKOVERALLEXPLAIN,0) ; 'This is the final result of a recursive verb. The block feeding into this shows the results from each recursion.',LF
   end.
 else.
   res =. 0 2$a:
@@ -6533,8 +6626,11 @@ NB. Remember if uop is a name
 uopisname =: name = (<0 0) {:: y
 utoken =: (<0 2) { y
 NB. Since we don't participate in traversal, fix it so that references to this locale are picked up
-NB. by the object of assignment.  We will take resultissdt from the assigner
-coinsert vop
+NB. by the object of assignment.  We will take resultissdt from the assigner.  We can do this only if
+NB. the value is a noun
+if. noun bwand (<2 0) {:: y do.
+  coinsert vop
+end.
 NB.?lintonly uop =: vop =: <'dissectverb'
 NB. Return the part of speech of the assigned value
 ((<2 0){y),(coname'');tokensource
@@ -9367,7 +9463,7 @@ else.
     end.
   end.
 end.
-,: EXEGESISRANKSTACKEXPLAIN;t
+,: EXEGESISOVERALLEXPLAIN;t
 )
 
 'dissectverb' primlocale '$:'
@@ -9755,427 +9851,444 @@ SFOPEN ;~ x getfailingisf_dissectobj_ f. y
 NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ dissectinstanceforregression_dissect_ 4 : ''destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 NB. wd@('psel dissect;pclose'"_)"0 i. 100
 runtests_base_ =: 0 : 0
-dissect '2+''a'''
-dissect '2,''a'''
-dissect '2 3+''a'''
-dissect '1 2 + ''ab'''
-dissect '1 2 +@+ ''ab'''
-dissect '1 2 +&+ ''ab'''
-dissect '1 2 +&+~ ''ab'''
-dissect '''ab'' +&+ 1 2'
-dissect '1 2 +@(]"0) ''ab'''
-dissect '1 2 +@(0:"0) ''ab'''
-dissect '0 1 2 + 1 2'
-dissect '+@+ ''a'''
-dissect '+@{. ''a'''
-dissect '0 +&+ ''a'''
-dissect '0 +&+ ''ab'''
-dissect '0 +&:+ ''a'''
-dissect '''a''+&+ 0'
-dissect '''ab''+&+ 0'
-dissect '''a''+&:+ 0'
-dissect '+&{. ''a'''
-dissect '+&:+ ''a'''
-dissect '+&2 (3 4)'
-dissect '3&* (3 4)'
-dissect '+&''a'' (3 4)'
-dissect '(+&2)@:(2&*) 4 6'
-dissect '3 4 +"1 i. 3 2'
-dissect '(i. 3 2) +"1 (3 4)'
-dissect '(i. 3 2) +"1 i. 3 2'
-dissect '(i. 3 2) +"1 i. 3 1'
-dissect '(i. 3 2) +"1 i. 1 1'
-dissect '2 3 +@]&> 5 6'
-dissect '2 3 +&:+: 4 5 6'   NB. must show sgreement error
-dissect '(i. 3 2) +@]"1 i. 1 1'
-dissect '(i. 3 2) +@["1 i. 1 1'
-dissect 'i.@(0&{) ''a'''
-dissect 'i."0 (1 2)'
-dissect '+~ i. 2 3'
-dissect '3 4 +~ i. 2 3'
-dissect '3 4 +~ i. 3 2'
-dissect '3 4 +@]~ i. 3 2'
-dissect '3 4 +@[~ i. 3 2'
-dissect '3 4 +~ i. 2 3'
-dissect '3 4 (+ - *) 0 1'
-dissect '0 1 2 (+ - *) 0 1'
-dissect '0 1 2 (+ - 0:) 0 1'
-dissect '0 1 2 (0: - *) 0 1'
-dissect '0 1 2 (1:"0 - 0:"0) 0 1'
-dissect '0 1 2 (+ - ]) 0 1'
-dissect '0 1 2 ([ - -) 0 1'
-dissect '0 1 2 ([ - ]) 0 1'
-dissect '0 1 2 (- + * % -)"0 (3 4 5)'
-dissect '0 1 (+ 0:) ''ab'''
-dissect '0 1 (+ {.) ''ab'''
-dissect '0 1 (+ ]) 1 2 3'
-dissect '(0 1 2 + 0 1"_) 5'   NB. must show agreement error
-dissect '0 1 2 + '''''
-dissect '0 1 2 + '' '''
-dissect '0 (+ - *) '''''
-dissect '0 (1 2 3 - *) '''''
-dissect '0 (1 2 3 - *)"0 '''''
-dissect '0 (1 2 3 , ])"0 $0'
-dissect '0 ([: 1 2 3"0 $)"0 $0'
-dissect '0 (+ - ]) '''''
-dissect '0 (1 2 3 - *)"0 $0'
-dissect '0 (1 2 3 - *)"0 (0)'
-dissect '0 +@* '''''
-dissect '0 (+@* - *) '''''
-dissect '0 (+@* *) '''''
-dissect '0 (+ *) '''''
-dissect '2 (+:@+:@+:@+ + ]) 3'  NB. test estheight
-dissect '2 (+:@+:@+:@+ + +) 3'  NB. test estheight
-dissect '2 (+ + +:@+:@+:@+) 3'  NB. test estheight
-dissect '2 ([ + +:@+:@+:@+) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+    + +:@+) + (+:@+:@+:@+:@+ + +   )) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+:@+ + +   ) + (+:@+:@+:@+    + +:@+)) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+:@+ + +:@+) + (+:@+:@+:@+    + +   )) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+    + +   ) + (+:@+:@+:@+:@+ + +:@+)) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+    +~ +:@+) + (+:@+:@+:@+:@+ +~ +   )) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+:@+ +~ +   ) + (+:@+:@+:@+    +~ +:@+)) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+:@+ +~ +:@+) + (+:@+:@+:@+    +~ +   )) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@+    +~ +   ) + (+:@+:@+:@+:@+ +~ +:@+)) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@]    +~ +   ) + (+:@+:@+:@+:@] +~ +:@+)) 3'  NB. test estheight
-dissect '2 ((+:@+:@+:@]    +~ +:@+   ) + (+:@+:@+:@+:@] +~ +)) 3'  NB. test estheight
-dissect '2 ([ +:) 3'
-dissect '2 (] +:) 3'
-dissect '2 (] ]) 3'
-dissect '2 ([ ]) 3'
-dissect '([ +:) 3'
-dissect '(] +:) 3'
-dissect '(] ]) 3'
-dissect '([ ]) 3'
-dissect '(#@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
-dissect 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' [ z =. 2
-dissect 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q''' [  z =. 2
-dissect '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
-dissect '(1&+@>)"1 ] 2 2 $ 0;''abc'';''b'';''cd'''
-dissect '(i.@# ((}.>) ,. ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
-dissect '(i.@# ((}.>) ,&< ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
-dissect '(i.@# ((}.>) , ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
-dissect '0 1 2 3 {~ 2'
-dissect '(i. 2 3) {~ 2'
-dissect '(i. 3 2) {~ 2'
-dissect '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'
-dissect '1 2 +"_1 0 (1 2)'
-dissect '1 2 ,"_1 i. 2 3'
-dissect 'y =. 2 + 5'
-dissect 'zzz + 5 [ zzz =. 6'
-dissect '''a b c'' =. i. 3'
-dissect '''`a b c'' =. +`-`%'
-dissect 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
-dissect '-&.> i. 3'
-dissect '-&.:> i. 3'
-dissect '+/ 1 2 3 4 5'
-dissect '(* -)/@> z' [ z =. <@i."0 (3 4 5 6)
-dissect '+/@> z' [ z =. <@i."0 (3 4 5 6)
-dissect '+/"1 z' [ z =. i. 4 3
-dissect 'i."0@[/ z' [ z =. 4 3 $ 2 3 4
-dissect '2([: +/ */) 4'
-dissect '2 3([: +/ */) 4 5 6'
-dissect '2 3 4([: +/ */) 4 5 6'
-dissect '+&.>/ ''a'';0;1;2 '
-dissect '+&.>/ z ' [ z =. 1;0
-dissect '+&.>/ z ' [ z =. 1;0;2
-dissect '+&.>/ z ' [ z =. 'a';0
-dissect '+&.>/ z ' [ z =. 'a';0;1
-dissect '+&.>/ z ' [ z =. 2;'a';0;1
-dissect '+&.>/ z ' [ z =. 1;3;2;'a';0;1
-dissect '+&.>/ z ' [ z =. $0
-dissect '+&.>/ z ' [ z =. 'a'
-'1 2 3 + y' 4 : 'dissect x' 4
-dissect '  (,1) ((}."1~ <:@#@$) ,~"1 ] {~ ({:@$@[ <. <:@#@$@]) <@{."1 [) ,.0 '
-dissect '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
-dissect '$@i."1 ]3 + i. 5 2'   NB. select to test vertical resize
-dissect 'z + > ''a'';1' [ z =. 1
-dissect 'i.@> z' [ z =. 1 1;(3,.4);6   NB. fills and selections
-dissect 'i.@> z' [ z =. 1 1;(3,:4);6   NB. fills and selections
-dissect 'i.@>@> z' [ z =. (1 1;(3,.4);6);<(2;4 2;6,:2)
-dissect 'i. z' [ z =. 3 1$1 _1 2
-dissect 'i. z' [ z =. 3 1$1 0.5 2
-dissect 'i.@> z' [ z =. <@,"0 (1 0.5 2)
-dissect 'i.@:> z' [ z =. <@,"0 (1 0.5 2)
-dissect 'i."0 z' [ z =. 0 1 0.5
-dissect 'i."0 z' [ z =. 0 1 2
-dissect '+:"0.5 _1 z' [ z =. 0 1 0.5
-dissect 'a ([ + (+/ % #)@]) z' [ z =. 3 9 6 */ 1 5 9 2 [ a =. 6 5 3
-dissect '(i. 3) +"1"2 i. 3 4 3'
-dissect 'i.@> z' [ z =. 1 1;(3 4);'a'
-dissect 'i.@> z' [ z =. 1 1;(3,:4);'a'
-dissect '(#@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
-dissect '(#@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
-dissect '(#@>)"1 ] 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
-dissect '(#@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
-dissect '(#@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
-dissect '(#@>)"1 |: 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
-dissect '(>:@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
-dissect '(>:@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
-dissect '(>:@>)"1 ] 5 2 $ 0;1;2;''cd'';''e'';''fg'''
-dissect '(>:@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;1;2'
-dissect '(>:@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
-dissect '(>:@>)"1 |: 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
-dissect '(+/ % #)&.:*: i. 3 3 3'
-dissect '+/ i. 2 4'
-dissect '+/ i. 3 4'
-dissect '+/"1 i. 3 4'
-dissect '+/"1 i. 3 2'
-dissect '+/@,/"1 i. 3 2'
-dissect '3 ''a'''
-dissect '   '
-dissect '3 4 5&*"1 i. 5 3'
-dissect '+/"2 i. 3 4 8'  NB. Failed during selection
-dissect '+:^:0 (1)'
-dissect '2 +^:0 (1)'
-dissect '+:^:1 (1)'
-dissect '2 +^:1 (1)'
-dissect '+:^:_1 (1)'
-dissect '2 +^:_1 (1)'
-dissect '+:^:2 (1)'
-dissect '2 +^:2 (1)'
-dissect '+:^:_2 (1)'
-dissect '2 +^:_2 (1)'
-dissect '+:^:0 2 (1)'
-dissect '2 +^:0 2 (1)'
-dissect '+:^:_2 2 (1)'
-dissect '2 +^:_2 2 (1)'
-dissect '*:^:_ (0.5)'
-dissect '*:^:__ (0.5)'
-dissect '*:^:(<_) (0.5)'
-dissect '*:^:(<__) (0.5)'
-dissect '+:^:0"0 (1 2 3)'
-dissect '2 +^:0"0 (1 2 3)'
-dissect '+:^:1"0 (1 2 3)'
-dissect '2 +^:1"0 (1 2 3)'
-dissect '+:^:_1"0 (1 2 3)'
-dissect '2 +^:_1"0 (1 2 3)'
-dissect '+:^:2"0 (1 2 3)'
-dissect '2 +^:2"0 (1 2 3)'
-dissect '+:^:_2 2"0 (1 2 3)'
-dissect '2 +^:_2 2"0 (1 2 3)'
-dissect '+:^:* 0'
-dissect '+:^:* 1'
-dissect '+:^:* _'
-dissect '2 +^:* 0'
-dissect '2 +^:* 1'
-dissect '2 +^:(*@]) 0'
-dissect '2 +^:(*@]) 1'
-dissect '2 +^:(*@]) _'
-dissect '0 2 +:@]^:[ 8'
-dissect '+:^:]"0 (0 1 2)'
-dissect '2 +^:]"0 (0 1 2)'
-dissect '3&*^:(100&>)^:_"0 (1 2 3)'
-dissect '3 *^:(100 > ])^:_"0 (1 2 3)'
-dissect '<^:]"0 z' [ z =. 1 2 0
-dissect '+:^:]"0 (0 0.5 1)'  NB. here
-dissect '(i. 2 3) +:@]^:[ (5)'
-dissect '(i. 2 3) +:@]^:(+:@[)"0 (5)'
-dissect '(i. 2 3) +:@]^:(+:@[)"1 (5)'
-dissect '>:^:0 a:'
-dissect '>:^:1 a:'
-dissect '>:L:3 f.@<^:0 1 2 3 4 (5)'
-dissect '>:L:_3 f.@<^:0 1 2 3 4 (5)'
-dissect '>:L:_3 f.@<^:1 2 3 4 (5)'
-dissect '>:L:_3 f.@<^:1 2 3 4 5 (5)'
-dissect '-:@{:@i.^:8 (12)'
-dissect 'i."0"1 z' [ z =. 2 2 $ 1 1 1 0.5
-dissect 'i."0"1 z' [ z =. 2 2 $ 1 1 0.5 1
-dissect 'i."0"1 z' [ z =. 2 2 $ 1 0.5 1 1
-dissect 'i."0"1 z' [ z =. 2 2 $ 0.5 1 1 1
-dissect '+&>/ z' [ z =. 1;2;'a';4;5;6
-dissect '(] ,~ ([ - ] +/ .* %.)&.|:)&(,:^:(1 = #@$))/&.|: z' [ z =. 3 3 ?@$ 100
-dissect '1 2 +&+:&(1 = ]) 4 5'
-dissect '_2 2 +:@]^:[ 8'
-dissect '(1) 2&+ 5 6 7'
-dissect '(0) 2&+ 5 6 7'
-dissect '(_1) 2&+ 5 6 7'
-dissect '(1 2 3) 2&+ 5 6 7'
-dissect '(1 2 3) 2&[ 5 6 7'
-dissect '(<5) +&.> <4'
-dissect '5 +&.> <4'
-dissect '(<5) +&.> 4'
-dissect '5 +&.> 4'
-dissect '(<2) +&.> <3 4 5'
-dissect '(100;200) +&.> <"0 i. 2 3'
-dissect '+/&.> 0 1 2;3 4 5 6'
-dissect '>:&.>@:i.&.> 3 + i. 4' 
-dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
-dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;'a'  NB. frame highlighting in error path
-dissect '(3 3 $ 0 1 2 3 4 5 6 7 7.5) ;&:(i."0) 0 1'
-dissect '(<<"0 i. 6) ,.&.> <"1 <"0 ''abcdef'''
-dissect '(<<"0 i. 6) ,"0&.> <"1 <"0 ''abcdef'''
-dissect '(< <"0 i. 3 2) #&.>&.> < ''four five six'' ,.&;: ''one two three'''
-dissect '(<2) +&.>&.>&.>&.> <^:4 (8)'
-dissect '(<2) +&.>&.>&.>&.> <^:4 (3 8)'
-dissect '(<2) +&.> <8'
-dissect '(<i. 3 2 3) +"2&.> <"1 i. 2 2 3'
-dissect '>:&.> 1;2;3;''a'''
-dissect '>:&.> ''a'';1;2;3'
-dissect '>:&.> 1;''a'';2;3'
-dissect'((* -> *) -> * -> *.) i:9'  NB. display tester
-dissect '+:\ i. 4'
-dissect '+:\\ i. 3 4'
-dissect '3 +:\ i. 5'
-dissect '3 +:\ i. 4 5'
-dissect '4 +:\ i. 4 5'
-dissect '_3 +:\ i. 5'
-dissect '5 +:\ i. 4 5'
-dissect '0 +:\ i. 4 5'
-dissect '_3 +:\ i. 6'
-dissect '2 3 +:\ i. 7'
-dissect '+:\. i. 4'
-dissect '+:\\. i. 3 4'
-dissect '+:\.\. i. 3 4'
-dissect '3 +:\. i. 5'
-dissect '3 +:\. i. 4 5'
-dissect '4 +:\. i. 4 5'
-dissect '_3 +:\. i. 5'
-dissect '5 +:\. i. 4 5'
-dissect '0 +:\. i. 4 5'
-dissect '_3 +:\. i. 6'
-dissect '2 3 +:\. i. 7'
-dissect '_3 (_2&(+\.))\. i. 7'
-dissect '+:/. i. 3 3'
-dissect '1 1 +//.@(*/) 1 2 1' 
-dissect '+:/. i. 4'
-dissect '+:/. i. 0'
-dissect '1 1 2 3 2 1 4 3 1 2 3 <@,/. ;:''The quick brown fox jumped over the lazy dog and slept'''
-dissect 'i.\ 0 1 2 3.5'
-dissect 'i.&.> ]each 0 1 2 3.5'
-dissect '#&.>\ ;: ''The quick brown fox'''
-dissect '#&.>/. ;: ''The quick brown fox'''
-dissect '#&.>\. ;: ''The quick brown fox'''
-dissect '#&.>\. ''abcd'''
-dissect '+:;.0 i. 3 3'
-dissect '(1 2,:2 3) +:;.0 i. 4 5'
-dissect '(1 3,:2 _2) +:;.0 i. 4 5'
-dissect '(1 _3,:2 2) +:;.0 i. 4 5'
-dissect '(1 _3,:2 _2) +:;.0 i. 4 5'
-dissect '(1,:2) +:;.0 i. 4 5'
-dissect '<;.1 ''every little thing'''
-dissect '<;.1 ;: ''a man a plan a canal panama'''
-dissect '(+/ % #);.1 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
-dissect '<;._1 ''every little thing'''
-dissect '<;._1 ;: ''a man a plan a canal panama'''
-dissect '(+/ % #);._1 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
-dissect '<;.2 ''every little thing'''
-dissect '<;.2 ;: ''a man a plan a canal panama'''
-dissect '(+/ % #);.2 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
-dissect '<;._2 ''every little thing'''
-dissect '<;._2 ;: ''a man a plan a canal panama'''
-dissect '(+/ % #);._2 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
-dissect '1 0 0 1 0 <;.1 ''abcde'''
-dissect '1 0 0 1 0 <;.2 ''abcde'''
-dissect '(1 0 1 0;1 0 1 1 0) +:;.1 i. 4 5'
-dissect '(1 0 1 0;1 0 1 1 0) +:"1;.1 i. 4 5'
-dissect '(3 4 ,: 2 3) <;.3 i. 10 10'
-dissect '(3 4 ,: 2 3) <;._3 i. 10 10'
-dissect '(3 4 ,: _2 3) <;.3 i. 10 10'
-dissect '(3 4 ,: _2 3) <;._3 i. 10 10'
-dissect '(3 6 ,: 2 3) <;.3 i. 10 10'
-dissect '(3 6 ,: 2 3) <;._3 i. 10 10'
-dissect '(3 6 ,: _2 3) <;.3 i. 10 10'
-dissect '(3 6 ,: _2 3) <;._3 i. 10 10'
-dissect '(0 4 ,: 2 3) <;.3 i. 10 10'
-dissect '(0 4 ,: 2 3) <;._3 i. 10 10'
-dissect '(0 0 ,: 2 3) <;.3 i. 10 10'
-dissect '(0 0 ,: 2 3) <;._3 i. 10 10'
-dissect '(3 4 ,: 2 3) +:;.3 i. 10 10'
-dissect '(3 4 ,: 2 3) +:;._3 i. 10 10'
-dissect '(3 4 ,: _2 3) +:;.3 i. 10 10'
-dissect '(3 4 ,: _2 3) +:;._3 i. 10 10'
-dissect '(3 ,: 2) <;.3 i. 10 10'
-dissect '(3 ,: 2) <;._3 i. 10 10'
-dissect '(0 ,: 2) <;.3 i. 10 10'
-dissect '(0 ,: 2) <;._3 i. 10 10'
-dissect '+: L:0 <1 2'
-dissect '+: L:0 (1 2; 3 4) ; 5 6'
-dissect '+: L:0 (1 2);''a'''
-dissect '|.L:0 <^:1 2 3 (0 1 2)'
-dissect '|.L:1 <^:1 2 3 (0 1 2)'
-dissect '+: L:0 (1 2);''a'';5 6'
-dissect '(100;200 300) ,L:0 (0 1);< 2 3 4 ; 1 ;<<5 6 ; 7 8'
-dissect '(100;200 300) ,L:0 (0 1);< 2 3 4 ; 1 ;<<''a'' ; 7 8'
-dissect '(<''a'') ,L:1(<0 1);<(<2 3 4);(<1);<<5 6;7 8'
-dissect '(<''a'') ,L:1(<0 1);<(<2 3 4);(1);<<5 6;7 8'
-dissect '+: S:0 <1 2'
-dissect '+: S:0 (1 2; 3 4) ; 5 6'
-dissect '+: S:0 (1 2);''a'''
-dissect '|.S:0 <^:1 2 3 (0 1 2)'
-dissect '|.S:1 a' [ a =. <^:1 2 3 (0 1 2)
-dissect '+: S:0 (1 2);''a'';5 6'
-dissect '(100;200 300) ,S:0 (0 1);< 2 3 4 ; 1 ;<<5 6 ; 7 8'
-dissect '(100;200 300) ,S:0 (0 1);< 2 3 4 ; 1 ;<<''a'' ; 7 8'
-dissect '(<''a'') ,S:1(<0 1);<(<2 3 4);(<1);<<5 6;7 8'
-dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8
-dissect '>:`<:@.(]"0) 0 1'
-dissect '+/`0:@.(4<#) i. 2'
-dissect '+/`0:@.(4<#) i. 3'
-dissect '+/`0:@.(4<#) i. 8'
-dissect '(*:@>)`(+:@>)`(-:@>)@.({.@>) 0 1 2;1 3 4;_1 11 12 13'
-dissect '(*:@>)`(+:@>)`(-:@>)@.({.@>) 0 1 2;''abc'';_1 11 12 13'
-dissect '2 5 6 (*:>)`(+:>)`(-:>)@.({.@>@]"0) 0 1 2;1 3 4;_1 11 12 13'
-dissect '2 5 6 (*>)`(+>)`(->)@.({.@>@]"0) 0 1 2;1 3 4;_1 11 12 13'
-dissect '(* $:@:<:)^:(1&<) 7'
-dissect '(* <:)^:(1&<) 7'
-dissect '>:`($:@>)@.(0<L.) 1 2 3;<4 5;6 7'
-dissect '>:`($:@.>)@.(0<L.) 1 2 3;<4 5;6 7'
-dissect '>:`($:&.>)@.(0<L.) 1 2 3;<4 5;6 7'
-dissect '>:`(0&$:&.>)@.(0<L.) 1 2 3;<4 5;6 7'
-dissect '>:`($:&.>)@.(0<L.) 1 2 3;<4 5;<<''a'';6 7'
-dissect '>L:1 (1);2;3;<<''a'';5'
-dissect '>L:1 ''a'';<<''a'';5'
-dissect '>L:1 <<''a'';5'
-dissect '>:&.> ''a'';5'
-dissect '>:&.> 5;''a'''
-dissect '+:&.> 6 12'
-dissect '+:&.> 6'
-dissect '>:L:0 <"0 i. 3 4'
-dissect '>:L:0"0 <"0 i. 4'
-dissect '>:L:0"0 (1;2;3;''a'')'
-dissect '>:L:0"0 (1;''a'';3;4)'
-dissect '>:L:0"0 (''a'';1;3;4)'
-dissect '>:&.>L:1"0 (1;(<<2);(<<3);(<<''a''))'
-dissect '>:&.>L:1"0 (1;(<<2);(<<''a''));(<<3)'
-dissect '>:&.>L:1"0 ((<<''a''));1;(<<2);(<<3)'
-dissect '(($:@(<#[) , (=#[) , $:@(>#[)) ({~ ?@#)) ^: (1<#) a' [ a =. 20 ? 50
-dissect '4 1 2 3 +//.@(*/) _1 4 0 2 6'
-dissect '5 ($: <:)^:(1<]) 6'
-dissect '+: powconj 4 [ 6' [ ](powconj=:^:)0 (1)
-dissect '(>: 2 */&i. 3) + (+:@>: i. 2 3)'
-dissect 'i."0 (2 3) $ 0.5 1 1 1 2 3'
-dissect 'i."0 (2 3) $ 1 0.5 1 1 2 3'
-dissect 'i."0 (2 3) $ 1 1 1 2 3 0.5'
-dissect 'i.&.> (2 3) $ 0.5 1 1 1 2 3'
-dissect 'i.&.> (2 3) $ 1 0.5 1 1 2 3'
-dissect 'i.&.> (2 3) $ 1 1 1 2 3 0.5'
-dissect '2&:+ 5'
-dissect '+&:5 (2)'
-dissect '2@+ 5'
-dissect '+@2 (5)'
-dissect '2@:+ 5'
-dissect '+@:2 (5)'
-dissect '+&.5 (2)'
-dissect '2&.+ 5'
-dissect '+&.:5 (2)'
-dissect '2&.:+ 5'
-dissect '2^:+: 6'
-dissect '2^:_1 (3)'
-dissect '+;.- 2 3'
-dissect '+:@:+:@+:@+: +: 4 +&+: 5 6 7'
-dissect '+:^:2"0 i. 5'
-dissect 'i.^:] ] _2 _1 0 1'
-dissect '+:^:] ] _2 _1 0 1'
-dissect '3 </. ''a'''
-dissect '(<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
-dissect '<@i./."2 (0.5) (<1 1 1)} i. 2 3 4'
-dissect 2 3 $ 1;(<'base');'qqq+3'  ; 'qqq';0;<,'6'
-dissect 2 3 $ 1;(<'base');'qqq+3'  ; 'qqq';0;<6
+2 dissect '2+''a'''
+2 dissect '2,''a'''
+2 dissect '2 3+''a'''
+2 dissect '1 2 + ''ab'''
+2 dissect '1 2 +@+ ''ab'''
+2 dissect '1 2 +&+ ''ab'''
+2 dissect '1 2 +&+~ ''ab'''
+2 dissect '''ab'' +&+ 1 2'
+2 dissect '1 2 +@(]"0) ''ab'''
+2 dissect '1 2 +@(0:"0) ''ab'''
+2 dissect '0 1 2 + 1 2'
+2 dissect '+@+ ''a'''
+2 dissect '+@{. ''a'''
+2 dissect '0 +&+ ''a'''
+2 dissect '0 +&+ ''ab'''
+2 dissect '0 +&:+ ''a'''
+2 dissect '''a''+&+ 0'
+2 dissect '''ab''+&+ 0'
+2 dissect '''a''+&:+ 0'
+2 dissect '+&{. ''a'''
+2 dissect '+&:+ ''a'''
+2 dissect '+&2 (3 4)'
+2 dissect '3&* (3 4)'
+2 dissect '+&''a'' (3 4)'
+2 dissect '(+&2)@:(2&*) 4 6'
+2 dissect '3 4 +"1 i. 3 2'
+2 dissect '(i. 3 2) +"1 (3 4)'
+2 dissect '(i. 3 2) +"1 i. 3 2'
+2 dissect '(i. 3 2) +"1 i. 3 1'
+2 dissect '(i. 3 2) +"1 i. 1 1'
+2 dissect '2 3 +@]&> 5 6'
+2 dissect '2 3 +&:+: 4 5 6'   NB. must show sgreement error
+2 dissect '(i. 3 2) +@]"1 i. 1 1'
+2 dissect '(i. 3 2) +@["1 i. 1 1'
+2 dissect 'i.@(0&{) ''a'''
+2 dissect 'i."0 (1 2)'
+2 dissect '+~ i. 2 3'
+2 dissect '3 4 +~ i. 2 3'
+2 dissect '3 4 +~ i. 3 2'
+2 dissect '3 4 +@]~ i. 3 2'
+2 dissect '3 4 +@[~ i. 3 2'
+2 dissect '3 4 +~ i. 2 3'
+2 dissect '3 4 (+ - *) 0 1'
+2 dissect '0 1 2 (+ - *) 0 1'
+2 dissect '0 1 2 (+ - 0:) 0 1'
+2 dissect '0 1 2 (0: - *) 0 1'
+2 dissect '0 1 2 (1:"0 - 0:"0) 0 1'
+2 dissect '0 1 2 (+ - ]) 0 1'
+2 dissect '0 1 2 ([ - -) 0 1'
+2 dissect '0 1 2 ([ - ]) 0 1'
+2 dissect '0 1 2 (- + * % -)"0 (3 4 5)'
+2 dissect '0 1 (+ 0:) ''ab'''
+2 dissect '0 1 (+ {.) ''ab'''
+2 dissect '0 1 (+ ]) 1 2 3'
+2 dissect '(0 1 2 + 0 1"_) 5'   NB. must show agreement error
+2 dissect '0 1 2 + '''''
+2 dissect '0 1 2 + '' '''
+2 dissect '0 (+ - *) '''''
+2 dissect '0 (1 2 3 - *) '''''
+2 dissect '0 (1 2 3 - *)"0 '''''
+2 dissect '0 (1 2 3 , ])"0 $0'
+2 dissect '0 ([: 1 2 3"0 $)"0 $0'
+2 dissect '0 (+ - ]) '''''
+2 dissect '0 (1 2 3 - *)"0 $0'
+2 dissect '0 (1 2 3 - *)"0 (0)'
+2 dissect '0 +@* '''''
+2 dissect '0 (+@* - *) '''''
+2 dissect '0 (+@* *) '''''
+2 dissect '0 (+ *) '''''
+2 dissect '2 (+:@+:@+:@+ + ]) 3'  NB. test estheight
+2 dissect '2 (+:@+:@+:@+ + +) 3'  NB. test estheight
+2 dissect '2 (+ + +:@+:@+:@+) 3'  NB. test estheight
+2 dissect '2 ([ + +:@+:@+:@+) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+    + +:@+) + (+:@+:@+:@+:@+ + +   )) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+:@+ + +   ) + (+:@+:@+:@+    + +:@+)) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+:@+ + +:@+) + (+:@+:@+:@+    + +   )) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+    + +   ) + (+:@+:@+:@+:@+ + +:@+)) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+    +~ +:@+) + (+:@+:@+:@+:@+ +~ +   )) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+:@+ +~ +   ) + (+:@+:@+:@+    +~ +:@+)) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+:@+ +~ +:@+) + (+:@+:@+:@+    +~ +   )) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@+    +~ +   ) + (+:@+:@+:@+:@+ +~ +:@+)) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@]    +~ +   ) + (+:@+:@+:@+:@] +~ +:@+)) 3'  NB. test estheight
+2 dissect '2 ((+:@+:@+:@]    +~ +:@+   ) + (+:@+:@+:@+:@] +~ +)) 3'  NB. test estheight
+2 dissect '2 ([ +:) 3'
+2 dissect '2 (] +:) 3'
+2 dissect '2 (] ]) 3'
+2 dissect '2 ([ ]) 3'
+2 dissect '([ +:) 3'
+2 dissect '(] +:) 3'
+2 dissect '(] ]) 3'
+2 dissect '([ ]) 3'
+2 dissect '(#@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
+2 dissect 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';0' [ z =. 2
+2 dissect 'z (# >)"1 ] 2 2 $ ''abc'';''b'';''cd'';''q''' [  z =. 2
+2 dissect '(1&+@>)"1 ] 2 2 $ ''abc'';''b'';''cd'';0'
+2 dissect '(1&+@>)"1 ] 2 2 $ 0;''abc'';''b'';''cd'''
+2 dissect '(i.@# ((}.>) ,. ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+2 dissect '(i.@# ((}.>) ,&< ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+2 dissect '(i.@# ((}.>) , ({.>))"0 ]) b' [ b =. ;:'The quick brown fox'
+2 dissect '0 1 2 3 {~ 2'
+2 dissect '(i. 2 3) {~ 2'
+2 dissect '(i. 3 2) {~ 2'
+2 dissect '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'
+2 dissect '1 2 +"_1 0 (1 2)'
+2 dissect '1 2 ,"_1 i. 2 3'
+2 dissect 'y =. 2 + 5'
+2 dissect 'zzz + 5 [ zzz =. 6'
+2 dissect '''a b c'' =. i. 3'
+2 dissect '''`a b c'' =. +`-`%'
+2 dissect 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
+2 dissect '-&.> i. 3'
+2 dissect '-&.:> i. 3'
+2 dissect '+/ 1 2 3 4 5'
+2 dissect '(* -)/@> z' [ z =. <@i."0 (3 4 5 6)
+2 dissect '+/@> z' [ z =. <@i."0 (3 4 5 6)
+2 dissect '+/"1 z' [ z =. i. 4 3
+2 dissect 'i."0@[/ z' [ z =. 4 3 $ 2 3 4
+2 dissect '2([: +/ */) 4'
+2 dissect '2 3([: +/ */) 4 5 6'
+2 dissect '2 3 4([: +/ */) 4 5 6'
+2 dissect '+&.>/ ''a'';0;1;2 '
+2 dissect '+&.>/ z ' [ z =. 1;0
+2 dissect '+&.>/ z ' [ z =. 1;0;2
+2 dissect '+&.>/ z ' [ z =. 'a';0
+2 dissect '+&.>/ z ' [ z =. 'a';0;1
+2 dissect '+&.>/ z ' [ z =. 2;'a';0;1
+2 dissect '+&.>/ z ' [ z =. 1;3;2;'a';0;1
+2 dissect '+&.>/ z ' [ z =. $0
+2 dissect '+&.>/ z ' [ z =. 'a'
+'1 2 3 + y' 4 : '2 dissect x' 4
+2 dissect '  (,1) ((}."1~ <:@#@$) ,~"1 ] {~ ({:@$@[ <. <:@#@$@]) <@{."1 [) ,.0 '
+2 dissect '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
+2 dissect '$@i."1 ]3 + i. 5 2'   NB. select to test vertical resize
+2 dissect 'z + > ''a'';1' [ z =. 1
+2 dissect 'i.@> z' [ z =. 1 1;(3,.4);6   NB. fills and selections
+2 dissect 'i.@> z' [ z =. 1 1;(3,:4);6   NB. fills and selections
+2 dissect 'i.@>@> z' [ z =. (1 1;(3,.4);6);<(2;4 2;6,:2)
+2 dissect 'i. z' [ z =. 3 1$1 _1 2
+2 dissect 'i. z' [ z =. 3 1$1 0.5 2
+2 dissect 'i.@> z' [ z =. <@,"0 (1 0.5 2)
+2 dissect 'i.@:> z' [ z =. <@,"0 (1 0.5 2)
+2 dissect 'i."0 z' [ z =. 0 1 0.5
+2 dissect 'i."0 z' [ z =. 0 1 2
+2 dissect '+:"0.5 _1 z' [ z =. 0 1 0.5
+2 dissect 'a ([ + (+/ % #)@]) z' [ z =. 3 9 6 */ 1 5 9 2 [ a =. 6 5 3
+2 dissect '(i. 3) +"1"2 i. 3 4 3'
+2 dissect 'i.@> z' [ z =. 1 1;(3 4);'a'
+2 dissect 'i.@> z' [ z =. 1 1;(3,:4);'a'
+2 dissect '(#@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
+2 dissect '(#@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+2 dissect '(#@>)"1 ] 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
+2 dissect '(#@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
+2 dissect '(#@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+2 dissect '(#@>)"1 |: 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
+2 dissect '(>:@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';''e'';''fg'';0'
+2 dissect '(>:@>)"1 ] 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+2 dissect '(>:@>)"1 ] 5 2 $ 0;1;2;''cd'';''e'';''fg'''
+2 dissect '(>:@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;1;2'
+2 dissect '(>:@>)"1 |: 5 2 $ ''abc'';''b'';''cd'';0;''e'';''fg'''
+2 dissect '(>:@>)"1 |: 5 2 $ ''abc'';0;''b'';''cd'';''e'';''fg'''
+2 dissect '(+/ % #)&.:*: i. 3 3 3'
+2 dissect '+/ i. 2 4'
+2 dissect '+/ i. 3 4'
+2 dissect '+/"1 i. 3 4'
+2 dissect '+/"1 i. 3 2'
+2 dissect '+/@,/"1 i. 3 2'
+2 dissect '3 ''a'''
+2 dissect '   '
+2 dissect '3 4 5&*"1 i. 5 3'
+2 dissect '+/"2 i. 3 4 8'  NB. Failed during selection
+2 dissect '+:^:0 (1)'
+2 dissect '2 +^:0 (1)'
+2 dissect '+:^:1 (1)'
+2 dissect '2 +^:1 (1)'
+2 dissect '+:^:_1 (1)'
+2 dissect '2 +^:_1 (1)'
+2 dissect '+:^:2 (1)'
+2 dissect '2 +^:2 (1)'
+2 dissect '+:^:_2 (1)'
+2 dissect '2 +^:_2 (1)'
+2 dissect '+:^:0 2 (1)'
+2 dissect '2 +^:0 2 (1)'
+2 dissect '+:^:_2 2 (1)'
+2 dissect '2 +^:_2 2 (1)'
+2 dissect '*:^:_ (0.5)'
+2 dissect '*:^:__ (0.5)'
+2 dissect '*:^:(<_) (0.5)'
+2 dissect '*:^:(<__) (0.5)'
+2 dissect '+:^:0"0 (1 2 3)'
+2 dissect '2 +^:0"0 (1 2 3)'
+2 dissect '+:^:1"0 (1 2 3)'
+2 dissect '2 +^:1"0 (1 2 3)'
+2 dissect '+:^:_1"0 (1 2 3)'
+2 dissect '2 +^:_1"0 (1 2 3)'
+2 dissect '+:^:2"0 (1 2 3)'
+2 dissect '2 +^:2"0 (1 2 3)'
+2 dissect '+:^:_2 2"0 (1 2 3)'
+2 dissect '2 +^:_2 2"0 (1 2 3)'
+2 dissect '+:^:* 0'
+2 dissect '+:^:* 1'
+2 dissect '+:^:* _'
+2 dissect '2 +^:* 0'
+2 dissect '2 +^:* 1'
+2 dissect '2 +^:(*@]) 0'
+2 dissect '2 +^:(*@]) 1'
+2 dissect '2 +^:(*@]) _'
+2 dissect '0 2 +:@]^:[ 8'
+2 dissect '+:^:]"0 (0 1 2)'
+2 dissect '2 +^:]"0 (0 1 2)'
+2 dissect '3&*^:(100&>)^:_"0 (1 2 3)'
+2 dissect '3 *^:(100 > ])^:_"0 (1 2 3)'
+2 dissect '<^:]"0 z' [ z =. 1 2 0
+2 dissect '+:^:]"0 (0 0.5 1)'  NB. here
+2 dissect '(i. 2 3) +:@]^:[ (5)'
+2 dissect '(i. 2 3) +:@]^:(+:@[)"0 (5)'
+2 dissect '(i. 2 3) +:@]^:(+:@[)"1 (5)'
+2 dissect '>:^:0 a:'
+2 dissect '>:^:1 a:'
+2 dissect '>:L:3 f.@<^:0 1 2 3 4 (5)'
+2 dissect '>:L:_3 f.@<^:0 1 2 3 4 (5)'
+2 dissect '>:L:_3 f.@<^:1 2 3 4 (5)'
+2 dissect '>:L:_3 f.@<^:1 2 3 4 5 (5)'
+2 dissect '-:@{:@i.^:8 (12)'
+2 dissect 'i."0"1 z' [ z =. 2 2 $ 1 1 1 0.5
+2 dissect 'i."0"1 z' [ z =. 2 2 $ 1 1 0.5 1
+2 dissect 'i."0"1 z' [ z =. 2 2 $ 1 0.5 1 1
+2 dissect 'i."0"1 z' [ z =. 2 2 $ 0.5 1 1 1
+2 dissect '+&>/ z' [ z =. 1;2;'a';4;5;6
+2 dissect '(] ,~ ([ - ] +/ .* %.)&.|:)&(,:^:(1 = #@$))/&.|: z' [ z =. 3 3 ?@$ 100
+2 dissect '1 2 +&+:&(1 = ]) 4 5'
+2 dissect '_2 2 +:@]^:[ 8'
+2 dissect '(1) 2&+ 5 6 7'
+2 dissect '(0) 2&+ 5 6 7'
+2 dissect '(_1) 2&+ 5 6 7'
+2 dissect '(1 2 3) 2&+ 5 6 7'
+2 dissect '(1 2 3) 2&[ 5 6 7'
+2 dissect '(<5) +&.> <4'
+2 dissect '5 +&.> <4'
+2 dissect '(<5) +&.> 4'
+2 dissect '5 +&.> 4'
+2 dissect '(<2) +&.> <3 4 5'
+2 dissect '(100;200) +&.> <"0 i. 2 3'
+2 dissect '+/&.> 0 1 2;3 4 5 6'
+2 dissect '>:&.>@:i.&.> 3 + i. 4' 
+2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
+2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;'a'  NB. frame highlighting in error path
+2 dissect '(3 3 $ 0 1 2 3 4 5 6 7 7.5) ;&:(i."0) 0 1'
+2 dissect '(<<"0 i. 6) ,.&.> <"1 <"0 ''abcdef'''
+2 dissect '(<<"0 i. 6) ,"0&.> <"1 <"0 ''abcdef'''
+2 dissect '(< <"0 i. 3 2) #&.>&.> < ''four five six'' ,.&;: ''one two three'''
+2 dissect '(<2) +&.>&.>&.>&.> <^:4 (8)'
+2 dissect '(<2) +&.>&.>&.>&.> <^:4 (3 8)'
+2 dissect '(<2) +&.> <8'
+2 dissect '(<i. 3 2 3) +"2&.> <"1 i. 2 2 3'
+2 dissect '>:&.> 1;2;3;''a'''
+2 dissect '>:&.> ''a'';1;2;3'
+2 dissect '>:&.> 1;''a'';2;3'
+2 dissect'((* -> *) -> * -> *.) i:9'  NB. display tester
+2 dissect '+:\ i. 4'
+2 dissect '+:\\ i. 3 4'
+2 dissect '3 +:\ i. 5'
+2 dissect '3 +:\ i. 4 5'
+2 dissect '4 +:\ i. 4 5'
+2 dissect '_3 +:\ i. 5'
+2 dissect '5 +:\ i. 4 5'
+2 dissect '0 +:\ i. 4 5'
+2 dissect '_3 +:\ i. 6'
+2 dissect '2 3 +:\ i. 7'
+2 dissect '+:\. i. 4'
+2 dissect '+:\\. i. 3 4'
+2 dissect '+:\.\. i. 3 4'
+2 dissect '3 +:\. i. 5'
+2 dissect '3 +:\. i. 4 5'
+2 dissect '4 +:\. i. 4 5'
+2 dissect '_3 +:\. i. 5'
+2 dissect '5 +:\. i. 4 5'
+2 dissect '0 +:\. i. 4 5'
+2 dissect '_3 +:\. i. 6'
+2 dissect '2 3 +:\. i. 7'
+2 dissect '_3 (_2&(+\.))\. i. 7'
+2 dissect '+:/. i. 3 3'
+2 dissect '1 1 +//.@(*/) 1 2 1' 
+2 dissect '+:/. i. 4'
+2 dissect '+:/. i. 0'
+2 dissect '1 1 2 3 2 1 4 3 1 2 3 <@,/. ;:''The quick brown fox jumped over the lazy dog and slept'''
+2 dissect 'i.\ 0 1 2 3.5'
+2 dissect 'i.&.> ]each 0 1 2 3.5'
+2 dissect '#&.>\ ;: ''The quick brown fox'''
+2 dissect '#&.>/. ;: ''The quick brown fox'''
+2 dissect '#&.>\. ;: ''The quick brown fox'''
+2 dissect '#&.>\. ''abcd'''
+2 dissect '+:;.0 i. 3 3'
+2 dissect '(1 2,:2 3) +:;.0 i. 4 5'
+2 dissect '(1 3,:2 _2) +:;.0 i. 4 5'
+2 dissect '(1 _3,:2 2) +:;.0 i. 4 5'
+2 dissect '(1 _3,:2 _2) +:;.0 i. 4 5'
+2 dissect '(1,:2) +:;.0 i. 4 5'
+2 dissect '<;.1 ''every little thing'''
+2 dissect '<;.1 ;: ''a man a plan a canal panama'''
+2 dissect '(+/ % #);.1 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+2 dissect '<;._1 ''every little thing'''
+2 dissect '<;._1 ;: ''a man a plan a canal panama'''
+2 dissect '(+/ % #);._1 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+2 dissect '<;.2 ''every little thing'''
+2 dissect '<;.2 ;: ''a man a plan a canal panama'''
+2 dissect '(+/ % #);.2 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+2 dissect '<;._2 ''every little thing'''
+2 dissect '<;._2 ;: ''a man a plan a canal panama'''
+2 dissect '(+/ % #);._2 (3 1 2 3 4 5 3 4 5 6 7 5 4)'
+2 dissect '1 0 0 1 0 <;.1 ''abcde'''
+2 dissect '1 0 0 1 0 <;.2 ''abcde'''
+2 dissect '(1 0 1 0;1 0 1 1 0) +:;.1 i. 4 5'
+2 dissect '(1 0 1 0;1 0 1 1 0) +:"1;.1 i. 4 5'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 10'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 10'
+2 dissect '(3 4 ,: _2 3) <;.3 i. 10 10'
+2 dissect '(3 4 ,: _2 3) <;._3 i. 10 10'
+2 dissect '(3 6 ,: 2 3) <;.3 i. 10 10'
+2 dissect '(3 6 ,: 2 3) <;._3 i. 10 10'
+2 dissect '(3 6 ,: _2 3) <;.3 i. 10 10'
+2 dissect '(3 6 ,: _2 3) <;._3 i. 10 10'
+2 dissect '(0 4 ,: 2 3) <;.3 i. 10 10'
+2 dissect '(0 4 ,: 2 3) <;._3 i. 10 10'
+2 dissect '(0 0 ,: 2 3) <;.3 i. 10 10'
+2 dissect '(0 0 ,: 2 3) <;._3 i. 10 10'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 10'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 10'
+2 dissect '(3 4 ,: _2 3) +:;.3 i. 10 10'
+2 dissect '(3 4 ,: _2 3) +:;._3 i. 10 10'
+2 dissect '(3 ,: 2) <;.3 i. 10 10'
+2 dissect '(3 ,: 2) <;._3 i. 10 10'
+2 dissect '(0 ,: 2) <;.3 i. 10 10'
+2 dissect '(0 ,: 2) <;._3 i. 10 10'
+2 dissect '+: L:0 <1 2'
+2 dissect '+: L:0 (1 2; 3 4) ; 5 6'
+2 dissect '+: L:0 (1 2);''a'''
+2 dissect '|.L:0 <^:1 2 3 (0 1 2)'
+2 dissect '|.L:1 <^:1 2 3 (0 1 2)'
+2 dissect '+: L:0 (1 2);''a'';5 6'
+2 dissect '(100;200 300) ,L:0 (0 1);< 2 3 4 ; 1 ;<<5 6 ; 7 8'
+2 dissect '(100;200 300) ,L:0 (0 1);< 2 3 4 ; 1 ;<<''a'' ; 7 8'
+2 dissect '(<''a'') ,L:1(<0 1);<(<2 3 4);(<1);<<5 6;7 8'
+2 dissect '(<''a'') ,L:1(<0 1);<(<2 3 4);(1);<<5 6;7 8'
+2 dissect '+: S:0 <1 2'
+2 dissect '+: S:0 (1 2; 3 4) ; 5 6'
+2 dissect '+: S:0 (1 2);''a'''
+2 dissect '|.S:0 <^:1 2 3 (0 1 2)'
+2 dissect '|.S:1 a' [ a =. <^:1 2 3 (0 1 2)
+2 dissect '+: S:0 (1 2);''a'';5 6'
+2 dissect '(100;200 300) ,S:0 (0 1);< 2 3 4 ; 1 ;<<5 6 ; 7 8'
+2 dissect '(100;200 300) ,S:0 (0 1);< 2 3 4 ; 1 ;<<''a'' ; 7 8'
+2 dissect '(<''a'') ,S:1(<0 1);<(<2 3 4);(<1);<<5 6;7 8'
+2 dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8
+2 dissect '>:`<:@.(]"0) 0 1'
+2 dissect '+/`0:@.(4<#) i. 2'
+2 dissect '+/`0:@.(4<#) i. 3'
+2 dissect '+/`0:@.(4<#) i. 8'
+2 dissect '(*:@>)`(+:@>)`(-:@>)@.({.@>) 0 1 2;1 3 4;_1 11 12 13'
+2 dissect '(*:@>)`(+:@>)`(-:@>)@.({.@>) 0 1 2;''abc'';_1 11 12 13'
+2 dissect '2 5 6 (*:>)`(+:>)`(-:>)@.({.@>@]"0) 0 1 2;1 3 4;_1 11 12 13'
+2 dissect '2 5 6 (*>)`(+>)`(->)@.({.@>@]"0) 0 1 2;1 3 4;_1 11 12 13'
+2 dissect '(* $:@:<:)^:(1&<) 7'
+2 dissect '(* <:)^:(1&<) 7'
+2 dissect '>:`($:@>)@.(0<L.) 1 2 3;<4 5;6 7'
+2 dissect '>:`($:@.>)@.(0<L.) 1 2 3;<4 5;6 7'
+2 dissect '>:`($:&.>)@.(0<L.) 1 2 3;<4 5;6 7'
+2 dissect '>:`(0&$:&.>)@.(0<L.) 1 2 3;<4 5;6 7'
+2 dissect '>:`($:&.>)@.(0<L.) 1 2 3;<4 5;<<''a'';6 7'
+2 dissect '>L:1 (1);2;3;<<''a'';5'
+2 dissect '>L:1 ''a'';<<''a'';5'
+2 dissect '>L:1 <<''a'';5'
+2 dissect '>:&.> ''a'';5'
+2 dissect '>:&.> 5;''a'''
+2 dissect '+:&.> 6 12'
+2 dissect '+:&.> 6'
+2 dissect '>:L:0 <"0 i. 3 4'
+2 dissect '>:L:0"0 <"0 i. 4'
+2 dissect '>:L:0"0 (1;2;3;''a'')'
+2 dissect '>:L:0"0 (1;''a'';3;4)'
+2 dissect '>:L:0"0 (''a'';1;3;4)'
+2 dissect '>:&.>L:1"0 (1;(<<2);(<<3);(<<''a''))'
+2 dissect '>:&.>L:1"0 (1;(<<2);(<<''a''));(<<3)'
+2 dissect '>:&.>L:1"0 ((<<''a''));1;(<<2);(<<3)'
+2 dissect '(($:@(<#[) , (=#[) , $:@(>#[)) ({~ ?@#)) ^: (1<#) a' [ a =. 20 ? 50
+2 dissect '4 1 2 3 +//.@(*/) _1 4 0 2 6'
+2 dissect '5 ($: <:)^:(1<]) 6'
+2 dissect '+: powconj 4 [ 6' [ ](powconj=:^:)0 (1)
+2 dissect '(>: 2 */&i. 3) + (+:@>: i. 2 3)'
+2 dissect 'i."0 (2 3) $ 0.5 1 1 1 2 3'
+2 dissect 'i."0 (2 3) $ 1 0.5 1 1 2 3'
+2 dissect 'i."0 (2 3) $ 1 1 1 2 3 0.5'
+2 dissect 'i.&.> (2 3) $ 0.5 1 1 1 2 3'
+2 dissect 'i.&.> (2 3) $ 1 0.5 1 1 2 3'
+2 dissect 'i.&.> (2 3) $ 1 1 1 2 3 0.5'
+2 dissect '2&:+ 5'
+2 dissect '+&:5 (2)'
+2 dissect '2@+ 5'
+2 dissect '+@2 (5)'
+2 dissect '2@:+ 5'
+2 dissect '+@:2 (5)'
+2 dissect '+&.5 (2)'
+2 dissect '2&.+ 5'
+2 dissect '+&.:5 (2)'
+2 dissect '2&.:+ 5'
+2 dissect '2^:+: 6'
+2 dissect '2^:_1 (3)'
+2 dissect '+;.- 2 3'
+2 dissect '+:@:+:@+:@+: +: 4 +&+: 5 6 7'
+2 dissect '+:^:2"0 i. 5'
+2 dissect 'i.^:] ] _2 _1 0 1'
+2 dissect '+:^:] ] _2 _1 0 1'
+2 dissect '3 </. ''a'''
+2 dissect '(<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'
+2 dissect '<@i./."2 (0.5) (<1 1 1)} i. 2 3 4'
+dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<,'6'
+dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
+2 dissect 'a =. /'
+2 dissect 'c =. ;.'
+2 dissect 't =. 2 2 $ 5'
 )
-
+testsandbox_base_ =: 3 : 0
+vn =. 1 2 3
+vn_base_ =: 'abc'
+va =. &.>
+vc =. &
+vv =. 3 : ('y =. y + 1';'y =. y + 2')
+sentence =. 'vv y vc + va vn'
+arg =. ,: 1;(coname'');sentence
+arg =. arg , 'vn';0;vn
+arg =. arg , 'va';1;5!:5 <'va'
+arg =. arg , 'vc';2;5!:5 <'vc'
+arg =. arg , 'vv';3;5!:5 <'vv'
+dissect arg
+)
 0 : 0  NB. Testcases that fail
 )
 
 0 : 0
-0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 0) [ destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:1 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+testsandbox_base_ 1
 )
