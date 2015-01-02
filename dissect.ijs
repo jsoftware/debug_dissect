@@ -43,23 +43,18 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Use morpheme logic for displaying data
 NB. hover and tooltips don't work in explorer
-NB. hovering over data: note if explorer allowed or already existent; if big, mention menu to change size; allow clicking in low-right of scrollbare to change individual size
-NB. Hover over verb should show definition (& script), if short
-NB. Explain a primitive verb in a line of the overall
+NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Hovering on shape/sel: show the verb at that level, and the input shape/selection/output shape
+NB. Give pn for main & explorer windows
 NB. Support u :: v
 NB.  Distinguish between the two previous on 'error'
 NB. explain different types of error
-NB. 2 dissect '+(a =. /) 3 4 5'  fails
-NB. Enforce a recursion limit to help debug stack error
-NB. Add 'About' box for dissect
+NB. Test display of fill-cells incl errors
+NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name
-NB. Give pn for main & explorer windows
 NB. Highlight net on a click/hover of a wire
 NB. Hovering over selected cell to detail computation there?
-NB. Test display of fill-cells incl errors
 NB. can simplify combineyxsels
 NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?
 NB. change rank stack in partitions (test /."0), don't dup /.
@@ -67,6 +62,7 @@ NB. Re-select of selected cell of @. should remove expansion
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. if a recursion produces no result, flag that fact
 NB. fix pas in 803
+NB. Add 'About' box for dissect?
 NB. dissect '>:L:0"0 (1;''a'';3;4)'   doesn't crosshatch unexecd cells.  Seems that it should: fillmask is right for it   rectcolorfromfillmask neexds to insert stippling
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
 NB. dissect '(* $:@:<:)^:(1&<) 7'    select result 1 - no detail displayed inside ^:
@@ -480,13 +476,12 @@ NB. and 'verb' for modifier executions
         return.
       end.
     case. 7 do.  NB. assignment
-  NB. Create an assignment block for the operands, and put that on the stack.
-      stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
   NB. See if we can analyze the assignment.  If so, add to the name table.
   NB. If the assignment is not a noun value, ignore it with a warning
       if. 0 = noun bwand 2 { exetypes do.
-        smoutput 'non-noun assignment ignored'
+        failparse 'non-noun assignment not supported'
         rname =. 0$a:
+        return.
   NB. See if it's a simple assignment to a name
       elseif. name = 0 { exetypes do.
         rname =. (<0 1) { exeblock  NB. boxed name
@@ -496,8 +491,9 @@ NB. and 'verb' for modifier executions
   NB.?lintonly op_dissectnoun_ =: '' [ rname =. <'dissectnoun'
         if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
           if. '`' = {. lvalue do.
-            smoutput 'AR assignment to ' , lvalue , ' ignored'
+            failparse 'AR assignment to ' , lvalue , ' ignored'
             rname =. 0$a:
+            return.
           else.
             rname =. ;: :: (a:$~0:) lvalue
           end.
@@ -509,6 +505,20 @@ NB. and 'verb' for modifier executions
       elseif. do.
         rname =. 0$a:
       end.
+      NB. If the assignment is one we can handle, we will have one or more names.  In that case, create an
+      NB. assignment block on the stack
+      stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
+        NB. We would like to preserve the value of the unhandleable assignment, but we can't, because
+        NB. We need an assignment node to account for the assignment tokens, and we can't get a value for the
+        NB. modifier because it might be complex (a train).  If we try to push the assignment tokens into
+        NB. the rvalue, it would have to be able to handle them, which we're not ready to do since they would be
+        NB. out of order. So, we lose the value of the assignment (kludge)
+        NB. Otherwise, we have to ignore it.  We can't produce an assignment block, because we don't know what
+        NB. value to put into the executed sentence.  So we just ignore the assignment, leaving
+        NB. the rvalue on the stack.  We will leave the assignment tokkens out of the display too, since we
+        NB. don't process them
+NB. obsolete         stack =. ((subj i. 1){.stack),((< ; 2 {"1 exeblock) (<0 2)} (subj i: 1)}. stack)
+NB. obsolete         stack =. ((subj i. 1){.stack),((subj i: 1)}. stack)
       
   NB. rname has the list of names that we should define.  If this is a global assignment,
   NB. append the locale name to each name that doesn't contain a locative
@@ -851,6 +861,16 @@ runningtimerloc_dissect_ =: coname ''
 wd 'timer ' , ": y
 )
 
+sessionyx =: 10 10   NB. Initial position of the first window
+NB. Set the initial value to use for the form, so we remember it from call to call
+NB. Called whenever we think the control might have moved
+setsessionyx =: 3 : 0
+  sessionyx_dissect_ =: 1 0 { 0 ". wdqform''
+)
+NB. Get the starting value
+getsessionyx =: 3 : 0
+sessionyx_dissect_
+)
 
 NB. ************** start of the display section (after the parse is over) ****************
 
@@ -991,24 +1011,27 @@ NB.?lintsaveglobals
 
 EXPANSIONROOMAROUNDISI =: 200 100  NB. Number of pixels to leave at margin
 NB. Size the isigraph and the parent, and size the drawing for display
-NB. Nilad.
+NB. If y is 1, set the initial position based on the session history
 NB. Globals sentencesize, scrolltlc, placeddrawing have been set
 NB. Result is the drawing (the result of sizeplacement)
 NB. Side effect: the isigraph and parent are resized (up only) as required
 NB. When we resize the isigraph, we include expansion room
 sizedrawingandform =: 3 : 0
+initfromsess =. y
 NB. Get the required size - mostly the isi, but must be wide enough for the sentence too
 yxneeded =. sentencesize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
 NB. Get the current size of the isi; if insufficient, make it bigger, with expansion added
-if. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
+if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
   'dissectisi' wdsetxywh 1 0 3 2 { cyxhw =. (MINIMUMISISIZE >. EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
-NB. If the main form has grown now that the isi has grown, resize it too.
-  wd 'pas 1 1'
-  if. IFQT do.
-    wd 'pmove ', ": (0 ". wd 'qform') >. 0 0 , 3 2 { cyxhw
-  else.
-    wd 'pas 1 1'
+  NB. If the main form has grown now that the isi has grown, resize it too.
+  if. initfromsess do. xywh =. 1 0 3 2 { (getsessionyx'') , +/ 2 2 $ cyxhw
+  else. xywh =. (0 ". wdqform'') >. 0 0 , |. +/ 2 2 $ cyxhw
   end.
+  wdpmove ": xywh
+NB. obsolete   if. IFQT do.
+NB. obsolete   else.
+NB. obsolete     wd 'pas 1 1'
+NB. obsolete   end.
 end.
 NB. Now that we have the size of the isigraph, center the sentence in the screen area; remember brect
 sentencebrect =: sentencesize (] ,: +) 0 , cyxhw (<.@-:@-)&{: sentencesize
@@ -1118,6 +1141,8 @@ NB.?lintmsgson
 resultroot =: 0$a:
 if. #winhwnd do.
   wd 'psel ' , winhwnd
+  NB. Remember where the window was, so we can put the next one there
+  setsessionyx''
   wd 'pclose'
   winhwnd =: ''  NB. not required
 end.
@@ -7142,6 +7167,9 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
+NB. If this verb is in a gerund, it will not know how to proplocales if it has no valence.
+NB. So we initialize valence to 0 to detect that case.
+valence =: 0
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
 NB. Look at the conjunction used, and use that to find the rank of this object (the derived verb)
 NB. Set resultissdt for modifier processing
@@ -7198,11 +7226,14 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , '(' , (exestring__vo
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-NB. For highlighting the sentence, we need only one clone.  Use the first
-if. y = 3 do.
-  uop,(<tokensource),vop0
+if. valence = 0 do. proplocales__localeat f. y  NB. Handles gerunds where we don't know our valence
 else.
-  (<^:(0=L.)@".@>^:(0 <: y) ;: 'uop vop0 vop1')
+  NB. For highlighting the sentence, we need only one clone.  Use the first
+  if. y = 3 do.
+    uop,(<tokensource),vop0
+  else.
+    (<^:(0=L.)@".@>^:(0 <: y) ;: 'uop vop0 vop1')
+  end.
 end.
 )
 
@@ -10202,6 +10233,7 @@ runtests_base_ =: 0 : 0
 2 dissect 'zzz + 5 [ zzz =. 6'
 2 dissect '''a b c'' =. i. 3'
 2 dissect '''`a b c'' =. +`-`%'
+2 dissect '''`a b c'' =. +&+`-`%'
 2 dissect 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
 2 dissect '-&.> i. 3'
 2 dissect '-&.:> i. 3'
@@ -10512,6 +10544,7 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 'a =. /'
 2 dissect 'c =. ;.'
 2 dissect 't =. 2 2 $ 5'
+2 dissect '+(a =. /) 3 4 5' 
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
