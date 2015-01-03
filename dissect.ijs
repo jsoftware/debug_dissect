@@ -43,10 +43,9 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '+/ z + i. 3 3' [ z =. 100 200 300   should suppress the 3 3 node for lack of variable input
+NB. Hovering on shape/sel: show the verb at that level, and the input shape/selection/output shape
 NB. hover and tooltips don't work in explorer
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
-NB. Hovering on shape/sel: show the verb at that level, and the input shape/selection/output shape
 NB. Give pn for main & explorer windows
 NB. Support u :: v
 NB.  Distinguish between the two previous on 'error'
@@ -71,7 +70,6 @@ NB.  this is because there are multiple possible results, so we skeletalu.  But 
 NB. should we show leading singleton axes?  Should we shoe datatype, for chars at least?
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
 NB. support axis permutations for display, for u;.
-NB. Display of executing a gerund has no data
 NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
 NB. faster addlog
 NB. Audit selection for in-bounds
@@ -492,7 +490,7 @@ NB. and 'verb' for modifier executions
   NB.?lintonly op_dissectnoun_ =: '' [ rname =. <'dissectnoun'
         if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
           if. '`' = {. lvalue do.
-            failparse 'AR assignment to ' , lvalue , ' ignored'
+            failparse 'AR assignment to ' , lvalue , ' not supported'
             rname =. 0$a:
             return.
           else.
@@ -3665,7 +3663,7 @@ NB. If there is a label stack, create an index for it.  The index will be a brec
 NB. but offset from the starting point of the pickrect for the rank stack.  If there is a label instead of a rank
 NB. stack, we create a null pickrect
 if. (#picknames) > labelx =. picknames i. <'DOlabelpos' do.
-  if.2 = 3!:0 displaylevrank do.
+  if. 2 = 3!:0 displaylevrank do.
     NB. Just a label - no rack stack to pick.  Make one rectangle for the text
     DOlabelpospickrects =: ($arects) $ 1 2 2 $ 0
   else.
@@ -5107,12 +5105,14 @@ dhw =. (<exp,1) { DOdatapos
 if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
   NB. Start accumulating the display
   if. 2 = 3!:0 DOranks do.
+    NB. This is either a noun or a monad/dyad that suppresses detail; verbs have rank stacks
     t =. 'This is a ',((*#DOranks) # 'named '),'noun.'
     if. nounhasdetail *. -. nounshowdetail do.
       t =. ' The value shown is the result of a computation that does not depend on any names.  To see the details of this computation, click anywhere in the value.'
     end.
     t =. t,LF
   else.
+    NB. Not a noun.
     t =. 'The result of the verb:',LF,(defstring 0),CR
   end.
   disp =. ,: EXEGESISDATASOURCE ; t , LF
@@ -6522,6 +6522,8 @@ NB. we save the operands needed by the first verb.  The rule is, we will pass to
 NB. it says it can use.  For comp. ease we may compute an operand but then immediately discard it.
 executingvalence__COCREATOR =: 1
 uop =: setvalence__uop ,resultissdt__yop
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop
 NB.?lintonly uop =: <'dissectrecursionpoint'
 noun;(coname'');''
 NB.?lintsaveglobals
@@ -6582,7 +6584,6 @@ end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
 NB. If detail is turned off, display only the final result
-QP'nounhasdetail nounshowdetail '
 if. -. nounshowdetail do.
   'displayhandlesin displaylevrank nounhasdetail physreqandhighlights__inheritroot' =: ($0);NORANKHISTNOUN;1;<NOPHYSREQ
   NOLAYOUTS ,&< coname''
@@ -6627,6 +6628,8 @@ end.
 NB.?lintonly uop =: <'dissectverb' [ yop =: xop =: coname''
 executingvalence__COCREATOR =: 2
 uop =: setvalence__uop resultissdt__xop,resultissdt__yop
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop
 NB.?lintonly uop =: <'dissectrecursionpoint'
 noun;(coname'');''
 NB.?lintsaveglobals
@@ -6679,7 +6682,7 @@ executingmonaddyad__COCREATOR =: executingmonaddyad__COCREATOR ,~ coname''
 if. 1 = #ures =. (xlayo ,&(joinlayoutsl`<@.recursionhere) ylayo) traverse__uop travops TRAVOPSSTARTHEAVY;0;(uopval xop,yop);<selresultshape__xop ,&< selresultshape__yop do.
   NB. If we don't have a locale-name to inherit from, it means that uop was an expansion node
   NB. and it took over the display of u.  We must display the result here separately.
-  'displayhandlesin displayhandleout displaylevrank' =: ((,0));1;<'Top-level result'
+  'displayhandlesin displayhandleout displaylevrank' =: ((,0));1;<,: 'Result after all recursions';(coname''),2#<_
   ures =. ures ,< coname''
 else.
   ures =. inheritu ures
@@ -8735,7 +8738,7 @@ exestring =: 3 : 0
 initloggingtable ''
 NB. If this is a recognized gerund, don't bother with conjunction logging, and log out the results of individual verbs
 if. 0 = valence do.
-  auditstg '(' , (conjlogstring '') , (defstring__uop 2) , ' ' , cop , (defstring__vop 3) , ')'
+  auditstg '(' , (logstring '') , (defstring__uop 2) , ' ' , cop , (defstring__vop 3) , ')'
 else.
   auditstg '(' , (exestring__uop 2) , ' ' , cop , (exestring__vop 3) , ')'
 end.
@@ -8757,13 +8760,24 @@ proplocales =: 3 : 0
 NB. Set globals, then initialize display for the noun.  There must be no DOLs, and we
 NB. return no U dols
 traverse =: 4 : 0
-assert. 0 = #x
-traversedowncalcselect 3 {. y  NB. Just to set error globals
-selresultshape =: $>selresult =: <conjex
+assert. 0 = #x [ 'Noun must have no layouts'
+traversedowncalcselect y  NB. To set globals, including selresult
 'displayhandlesin displayhandleout displaylevrank nounhasdetail' =: ($0);1;NORANKHISTNOUN;0
 x ,&< coname''  NB. Return the empty DOLs
 )
-
+NB. obsolete 
+NB. obsolete 
+NB. obsolete NB. Set globals, then initialize display for the noun.  There must be no DOLs, and we
+NB. obsolete NB. return no U dols
+NB. obsolete traverse =: 4 : 0
+NB. obsolete assert. 0 = #x
+NB. obsolete traversedowncalcselect 4 {. y  NB. Just to set error globals
+NB. obsolete selresultshape =: $conjex
+NB. obsolete selresult =: ,<conjex
+NB. obsolete 'displayhandlesin displayhandleout displaylevrank nounhasdetail' =: ($0);1;NORANKHISTNOUN;0
+NB. obsolete x ,&< coname''  NB. Return the empty DOLs
+NB. obsolete )
+NB. obsolete 
 NB. Nilad.  The locale called must be a noun locale.  The result is the list of verb locales that make up
 NB. the gerund in the locale.  If the locale is not a gerund, the result is empty.
 querygerund =: 3 : 0
