@@ -18,7 +18,7 @@ ALLOWNONQTTOOLTIP_dissect_ =: 1
 NB. obsolete NB. set SINGLESELECTION to clear previous selections when a new selection branch is opened
 NB. obsolete SINGLESELECTION_dissect_ =: 1
 NB. obsolete 
-CLEANUP_dissect_ =: 1  NB. set to 0 for debugging to allow postmortem
+NOCLEANUP_dissect_ =: 0  NB. set to 1 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
 DEBHLIGHT_dissect_ =: 0   NB. set for highlight printout
@@ -766,13 +766,13 @@ MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
 
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
-MINIMUMISISIZE =: 80 400     NB. minimum size for graphics, needed to allow room for tooltip
+MINIMUMISISIZE =: 700 500     NB. minimum size for graphics, needed to allow room for tooltip
 
 TOOLTIPMAXPIXELS =: 450  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.8  NB. Max tooltip width, as frac of isigraph width
 
 TOOLTIPDELAYCHOICES =: ('immed';'250';'500';'1000') ,. ('immediate';'0.25 sec';'0.5 sec';'1 sec') ,. <"0 (1 250 500 1000)
-TOOLTIPDETAILCHOICES =: ('0';'1') ,. ('laconic';'verbose') ,. <"0 (0 1)
+TOOLTIPDETAILCHOICES =: ('0';'1';'2') ,. ('laconic';'verbose';'tutorial') ,. <"0 (0 1 2)
 
 fontlines =. ; <@('menu fmfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 FONTSIZECHOICES
 ttfontlines =. ; <@('menu fmttfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 TOOLTIPFONTSIZECHOICES
@@ -806,6 +806,10 @@ menupopz;
 menupop "Detail";
 rem ttdetlines;
 menupopz;
+menupopz;
+menupop "&Help";
+menu fmhelplearning "Learning Dissect";
+menu fmhelpusing "Using Dissect";
 menupopz;
 xywh 3 4 20 12;cc fmshowerror button;cn "<<";
 xywh 26 4 20 12;cc fmbwd button;cn "<";
@@ -842,6 +846,10 @@ menupop "Detail";
 rem ttdetlines;
 menupopz;
 menupopz;
+menupop "&Help";
+menu fmhelplearning "Learning Dissect";
+menu fmhelpusing "Using Dissect";
+menupopz;
 bin vh0;
 minwh 10 28;cc fmshowerror button;cn "<<";
 set fmshowerror tooltip Go back to initial selection;
@@ -861,10 +869,12 @@ rem form end;
 
 NB. wd covers
 wdsetitems =: ([: wd 'set ', [ , ' *' , ])`([: wd 'set ', [ , ' items *' , ])@.IFQT
+wdsettext =: ([: wd 'set ', [ , ' *' , ])`([: wd 'set ', [ , ' text *' , ])@.IFQT
 wdsetvalue =: ([: wd 'set ', [ , ' *' , ])`([: wd 'set ', [ , ' value *' , ])@.IFQT
 wdsetselect =: ([: wd 'setselect ', [ , ' ' , ])`([: wd 'set ', [ , ' select ' , ])@.IFQT
 wdsetcaption =: ([: wd 'setcaption ', [ , ' *' , ])`([: wd 'set ', [ , ' caption *' , ])@.IFQT
 wdsetshow =: ([: wd 'setshow ', [ , ' ' , ])`([: wd 'set ', [ , ' show ' , ])@.IFQT
+wdsetfocus =: ([: wd 'setfocus ', ])`([: wd 'set ', ' focus' ,~ ])@.IFQT
 wdsetenable =: ([: wd 'setenable ', [ , ' ' , ])`([: wd 'set ', [ , ' enable ' , ])@.IFQT
 wdsetxywh =: ([: wd 'setxywhx ', [ , ' ' , ":@])`([: wd 'set ', [ , ' wh ' , [: ": _2 {. ])@.IFQT
 wdqform =: ([: wd 'qformx'"_)`([: wd 'qform'"_)@.IFQT
@@ -934,7 +944,7 @@ NB. If the sentence ran correctly for the user, make sure we get the same result
 NB. If there is only one result, we don't compare
 if. 1 < #y do.
   if. -.@-:/ y do.
-QP^:(-.CLEANUP)'y '
+QP^:(NOCLEANUP)'y '
     'dissect error: internal result does not match the result from the J session!  Aborting.' 13!:8 (1)
     return.
   end.
@@ -1159,7 +1169,7 @@ NB.?lintmsgsoff
 NB. dissectinstance is used only during the initial setup; when we return to wait for user interaction,
 NB. it must be empty.  Here we clear it for the cases of nodisplay and of error during initial display
 dissectinstance_dissect_ =: 0$a:
-if. x +: CLEANUP do. '' return. end.
+if. NOCLEANUP *. -. x do. '' return. end.
 for_o. ~. objtable do. destroy__o '' end.
 NB.?lintmsgson
 resultroot =: 0$a:
@@ -1255,6 +1265,11 @@ dissect_fmtooltipdetail_button =: 3 : 0
 (4 : 0&> i.@#) 0 {"1 TOOLTIPDETAILCHOICES
 ". 'dissect_fmtooltipdetail' , x , '_button =: dissect_fmtooltipdetail_button@(', (":y) ,'"_)'
 )
+
+dissect_fmhelplearning_button =: helpshow_dissecthelplearning_
+
+dissect_fmhelpusing_button =: helpshow_dissecthelpusing_
+
 
 NB. Draw the user's sentence at the top, showing highlighting
 NB. x is the sentence, in the user's spacing
@@ -4760,31 +4775,61 @@ shape =. (#frame) }. shape
 (1 < */ frame) exegesisplural (4 <. #shape) {:: ('atom';((":shape) , '-atom list')) , (exegesisshapewithx shape)&,&.> ' table';' brick';' subarray'
 )
 
-NB. y is (shape of a cell),(frame), result is string describing the frame; always singular
-exegesisfmtframe =: exegesisfmtcell@:(1&(|.!.a:))
+NB. y is (shape of a cell),(frame), result is string describing the frame; suitable for being follwed by a cell format, thus
+NB. ending with 'of' or a number.  Ends with a space.  Always an indefinite article is appended, except when this starts with a number
+exegesisfmtframe =: 3 : 0
+'shape frame' =. y
+(4 <. #frame) {:: ((exegesisindefinite 'single ');((":frame) , ' ')) , exegesisindefinite@((exegesisshapewithx frame)&,)&.> ' table of ';' brick of ';' subarray of '
+)
 
 NB. These are the morphemes we use, in the order they should appear in the final result.
 NB. Some may be entended with selection levels when they are created.
-exegesismorphemes =. <;._2 (0 : 0)
-EXEGESISFRAMENOFRAME
-EXEGESISFRAMENUGATORY
-EXEGESISFRAMENONNOUN
-EXEGESISFRAMENOSHAPE
-EXEGESISFRAMEVALID
-EXEGESISFRAMESURROGATE
-EXEGESISRANKSTACKEXPLAIN
-EXEGESISRANKSTACKPOWERSTART
-EXEGESISRANKSTACKPARTITIONSTART
-EXEGESISRANKOVERALLEXPLAIN
-EXEGESISDATASOURCE
-EXEGESISDATASHAPE
-EXEGESISDATAPATH
-EXEGESISDATAARRANGEMENT
-EXEGESISDATAEXPLORABLE
-EXEGESISVERBDESC
-EXEGESISONELINEDESC
+NB. The number is the detail level at which the value is display
+exegesismorphemes =. 3&{.@;:;._2 (0 : 0)
+EXEGESISTUTORIAL 2 Tutorial
+EXEGESISRANKOVERALLEXPLAIN 0 Description
+EXEGESISRANKSTACKEXPLAIN 0 Description
+EXEGESISRANKSTACKPOWERSTART 0 Description
+EXEGESISRANKSTACKPARTITIONSTART 0 Description
+EXEGESISFRAMENOFRAME 1 Frame
+EXEGESISFRAMENUGATORY 1 Frame
+EXEGESISFRAMENONNOUN 1 Frame
+EXEGESISFRAMENOSHAPE 1 Frame
+EXEGESISFRAMEVALID 1 Frame
+EXEGESISFRAMESURROGATE 1 Frame
+EXEGESISSHAPESELECTINGVERB 0
+EXEGESISSHAPEFRAME 0
+EXEGESISSHAPERESULT 0
+EXEGESISDATASOURCE 1
+EXEGESISDATASHAPE 1
+EXEGESISDATAPATH 1
+EXEGESISDATAARRANGEMENT 1
+EXEGESISDATAEXPLORABLE 0
+EXEGESISVERBDESC 0 Verb
+EXEGESISONELINEDESC 0 Verb
 )
-(exegesismorphemes) =: i. # exegesismorphemes
+({."1 exegesismorphemes) =: i. # exegesismorphemes
+exegesislevels =: (1) 0&".@{::"1 exegesismorphemes
+exegesislabels =: 2 {"1 exegesismorphemes
+
+NB. y is a table of morphemes; turn them into a displayable string
+exegesisgrammar =: 3 : 0
+tt =. y
+NB. Cull the morphemes that are below the user's culling level
+tt =. (tooltipdetailx >: exegesislevels {~ 0 {::"1 tt) # tt
+NB. Order them in grammatical order
+tt =. tt /: > 0 {"1 tt
+NB. The 'no frame' line is provided only to prevent dead air.  Delete it if there is anything else to say about frame.
+tags =.  > 0 {"1 tt
+if. ((#tags) > nft =. tags i. EXEGESISFRAMENOFRAME) *. (EXEGESISFRAMENUGATORY,EXEGESISFRAMENOSHAPE,EXEGESISFRAMENONNOUN,EXEGESISFRAMEVALID,EXEGESISFRAMESURROGATE) +./@:e. tags do.
+  tt =. (<<<nft) { tt
+  tags =. (<<<nft) { tags
+end.
+NB. Insert fences before each new nonnull topic
+fencewords =. (] ((~:@] *. a: ~: [) #&.> ]) ((LF,'---') , ('---------------------',LF) ,~ ])&.>) tags { exegesislabels
+NB. Run the result together, and delete all but the last CR/LF, and any leading CR/LF
+(}.~    (CR,LF) i.&0@:e.~ ]) ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; fencewords ,. 1 {"1 tt
+)
 
 NB. Explain the frame of the verb.
 NB. Called in the locale in which the operands and string form are defined
@@ -4855,15 +4900,15 @@ NB. obsolete     vstring =. '.'
     ftext =. ftext , 'The frame, ' , (":frame) , ' ' , (0{::ctense) , ' prepended to the result of the ',cvstring
   case. do.
     if. 1 = #vranks do.
-      ftext =. 'The argument is broken into ' , (exegesisindefinite exegesisfmtframe (0{::shapes);frame) ,' of ' , (exegesisfmtcell (0{::shapes);frame) , ', which will be supplied one by one to the ',vstring,'.',LF
+      ftext =. 'The argument is broken into ' , (exegesisfmtframe (0{::shapes);frame) , (exegesisfmtcell (0{::shapes);frame) , ', which will be supplied one by one to the ',vstring,'.',LF
     else.
       if. # 0 {:: frames do.
-        ftext =. 'x is broken into ' , (exegesisindefinite exegesisfmtframe shapes ,&(0&{) frames) ,' of ' , (exegesisfmtcell shapes ,&(0&{) frames),'.',LF
+        ftext =. 'x is broken into ' , (exegesisfmtframe shapes ,&(0&{) frames) , (exegesisfmtcell shapes ,&(0&{) frames),'.',LF
       else.
         ftext =. 'x is a single cell that will be replicated for use with each cell of y.',LF
       end.
       if. # 1 {:: frames do.
-        ftext =. ftext , 'y is broken into ' , (exegesisindefinite exegesisfmtframe shapes ,&(1&{) frames) ,' of ' , (exegesisfmtcell shapes ,&(1&{) frames),'.',LF
+        ftext =. ftext , 'y is broken into ' , (exegesisfmtframe shapes ,&(1&{) frames) , (exegesisfmtcell shapes ,&(1&{) frames),'.',LF
       else.
         ftext =. ftext , 'y is a single cell that will be replicated for use with each cell of x.',LF
       end.
@@ -4874,7 +4919,7 @@ NB. obsolete     vstring =. '.'
       (0~:#surplusframe) *. 0 -.@e. #@> frames do.
         NB. cells of the short operand must be replicated, and not just a single cell.
         'short long' =. (>&#&>/ frames) |. 'x';'y'
-        ftext =. ftext , 'Each cell of ' , short , ' is replicated into ' , (exegesisindefinite exegesisfmtframe '';surplusframe) ,' of identical cells, and then corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
+        ftext =. ftext , 'Each cell of ' , short , ' is replicated into ' , (exegesisfmtframe '';surplusframe) ,'identical cells, and then corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
       elseif. do.
         ftext =. ftext , 'Corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
       end.
@@ -4976,6 +5021,22 @@ NB. go back to the previous level
 findparentwithshapes =: ;&2
 NB. This definition is overridden for & and @
 
+hoverDOlabelposchartutorial =: 0 : 0
+This is the name field for a named noun.  In verb blocks this will be the rank stack.
+)
+hoverDOlabelposranktutorial =: 0 : 0
+This is the rank stack.  At the bottom of the stack is the verb whose result is displayed in the data portion of the block. Other lines in the rank stack are modifiers that affect the execution of the verb by changing the cells it operates on.
+
+The numbers in each line indicate the rank(s) of the cells operated on by the modifier in that line.  Each rank is color-coded with the color of the selection level it uses.  This color matches the color of the frame of the modifier in the shape line.
+
+For example, in the sentence
+(i.3) +"1"2 i. 3 4 3
+the rank stack for + will have 3 lines, one for each " modifier and one for the verb + .  The top line, with rank 2, relates to the overall verb +"1"2 .  The middle line, with rank 1, relates to the verb +"1.  The bottom line, with rank 0, relates to the verb + .  Selection is possible at each level.
+
+Hovering over a line of the rank stack will provide more information.  Hovering over the verb line will describe the overall operation of the block; hovering over a modifier line will describe that modifier.
+)
+
+
 NB. Hovering in the label 
 hoverDOlabelpos =: 4 : 0
 exp =. x
@@ -4983,6 +5044,7 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
   'ix pyx' =. {. r   NB. index of pickrect found
   tt =. 0 2 $a:
   if. 2 ~: 3!:0 displaylevrank do.
+    tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposranktutorial
     NB. If there is a rank stack, process it.  First the frame, then the individual item
     labelloc =. ix { DOranklocales
     NB.?lintonly labelloc =. <'dissectobj'
@@ -4997,7 +5059,7 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
       'frameloc opno' =. findparentwithshapes__parent labelloc
     end.
     NB. Get the explanation of frame
-    tt =. exegesisframe__frameloc labelloc;opno
+    tt =. tt , exegesisframe__frameloc labelloc;opno
     NB. Append any explanation unique to this line.  The y argument is
     NB. (1 if this locale appears more than once);(1 if this is the last locale in the stack);
     NB. Computational flags display only when both are 0, leaving the display for the overall node
@@ -5008,25 +5070,36 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     NB. We process bottom-up to leave explanations in reverse order, at the top of the tooltip
     if. ix = <:#DOranklocales do. tt =. tt ,~ ; (4 : '(1 < y +/@:= 1 {"1 displaylevrank) exegesisrankoverall__y&.> x')/"1 |. 2 {."1 displaylevrank end.
   else.
+    tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
     NB. If the display was text, we will pass that text into the overall for the node
-    tt =. exegesisrankoverall displaylevrank
+    tt =. tt , exegesisrankoverall displaylevrank
   end.
-  NB. Order the lines according to the order of morphemes in our list
-  tt =. tt /: > 0 {"1 tt
-  NB. The 'no frame' line is provided only to prevent dead air.  Delete it if there is anything else to say about frame.
-  if. (EXEGESISFRAMENOFRAME = 0 0 {:: tt) *. (EXEGESISFRAMENUGATORY,EXEGESISFRAMENOSHAPE,EXEGESISFRAMENONNOUN,EXEGESISFRAMEVALID,EXEGESISFRAMESURROGATE) +./@:e. > 0 {"1 tt do.
-    tt =. }. tt
-  end.
-  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; (1 {"1 tt)
+  text =. exegesisgrammar tt
 else.
-  text =. 'The name of the noun or verb, and any rank or level modifiers attached to it'
+  text =. ''
 end.
 reflowtoscreensize text
 )
 
+hoverDOshapepostutorial =: 0 : 0
+This is the shape/selection line(s).  The first line gives the shape of the result; the second line, which is present only when a selection has been made inside the result, gives the index list or path of the selection.
+
+The result-shape comprises the frame and the shape of the result cells.  The shape of the result cells is shown in white against a dark-blue background.  If the result-cells have varying shapes, the string '(fill)' is appended to the shape to indicate that the result contains fills (which are shown by crosshatching in the data area).
+
+The frame, if any, is the part of the result-shape before the dark-blue result-cell shape.  The frame is color-coded to match the modifier that selects from it.
+
+If the block is part of a compound using @, &, or &. there is no displayable result until a single result-cell has been selected.  Until that time the shape/selection lines are omitted.
+
+A result that is a single atom (with empty shape) is indicated by the word 'atom' in the result-cell shape.
+
+If the block includes modifiers that look inside the boxing structure, namely each, &.>, L:n, or S:n, entry into a level of boxing is indicated with '>' at the appropriate point.
+)
+
 NB. default verbs for other hovering
 hoverDOshapepos =: 4 : 0
-'The shape of the noun, followed by any selection'
+tt =. ,: EXEGESISTUTORIAL ; hoverDOshapepostutorial
+tt =. tt , EXEGESISSHAPESELECTINGVERB ; 'The shape of the noun, followed by any selection',LF
+reflowtoscreensize exegesisgrammar tt
 )
 
 errorlookup =: (LF&taketo ; LF&takeafter);._1 (0 : 0)
@@ -5095,6 +5168,12 @@ origemsg =. (<<<0 _1)&{^:('('={.) DOstatusstring
 reflowtoscreensize ((1 {"1 errorlookup) , <'') {::~ (0 {"1 errorlookup) i. <origemsg 
 )
 
+hoverDOdatapostutorial =: 0 : 0
+This is the data area, where the result of the verb is displayed.
+
+The maximum size of the data area can be set in the Sizes menu.  If the result does not fit, scrollbars are provided; in addition you can right-click in the data area to create a fullscreen explorer window that will show the result.
+)
+
 hoverDOdatapos =: 4 : 0
 exp =. x
 hoveryx =. y
@@ -5103,6 +5182,7 @@ NB. If the click is in the scrollbar, handle scrolling
 NB. See which scrollbar, if any, the click is in
 dhw =. (<exp,1) { DOdatapos
 if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
+  disp =. ,: EXEGESISTUTORIAL ; hoverDOdatapostutorial
   NB. Start accumulating the display
   if. 2 = 3!:0 DOranks do.
     NB. This is either a noun or a monad/dyad that suppresses detail; verbs have rank stacks
@@ -5115,7 +5195,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     NB. Not a noun.
     t =. 'The result of the verb:',LF,(defstring 0),CR
   end.
-  disp =. ,: EXEGESISDATASOURCE ; t , LF
+  disp =. disp , EXEGESISDATASOURCE ; t , LF
   if. sellevel <: #selections do.
     NB. Display the shape of the result
     rshape =. 0{::valueformat
@@ -5160,7 +5240,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
       disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to destrpy the explorer window.',LF
     end.
   end.
-  text =. ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; 1 {"1 disp
+  text =. exegesisgrammar disp
 else.
   NB. Hover in the scrollbars, ignore
   text =. ''
@@ -5282,6 +5362,7 @@ NB. When the timer expires, perform the hover action.  Runs in instance locale
 dissect_timer =: 3 : 0
 NB.?lintonly wdtimer =: wd
 wdtimer 0
+wd 'psel ' , winhwnd   NB. J bug on the Mac requires explicit psel
 hoverdo''
 0 0$0
 )
@@ -6276,10 +6357,10 @@ elseif.  '^:_1' -: _4 {. execform do.
 elseif. do. r =. 0 2$a:
 end.
 if. #onelinedesc do.
-  r =. r , EXEGESISONELINEDESC ; LF,'The definition of this verb is:',LF,onelinedesc,CR
+  r =. r , EXEGESISONELINEDESC ; 'The definition of this verb is:',LF,onelinedesc,CR
 end.
 if. (#verbexplains) > tx =. (0{"1 verbexplains) i. <titlestring do.
-  r =. r , EXEGESISVERBDESC ; LF,((<tx,valence) {:: verbexplains),LF
+  r =. r , EXEGESISVERBDESC ; ((<tx,valence) {:: verbexplains),LF
 end.
 r
 )
@@ -7981,12 +8062,13 @@ end.
 
 exegesisrankoverall =: 4 : 0
 if. x do.
-  t =. 'This block displays the intermediate results in the execution of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation. The calculation of the result started in the block(s) marked with ''/'' .',LF
+  t =. 'This block displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation. The calculation of the result started in the block(s) marked with ''/'' .',LF
 else.
-  t =. 'This block calculates and displays the intermediate results in the execution of the verb:',LF,(defstring 0),CR
+  t =. 'This block calculates and displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR
 end.
+t =. t , 'The results are displayed as a list of boxes, where the contents of a box contains one intermediate result. '
 t =. t , 'The order of results matches the order of items of y, which is the reverse of the executed order. In other words, the first result in the list is the final result of the verb. '
-t =. t , 'Select any result to see how it was calculated.'
+t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the '>' in the selection line) and allow you to continue selections inside the box. '
 ,: EXEGESISRANKOVERALLEXPLAIN;t,LF,LF
 )
 
@@ -8576,10 +8658,11 @@ else.
   t =. 'This block selects from the powers of',LF,(defstring 0),CR,'and displays the last verb of the computation. Computation of the power starts in the block(s) labeled ^: .',LF
 end.
 if. selectedpower = 0 do.
-  t =. t , 'In this case, the power being computed is 0, so there is no computation to view.'
+  t =. t , 'In this case, the power being computed is 0, so there is no computation to view.',LF
 else.
   t =. t , LF,'The boxes in the display shows the results of succeeding applications of the verb. The first box shows power 0 (the original y argument), '
-  t =. t , 'the second shows power ',(":*selectedpower),', and so on.',LF
+  t =. t , 'the second shows power ',(":*selectedpower),', and so on. '
+  t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the '>' in the selection line) and allow you to continue selections inside the box. ',LF
 end.
 ,: EXEGESISRANKOVERALLEXPLAIN;t
 )
@@ -9104,7 +9187,7 @@ elseif. y -.@-: cop do.
     if. selectable *. sellevel < #selections do.
       t =. t , LF,'To see the calculation of a single partition, select its result',LF
     else.
-      t =. t , LF , 'The computation of the selected partition starts in the block(s) labeled ',cop,' and ends in the block feeding into this one.',LF
+      t =. t , LF ,'The computation of the selected partition starts in the block(s) labeled ',cop,' and ends in the block feeding into this one.',LF
     end.
   end.
 elseif. do.
@@ -10183,6 +10266,145 @@ getfailingisf =: 4 : 0
 SFOPEN ;~ x getfailingisf_dissectobj_ f. y
 )
 
+NB. ******************************** help windows ********************************************
+cocurrent 'dissecthelp'
+coinsert 'dissect'
+
+ignoredhtml =. (<;._1 ' <strong> </strong>') ,. <''
+LFhtml =. (<;._1 ' </ul> </li>') ,. <LF
+LFLFhtml =.  (<;._1 ' <h1> <h2> <h3> </h1> </h2> </h3> <p> <ul>') ,. <LF,LF
+specialhtml =. (<;._1 ' <li> &gt; &lt; &amp;') ,. ' * ';'>';'<';'&'
+htmlrplcs =: ignoredhtml , LFhtml , LFLFhtml , specialhtml
+NB. y is HTML, result is a simulation in plain text
+htmltoplain =: 3 : 0
+NB. Convert whitespace to spaces, remove multiples
+ws =. deb y rplc ((TAB,LF,CR) ,. ' ')
+NB. Make changes
+deb ws rplc htmlrplcs
+)
+
+HELP =: 0 : 0
+pc help;
+xywh 1 1 winsize;cc helptext editm es_autovscroll;
+pas 0 0;
+)
+HELP =: 0 : 0 [^:IFQT HELP
+pc help;
+minwh winsize;cc helptext edith readonly;
+pas 0 0;
+)
+
+NB. Called in locale of the help form desired
+helpshow =: 3 : 0
+if. #hwndp do.
+  wd 'psel ' , hwndp
+  wdsetfocus 'helptext'
+else.
+  wd HELP rplc 'winsize';helpsize
+  hwndp =: wd 'qhwndp'
+  wd 'pn *' , helptitle
+  'helptext' wdsettext helptext
+  wd 'pshow'
+end.
+)
+
+helpclose =: 3 : 0
+  if. #hwndp do. 'psel ' , hwndp end.
+  wd 'pclose'
+  hwndp =: ''
+)
+
+help_cancel =: help_close =: helpclose
+
+cocurrent 'dissecthelplearning'
+coinsert 'dissecthelp'
+hwndp =: ''
+helptitle =: 'Learning Dissect'
+helpsize =: IFQT {:: '200 200';'300 400'
+helptext =: htmltoplain^:(-.IFQT) 0 : 0
+<strong>Dissect</strong> displays each verb-execution in a <strong>block</strong> so that you can see its result.  The flow of execution goes generally from top to bottom, with the final result at the bottom of the display.
+<p>
+Use tooltips to learn Dissect.  Set Tooltips|Detail to 'tutorial', and Tooltips|Delay to 'immediate'.  Move the mouse around your display.
+Learn about the components of each block, which are:
+<ul>
+<li>
+Name (for nouns only) - the name of the noun
+</li><li>
+Rank Stack - the verb (at the bottom of the stack) preceded by modifiers, such as ", that affect its execution.  The rank of each modifier is shown.
+</li><li>
+Shape line - the shape of the result, split into color-coded parts.  The shape of rhe result-cells is shown against a dark blue background.
+The rest of the result shape is the frame of the execution, colored to show which part of the frame was selected by each modifier in the rank stack.
+</li><li>
+Selection line - if you have selected a portion of a result for analysis, its index list is shown beneath the shape.
+</li><li>
+Error - If execution failed, the block responsible for the error will be flagged.
+</li><li>
+Result - the result itself
+</li>
+</ul>
+)
+
+cocurrent 'dissecthelpusing'
+coinsert 'dissecthelp'
+hwndp =: ''
+helptitle =: 'Using Dissect'
+helpsize =: IFQT {:: '400 600';'600 800'
+helptext =: htmltoplain^:(-.IFQT) 0 : 0
+<h1>Flow of execution</h1>
+Inputs come in at the top of a block, the output comes out of the bottom.  Execution flows generally from top to bottom.  For blocks such as u^:v and m@.v that have a control input, the control input comes from the right.
+<p>
+For verbal information about the execution of a sentence, hover over it.
+<h2>Display of modifiers</h2>
+Each block represents the execution of a verb.  The verb may be a primitive or a named verb, or it may be a <strong>compound verb</strong>, such as u"n, u@v or u/ .
+<p>
+The last line in the rank stack is a verb that executes to produce a result.  Modifiers that affect the way the verb is applied to its inputs, such as "n or L:n, are shown in a line in the rank stack.
+By looking at the ranks in the rank stack, and the color-coding of the shape line, you can see how the input to the verb is broken into cells.
+<h2>Invisible modifiers</h2>
+Sentence elements that simply control the flow of computation, such as &, @, &., ~, ], [, hook, and fork, are not shown explicitly.  Their effect is taken into account in the way the blocks are connected.
+<p>
+If a modifier such as "n is applied to a hook or fork, or to u&v, it is shown in the rank stack of each verb it applies to.  For example, in (* % #)"1 the "1 will be shown on the * and # blocks.
+<h1>Probing Execution</h1>
+To see more about how a result was computed, click on it. This will produce <strong>highlighting</strong>, <strong>selection</strong>, or <strong>expansion</strong>, if there is more to be seen.
+<h2>Highlighting</h2>
+Clicking on a result that has more than one result-cell will <strong>highlight</strong> that cell, and the arguments that contributed to its calculation.
+The result-cell itself is highlighted with a solid black border; the arguments have dashed colored borders.  The color of the argument border matches the selection level of the result-cell.
+<h2>Selection</h2>
+When a result is created by more than one verb, for example +:@&gt;"1, where the result of +: is also the result of the larger verb +:@&gt; as well as the overall verb +:@&gt;"1, clicking on a result-cell <strong>selects</strong> that cell, in all the verbs that contribute to the result.
+The selection chooses a cell of the largest containing verb; clicking again within the selected cell chooses a cell of the next-largest verb, and so on.
+Each selected cell is color-coded with a background color that indicates its selection level.  This color matches the highlighting color for its arguments, and also the colors used in the shape and selection lines.
+Hovering over the rank stack will show the verbs that selections are made from.
+<h3>Hidden Results</h3>
+Compound verbs using @, &, and &. operate on cells individually and may produce intermediate results that cannot be assembled into a single result.
+For example, in #@&gt; 2;'a' the individual results of > are incompatible.  In such compounds, the verbs before the final result show no values until a single argument-cell has been selected.
+<h2>Expansion</h2>
+Many modifiers, such as u/ y or u^:v y, produce many intermediate results on their way to a final result.
+Clicking on a result of such a modifier will create a new block, called an <strong>expansion block</strong>.
+The overall result of the modifier will be tagged as 'Final', and the expansion block will connect to its input.
+Click on the expansion block to select an intermediate result, and click further to probe its execution.
+<h2>Sentences containing errors</h2>
+When a sentence fails, dissect will automatically select each cell in the path to the error, so that the initial display will show the failing computation.
+<h2>Undo and redo</h2>
+The buttons at the top of the dissect form allow you to undo and redo selections, or start over in the initial state.
+<h1>Display of data</h1>
+All arrays are displayed in 2-dimensional form.
+<h2>Results with high rank</h2>
+A 3-dimensional result is displayed as a list of 2-dimensional arrays.  A 4-dimensional result is displayed as a 2-dimensional array of 2-dimensional arrays, and so on.
+Blue lines indicate boundaries between such cells, with the width of the line indicating the rank of the cells it separates.
+<h2>Large results</h2>
+You can select, under the Sizes menu, the maximum size of the display for a result.  If the result is larger than this maximum, it will be displayed with scrollbars.
+If you right-click on a result with scrollbars, a fullscreen window, called an <strong>explorer window</strong>, will pop up providing a larger view.
+Selections can be made in either the explorer window or the main dissect form.
+Right-clicking in the explorer window will close it.
+<h2>Constant nouns</h2>
+Results that do not depend on a variable are called constants and are displayed without showing all the detail that created them.  For example, in the sentence
+<p>
+z + 2 2 $ _1 1 1 0
+<p>
+the right argument to + will be a single block containing the 2x2 array.  To see the computation that produced the constant, click on the constant's value.
+<h2>Fill cells, error cells, and unexecuted cells</h2>
+Crosshatching indicates atoms that were added when results of unequal sizes were filled.  Double crosshatching indicates the cell on which an error was detected.
+Reverse crosshatching indicates cells that were not executed owing to earlier error.
+)
 
 
 NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ dissectinstanceforregression_dissect_ 4 : ''destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
