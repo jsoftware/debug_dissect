@@ -43,14 +43,13 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Hovering on shape/sel: show the verb at that level, and the input shape/selection/output shape
-NB. hover and tooltips don't work in explorer
+NB. Launch Jwiki from hotlinks in tooltips
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
-NB. Give pn for main & explorer windows
 NB. Support u :: v
+NB. Test display of fill-cells incl errors
+NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
 NB. explain different types of error
-NB. Test display of fill-cells incl errors
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name
 NB. Highlight net on a click/hover of a wire
@@ -62,7 +61,6 @@ NB. Re-select of selected cell of @. should remove expansion
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. if a recursion produces no result, flag that fact
 NB. fix pas in 803
-NB. Add 'About' box for dissect?
 NB. dissect '>:L:0"0 (1;''a'';3;4)'   doesn't crosshatch unexecd cells.  Seems that it should: fillmask is right for it   rectcolorfromfillmask neexds to insert stippling
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
 NB. dissect '(* $:@:<:)^:(1&<) 7'    select result 1 - no detail displayed inside ^:
@@ -756,6 +754,12 @@ end.
 ntypeval
 )
 
+NB. These settings are persistent across dissections, since they describe the user, not the problem
+minimumfontsizex =: 2   NB. font size to use in main window
+ttfontsizex =: 0   NB. tooltip font size
+tooltipdelayx =: 2  NB. tooltip delay
+tooltipdetailx =: 1   NB. tooltip detail level
+
 
 NB. Following lines must match the menus!
 FONTSIZECHOICES =: 8 10 12 14 16 20 24
@@ -766,7 +770,9 @@ MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
 
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
-MINIMUMISISIZE =: 700 500     NB. minimum size for graphics, needed to allow room for tooltip
+NB. The tooltip size will be selected according to detail and expanded according to fontsize
+TOOLTIPMINISISIZE =: 200 300,300 500,:900 600
+MINIMUMISISIZE =: 300 500     NB. minimum size for graphics, needed to allow room for tooltip
 
 TOOLTIPMAXPIXELS =: 450  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.8  NB. Max tooltip width, as frac of isigraph width
@@ -814,6 +820,7 @@ menupopz;
 xywh 3 4 20 12;cc fmshowerror button;cn "<<";
 xywh 26 4 20 12;cc fmbwd button;cn "<";
 xywh 48 4 20 12;cc fmfwd button;cn ">";
+xywh 74 4 120 12;cc fmstatline static;
 xywh 3 19 2 2;cc dissectisi isigraph;
 pas 0 0;
 rem form end;
@@ -850,17 +857,17 @@ menupop "&Help";
 menu fmhelplearning "Learning Dissect";
 menu fmhelpusing "Using Dissect";
 menupopz;
-bin vh0;
-minwh 10 28;cc fmshowerror button;cn "<<";
+bin vhh0;
+minwh 6 28;cc fmshowerror button;cn "<<";
 set fmshowerror tooltip Go back to initial selection;
-bin s;
-minwh 10 28;cc fmbwd button;cn "<";
+minwh 6 28;cc fmbwd button;cn "<";
 set fmbwd tooltip Undo selection;
-bin s;
-minwh 10 28;cc fmfwd button;cn ">";
+minwh 6 28;cc fmfwd button;cn ">";
 set fmfwd tooltip Redo selection;
-bin s;
-bin z;
+minwh 5 28;cc fmspacer static;cn "";
+bin zh1;
+minwh 50 16;cc fmstatline static;
+bin zz;
 minwh 400 80;cc dissectisi isidraw flush;
 bin z;
 pas 0 0;
@@ -973,17 +980,16 @@ NB. obsolete NB. If we didn't crash, remove the show error button
 NB. obsolete wd ; <@(#~ -.@('fmshowerror'&(+./@:E.)));.2^:(-. crashed) DISSECT
 wd DISSECT
 winhwnd =: wd 'qhwndp'
-
 NB. Initialize the user selection
 NB. obsolete 'fmfontsize' wdsetitems ; (LF ,~ ":)&.> FONTSIZECHOICES
 NB. obsolete 'fmfontsize' wdsetselect ": minimumfontsizex =: 2
-('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex =: 2) wdsetvalue  '1'
-('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex =: 0) wdsetvalue  '1'
+('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '1'
+('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '1'
 maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '1'
 ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '1'
-('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0 ,~ tooltipdelayx =: 2) wdsetvalue '1'
-('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0 ,~ tooltipdetailx =: 1) wdsetvalue '1'
+('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0 ,~ tooltipdelayx) wdsetvalue '1'
+('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0 ,~ tooltipdetailx) wdsetvalue '1'
 maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 calccfms minimumfontsizex { FONTSIZECHOICES
 displaystealth =: 0
@@ -995,6 +1001,8 @@ NB.?lintonly resultissdt_dissectmonad_ =: 0
 initnounshowdetail__resultroot resultissdt__resultroot
 NB. If we crashed, do an initial traversal to set selection flags to find the error
 maxnoundisplaysizes =: 2 2$0  NB. Init to small display for sniff, for speed
+
+wd 'pn *Dissecting ' , usersentence
 
 wd 'pshow'  NB. On QT, you can't calculate the size of graphics unless you are showing the form
 
@@ -1056,7 +1064,8 @@ NB. Get the required size - mostly the isi, but must be wide enough for the sent
 yxneeded =. sentencesize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
 NB. Get the current size of the isi; if insufficient, make it bigger, with expansion added
 if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
-  'dissectisi' wdsetxywh 1 0 3 2 { cyxhw =. (MINIMUMISISIZE >. EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
+  minisi =. MINIMUMISISIZE >. <. (%/ TOOLTIPFONTSIZECHOICES {~ ttfontsizex,0) * tooltipdetailx { TOOLTIPMINISISIZE
+  'dissectisi' wdsetxywh 1 0 3 2 { cyxhw =. (minisi >. EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
   NB. If the main form has grown now that the isi has grown, resize it too.
   if. initfromsess do. xywh =. 1 0 3 2 { (getsessionyx'') , +/ 2 2 $ cyxhw
   else. xywh =. (0 ". wdqform'') >. 0 0 , |. +/ 2 2 $ cyxhw
@@ -1207,7 +1216,7 @@ dissect_fmfontsize_button =: 3 : 0
 NB.?lintonly fmfontsize_select =. '0'
 NB. obsolete minimumfontsizex =: 0 ". fmfontsize_select
 ('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '0'
-('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex =: y) wdsetvalue  '1'
+('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex_dissect_ =: y) wdsetvalue  '1'
 calccfms minimumfontsizex { FONTSIZECHOICES
 dissect_dissectisi_paint 1
 )
@@ -1218,7 +1227,7 @@ dissect_dissectisi_paint 1
 dissect_fmttfontsize_button =: 3 : 0
 NB. obsolete minimumfontsizex =: 0 ". fmfontsize_select
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '0'
-('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex =: y) wdsetvalue  '1'
+('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex_dissect_ =: y) wdsetvalue  '1'
 )
 (4 : 0"0 i.@#) TOOLTIPFONTSIZECHOICES
 ". 'dissect_fmttfontsize' , (":x) , '_button =: dissect_fmttfontsize_button@(', (":y) ,'"_)'
@@ -1252,7 +1261,7 @@ dissect_dissectisi_paint 1
 
 dissect_fmtooltipdelay_button =: 3 : 0
 ('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx) wdsetvalue  '0'
-('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx =: y) wdsetvalue  '1'
+('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx_dissect_ =: y) wdsetvalue  '1'
 )
 (4 : 0&> i.@#) 0 {"1 TOOLTIPDELAYCHOICES
 ". 'dissect_fmtooltipdelay' , x , '_button =: dissect_fmtooltipdelay_button@(', (":y) ,'"_)'
@@ -1260,7 +1269,7 @@ dissect_fmtooltipdelay_button =: 3 : 0
 
 dissect_fmtooltipdetail_button =: 3 : 0
 ('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx) wdsetvalue  '0'
-('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx =: y) wdsetvalue  '1'
+('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx_dissect_ =: y) wdsetvalue  '1'
 )
 (4 : 0&> i.@#) 0 {"1 TOOLTIPDETAILCHOICES
 ". 'dissect_fmtooltipdetail' , x , '_button =: dissect_fmtooltipdetail_button@(', (":y) ,'"_)'
@@ -1428,7 +1437,7 @@ NB. Defaults for switches set only in certain paths
 rankcalculussupported =: 1
 
 NB. The following names must be redefined when an object is cloned
-clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel explorer errorwasdisplayedhere pointoffailure sellevel selectable stealthoperand ishighlightnode endhighlightnode'
+clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel winhwnd errorwasdisplayedhere pointoffailure sellevel selectable stealthoperand ishighlightnode endhighlightnode'
 
 NB. Object creation.  create the signaling variables used for communicating with the grid.
 NB. y is <the tokens that these values came from
@@ -2277,16 +2286,16 @@ end.
 )
 
 NB. Create accumulated frame, from the current node through all its inheritance, to the end.  Nilad.
-NB. Result is a table, one per node, each row being sellevel;ISF for the node
+NB. Result is a table, one per node, each row being sellevel;ISF for the node;locale for the node (no extra box)
 NB. The ISF contains the frame and any SFOPENs called for by the resultlevel
 NB. Forced selections are replaced by empty frame
-accumframe_dissect_ =: (0 2$a:)"_
+accumframe_dissect_ =: (0 3$a:)"_
 accumframe =: 3 : 0
 QP^:DEBDOvn'accumframe for ?defstring]0%>coname''''%selframe%unforcedselection''''%sellevel%selections%'
 NB. Ignore frames that are beyond the next level of unfilled selections.  We
 NB. may generate them while doing rank calculus
-if. sellevel > #selections do. 0 2$a:  NB. < means selection exists; = means on deck; > means in the hold
-else. (sellevel ,&< (<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) , accumframe__inheritedfrom 0
+if. sellevel > #selections do. 0 3$a:  NB. < means selection exists; = means on deck; > means in the hold
+else. (sellevel ; ((<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) ; coname'') , accumframe__inheritedfrom 0
 end.
 )
 NB. Signal early error
@@ -3579,7 +3588,8 @@ NB. Create the shape/selector line if we can
 NB. The shape is the concatenation of the frames, so that in an expansion node it includes the expansion.
 NB. We also append the shape of the max result cell in the last node, to get the total shape of the result
 NB. Create displayable frame for each selection.  This is a list of boxed strings
-DOshapes =: <@;@(": L:0)@;/./ |: accumframe__inheritedtailforselectinfo''
+DOshapes =: <@;@(": L:0)@;/./ |: 0 1 {"1 af =. accumframe__inheritedtailforselectinfo''
+DOshapelocales =: {:/./ |: 0 2 {"1 af   NB. The locale that makes the selection
 QP^:DEBDOvn'defstring]0 $shapetouse shapetouse errorcode sellevel selectable selections '
 QP^:DEBDOvn'defstring__inheritroot]0 sellevel__inheritedtailforselectinfo sellevel__inheritroot selections__inheritroot '
 QP^:DEBDOvn'maxcellresultshape__inheritroot '
@@ -3613,6 +3623,7 @@ elseif. (0 < #selresult) *. (errorcode e. EHASVALIDFILLMASK) *. (0 ~: #fillatom)
   NB. The value, which has no shape, is a valid data value, viz an atom.  Display that shape to distinguish it
   NB. from an unselected value.  This is perforce the cell color, so make it the last thing in the list
   DOshapes =: ,: ,<'atom'
+  DOshapelocales =: 0$a:
 elseif. do.
   NB. No display because no selection
   DOshapes =: 0 0 $ <''
@@ -3688,6 +3699,13 @@ if. (#picknames) > labelx =. picknames i. <'DOlabelpos' do.
   end.
 end.
 
+NB. Similarly, if there is a shape/selection line, create an index for it
+if. (#picknames) > shapex =. picknames i. <'DOshapepos' do.
+  NB. Convert the overall brect to yx,:00, then subtract it from the brect for each row
+  DOshapepospickrects =: (brect"0@{.@> shapex {"1 arects) -"2"_1 (1 0) *"1 2 shapex {"3 pickrects
+  assert. (#DOshapelocales) = <: 1 { $DOshapepospickrects
+end.
+
 NB. There should always be SOMETHING to display (shape, label, or data), but during sniff we don't allow
 NB. any space for the data, which could leave us with nothing.  Make sure we have a valid DOsize then
 DOsize =: 2 2&>.@{:@brect"_1 pickrects
@@ -3721,6 +3739,7 @@ scrollpoints =: displayscrollbars * scrollpoints
 NB.?lintonly 'DOlabelpos DOshapepos DOstatuspos DOdatapos' =: <2 2 $ 0
 NB.?lintonly 'DOranks DOranklevels DOshapes' =: ($0);($0);<0$a:
 NB.?lintonly 'DOlabelpospickrects DOranklocales' =: (1 0 2 2$0);(0$a:)
+NB.?lintonly 'DOshapepospickrects DOshapelocales' =: (1 0 2 2$0);(0$a:)
 0  NB. object created, say so
 NB.?lintsaveglobals
 )
@@ -4267,7 +4286,7 @@ drawDOvnall =: 3 : 0
 a: drawDOvnall y
 :
 if. #y do. DOyx =: (#DOsize) {. y ,: EXPLORERYX end.
-drawDOvn"1 x { (>:*#explorer) {. ((#DOsize) {. (winhwnd__COCREATOR;explorer),.(0;1),.(1<#DOsize);0) ,. |: <"_1@> DOyx;DOsize;DOlabelpos;DOshapepos;DOstatuspos;DOdatapos;displayscrollbars;pickrects;scrollpoints
+drawDOvn"1 x { (>:*#winhwnd) {. ((#DOsize) {. (winhwnd__COCREATOR;winhwnd),.(0;1),.(1<#DOsize);0) ,. |: <"_1@> DOyx;DOsize;DOlabelpos;DOshapepos;DOstatuspos;DOdatapos;displayscrollbars;pickrects;scrollpoints
 )
 
 NB. y is info for the surface we are drawing (position, size, etc)
@@ -4768,11 +4787,14 @@ end.
 )
 
 NB. y is (shape of an operand),(frame), result is string describing the cell; singular if frame describes < 2 cells
+NB. If x is given, it overrides the singular/plural specification
 exegesisfmtcell =: 3 : 0
+(1 < */ 1 {:: y) exegesisfmtcell y
+:
 'shape frame' =. y
 NB. Convert from operand shape to cell shape
 shape =. (#frame) }. shape
-(1 < */ frame) exegesisplural (4 <. #shape) {:: ('atom';((":shape) , '-atom list')) , (exegesisshapewithx shape)&,&.> ' table';' brick';' subarray'
+x exegesisplural (4 <. #shape) {:: ('atom';((":shape) , '-atom list')) , (exegesisshapewithx shape)&,&.> ' table';' brick';' subarray'
 )
 
 NB. y is (shape of a cell),(frame), result is string describing the frame; suitable for being follwed by a cell format, thus
@@ -4827,8 +4849,8 @@ if. ((#tags) > nft =. tags i. EXEGESISFRAMENOFRAME) *. (EXEGESISFRAMENUGATORY,EX
 end.
 NB. Insert fences before each new nonnull topic
 fencewords =. (] ((~:@] *. a: ~: [) #&.> ]) ((LF,'---') , ('---------------------',LF) ,~ ])&.>) tags { exegesislabels
-NB. Run the result together, and delete all but the last CR/LF, and any leading CR/LF
-(}.~    (CR,LF) i.&0@:e.~ ]) ({.~ 2 + (CR,LF) i:&0@:e.~ ]) ; fencewords ,. 1 {"1 tt
+NB. Run the result together, and delete all but the last LF, and any leading LF, and allow no more than 3 consecutive LF
+(#~   [: -. (LF,LF,LF)&E.) (}.~    LF i.&0@:= ]) ({.~ 2 + LF i:&0@:= ]) ; fencewords ,. 1 {"1 tt
 )
 
 NB. Explain the frame of the verb.
@@ -4888,7 +4910,17 @@ NB. obsolete     vstring =. '.'
     if. 1 = #vranks do.
       ftext =. 'The argument is empty, so ', (exegesisindefinite exegesisfmtcell (0{::shapes);frame), ' of ' ,((0<#0{::shapes) exegesisplural 'fill') , ' are supplied to the ',vstring,'.',LF
     else.
-      ftext =. 'The arguments are empty, so cells of fill (on the left, ' , (exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames) , '; on the right, ' , (exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames) , ') are supplied to the ',vstring,'.',LF
+      if. 1 1 -: emptyop =. 0&e.@> frames do.
+        ftext =. 'The arguments are empty, so cells of fill (on the left, ' , (exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames) , '; on the right, ' , (exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames) , ') are supplied to the ',vstring,'.',LF
+      else.
+        'ename nonename' =. 'xy' \: emptyop
+        ftext =. ename , ' is empty, so it is replaced by a cell of fill (' , (exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames) , '); ',LF
+        if. # (emptyop i. 0) {:: frames do.
+          ftext =. ftext , nonename, ' is broken into ' , (exegesisfmtframe shapes ,&((emptyop i. 0)&{) frames) , (exegesisfmtcell shapes ,&((emptyop i. 0)&{) frames),' which are supplied to the ',vstring,'.',LF
+        else.
+          ftext =. ftext , nonename , ' is a single cell, ', (exegesisindefinite exegesisfmtcell (0{::shapes);frame) , '.  These arguments are supplied to the ',vstring,'.',LF
+        end.
+      end.
     end.
     ftext =. ftext , 'The frame, ' , (":frame) , ' ' , (0{::ctense) , ' prepended to the result of the ',cvstring
   case. 1 do.
@@ -4905,12 +4937,12 @@ NB. obsolete     vstring =. '.'
       if. # 0 {:: frames do.
         ftext =. 'x is broken into ' , (exegesisfmtframe shapes ,&(0&{) frames) , (exegesisfmtcell shapes ,&(0&{) frames),'.',LF
       else.
-        ftext =. 'x is a single cell that will be replicated for use with each cell of y.',LF
+        ftext =. 'x is a single cell (',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),') that will be replicated for use with each cell of y.',LF
       end.
       if. # 1 {:: frames do.
         ftext =. ftext , 'y is broken into ' , (exegesisfmtframe shapes ,&(1&{) frames) , (exegesisfmtcell shapes ,&(1&{) frames),'.',LF
       else.
-        ftext =. ftext , 'y is a single cell that will be replicated for use with each cell of x.',LF
+        ftext =. ftext , 'y is a single cell (',(exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames),') that will be replicated for use with each cell of x.',LF
       end.
       if. (i.&0@:=/ > frames) < <./ #@> frames do.
         ftext =. ftext , 'This is an agreement error.',LF
@@ -4919,7 +4951,7 @@ NB. obsolete     vstring =. '.'
       (0~:#surplusframe) *. 0 -.@e. #@> frames do.
         NB. cells of the short operand must be replicated, and not just a single cell.
         'short long' =. (>&#&>/ frames) |. 'x';'y'
-        ftext =. ftext , 'Each cell of ' , short , ' is replicated into ' , (exegesisfmtframe '';surplusframe) ,'identical cells, and then corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
+        ftext =. ftext , 'Each ',(0 exegesisfmtcell (0{::shapes);frame),' of ' , short , ' is replicated into ' , (exegesisfmtframe '';surplusframe) ,'identical cells, and then corresponding cells of x and y are supplied one by one to the ',vstring,'.',LF
       elseif. do.
         ftext =. ftext , 'Corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
       end.
@@ -4994,19 +5026,23 @@ end.
 0 0$0
 )
 
-NB. Hover is like pick, but there is no mouse button and no control keys
+NB. hover/statline is like pick, but there is no mouse button and no control keys
 NB. We return the string to use for the tooltip
-hoverDO =: 3 : 0  NB. Called in locale of the node that drew the DO
+hoverstatDO =: 4 : 0  NB. Called in locale of the node that drew the DO
 'exp yx' =. y
 if. #r =. (exp{pickrects) findpickhits yx do.
   'ix pyx' =. {. r
-  if. 3 = 4!:0 <name =. 'hover' , ix {:: picknames do.
+  if. 3 = 4!:0 <name =. x , ix {:: picknames do.
     exp name~ pyx
   else. ''
   end.
 else. ''
 end.
 )
+hoverDO =: 'hover'&hoverstatDO
+statlineDO =: 'statline'&hoverstatDO
+
+NB. Statline is like hover.  We return the statline string
 
 NB. For all these hover verbs, x is (view number), y is the yx position of the click relative to start of pickrect
 
@@ -5080,6 +5116,22 @@ else.
 end.
 reflowtoscreensize text
 )
+statlineDOlabelpos =: 4 : 0
+exp =. x
+if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
+  'ix pyx' =. {. r   NB. index of pickrect found
+  if. 2 ~: 3!:0 displaylevrank do.
+    labelloc =. ix { DOranklocales
+    NB.?lintonly labelloc =. <'dissectobj'
+    text =. defstring__labelloc 0
+  else.
+    text =. displaylevrank
+  end.
+else.
+  text =. ''
+end.
+text
+)
 
 hoverDOshapepostutorial =: 0 : 0
 This is the shape/selection line(s).  The first line gives the shape of the result; the second line, which is present only when a selection has been made inside the result, gives the index list or path of the selection.
@@ -5098,8 +5150,33 @@ If the block includes modifiers that look inside the boxing structure, namely ea
 NB. default verbs for other hovering
 hoverDOshapepos =: 4 : 0
 tt =. ,: EXEGESISTUTORIAL ; hoverDOshapepostutorial
-tt =. tt , EXEGESISSHAPESELECTINGVERB ; 'The shape of the noun, followed by any selection',LF
+exp =. x
+if. #r =. (exp{DOshapepospickrects) findpickhits y do.
+  'ix pyx' =. {. r   NB. index of pickrect found
+  if. ix < #DOshapelocales do.
+    l =. ix { DOshapelocales   NB. the locale of the selection
+    NB.?lintonly l =. <'dissectverb'
+    tt =. tt , EXEGESISSHAPESELECTINGVERB ; 'This portion of the frame selects a cell for the verb:',LF,(defstring__l 0),CR
+  else.
+    tt =. tt , EXEGESISSHAPERESULT ; 'The shape of a single result-cell',((fillrequired *. 0 = #resultlevel) # '.  Some cells are padded with fill'),'.',LF
+  end.
+end.
 reflowtoscreensize exegesisgrammar tt
+)
+statlineDOshapepos =: 4 : 0
+exp =. x
+if. #r =. (exp{DOshapepospickrects) findpickhits y do.
+  'ix pyx' =. {. r   NB. index of pickrect found
+  if. ix < #DOshapelocales do.
+    l =. ix { DOshapelocales   NB. the locale of the selection
+    NB.?lintonly l =. <'dissectverb'
+    tt =. 'frame of ' , defstring__l 0
+  else.
+    tt =. (*#vranks) {:: 'shape of noun'; 'result shape' , (fillrequired *. 0 = #resultlevel) # ' (fill added)'
+  end.
+else. tt =. ''
+end.
+tt
 )
 
 errorlookup =: (LF&taketo ; LF&takeafter);._1 (0 : 0)
@@ -5232,12 +5309,12 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   end.
   NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
   if. 1 < #DOsize do.
-    if. 0=#explorer do.
+    if. 0=#winhwnd do.
       disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can change the limit on the Sizes menu. You can also right-click the data to open a separate window for exploring the value.',LF
     elseif. exp=0 do.
       disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to bring up the explorer window.',LF
     elseif. do.
-      disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to destrpy the explorer window.',LF
+      disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to destroy the explorer window.',LF
     end.
   end.
   text =. exegesisgrammar disp
@@ -5246,6 +5323,26 @@ else.
   text =. ''
 end.
 reflowtoscreensize text
+)
+statlineDOdatapos =: 4 : 0
+exp =. x
+hoveryx =. y
+dhw =. (<exp,1) { DOdatapos
+if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
+  if. 2 = 3!:0 DOranks do. text =. 'noun'&[^:(0=#) DOranks
+  else. text =. defstring 0
+  end.
+  if. sellevel <: #selections do.
+    rshape =. 0{::valueformat
+    if. 1 < */ rshape do.
+      selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
+      selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
+      text =. text , '         path=' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath)
+    end.
+  end.
+else. text =. ''
+end.
+text
 )
 
 FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
@@ -5311,8 +5408,11 @@ NB. to show the selected cell at top-left
     dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
   else.
 NB. User tried to select, but we couldn't do it.  Give him a tooltip.  0=no frame, _1=no further selection, _2=empty operand
-    drawtooltip__COCREATOR (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { 'unselectable - no frame';'empty value is not selectable';'no further selection possible'
-    hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''
+    NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
+    formloc =. exp { COCREATOR,coname''
+    NB.?lintonly formloc =. <'dissect'
+    drawtooltip__formloc (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { 'unselectable - no frame';'empty value is not selectable';'no further selection possible'
+    hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
 )
@@ -5320,8 +5420,8 @@ end.
 NB. right click - if explorable, create the explorer, or raise it if it already exists
 pickrDOdatapos =: 4 : 0
 if. 1 < #DOsize do.
-  if. 0 = #explorer do. createexplorer''
-  else. wd 'psel ' , explorer , ';pshow;setfocus dissectisi'
+  if. 0 = #winhwnd do. createexplorer''
+  else. wd 'psel ' , winhwnd , ';pshow;setfocus dissectisi'
   end.
 end.
 )
@@ -5367,7 +5467,7 @@ hoverdo''
 0 0$0
 )
 
-NB. We have internal actions hoverstart, hoverend, hovercheck, hoverdo.  hoverstart is called when the mouse
+NB. We have internal actions hoverstart, hoverend, hoverdo.  hoverstart is called when the mouse
 NB. moves; we record where it was and set a timer, abandoning the old timer if the mouse has moved.
 NB. hoverend is called whenever anything happens to abort the hover (click, focuslost, etc).  hoverdo
 NB. is called when the timer expires: we then see where the cursor is and call the owner to get a tooltip.
@@ -5377,7 +5477,12 @@ hoverinitloc =: $0   NB. Init no hover active
 MAXHOVERMOVEMENT =: 1   NB. Allow this much movement from start-of-hover position
 NB. obsolete HOVERTIME =: 1000  NB. time to hover, in msec
 'HOVEROFFSETY HOVEROFFSETX' =: _8 5  NB. amount to offset tooltip from the hover
-hoverstart =: 3 : 0
+
+NB. This is called in the locale and with the psel of whatever form is active - the main or an explorer.
+NB. The timer will run in the locale this was called from
+NB. x is (window type 0=main 1=exp);(1 to write to the statline (which doesn't exist on explorers))
+hoverstart =: 4 : 0
+'isexp writestat' =. x
 if. #hoverinitloc do.  NB. We are hovering.  Does this continue the same hover?
   if. MAXHOVERMOVEMENT < >./ | y - hoverinitloc do. hoverend'' end.
 end.
@@ -5385,21 +5490,52 @@ if. 0 = #hoverinitloc do.   NB. If no hover running (and perhaps we just cleared
 NB.?lintonly wdtimer =: wd
   wdtimer (tooltipdelayx,2) {:: TOOLTIPDELAYCHOICES  NB. start the hover timer
   hoverinitloc =: y
+  hoverisexp =: isexp
+  NB. The same action that starts the hover timer will set the status line immediately
+  if. writestat do. statlinedo y end.
+  NB.?lintsaveglobals
 end.
 )
 
 NB. Nilad.  Ask the owner for a tooltip and display it if there is one
+NB. This runs in the hovering locale, either the main form or an explorer
 hoverdo =: 3 : 0
 if. #hoverinitloc do.   NB. should always be there, but we might get a late timer event
 NB.?lintonly hoverinitloc =: 0 0
-  for_r. pr =. locpickrects findpickhits hoverinitloc do.
-    'l yx' =. r
-    pickloc =. l { picklocs
+  NB. Get the locale of the object.  If we are on an explorer, it's just that; if on the main, we have to
+  NB. look for the pickrect
+  if. hoverisexp do.
+    pickloc =. coname''
+    yx =. hoverinitloc
+  else.
+    if. #pr =. locpickrects findpickhits hoverinitloc do.
+      'l yx' =. {. pr
+      pickloc =. l { picklocs
+    else.
+      pickloc =. ''
+NB.?lintonly yx =. 0 0
+    end.
+  end.
 NB.?lintonly pickloc =. <'dissectobj'
-    hstring =. hoverDO__pickloc 0;yx
+  if. #pickloc do.
+    hstring =. hoverDO__pickloc hoverisexp;yx
     if. #hstring do. drawtooltip hoverinitloc;hstring end.
   end.
 end.
+)
+
+NB. y is mouse position.  Write to the status line, which is a lot like a hover
+NB. This runs in the hovering locale, either the main form or an explorer
+statlinedo =: 3 : 0
+stattext =. ''
+for_r. pr =. locpickrects findpickhits y do.
+  'l yx' =. r
+  pickloc =. l { picklocs
+NB.?lintonly pickloc =. <'dissectobj'
+  stattext =. statlineDO__pickloc hoverisexp;yx
+end.
+'fmstatline' wdsettext stattext
+0 0$0
 )
 
 
@@ -5551,7 +5687,7 @@ NB. start or continue the hover
   if. 1 e. 4 5 8 9 10 { sd do.   NB. If any button down...
     hoverend''
   else.
-    hoverstart 1 0 { sd
+    0 1 hoverstart 1 0 { sd
   end.
 end.
 )
@@ -5810,8 +5946,9 @@ createexplorer =: 3 : 0
 NB. Start the window definition, so we can use existence of 'explorer' to indicate destination
 NB. Create the isigraph and finish creating the form
 wd '?' (taketo , (": |. -:^:(-.IFQT) {: DOsize) , takeafter) EXPLORER
+wd 'pn *Exploring ' , ({.~ 100 <. #) defstring 0
 wd 'pshow'
-explorer =: wd 'qhwndp'
+winhwnd =: wd 'qhwndp'
 NB. Draw the object on the explorer form
 1 drawDOvnall ''
 )
@@ -5819,10 +5956,10 @@ NB. Draw the object on the explorer form
 NB. Use destroy to remove the explorer window without writing to the main form, as for example
 NB. when the old explorer is invalid
 destroyexplorer =: 3 : 0
-if. #explorer do.
-  wd 'psel ', explorer
+if. #winhwnd do.
+  wd 'psel ', winhwnd
   wd 'pclose'
-  explorer =: ''
+  winhwnd =: ''
 end.
 )
 
@@ -5837,6 +5974,7 @@ NB. ** explorer mouse events **
 NB. The only event is a click in the one defined region.  We are already in the object locale
 explorer_dissectisi_mbldown =: 3 : 0
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
+hoverend''
 yx =. EXPLORERYX -~ 1 0 { sd =. 0 ". sysdata
 if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;#. 4 5 6 7 { sd end.
 )
@@ -5854,6 +5992,14 @@ NB. abort it.
     1 scrollmmove 1 0 { sd
   else.
     explorer_dissectisi_mblup''
+  end.
+elseif. do.
+NB. mmove not for scrolling.  If a mouse button is down, stop the hover; otherwise
+NB. start or continue the hover
+  if. 1 e. 4 5 8 9 10 { sd do.   NB. If any button down...
+    hoverend''
+  else.
+    1 0 hoverstart 1 0 { sd
   end.
 end.
 )
@@ -8068,7 +8214,7 @@ else.
 end.
 t =. t , 'The results are displayed as a list of boxes, where the contents of a box contains one intermediate result. '
 t =. t , 'The order of results matches the order of items of y, which is the reverse of the executed order. In other words, the first result in the list is the final result of the verb. '
-t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the '>' in the selection line) and allow you to continue selections inside the box. '
+t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. '
 ,: EXEGESISRANKOVERALLEXPLAIN;t,LF,LF
 )
 
@@ -8662,7 +8808,7 @@ if. selectedpower = 0 do.
 else.
   t =. t , LF,'The boxes in the display shows the results of succeeding applications of the verb. The first box shows power 0 (the original y argument), '
   t =. t , 'the second shows power ',(":*selectedpower),', and so on. '
-  t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the '>' in the selection line) and allow you to continue selections inside the box. ',LF
+  t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. ',LF
 end.
 ,: EXEGESISRANKOVERALLEXPLAIN;t
 )
@@ -10296,6 +10442,7 @@ pas 0 0;
 
 NB. Called in locale of the help form desired
 helpshow =: 3 : 0
+NB.?lintonly hwndp =: helpsize =: helptitle =: helptext =: ''
 if. #hwndp do.
   wd 'psel ' , hwndp
   wdsetfocus 'helptext'
@@ -10306,10 +10453,11 @@ else.
   'helptext' wdsettext helptext
   wd 'pshow'
 end.
+NB.?lintsaveglobals
 )
 
 helpclose =: 3 : 0
-  if. #hwndp do. 'psel ' , hwndp end.
+  if. #hwndp do. wd 'psel ' , hwndp end.
   wd 'pclose'
   hwndp =: ''
 )
@@ -10376,11 +10524,24 @@ Hovering over the rank stack will show the verbs that selections are made from.
 <h3>Hidden Results</h3>
 Compound verbs using @, &, and &. operate on cells individually and may produce intermediate results that cannot be assembled into a single result.
 For example, in #@&gt; 2;'a' the individual results of > are incompatible.  In such compounds, the verbs before the final result show no values until a single argument-cell has been selected.
+<h3>Selection inside boxes</h3>
+If the block includes modifiers that look inside the boxing structure, namely each, &.>, L:n, or S:n, selection includes opening any boxes that enclose the actual argument.  Entry into a level of boxing is indicated with '>' at the appropriate point in the selection line.
 <h2>Expansion</h2>
-Many modifiers, such as u/ y or u^:v y, produce many intermediate results on their way to a final result.
+Many modifiers, such as u;.1 y, u/ y, or u^:v y, produce many intermediate results on their way to a final result.
 Clicking on a result of such a modifier will create a new block, called an <strong>expansion block</strong>.
 The overall result of the modifier will be tagged as 'Final', and the expansion block will connect to its input.
-Click on the expansion block to select an intermediate result, and click further to probe its execution.
+Expansion blocks come in two types.
+<h3>Expansion for selected results</h3>
+<strong>Partitioning modifiers</strong> (u/. u\ u\. u;.) apply the verb u repeatedly, and assemble the individual result into a final overall result.  Computation is <strong>repeated</strong> but not <strong>hidden</strong>.
+For these modifiers, the expansion block shows the single application of u that led to the selected result.  You can probe the expansion block to understand this result.
+
+Other modifiers without hidden results, such as m@.v and u :: v, produce single expansion blocks similarly.
+<h3>Expansion for intermediate results</h3>
+The modifiers u/ and u^:v, as well as recursion $:, perform repeated calculations but show only the result of the last one.  For example, u/ 1 2 3 computes (2 u 3) and then (1 u (2 u 3)).
+
+For these verbs, the expansion block shows all the intermediate results on the way to the final result.  Select one of these intermediate results to see how it was computed, and click further to probe its execution.
+
+The intermediate results are shows as the contents of separate boxes.  When you select a result, the box is opened to allow further probing.  The selection of a intermediate result counts as the first level of selection for the block, and includes a '>' in the shape/selection lines to represent the opening of the selection.
 <h2>Sentences containing errors</h2>
 When a sentence fails, dissect will automatically select each cell in the path to the error, so that the initial display will show the failing computation.
 <h2>Undo and redo</h2>
@@ -10830,7 +10991,12 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 'a =. /'
 2 dissect 'c =. ;.'
 2 dissect 't =. 2 2 $ 5'
-2 dissect '+(a =. /) 3 4 5' 
+2 dissect '+(a =. /) 3 4 5'
+2 dissect '0$a:'
+2 dissect '5 (6 $~ 5 + ]) '''''
+2 dissect '5 (6 $~ 5 + ])"0 '''''
+2 dissect '5 (6 $~ 5 + ])"0 (7)'
+2 dissect '5 (6 $~ 5 [ ]) '''''
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
