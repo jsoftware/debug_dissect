@@ -50,6 +50,7 @@ NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
 NB. explain different types of error
+NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name
 NB. Highlight net on a click/hover of a wire
@@ -1955,7 +1956,7 @@ NB. Here for verb with invalid frame - an early error
     SM^:DEBTRAVDOWN'rank-calculus probe'
 NB. There were no selectors.  This means that rank calculus was applied somewhere to give us a shape without
 NB. a valid selector.  The frame is valid, as just calculated, and the operand shapes too, provided this is a regular verb
-    'errorcode selector selresult selopinfovalid' =: ENOOPS;(0$0);(0$a:);(rankcalculussupported"0 physreqandhighlights)
+    'errorcode selresult selopinfovalid' =: ENOOPS;(0$a:);(rankcalculussupported"0 physreqandhighlights)  NB. leave selector unchanged
     NB. do the rank-calculus processing of the shape, and whether we can accept a selection
     selopshapes =: ($^:(0<L.)&.> selopshapes) (}.~ #)&.> frames
     selectable =: selframe +.&*&# resultlevel
@@ -2292,10 +2293,14 @@ NB. Forced selections are replaced by empty frame
 accumframe_dissect_ =: (0 3$a:)"_
 accumframe =: 3 : 0
 QP^:DEBDOvn'accumframe for ?defstring]0%>coname''''%selframe%unforcedselection''''%sellevel%selections%'
-NB. Ignore frames that are beyond the next level of unfilled selections.  We
-NB. may generate them while doing rank calculus
-if. sellevel > #selections do. 0 3$a:  NB. < means selection exists; = means on deck; > means in the hold
-else. (sellevel ; ((<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) ; coname'') , accumframe__inheritedfrom 0
+NB. Keep taking frames as long as they are valid, i. e. as long as we had valid shape coming in
+NB. We have to patch over the monad/dyad execution, which has no inputs, so that we get to the
+NB. verb execution which does.  So we don't bail out if the node is a noun (which happens only on the
+NB. monad/dyad, if we are displaying a verb result)
+NB. obsolete if. sellevel > #selections do. 0 3$a:  NB. < means selection exists; = means on deck; > means in the hold
+if. (*#vranks) *. 0 = #inputselopshapes do. 0 3$a:  NB. keep frames as long as there is valid shape
+else.
+  (sellevel ; ((<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) ; coname'') , accumframe__inheritedfrom 0
 end.
 )
 NB. Signal early error
@@ -3609,10 +3614,15 @@ if. #(;DOshapes),cellshapedisp do.
   currselections =. sellevel__inheritedtailforselectinfo }. (sellevel__inheritroot + selectable__inheritroot) ((<. #) {. ]) selections__inheritroot
   NB. Get surplus frames, and result shape; delete any characters after >, delete any boxes after >
   unselectedframes =. ({.~    1 (e. + i.~) '>' = {:@>) '>'&((>:@i.~ {. ])^:e.)&.> inituframes =. ((#currselections) }. DOshapes) , <cellshapedisp
-  NB. put the unselected frame back onto the selected ones, and then, if we snipped off the last box (containing the special result-cell shape),
+  NB. put the unselected frame back onto the selected ones
+  NB. First get the surviving boxes that contain valid selections
+  DOshapes =: ((#currselections) {. DOshapes) , unselectedframes
+  NB. Trim down the number of locales to match the valid selections
+  DOshapelocales =: DOshapes (<.&# {. ]) DOshapelocales
+  NB. if we snipped off the last box (containing the special result-cell shape),
   NB. add one to carry the special color and indicate that we don't know the exact frame
   NB. Also, at this point expand DOshapes to a table: first row shapes, second row (optional) selections
-  DOshapes =: ,: ((#currselections) {. DOshapes) , unselectedframes , (inituframes >&# unselectedframes) # <'?'
+   DOshapes =: ,: DOshapes , (inituframes >&# unselectedframes) # <'?'
 NB. If there are selections, line them up under the boxes in the shape containing selectable values
 NB. (i. e. more than one cell)
   if. #currselections do.
