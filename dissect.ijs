@@ -2293,12 +2293,12 @@ NB. Forced selections are replaced by empty frame
 accumframe_dissect_ =: (0 3$a:)"_
 accumframe =: 3 : 0
 QP^:DEBDOvn'accumframe for ?defstring]0%>coname''''%selframe%unforcedselection''''%sellevel%selections%'
-NB. Keep taking frames as long as they are valid, i. e. as long as we had valid shape coming in
-NB. We have to patch over the monad/dyad execution, which has no inputs, so that we get to the
-NB. verb execution which does.  So we don't bail out if the node is a noun (which happens only on the
-NB. monad/dyad, if we are displaying a verb result)
+NB. Keep taking frames as long as they are valid, i. e. as long as we have selected from them using a
+NB. selector that is not a rank-calculus probe.
+NB. We have to patch over the first node of monad/dyad, which looks like a noun and has no selops out;
+NB. the following verb will be OK
 NB. obsolete if. sellevel > #selections do. 0 3$a:  NB. < means selection exists; = means on deck; > means in the hold
-if. (*#vranks) *. 0 = #inputselopshapes do. 0 3$a:  NB. keep frames as long as there is valid shape
+if. (*#vranks) *. (0 = #selopshapes) +. (selector -: a:) do. 0 3$a:  NB. keep frames as long as there is valid shape
 else.
   (sellevel ; ((<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) ; coname'') , accumframe__inheritedfrom 0
 end.
@@ -3595,15 +3595,25 @@ NB. We also append the shape of the max result cell in the last node, to get the
 NB. Create displayable frame for each selection.  This is a list of boxed strings
 DOshapes =: <@;@(": L:0)@;/./ |: 0 1 {"1 af =. accumframe__inheritedtailforselectinfo''
 DOshapelocales =: {:/./ |: 0 2 {"1 af   NB. The locale that makes the selection
+NB.QP'DOshapes DOshapelocales af '
+if. #af do.
+  NB. The last locale returned by accumframe is the last one that had valid output, i. e. the last one whose
+  NB. frame was used to select a result.  We use the result-cell info from THAT node to supply result info
+  lastexecutednode =. {: DOshapelocales
+  NB.?lintonly lastexecutednode =. <'dissectobj'
+  cellshapedisp =. (": maxcellresultshape__lastexecutednode) , (fillrequired__lastexecutednode *. 0 = #resultlevel__lastexecutednode) # ' (fill)'
+else.
+  cellshapedisp =. ''
+end.
+NB. obsolete NB. Get the frame before the first sropdown; any surplus displayed shape must be the result-cell shape
+NB. obsolete rankbeforedrop =. # ; SFOPEN (i.~ {. ]) ; 1 {"1 af
 QP^:DEBDOvn'defstring]0 $shapetouse shapetouse errorcode sellevel selectable selections '
 QP^:DEBDOvn'defstring__inheritroot]0 sellevel__inheritedtailforselectinfo sellevel__inheritroot selections__inheritroot '
 QP^:DEBDOvn'maxcellresultshape__inheritroot '
-NB. Get the string to add on at the end of the frames: the residual shape of the last cell.  If this
-NB. requires fill, so indicate - but never if the results are boxed rather than filled
-cellshapedisp =. (": maxcellresultshape__inheritroot) , (fillrequired *. 0 = #resultlevel) # ' (fill)'
 NB. If we have no shape, either it's a scalar, or we have empty frame with unknown shape.
-NB. in both cases, it's OK to elide the shape/selector line.
+NB. obsolete cellshapedisp =. (": maxcellresultshape__inheritroot) , (fillrequired *. 0 = #resultlevel) # ' (fill)'
 if. #(;DOshapes),cellshapedisp do.
+NB.QP'inheritroot defstring__lastexecutednode]0 defstring__inheritroot]0 defstring]0 cellshapedisp '
   NB. The frames may include values that are beyond the last selection.  This is OK as long as they don't drop down:
   NB. they are just indicating the frames of the successive verbs; after the frame of the last verb we should append
   NB. the shape of the last result cell.  But if unselected nodes drop down, we have no idea what the frames or cellshapes
@@ -3619,10 +3629,10 @@ if. #(;DOshapes),cellshapedisp do.
   DOshapes =: ((#currselections) {. DOshapes) , unselectedframes
   NB. Trim down the number of locales to match the valid selections
   DOshapelocales =: DOshapes (<.&# {. ]) DOshapelocales
-  NB. if we snipped off the last box (containing the special result-cell shape),
+  NB. If we snipped off the last box (containing the special result-cell shape),
   NB. add one to carry the special color and indicate that we don't know the exact frame
   NB. Also, at this point expand DOshapes to a table: first row shapes, second row (optional) selections
-   DOshapes =: ,: DOshapes , (inituframes >&# unselectedframes) # <'?'
+  DOshapes =: ,: DOshapes , (inituframes >&# unselectedframes) # <'?'
 NB. If there are selections, line them up under the boxes in the shape containing selectable values
 NB. (i. e. more than one cell)
   if. #currselections do.
@@ -11029,3 +11039,4 @@ dissect arg
 0!:1 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 )
+   
