@@ -44,6 +44,9 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. Don't show expansion for u/. till result selected.  Other partitions too?
+NB. Have switch to expand title lines to show the full verb.  Trouble in ^: expansion, where title string is passed in & may come from m&v.  Otherwise OK
+NB. Make (u/ on 2) an option
 NB. need to preserve the rank stack - at least the left side - to u of hook
 NB.    dissect '(+ ])/ i. 2 3'   doesn't show 'on 2'
 NB. agreement error on u/ or power should still display the selector, to see which inputs failed
@@ -185,7 +188,7 @@ x =. x, (lpar,       cavn,       rpar, any      ); 1 1 1 0; '8 Paren'
 
 PTpatterns =: >0{"1 x  NB. parse table - patterns
 PTsubj =: >1{"1 x  NB. "subject to" masks
-PTactions =:  2{"1 x  NB. actions
+PTactions =: 2{"1 x  NB. actions
 
 bwand =: 17 b.    NB. bitwise and
 bwor =: 23 b.    NB. bitwise or
@@ -1499,6 +1502,13 @@ y
 
 names =: 4!:1
 
+useexpandednames_dissect_ =: 0
+NB. y is a short string, usually the name of the modifier that creates a verb.
+NB. result is the value to use for titlestring.
+fulltitlestring =: 3 : 0
+if. useexpandednames_dissect_ do. defstring 0 else. y end.
+)
+
 NB. Clone.  Nilad.  Create a new locale.  Chain path through the path of the current object.
 NB. That way, a cloned noun points to the originating noun, which will be the one that gets
 NB. a value after execution, so the value can be reused
@@ -1961,8 +1971,11 @@ NB. Here for verb with invalid frame - an early error
   NB. No early error.  See if selections are possible.  We make a node selectable if it has a selection frame, even if that frame has
   NB. only one possibility (to provide consistent UI), or if the verb is L: or S:, similarly even if only one result is possible; but that too
   NB. comes through the (pseudo)frame
+  NB. BUT: as currently coded, selection only drops down one level at a time; and some of the highlighting code might(?) depends on
+  NB. only one drop per selector (on second thought, how could it? L: can drop more).  So we must flag &.> as selectable, to keep the
+  NB. selection in sync with the selectable.  Kludge.  Should recode selection to add boxing for unselectable &.> nodes following the selected node
 NB. obsolete   selectable =: selframe +.&*&# resultlevel
-  selectable =: *#selframe
+  selectable =: (*#selframe) +. (resultlevel -: 1)
   a: -: selector do.
     SM^:DEBTRAVDOWN'rank-calculus probe'
 NB. There were no selectors.  This means that rank calculus was applied somewhere to give us a shape without
@@ -2053,12 +2066,13 @@ NB. selection is forced, on a previous traversal).  If we get a change of select
 qprintf^:DEBTRAVDOWN'seltype thissel sellevel selections '
     select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 4=autoselect of node with no frame
     case. 2 do.
-NB. Forced selection: if this is the first time we see it, perform the forced selection, propagating it to lower nodes
+      NB. Forced selection: if this is the first time we see it, perform the forced selection, propagating it to lower nodes
 NB. obsolete       if. unforcedselection'' do. propsel (sellevel {. selections) , thissel end.
       if. unforcedselection'' do. makeselection , thissel end.
+      NB. If forced selection, don't apply thissel, because it would result in multiple ranges.  Just keep
+      NB. the selector we had.
     case. 1 do.
-NB. If forced selection, don't apply thissel, because it would result in multiple ranges.  Just keep
-NB. the selector we had.  Here we select for the unforced selection
+    NB. Here we select for the unforced selection
 NB. Calculate the selection interval corresponding to each selected result.  Put result intervals into selection order, then choose one
 NB. But if there is 0 in the frame (meaning we ran on a cell of fills), selection is perfunctory and we will simply
 NB. keep the old selector
@@ -2110,7 +2124,6 @@ NB. recalculate selopshapes now that we have the selection
 end.
 assert. 1 = #$selresult
 NB. Now selresult (a list) contains the unopened and unframed results.  frame contains the frame.
-
 NB. We will calculate a faux
 NB. shape for the result, by looking at the values without opening selresult.  If they have a common
 NB. shape, we will show that shape after the frame.  If the cell collected, and there was no error
@@ -2382,13 +2395,16 @@ NB. in a sequence of u@u@u@v, the lowest u gets its values propagated into the d
 NB. y is result of traverse: dol ,&< locale of new dol.
 NB. Result is the dol ,&< locale to display: usually this locale, but if this locale had no results and the lower
 NB. locale did, the lower locale
-NB. x is 1 (default 0) to add an end-of-cumputation mark to the display stack.  This is a line with empty title and
+NB. 0{x is 1 (default 0) to add an end-of-cumputation mark to the display stack.  This is a line with empty title and
 NB. the current locale
+NB. 1{x is 1 (default 1) to copy dispstealthoperand from u.  This is used so that t@(]@v) will treat the output of ]@v, which has
+NB. nothing since v has already been outed, as a stealth.  But if u@v is a collector that loops back, we have to make sure
+NB. it displays, so we leave the ] in
 DISPINFO =: ;: 'displayhandlesin displayhandleout displaylevrank dispstealthoperand'
 inheritu =: 3 : 0
-0 inheritu y
+0 1 inheritu y
 :
-addcompmark =. x
+'addcompmark copystealth' =. x , (#x) }. 0 1
 loc =. 1 {:: y
 NB.?lintonly loc =. <'dissectobj'
 SM^:DEBINHU 'inheritu: in ' , (>coname'') , ' ' , defstring 0
@@ -2399,7 +2415,9 @@ NB. The display information is always inherited from the last u, which creates i
 NB. The only time we wouldn't inherit is if the error is detected before the last u, example 1.5 u/ y which
 NB. would detect it on u/.  We detect that by the error-point codes
 if. errorcode -.@e. EABORTED,EEXEC do.
-  (DISPINFO) =: ".@(,&'__loc')&.> DISPINFO
+  cnames =. (<:copystealth) }. DISPINFO
+  NB.?lintonly cnames =. DISPINFO
+  (cnames) =: ".@(,&'__loc')&.> cnames
   if. addcompmark do. displaylevrank =: displaylevrank , '';coname'' end.
 end.
 NB. If any node contributing to this display is highlightable, enable the highlight.  The flag
@@ -4182,9 +4200,9 @@ NB. For each request, we take all the
 NB. physical selections before the highlight, and append the highlight
   dol addselecttoDOL physreqandhighlights__inheritroot__loc
 end.
-NB. if there are right-sided operands, highlight them too
 NB.?lintonly y =. <'dissectobj'
 res =. dol joinlayouts__loc ''
+NB. if there are right-sided operands, highlight them too
 if. #right do.
 NB. Install highlights
   addselecttoDOL&>/"1 right
@@ -4784,6 +4802,7 @@ exegesisrankstack =: (0 2$a:)"_
 
 NB. Produce an explanation of the block containing this rank stack.  All participants get their chance to contribute,
 NB. and the results are put at the top of the tooltip.
+NB. x is 1 if this locale appears more than once in this rank stack
 NB. y is the titlestring in the line for this locale
 NB. Result is a table of retcode;text
 exegesisrankoverall =: (0 2$a:)"_
@@ -5008,7 +5027,7 @@ NB. obsolete     vstring =. '.'
         ftext =. ftext , 'Corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
       end.
     end.
-    ftext =. ftext , 'The results ',(1{::ctense),' assembled into' ,LF, (exegesisindefinite exegesisshapex frame) , ' result-cells after completion of the ',cvstring
+    ftext =. ftext , 'The results ',(1{::ctense),' assembled into ' , (exegesisindefinite exegesisshapex frame) , ' result-cells after completion of the ',cvstring
   end.
   res =. res , EXEGESISFRAMEVALID ; ftext
 end.
@@ -5159,7 +5178,7 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
   else.
     tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
     NB. If the display was text, we will pass that text into the overall for the node
-    tt =. tt , exegesisrankoverall displaylevrank
+    tt =. tt , 0 exegesisrankoverall displaylevrank
   end.
   text =. exegesisgrammar tt
 else.
@@ -5203,20 +5222,24 @@ hoverDOshapepos =: 4 : 0
 tt =. ,: EXEGESISTUTORIAL ; hoverDOshapepostutorial
 exp =. x
 if. #r =. (exp{DOshapepospickrects) findpickhits y do.
-  'ix pyx' =. {. r   NB. index of pickrect found
-  if. ix < #DOshapelocales do.
-    l =. ix { DOshapelocales   NB. the locale of the selection
-    NB.?lintonly l =. <'dissectverb'
-    tt =. tt , EXEGESISSHAPESELECTINGVERB ; 'This portion of the frame selects a cell for the verb:',LF,(defstring__l 0),CR
-  else.
-    ttt =. 'The shape of a single result-cell of the verb:',LF,(defstring__lastexecutednode 0),CR
-    select. {: cellshapedisp
-    case. ')' do.
-       ttt =. ttt , LF,'Some cells are padded with fill.',LF
-    case. '?' do.
-       ttt =. ttt , LF,'The shape of a result-cell is unknown.',LF
+  if. #vranks do.
+    'ix pyx' =. {. r   NB. index of pickrect found
+    if. ix < #DOshapelocales do.
+      l =. ix { DOshapelocales   NB. the locale of the selection
+      NB.?lintonly l =. <'dissectverb'
+      tt =. tt , EXEGESISSHAPESELECTINGVERB ; 'This portion of the frame selects a cell for the verb:',LF,(defstring__l 0),CR
+    else.
+      ttt =. 'The shape of a single result-cell of the verb:',LF,(defstring__lastexecutednode 0),CR
+      select. {: cellshapedisp
+      case. ')' do.
+         ttt =. ttt , LF,'Some cells are padded with fill.',LF
+      case. '?' do.
+         ttt =. ttt , LF,'The shape of a result-cell is unknown.',LF
+      end.
+      tt =. tt , EXEGESISSHAPERESULT ; ttt
     end.
-    tt =. tt , EXEGESISSHAPERESULT ; ttt
+  else.
+    tt =. tt , EXEGESISSHAPERESULT ; 'The shape of this noun.',LF
   end.
 end.
 reflowtoscreensize exegesisgrammar tt
@@ -5336,17 +5359,18 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     rshape =. 0{::valueformat
     disp =. disp , EXEGESISDATASHAPE ; 'This is ',(exegesisindefinite exegesisfmtcell rshape;''),'.',LF,LF
 
-    if. 1 < */ rshape do.
+    NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
+    NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
+    NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
+    selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
+
+    NB. Convert the isf to a path.  Put SFOPEN at the end, then cut on SFOPEN and run boxes together.
+    NB. If the last box is empty, remove it
+    selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
+NB. obsolete     if. 1 < */ rshape do.
+    if. #selpath do.
       NB. If there are selection options, display the path
 
-      NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
-      NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
-      NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
-      selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
-
-      NB. Convert the isf to a path.  Put SFOPEN at the end, then cut on SFOPEN and run boxes together.
-      NB. If the last box is empty, remove it
-      selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
       if. 1 >: #selpath do.
         disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (": ; selpath),'.',LF,LF
       else.
@@ -6482,7 +6506,7 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand, as the display and executable form (we may modify the display form later)
 'execform titlestring' =: ,&.> boxopen 0 {:: y
-stealthoperand =: 1 2 3 4 5 6 0 {~ ((;:'][[:'),']';']]';'[[') i. <titlestring  NB. '[[' and ']]' are always-invisible forms
+stealthoperand =: 1 2 3 4 5 6 0 {~ ((;:'][[:'),']';']]';'[[') i. <titlestring  NB. '[' scalar is always-display. '[[' and ']]' are always-invisible forms
 titlestring =: stealthoperand {:: titlestring; ;: '][[:]]['
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
@@ -7460,8 +7484,8 @@ if. 1 = #loc do.
   NB. Normal case: no expansion, or v created a layout; show it
   x =. joinlayoutsl doll
   NB. execute u
-   NB. If v is a stealth operand, rankhistory and highlighting that would have been applied on v will have disappeared,
-   NB. so in that case we transfer them to u
+  NB. If v is a stealth operand, rankhistory and highlighting that would have been applied on v will have disappeared,
+  NB. so in that case we transfer them to u
   inheritu x traverse__uop travops ((dispstealthoperand__vop e. 1 2 5 6) { (TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW),:(TRAVOPSKEEPALL;TRAVOPSPHYSNEW)),(uopval vop);<<selresultshape__vop
 else.
   NB. The expansion did not create a layout, either because it was processed as a forced selection or because it
@@ -8190,6 +8214,7 @@ auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '')
 NB. Traversal up and down the tree.
 NB.
 NB. The result is the DOL, up through the result of u
+uon2ok =: 0:
 traverse =: 4 : 0
 NB. If there is no selection, we simply roll up the display of everything under the name u/ and fall through,
 NB. so that the value will be displayed in the collector.  We do not traverse u in this case.
@@ -8204,7 +8229,13 @@ NB. u, allowing selection of one.  We will pass no layouts to the collector, whi
 
 NB. Create display type:
 traversedowncalcselect y
-if. frame -: ,1 do.
+if. uon2ok  frame -: ,1 do.
+  NB. This is the code for the '(u on 2)' display.  It has been removed because users didn't like it.
+  NB. It also had a bug: in dissect '+/ 8 9'  it led to error selecting in the result, because this locale's frame
+  NB. (1) got included in the frame of the result, which should be an atom.  I think this is because we put this
+  NB. node's chain in the display.
+  NB. If we reinstate this block, it should be enabled by a preference switch, and we should simply
+  NB. replace this block by the display of dyad u
   formatcode =: 0   NB. forced selection
 NB. We have a selection of a u/ of exactly 2 items.  Convert to dyad
    x =. |.^:(<:/ estheights__uop) (, createreference) x   NB. Create reference for dyad u
@@ -8215,11 +8246,11 @@ NB. locale chain to u/, so that the highlights calculated in u/ are displayed
   NB. u is always executed as a dyad.  If this node selected through its forced selection, physreq will have been expanded
   NB. to dyad shape.  But if not, we take the precaution here of forcing it to be a dyad so that its highlights can carry on.
   ures =. x traverse__uop ((<'(/ on 2 items)')&((<_1 0)}))`'' travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);(vopval selopinfovalid);<selopshapes
-  extendinheritchain 1 {:: ures   NB. add u/ to display of u.  This locale cannot be a flag (those occur only in u@v)
+NB.   extendinheritchain 1 {:: ures   NB. add u/ to display of u.  This locale cannot be a flag (those occur only in u@v)
 NB. Indicate that u@v (the final collector) should suppress its u, and use this result as the sole result
   (<0;<1 { ures) 1} ures  NB. 0;locale for suppressed expansion
   
-elseif. (1 < nitems =. {.frame) *. (sellevel < #selections) do.
+elseif. (0 < nitems =. {.frame) *. (sellevel < #selections) do.
 NB. We have a selector, and at least 2 possible selections.  Display the selector, and traverse u
   formatcode =: 1   NB. selector is displayed
 
@@ -8232,8 +8263,8 @@ NB. Mark the ] node with the 'Final' tag to avoid confusion
 NB. Replace the last line of rankhistory with simple '/'
 NB. Traverse u to display it and its descendants, and create a display node for pre-u.  Then u will be inherited into the display
 NB. of the expansion created here, which is part of the result.
-  NB. Append a marker indicating that this node completes the expansion calculation
-  1 inheritu x traverse__uop ((<cop)&((<_1 0)}))`'' travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
+  NB. Append a marker indicating that this node completes the expansion calculation; don't copy dispstealth
+  1 0 inheritu x traverse__uop ((<cop)&((<_1 0)}))`'' travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
 NB. The collector will display the result from the above
 elseif. do.
 NB. If there is no selector yet, the u/ node vanishes, with the display being provided entirely by the collector.
@@ -8245,10 +8276,11 @@ NB. Remove the adornment of the titlestring in the ] node - if any
   titlestring__iop =: 1&{::^:(0<L.) titlestring__iop
   x ;< 1;(coname'');,0   NB. 1;locale;initial selection
 end.
+NB.?lintsaveglobals
 )
 
 exegesisrankstack =: 3 : 0
-if. frame -: ,1 do.
+if. formatcode = 0 do.
   NB. This is the special '/ on 2 items' box.
   ,: EXEGESISRANKSTACKEXPLAIN;'The monadic verb ',LF,(defstring 0),CR,'is applied to an array with 2 items. It is displayed as a dyad, with both x and y arguments coming from the input to the monad.',LF,LF,'This block is a starting point for the dyad.',LF
 else.
@@ -8293,9 +8325,11 @@ NB. Result boxing level will be 1 if the frame is longer than 1
 NB. Nilad.  Result is the selection for this node:  type;selection where type=
 NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only
 getselection =: 3 : 0
-if. frame -: ,1 do. 2 ,&< a:   NB. forced selection if 2 items
-elseif. selectable *. (sellevel < #selections) do. 1 ;<  sellevel { selections
-elseif. do. 0 0
+if. selectable *. (sellevel < #selections) do.
+  if. uon2ok   frame -: ,1 do. 2 ,&< a:   NB. forced selection if 2 items
+  else. 1 ;<  sellevel { selections
+  end.
+else. 0 0
 end.
 )
 
@@ -8367,6 +8401,11 @@ if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
 )
 
+exegesisrankstack =: 3 : 0
+,: EXEGESISRANKSTACKEXPLAIN;'x u/ y applies u between each cell of x and the entirety of y. The full verb is',LF,(defstring 0),CR
+)
+
+
 
 NB. **** ^: ****
 localepower_dissect_ =: primlocale '^:'
@@ -8385,7 +8424,7 @@ NB. the expansion node and selection of powers.  We create a new
 NB. node that looks like a modifier, i. e. u*^:v where * is the expansion.
 NB. The display of the result of u^:v (as an inheritable u) comes from
 NB. this locale; the expansion (as a v) comes from *.
-NB. All we need to pass in is the locale of u and the title string (which may be different from '^:'
+NB. All we need to pass in is the locale of u and the titlestring (which may be different from '^:'
 uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
 NB. Save the display form of the conjunction and the locale of v.
 NB. If the display form of the conjunction is not '^:', we are acting as a surrogate for another function like dyad u&m
@@ -9380,19 +9419,19 @@ if. 0 = y do.
   NB. This block has the expansion result, and possibly the whole thing
   if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
     if. selectable *. sellevel < #selections do.
-      'ctext stext' =. (x{::'calculates';'shows the result of');''
+      'ctext stext' =. (x{::'shows the result of';'calculates');''
     else.
-      'ctext stext' =. (x{::'will calculate';'will show the result of');'after a selection is made.',LF
+      'ctext stext' =. (x{::'will show the result of';'will calculate');'after a selection is made.',LF
     end.
   else.
-    'ctext stext' =. (x{::'will calculate';'will show the result of');'after a single partition has been selected.',LF
+    'ctext stext' =. (x{::'will show the result of';'will calculate');'after a single partition has been selected.',LF
   end.
   if. x do.
     t =. 'This block ',ctext,' the selected partition of',LF,(defstring 0),CR,stext
   else.
     t =. 'This block ',ctext,' the selected partition of',LF,(defstring 0),CR,'including the last verb of the computation. Computation of the partition starts in the block(s) labeled ',cop,' .',LF
   end.
-elseif. y -.@-: cop do.
+elseif. y -: ('Final ' #~ selectable *. sellevel < #selections) , defstring 0 do.
   NB. u/. 
   t =. LF,'This block shows the result of the verb:',LF,(defstring 0),CR,'which ',(exegesispartitiondesc''),'.',LF
   if. #selframe do.
@@ -9400,9 +9439,9 @@ elseif. y -.@-: cop do.
   end.
   if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
     if. selectable *. sellevel < #selections do.
-      t =. t , LF,'To see the calculation of a single partition, select its result',LF
-    else.
       t =. t , LF ,'The computation of the selected partition starts in the block(s) labeled ',cop,' and ends in the block feeding into this one.',LF
+    else.
+      t =. t , LF,'To see the calculation of a single partition, select its result',LF
     end.
   end.
 elseif. do.
@@ -11097,6 +11136,8 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect '(2: crash9_dissect_/\ ])/ 5 + i. 2 3'
 2 dissect '(2: crash9_dissect_/\)/ 5 + i. 2 3'
 2 dissect '(2: +/\ ])/ 5 + i. 2 3'
+2 dissect '(] crash9_dissect_)&.>/ z' [ z =. 1;2 3;4 5 9
+2 dissect '2 1 4 +//.@:(*/) 3 _2 3 1'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
