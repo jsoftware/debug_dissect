@@ -1,4 +1,4 @@
-NB. Copyright (c) Henry H. Rich, 2012-2014.  All rights reserved.
+NB. Copyright (c) Henry H. Rich, 2012-2015.  All rights reserved.
 
 locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops powerexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector nadverb conjunction'
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
@@ -34,6 +34,7 @@ DEBINHU_dissect_ =: 0  NB. display inheritu
 DEBDOL2_dissect_ =: 0  NB. display drawing locales
 DEBDOvn_dissect_ =: 0  NB. display object headers
 DEBPICK_dissect_ =: 0  NB. display pick progress
+DEBEXEGESIS_dissect_ =: 0  NB. display exegetic creation
 DEBTIME_dissect_ =: 0  NB. Show elapsed times
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
@@ -44,19 +45,16 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Don't show expansion for u/. till result selected.  Other partitions too?
-NB. Have switch to expand title lines to show the full verb.  Trouble in ^: expansion, where title string is passed in & may come from m&v.  Otherwise OK
-NB. Make (u/ on 2) an option
+NB. dissect '(<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'  does not show overall for final + verb, just hook
 NB. need to preserve the rank stack - at least the left side - to u of hook
 NB.    dissect '(+ ])/ i. 2 3'   doesn't show 'on 2'
-NB. agreement error on u/ or power should still display the selector, to see which inputs failed
+NB. agreement error on u/ or power or partition should still display the selector, to see which inputs failed
 NB. Launch Jwiki from hotlinks in tooltips
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Support u :: v
 NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
-NB. explain different types of error
 NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name
@@ -274,7 +272,7 @@ NB.?lintsaveglobals
 
 NB. Signal failure of the parse.  y is the error message
 NB. We keep it in the main dissect locale for ease, since it is valid only over the parse
-failparse =: 3 : 0
+failmsg =: 3 : 0
 errormessage_dissect_ =: y
 13!:8 (1)
 )
@@ -423,7 +421,7 @@ end.
 NB.?lintonly usersentence =: ''
 
 NB. If the sentence is empty, abort
-if. 0 = #queue do. failparse 'No sentence' return. end.
+if. 0 = #queue do. failmsg 'No sentence' return. end.
 
 NB. Append an end-of-queue mark to the sentence, and initialize the stack.
 NB. The stack is type;value;tokennums where value is the locale of the object producing the result, for verb and noun;
@@ -477,14 +475,14 @@ NB. and 'verb' for modifier executions
   NB. This becomes an adverb type.  The value is the exeblock, which will be executed later
         stack =. ((subj i. 1){.stack),(adv;exeblock; ; 2 {"1 exeblock),((>:subj i: 1)}. stack)
       elseif. do.
-        failparse 'Invalid sequence: ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj)
+        failmsg 'Invalid sequence: ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj)
         return.
       end.
     case. 7 do.  NB. assignment
   NB. See if we can analyze the assignment.  If so, add to the name table.
   NB. If the assignment is not a noun value, ignore it with a warning
       if. 0 = noun bwand 2 { exetypes do.
-        failparse 'non-noun assignment not supported'
+        failmsg 'non-noun assignment not supported'
         rname =. 0$a:
         return.
   NB. See if it's a simple assignment to a name
@@ -496,14 +494,14 @@ NB. and 'verb' for modifier executions
   NB.?lintonly op_dissectnoun_ =: '' [ rname =. <'dissectnoun'
         if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
           if. '`' = {. lvalue do.
-            failparse 'AR assignment to ' , lvalue , ' not supported'
+            failmsg 'AR assignment to ' , lvalue , ' not supported'
             rname =. 0$a:
             return.
           else.
             rname =. ;: :: (a:$~0:) lvalue
           end.
         else.
-          failparse 'Invalid assignment'
+          failmsg 'Invalid assignment'
           return.
         end.
   NB. If the assignment is to a variable name, we can do nothing with it
@@ -627,7 +625,7 @@ NB. obsolete         stack =. ((subj i. 1){.stack),((subj i: 1)}. stack)
            NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
           ntypeval =. createverb (qend;(#queue)) , (-. LF e. objval)#<objval
         case. do.
-          failparse 'undefined name: ' , qend
+          failmsg 'undefined name: ' , qend
           return.
       end.
       
@@ -647,7 +645,7 @@ NB. Must be a primitive.  Get its type and stack it
         case. 3 do.
           ntypeval =. createverb qend;(#queue)
         case. do.
-          failparse 'invalid type for primitive'
+          failmsg 'invalid type for primitive'
           return.
       end.
       stack =. ntypeval,stack
@@ -658,7 +656,7 @@ NB. Must be a primitive.  Get its type and stack it
 end.   NB. End of loop processing stack.  top of stack is a mark
 NB. verify that the sentence has a valid finish: 1 noun.
 if. 1 1 -.@-: * (noun,mark) bwand >(<1 2;0){stack do.
-  failparse usermodifierencountered {:: 'Sentence did not produce a noun result';'Sentence does not seem to produce a noun result.  Dissect assumes that user modifiers produce verb results.'
+  failmsg usermodifierencountered {:: 'Sentence did not produce a noun result';'Sentence does not seem to produce a noun result.  Dissect assumes that user modifiers produce verb results.'
   return.
 end.
 
@@ -747,7 +745,7 @@ NB. obsolete   if. bwand/ sdt 1} exetypes do.
     case. 3 do.
       ntypeval =. createverb (5!:5 <'exeobj');tokennums
     case. do.
-      failparse 'Invalid type while applying modifier'
+      failmsg 'Invalid type while applying modifier'
       return.
     end.
   else.
@@ -767,6 +765,9 @@ minimumfontsizex =: 2   NB. font size to use in main window
 ttfontsizex =: 0   NB. tooltip font size
 tooltipdelayx =: 2  NB. tooltip delay
 tooltipdetailx =: 1   NB. tooltip detail level
+displaycompmods =: 0   NB. display full modified verb, not just modifier line
+displaystructmods =: 0   NB. display a line for @ @: & etc
+displayautoexpand2 =: 0   NB. Automatically show u/ on 2 items as dyad
 
 
 NB. Following lines must match the menus!
@@ -804,6 +805,9 @@ menupop "&Tooltip Font Size";
 rem ttfont;
 menupopz;
 menu fmshowstealth "Show ][";
+menu fmshowcompmods "Show full compound-names";
+menu fmshowstructmods "Show @ @: etc";
+menu fmautoexpand2 "Show u/ on 2 items as dyad";
 menupopz;
 menupop "&Sizes";
 menupop "Max &Width as % of Screen";
@@ -844,6 +848,9 @@ menupop "&Tooltip Font Size";
 rem ttfont;
 menupopz;
 menu fmshowstealth "Show ][";
+menu fmshowcompmods "Show full compound-names";
+menu fmshowstructmods "Show @ @: etc";
+menu fmautoexpand2 "Show u/ on 2 items as dyad";
 menupopz;
 menupop "&Sizes";
 menupop "Max &Width as % of Screen";
@@ -940,12 +947,14 @@ if. #dissectinstance do.
     NB. Normal return: quiet return, unless user asked for the object id
     ret
   catch.
-    NB. If error during initial display, display the error and clean up
-    smoutput 'error in initial display'
-    smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
-    smoutput 13!:12''
+    if. 0 = #errormessage do.
+    NB. If the error was unexpected, display it
+      smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
+      smoutput 13!:12''
+      errormessage =: 'Error during initial display'
+    end.
     destroy__dissectinstance''
-    'Error in dissect.'
+    errormessage
   end.
 else.   NB. user tried recursive execution
   destroy__dissectinstance''
@@ -960,7 +969,7 @@ NB. If there is only one result, we don't compare
 if. 1 < #y do.
   if. -.@-:/ y do.
 QP^:(NOCLEANUP)'y '
-    'dissect error: internal result does not match the result from the J session!  Aborting.' 13!:8 (1)
+    failmsg 'dissect error: dissected sentence has incorrect result'
     return.
   end.
 end.
@@ -1164,6 +1173,9 @@ NB. obsolete     'fmshowstealth' wdsetcaption displaystealth {:: 'Show ][';'Hide
     'fmshowstealth' wdsetvalue ": displaystealth
   end.
   'fmshowstealth' wdsetenable ": stealthopencountered
+  'fmshowcompmods' wdsetvalue ": displaycompmods
+  'fmshowstructmods' wdsetvalue ": displaystructmods
+  'fmautoexpand2' wdsetvalue ": displayautoexpand2
   
 NB. stealthopencountered =: 0   NB. Set if there is a stealth op on the display
   
@@ -1214,6 +1226,21 @@ dissect_fmshowstealth_button =: 3 : 0
 'fmshowstealth' wdsetvalue ": displaystealth =: -. displaystealth
 NB. The operand is the list of types that should NOT be displayed
 calcallestheights__resultroot displaystealth # 1 2
+dissect_dissectisi_paint 1
+)
+NB. Toggle the state of compmod display
+dissect_fmshowcompmods_button =: 3 : 0
+'fmshowcompmods' wdsetvalue ": displaycompmods_dissect_ =: -. displaycompmods
+dissect_dissectisi_paint 1
+)
+NB. Toggle the state of structmod display
+dissect_fmshowstructmods_button =: 3 : 0
+'fmshowstructmods' wdsetvalue ": displaystructmods_dissect_ =: -. displaystructmods
+dissect_dissectisi_paint 1
+)
+NB. Toggle the state of structmod display
+dissect_fmautoexpand2_button =: 3 : 0
+'fmautoexpand2' wdsetvalue ": displayautoexpand2_dissect_ =: -. displayautoexpand2
 dissect_dissectisi_paint 1
 )
 
@@ -1502,11 +1529,15 @@ y
 
 names =: 4!:1
 
-useexpandednames_dissect_ =: 0
 NB. y is a short string, usually the name of the modifier that creates a verb.
 NB. result is the value to use for titlestring.
-fulltitlestring =: 3 : 0
-if. useexpandednames_dissect_ do. defstring 0 else. y end.
+NB. x indicates the context: (this is structural modifier)
+fulltitlestring =: 4 : 0
+isstruct =. x
+if. isstruct *. -. displaystructmods do. ''
+elseif. displaycompmods do. defstring 0
+elseif. do. y
+end.
 )
 
 NB. Clone.  Nilad.  Create a new locale.  Chain path through the path of the current object.
@@ -1618,7 +1649,6 @@ newsel =. selectiontodisplay y
 NB. If we are changing the selection coming into this node (not the selection here: the user is looking at that),
 NB. clear the scrollpoints so they will be refigured
 if. newsel -.@-:&(sellevel&{.) selections do. scrollpoints =: 0 2$0 end.
-NB.??QP'installselscrollpoints=?scrollpoints defstring]0 '
 NB. If we encounter the highlight node, change it so we know we touched it
 endhighlightnode =: +: endhighlightnode
 selections =: newsel
@@ -3790,18 +3820,15 @@ NB. calculate highlight rectangle tlbr; compare ending position against size of 
     QP^:DEBHLIGHT'defstring]0 edisp'''' shr sellevel selections valueformat selresult fillmask '
     if. #htlbr =. INVALIDRECT -.~ valueformat hlighttotlbr (<0 1) { shr do.
       scrollpoints =: ({. htlbr) *"1 0 (pickrects {~ < a: ; _1 ;~ picknames i. <'DOdatapos') +./@:<"1 {: htlbr
-NB.??QP'setscrollpoints=?scrollpoints $scrollpoints defstring]0 '
     end.
   end.
 end.
 NB. In case a view has been added or deleted, make the number of scrollpoints match the number of views.  Default to 0 if not set above
 scrollpoints =: (#DOsize) {. scrollpoints
-NB.??QP'sizescrollpoints=?scrollpoints $scrollpoints defstring]0 '
 NB. Force the scrollpoint to 0 in any dimension that doesn't have a scrollbar.  That could happen if we have
 NB. a scrolled display and the user enlarges the max datasize; then the scrollbar would be removed with data not
 NB. on the screen
 scrollpoints =: displayscrollbars * scrollpoints
-NB.??QP'dispscrollpoints=?scrollpoints $scrollpoints defstring]0 '
 NB.?lintonly 'DOlabelpos DOshapepos DOstatuspos DOdatapos' =: <2 2 $ 0
 NB.?lintonly 'DOranks DOranklevels DOshapes' =: ($0);($0);<0$a:
 NB.?lintonly 'DOlabelpospickrects DOranklocales' =: (1 0 2 2$0);(0$a:)
@@ -4353,7 +4380,6 @@ drawDOvnall =: 3 : 0
 a: drawDOvnall y
 :
 if. #y do. DOyx =: (#DOsize) {. y ,: EXPLORERYX end.
-NB.??QP'$scrollpoints scrollpoints defstring]0 '
 drawDOvn"1 x { (>:*#winhwnd) {. ((#DOsize) {. (winhwnd__COCREATOR;winhwnd),.(0;1),.(1<#DOsize);0) ,. |: <"_1@> DOyx;DOsize;DOlabelpos;DOshapepos;DOstatuspos;DOdatapos;displayscrollbars;pickrects;scrollpoints
 )
 
@@ -4369,7 +4395,6 @@ NB. Result is pick window (yx,:hw) for the DO
 drawDOvn =: 3 : 0
 NB. These local variables cover the global names inside this routine (kludge).  hwindex is the window number we are displaying
 'hwnd hwindex explorable DOyx DOsize DOlabelpos DOshapepos DOstatuspos DOdatapos displayscrollbars pickrects scrollpoint' =. y
-NB.??QP'$DOsize scrollpoint scrollpoints defstring]0 '
 wd 'psel ' , hwnd
 glsel 'dissectisi'
 'cfmlabel cfmshape cfmstatus cfmdata' =. DOcfm
@@ -4427,7 +4452,6 @@ NB. Calculate the cliprect for the data portion, as tlhw
   cliptlhw =. (DOyx,:0) + DOdatapos   NB. startpos + tlhw rect
 NB. Convert cliprect to tlbr form, and calculate the starting (y,x), which is the window position, plus boxing margin if
 NB. the data is boxed, but all backed up by the scroll offset
-NB.??QP'$cliptlhw $scrollpoint cliptlhw scrollpoint defstring]0 '
   boxyx =. BOXMARGIN +^:(3<#valueformat) ({. cliptlbr =. +/\ cliptlhw) - scrollpoint
 NB. Reduce the cliprect to the data window (including scrollbars, which are drawn last).
   glclipreset''
@@ -4921,7 +4945,11 @@ end.
 NB. Insert fences before each new nonnull topic
 fencewords =. (] ((~:@] *. a: ~: [) #&.> ]) ((LF,'---') , ('---------------------',LF) ,~ ])&.>) tags { exegesislabels
 NB. Run the result together, and delete all but the last LF, and any leading LF, and allow no more than 3 consecutive LF
-(#~   [: -. (LF,LF,LF)&E.) (}.~    LF i.&0@:= ]) ({.~ 2 + LF i:&0@:= ]) ; fencewords ,. 1 {"1 tt
+runtext =. (#~   [: -. (LF,LF,LF)&E.) (}.~    LF i.&0@:= ]) ({.~ 2 + LF i:&0@:= ]) ; fencewords ,. 1 {"1 tt
+NB. Delete the first %al1%, replace others by 'also'
+runtext =. '%al1%' (taketo , takeafter) runtext
+if. #sx =. '%al1%' ss runtext do. runtext =. 'also ' (sx +/ i. #'also ')} runtext end.
+runtext
 )
 
 NB. Explain the frame of the verb.
@@ -5174,11 +5202,13 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     NB. Finally, any explanation for the node in general.  Expansions and Finals are explained here.  Every line contributes.
     NB. We pass the title string into the line as y, and a flag set to 1 if this locale appears twice in the stack, as x.
     NB. We process bottom-up to leave explanations in reverse order, at the top of the tooltip
-    if. ix = <:#DOranklocales do. tt =. tt ,~ ; (4 : '(1 < y +/@:= 1 {"1 displaylevrank) exegesisrankoverall__y&.> x')/"1 |. 2 {."1 displaylevrank end.
+    QP^:DEBEXEGESIS'displaylevrank '
+    if. DEBEXEGESIS do. for_l. 1{"1 displaylevrank do. QP'defstring__l]0 ' end. end.
+    if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (;~"1 0  [: (= +/\) *@#@>@{."1) |. 2 {."1 displaylevrank end.
   else.
     tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
     NB. If the display was text, we will pass that text into the overall for the node
-    tt =. tt , 0 exegesisrankoverall displaylevrank
+    tt =. tt , 0 exegesisrankoverall displaylevrank;1
   end.
   text =. exegesisgrammar tt
 else.
@@ -6575,9 +6605,9 @@ if. execform -.@:-: titlestring do.
   NB. If this is a final node (execform not the same as titlestring), explain the expansion
   NB. We will know that the node has expanded if its initialselection is present
   if. (selectable+sellevel) < #selections do.  NB. expansion selected
-    r =. ,: EXEGESISRANKSTACKEXPLAIN ; 'This block displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'The block feeding into this one shows the details of the computation. Select this result again to hide the details.',LF
+    r =. ,: EXEGESISRANKOVERALLEXPLAIN ; 'This block %al1%displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'The block feeding into this one shows the details of the computation. Select this result again to hide the details.',LF
   else.
-    r =. ,: EXEGESISRANKSTACKEXPLAIN ; 'This block displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'To see the details of the computation, select the result to see a block containing the intermediate results.',LF
+    r =. ,: EXEGESISRANKOVERALLEXPLAIN ; 'This block %al1%displays the final result of the verb:',LF,(> {: <^:(0=L.) titlestring),CR,'To see the details of the computation, select the result to see a block containing the intermediate results.',LF
   end.
 elseif.  '^:_1' -: _4 {. execform do.
   NB. If this was an inverse added by &.&.:, explain that
@@ -6904,8 +6934,9 @@ NB.?lintsaveglobals
 
 NB. Add on a description of the rank line if applicable.  It is, if this is a Final node
 exegesisrankoverall =: 4 : 0
+'endflag linetext' =. y
 if. recursionhere do.
-  if. y -: '' do.
+  if. linetext -: '' do.
     NB. Result has not expanded
     res =. ,: (EXEGESISRANKOVERALLEXPLAIN,0) ; 'This is the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
   else.
@@ -7010,8 +7041,9 @@ NB.?lintsaveglobals
 
 NB. Add on a description of the rank line if applicable.  It is, if this is a Final node
 exegesisrankoverall =: 4 : 0
+'endflag linetext' =. y
 if. recursionhere do.
-  if. y -: '' do.
+  if. linetext -: '' do.
     NB. Result has not expanded
     res =. ,: (EXEGESISRANKOVERALLEXPLAIN,0) ; 'This is the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
   else.
@@ -7379,7 +7411,7 @@ localeat_dissect_ =: 'dissectextendv' primlocale '@@:'
 
 create =: 3 : 0
 if. 0 = bwand/ verb , > (<0 2;0) { y do.
-  failparse 'domain error: operands to ',((<1 1){::y),' must be verbs'
+  failmsg 'domain error: operands to ',((<1 1){::y),' must be verbs'
 end.
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -7476,6 +7508,8 @@ NB. We do not display u: we pass its display information back so that it can eve
 NB. be displayed if it ever reaches a collector.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
+NB. scalar cop is an expansion node - hide that
+if. #$cop do. titlestring =: 1 fulltitlestring cop end.
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. Run v.  The result is dol;code where code is either a locale or an initialselection
@@ -7522,7 +7556,7 @@ if. (,'&') -: (<1 1){::y do.
     create y return.
   end.
 elseif. 0 = bwand/ verb , > (<0 2;0) { y do.
-  failparse 'domain error: operands to ',((<1 1){::y),' must be verbs'
+  failmsg 'domain error: operands to ',((<1 1){::y),' must be verbs'
 end.
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -7632,6 +7666,7 @@ NB. We do not display u: we pass its display information back so that it can eve
 NB. be displayed if it ever reaches a collector.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
+titlestring =: 1 fulltitlestring cop
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 dol =. joinlayoutsl (0 1 # x) traverse__vop1 travops (TRAVOPSKEEPINLIGHT 0 1 2);TRAVOPSPHYSKEEP;(vopval 1 { selopinfovalid);selopshapes;1
@@ -7651,7 +7686,6 @@ newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
-titlestring =: cop    NB. Use the & as the name in the rank stack
 NB. Don't try to remember locale yet - we might clone
 verboperandx =: * verb bwand (<2 0) {:: y   NB. Index of the verb operand
 NB. Set resultissdt for modifier processing
@@ -7739,6 +7773,7 @@ NB. We do not display u: we pass its display information back so that it can eve
 NB. be displayed if it ever reaches a collector.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
+titlestring =: 0 fulltitlestring cop    NB. Use the & as the name in the rank stack
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 dol =. verboperandx |. x , joinlayoutsl NOLAYOUTS traverse__nounop TRAVNOUN
@@ -7787,7 +7822,7 @@ NB. we emulate this with v^"_1@:u&[:]v.  The only thing we do here is defstring,
 
 create =: 3 : 0
 if. 0 = bwand/ verb , > (<0 2;0) { y do.
-  failparse 'domain error: operands to ',((<1 1){::y),' must be verbs'
+  failmsg 'domain error: operands to ',((<1 1){::y),' must be verbs'
 end.
 NB. Handle the special form we recognize: &.>
 if. ('&.' -: (<1 1) {:: y) *. (verb -: (<2 0) {:: y) do.
@@ -7840,7 +7875,6 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
-titlestring =: cop   NB. Since this may show up in the rank stack, have a title string
 NB. Save the type of v
 vtype =: (<2 0) {:: y
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
@@ -7895,6 +7929,7 @@ NB. The result is the DOL, up through the result of u
 NB. We do not create a cell; we just traverse u.  There is no visible indication of the rank operator, except in the
 NB. frames
 traverse =: 4 : 0
+titlestring =: 0 fulltitlestring cop   NB. Since this may show up in the rank stack, have a title string
 NB. for u"n, resolve n internally.  It will not display, but we need a result for getverbrank
 if. vtype bwand noun do. NOLAYOUTS traverse__vop TRAVNOUN end.
 traversedowncalcselect y
@@ -7941,10 +7976,10 @@ primlocale 'L: S:'
 
 create =: 3 : 0
 if. 0 = verb bwand (<0 0) {:: y do.
-  failparse 'domain error: left operand to ',((<1 1){::y),' must be a verb'
+  failmsg 'domain error: left operand to ',((<1 1){::y),' must be a verb'
 end.
 if. 0 = noun bwand (<2 0) {:: y do.
-  failparse 'domain error: right operand to ',((<1 1){::y),' must be a noun'
+  failmsg 'domain error: right operand to ',((<1 1){::y),' must be a noun'
 end.
 create_dissectobj_ f. (<1 2) {  y
 NB. Register this object so we can clean up at end
@@ -8002,7 +8037,7 @@ NB. frames
 traverse =: 4 : 0
 NB. Resolve n internally.  It will not display, but we need a result for getverbrank
 NOLAYOUTS traverse__vop TRAVNOUN
-titlestring =: cop , ": ulevel =: ((#x) {:: '';(,0);1 2) { 3 $&.|. fillmask__vop frameselresult__vop selresult__vop
+titlestring =: 0 fulltitlestring cop , ": ulevel =: ((#x) {:: '';(,0);1 2) { 3 $&.|. fillmask__vop frameselresult__vop selresult__vop
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
@@ -8180,7 +8215,6 @@ NB. @ from forcing out the v; but for the nonce, just make the ] stealth
 if. valence = 2 do.
 NB. Dyad u/  unset what we set for the monad
   stealthoperand__iop =: 5   NB. Hide the ]
-  titlestring =: cop   NB. This is the rank-stack version of /
 end.
 separatevalences''
 coname''
@@ -8214,7 +8248,6 @@ auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '')
 NB. Traversal up and down the tree.
 NB.
 NB. The result is the DOL, up through the result of u
-uon2ok =: 0:
 traverse =: 4 : 0
 NB. If there is no selection, we simply roll up the display of everything under the name u/ and fall through,
 NB. so that the value will be displayed in the collector.  We do not traverse u in this case.
@@ -8229,7 +8262,7 @@ NB. u, allowing selection of one.  We will pass no layouts to the collector, whi
 
 NB. Create display type:
 traversedowncalcselect y
-if. uon2ok  frame -: ,1 do.
+if. displayautoexpand2 *. frame -: ,1 do.
   NB. This is the code for the '(u on 2)' display.  It has been removed because users didn't like it.
   NB. It also had a bug: in dissect '+/ 8 9'  it led to error selecting in the result, because this locale's frame
   NB. (1) got included in the frame of the result, which should be an atom.  I think this is because we put this
@@ -8245,7 +8278,8 @@ NB. Don't inherit u into u/, because u/ (the collector) has a frame, while u is 
 NB. locale chain to u/, so that the highlights calculated in u/ are displayed
   NB. u is always executed as a dyad.  If this node selected through its forced selection, physreq will have been expanded
   NB. to dyad shape.  But if not, we take the precaution here of forcing it to be a dyad so that its highlights can carry on.
-  ures =. x traverse__uop ((<'(/ on 2 items)')&((<_1 0)}))`'' travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);(vopval selopinfovalid);<selopshapes
+NB. obsolete   ures =. x traverse__uop ((<'(/ on 2 items)')&((<_1 0)}))`'' travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);(vopval selopinfovalid);<selopshapes
+  ures =. x traverse__uop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);(vopval selopinfovalid);<selopshapes
 NB.   extendinheritchain 1 {:: ures   NB. add u/ to display of u.  This locale cannot be a flag (those occur only in u@v)
 NB. Indicate that u@v (the final collector) should suppress its u, and use this result as the sole result
   (<0;<1 { ures) 1} ures  NB. 0;locale for suppressed expansion
@@ -8286,9 +8320,9 @@ if. formatcode = 0 do.
 else.
   select. y
   case. 1 0 do.  NB. All computation in this block
-     ,: EXEGESISRANKSTACKEXPLAIN;'This block shows the intermediate results of the verb:',LF,(defstring 0),CR
+     ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the intermediate results of the verb:',LF,(defstring 0),CR
   case. 0 0 do.  NB. Computation ends in another block
-     ,: EXEGESISRANKSTACKEXPLAIN;'This block starts the computation of an intermediate result of the verb:',LF,(defstring 0),CR
+     ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the computation of an intermediate result of the verb:',LF,(defstring 0),CR
   case. do.
      0 2$a:  NB. leave it for the overall text
   end.
@@ -8296,12 +8330,13 @@ end.
 )
 
 exegesisrankoverall =: 4 : 0
-if. 0 = #y do.
+'endflag linetext' =. y
+if. 0 = #linetext do.
   NB. This is the 'end-of-computation' node.  Put out the description
   if. x do.  NB. start and end in same stack
-    t =. 'This block calculates and displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR
+    t =. 'This block %al1%calculates and displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR
   else.
-    t =. 'This block displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation. The calculation of the result started in the block(s) marked with ''/'' .',LF
+    t =. 'This block %al1%displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation. The calculation of the result started in the block(s) marked with ''/'' .',LF
   end.
   t =. t , 'The results are displayed as a list of boxes, where the contents of a box contains one intermediate result. '
   t =. t , 'The order of results matches the order of items of y, which is the reverse of the executed order. In other words, the first result in the list is the final result of the verb. '
@@ -8326,7 +8361,7 @@ NB. Nilad.  Result is the selection for this node:  type;selection where type=
 NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only
 getselection =: 3 : 0
 if. selectable *. (sellevel < #selections) do.
-  if. uon2ok   frame -: ,1 do. 2 ,&< a:   NB. forced selection if 2 items
+  if. displayautoexpand2 *. frame -: ,1 do. 2 ,&< a:   NB. forced selection if 2 items
   else. 1 ;<  sellevel { selections
   end.
 else. 0 0
@@ -8396,6 +8431,7 @@ NB. Traversal up and down the tree.
 NB.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
+titlestring =: 0 fulltitlestring cop   NB. This is the rank-stack version of /
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
@@ -8412,7 +8448,7 @@ localepower_dissect_ =: primlocale '^:'
 
 create =: 3 : 0
 if. 0 = verb bwand (<0 0) {:: y do.
-  failparse 'domain error: left operand to ',((<1 1){::y),' must be a verb'
+  failmsg 'domain error: left operand to ',((<1 1){::y),' must be a verb'
 end.
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -8750,7 +8786,7 @@ create_dissectobj_ f. '';$0   NB. no string, no tokens
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the locale of u
-'uop titlestring' =: y
+'uop cop' =: y
 NB.?lintonly uop =: <'dissectverb'
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
@@ -8779,7 +8815,7 @@ estheights =: estheights__uop combineheights ,1     NB. add 1 for expansion node
 
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
-enparen^:(y=3) (defstring__uop 2) , titlestring
+enparen^:(y=3) (defstring__uop 2) , cop
 )
 
 NB. return string form of operands, including instrumentation within u but not within inverse of u
@@ -8808,6 +8844,7 @@ traverse =: 4 : 0
 'traverseu skeletalu noexpansion vis1 selectedpower visnoun travy' =: y   NB. Unpack the added operands, info about v
 assert. (6 0$0) -: $@".@> ;: 'traverseu skeletalu noexpansion vis1 selectedpower visnoun'
 QP^:DEBTRAVDOWN'traverseu skeletalu noexpansion vis1 selectedpower visnoun '
+titlestring =: 0 fulltitlestring cop
 traversedowncalcselect travy
 if. errorcode e. EEARLYERROR do. (earlyerror x);0 return. end.
 
@@ -8893,20 +8930,21 @@ NB.?lintsaveglobals
 exegesisrankstack =: 3 : 0
 select. y
 case. 1 0 do.  NB. All computation in this block
-   ,: EXEGESISRANKSTACKEXPLAIN;'This block shows the intermediate results of the verb:',LF,(defstring 0),CR
+   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the intermediate results of the verb:',LF,(defstring 0),CR
 case. 0 0 do.  NB. Computation ends in another block
-   ,: EXEGESISRANKSTACKEXPLAIN;'This block starts the computation of an intermediate result of the verb:',LF,(defstring 0),CR
+   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the computation of an intermediate result of the verb:',LF,(defstring 0),CR
 case. do.
    0 2$a:  NB. leave it for the overall text
 end.
 )
 exegesisrankoverall =: 4 : 0
-if. 0 = #y do.
+'endflag linetext' =. y
+if. 0 = #linetext do.
   NB. Display overall explanation only on the end-of-computation marker
   if. x do.  NB. start and end in same block
-    t =. 'This block selects from the powers of',LF,(defstring 0),CR,'and displays the last verb of the computation. Computation of the power starts in the block(s) labeled ^: .',LF
+    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'and displays the last verb of the computation. Computation of the power starts in the block(s) labeled ^: .',LF
   else.
-    t =. 'This block selects from the powers of',LF,(defstring 0),CR,'and displays the selected result.'
+    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'and displays the selected result.'
   end.
   if. selectedpower = 0 do.
     t =. t , 'In this case, the power being computed is 0, so there is no computation to view.',LF
@@ -9349,7 +9387,6 @@ newobj__COCREATOR coname''
 NB. Save the operands - locale of the verb, and string form of the adv
 'uop cop' =: 1 {"1 y
 NB.?lintonly uop =: <'dissectverb' [ cop =: ''
-titlestring =: cop
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
 NB. Create a selector, which will be the first entry point for this sequence
@@ -9379,43 +9416,51 @@ NB.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
 yop =: < (_1 3;0 0) {:: x  NB. locale of y operand, needed for u;.1
+titlestring =: 0 fulltitlestring cop
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
-NB. Create a display for u (as a v-type).  It may or may not have detail, depending on whether anything was selected here
-NB. u is always a monad, so we pass in only the last argument
-NB. To assist tooltipping, we insert a heavy rank line for this locale at the end of the rankstack.
-NB. This will not show, but it will mark the node that performs the computation of the selected node (if there is one)
-rankhistory =: rankhistory , 0 ; (coname'')
-udol =. joinlayoutsl (_1 {. x) traverse__uop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE ,_2);(vopval selopinfovalid);selopshapes;_1
-
+if. *./ selopinfovalid do.
+  NB. Create a display for u (as a v-type).  It may or may not have detail, depending on whether anything was selected here
+  NB. u is always a monad, so we pass in only the last argument
+  NB. To assist tooltipping, we insert a heavy rank line for this locale at the end of the rankstack.
+  NB. This will not show, but it will mark the node that performs the computation of the selected node (if there is one)
+NB. obsolete   rankhistory =: rankhistory , 0 ; (coname'')
+  rankhistory =: rankhistory , '' ; (coname'')
+  udol =. joinlayoutsl (_1 {. x) traverse__uop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE ,_2);(vopval selopinfovalid);selopshapes;_1
+  rankhistory =: 0 $ rankhistory
+  x =. ({.udol) _1} x
+end.
 NB. Create a display for this node, as if it were a u-type verb.  This display will be inherited into the selector.
 NB. We initialize the rank stack, and it is that that will give the label for this display.
 NB. The /. node always displays the entire partitioning verb, with 'Final' prepended when the /. is selectable
 NB. and there has been a selection.
 NB. obsolete rankstack =. ,: (('Final ' #~ selectable *. sellevel < #selections) , defstring 0) ; <"0 sellevel , |. vranks
-rankstack =. ,: (('Final ' #~ selectable *. sellevel < #selections) , defstring 0) ; (coname'') , <"0  |. vranks
+rankstack =. rankhistory , (('Final ' #~ selectable *. sellevel < #selections) , defstring 0) ; (coname'') , <"0  |. vranks
 'displayhandlesin displayhandleout displaylevrank' =: (valence {:: ($0);(,0);_0.3 0.3);1;<rankstack
 NB. The highlights for x (if any) are preserved, but the ones for y are reset, since there is no selection from u/. into u
 physreqandhighlights =: (<EMPTYPRH) _1} physreqandhighlights
 NB. The result of u becomes the last argument to the display of this node, along with the original x operand if
 NB. there was one.
-((_1 }. x) ,  udol) ,&< coname''
+NB. obsolete ((_1 }. x) ,  udol) ,&< coname''
+x ,&< coname''
 )
 
 exegesisrankstack =: 3 : 0
 select. y
 case. 1 0 do.  NB. All computation in this block
-   ,: EXEGESISRANKSTACKPARTITIONSTART;'This block calculates the selected partition of the verb:',LF,(defstring 0),CR
+   ,: EXEGESISRANKSTACKPARTITIONSTART;'This block %al1%calculates the selected partition of the verb:',LF,(defstring 0),CR
 case. 0 0 do.  NB. Computation ends in another block
-   ,: EXEGESISRANKSTACKPARTITIONSTART;'This block starts the calculation of the selected partition of the verb:',LF,(defstring 0),CR
+   ,: EXEGESISRANKSTACKPARTITIONSTART;'This block %al1%starts the calculation of the selected partition of the verb:',LF,(defstring 0),CR
 case. do.
    0 2$a:  NB. leave it for the overall text
 end.
 )
 
 exegesisrankoverall =: 4 : 0
+'endflag linetext' =. y
 NB. This block is pointed to 3 times: u/. in the selector, 0 in the expansion, and /. at the start of computation
-if. 0 = y do.
+NB. obsolete if. 0 = linetext do.
+if. 0 = #linetext do.
   NB. This block has the expansion result, and possibly the whole thing
   if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
     if. selectable *. sellevel < #selections do.
@@ -9427,13 +9472,13 @@ if. 0 = y do.
     'ctext stext' =. (x{::'will show the result of';'will calculate');'after a single partition has been selected.',LF
   end.
   if. x do.
-    t =. 'This block ',ctext,' the selected partition of',LF,(defstring 0),CR,stext
+    t =. 'This block %al1%',ctext,' the selected partition of',LF,(defstring 0),CR,stext
   else.
-    t =. 'This block ',ctext,' the selected partition of',LF,(defstring 0),CR,'including the last verb of the computation. Computation of the partition starts in the block(s) labeled ',cop,' .',LF
+    t =. 'This block %al1%',ctext,' the selected partition of',LF,(defstring 0),CR,'including the last verb of the computation. Computation of the partition starts in the block(s) labeled ',cop,' .',LF
   end.
-elseif. y -: ('Final ' #~ selectable *. sellevel < #selections) , defstring 0 do.
+elseif. endflag do.
   NB. u/. 
-  t =. LF,'This block shows the result of the verb:',LF,(defstring 0),CR,'which ',(exegesispartitiondesc''),'.',LF
+  t =. LF,'This block %al1%shows the result of the verb:',LF,(defstring 0),CR,'which ',(exegesispartitiondesc''),'.',LF
   if. #selframe do.
     t =. t , LF,'The results of execution on the partitions are assembled into ',(exegesisindefinite exegesisfmtcell selframe;''),' of result-cells.',LF
   end.
@@ -9462,7 +9507,7 @@ if. noun bwand (<0 0) {:: y do.
   create y
   return.
 elseif. 0 = noun bwand (<2 0) {:: y do.
-  failparse 'domain error: right operand to ',((<1 1){::y),' must be a noun'
+  failmsg 'domain error: right operand to ',((<1 1){::y),' must be a noun'
 end.
 create_dissectobj_ f. (<1 2) {  y
 NB. Register this object so we can clean up at end
@@ -9499,7 +9544,7 @@ NB. then we complete the traversal using the adverb form
 traverse =: 4 : 0
 NB. Traverse n.  It's a noun, and so must produce a single result
 NOLAYOUTS traverse__vop TRAVNOUN
-titlestring =: cop,":partitionn =: >{.logvalues__vop
+titlestring =: 0 fulltitlestring cop,":partitionn =: >{.logvalues__vop
 x traverse_dissectpartitionadverb_ f. y
 )
 
@@ -10001,7 +10046,7 @@ NB.?lintonly uop =: <'dissectobj'
 NB. Switch to general verb if v is a noun, or if u is not a noun, or if u is not understood as a gerund
 if. (noun bwand (<2 0) {:: y) +. 0 = #ulocales =: querygerund__uop '' do.
   if. 0 = noun bwand (<0 0) {:: y do.
-    failparse 'domain error: verb@.v'
+    failmsg 'domain error: verb@.v'
   end.
   changeobjtypeto localedefault
   create y
@@ -10011,7 +10056,6 @@ NB. It is m@.v with m a gerund.  ulocales is the list of locales in the gerund
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
-titlestring =: cop  NB. make this show up on rank stack
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
 NB. Ignore ]@ etc.
 NB. Set resultissdt for modifier processing
@@ -10061,6 +10105,7 @@ proplocales =: 3 : 0
 NB. Traversal up and down the tree.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
+titlestring =: 0 fulltitlestring cop  NB. make this show up on rank stack
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. Create references for the input(s) and assign the correct one to u and v.
@@ -10116,19 +10161,20 @@ NB.?lintsaveglobals
 exegesisrankstack =: 3 : 0
 select. y
 case. 1 0 do.  NB. All computation in this block
-   ,: EXEGESISRANKSTACKEXPLAIN;'This block shows the calculation of the selected gerund.',LF
+   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the calculation of the selected gerund.',LF
 case. 0 0 do.  NB. Computation ends in another block
-   ,: EXEGESISRANKSTACKEXPLAIN;'This block starts the calculation of the selected gerund.',LF
+   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the calculation of the selected gerund.',LF
 case. do.
    0 2$a:  NB. leave it for the overall text
 end.
 )
 
 exegesisrankoverall =: 4 : 0
+'endflag linetext' =. y
 if. cop -: ,'@.' do.
-  t =. 'This block starts the calculation of the selected gerund.',LF
+  t =. 'This block %al1%starts the calculation of the selected gerund.',LF
 else. 
-  t =. 'This block displays the result of executing',LF,(defstring 0),CR,'The selection of executed verb comes in from the right.',LF
+  t =. 'This block %al1%displays the result of executing',LF,(defstring 0),CR,'The selection of executed verb comes in from the right.',LF
   if. (errorcode__vop <: EOK) do.
     if. *./ selopinfovalid do.
       t =. LF,'The calculation for the selected result is shown ending in the block feeding into this one.',LF,'Computation starts in the block(s) labeled @. .'
@@ -10159,7 +10205,7 @@ destroy_dissectverb_ f. ''
 
 setvalence =: 3 : 0
 if. executingvalence__COCREATOR ~: #y do.
-  failparse 'dissect restriction: recursion must have the same valence as the original execution'
+  failmsg 'dissect restriction: recursion must have the same valence as the original execution'
 end.
 setvalence_dissectverb_ f. y
 )
@@ -10173,7 +10219,7 @@ NB.?lintsaveglobals
 )
 
 exegesisrankstack =: 3 : 0
-,: EXEGESISRANKSTACKEXPLAIN;'This block shows the result of a recursion. Select the result to see results of all recursion levels and examine any of them.',LF
+,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the result of a recursion. Select the result to see results of all recursion levels and examine any of them.',LF
 )
 
 getselection =: 3 : 0
@@ -10332,8 +10378,12 @@ NB. to start the physreqs with the values that they would have had to start uv.
 )
 
 exegesisrankoverall =: 4 : 0
-t =. 'This block shows the result of the fork:',LF,(defstring 0),CR
-,: EXEGESISRANKOVERALLEXPLAIN;t
+'endflag linetext' =. y
+if. endflag do.
+  t =. 'This block %al1%shows the result of the fork:',LF,(defstring 0),CR
+  ,: EXEGESISRANKOVERALLEXPLAIN;t
+else. 0 2$a:
+end.
 )
 
 NB. **** hook ****
@@ -10421,8 +10471,12 @@ NB. obsolete 1 inheritu (dol ,~ 0 {  x) traverse__uop travops (TRAVOPSSTARTINHEA
 )
 
 exegesisrankoverall =: 4 : 0
-t =. 'This block shows the result of the hook:',LF,(defstring 0),CR
-,: EXEGESISRANKOVERALLEXPLAIN;t
+'endflag linetext' =. y
+if. endflag do.
+  t =. 'This block %al1%shows the result of the hook:',LF,(defstring 0),CR
+  ,: EXEGESISRANKOVERALLEXPLAIN;t
+else. 0 2$a:
+end.
 )
 
 
@@ -10460,8 +10514,6 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop' =: 1 {"1 y
-NB. Set the title string to the actual characters the user used
-titlestring =: ; (<:tokensource) { ;: usersentence__COCREATOR   NB. decr tokensource to accoutn for MARK added
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
@@ -10509,6 +10561,8 @@ NB. The result is the DOL, up through the result of u
 NB. We do not create a cell; we just traverse u.  There is no visible indication of the rank operator, except in the
 NB. frames
 traverse =: 4 : 0
+NB. Set the title string to the actual characters the user used
+titlestring =: 0 fulltitlestring ; (<:tokensource) { ;: usersentence__COCREATOR   NB. decr tokensource to accoutn for MARK added
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
@@ -11138,6 +11192,7 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect '(2: +/\ ])/ 5 + i. 2 3'
 2 dissect '(] crash9_dissect_)&.>/ z' [ z =. 1;2 3;4 5 9
 2 dissect '2 1 4 +//.@:(*/) 3 _2 3 1'
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 't =. t + 2' [ t =. 0
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
