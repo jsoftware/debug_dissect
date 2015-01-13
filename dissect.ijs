@@ -45,6 +45,7 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. Use italics or the like to distinguish verb-starts from verb-ends
 NB. dissect '(<1 23 4) (+&.> 2&(>./\)&.>)~ (<2 3)'  does not show overall for final + verb, just hook
 NB. need to preserve the rank stack - at least the left side - to u of hook
 NB.    dissect '(+ ])/ i. 2 3'   doesn't show 'on 2'
@@ -3369,7 +3370,49 @@ NB. For the displayed sentence
 satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 SATZFONT;SATZFONTSIZE;SATZMARGIN
 satzcfm =: satzcfm , SATZCOLOR;SATZTEXTCOLOR;SATZFONT;SATZFONTSIZE;SATZMARGIN
 
+NB. font pen margin tcolor bcolor
+FONTSFORCLASSRANKVERB =: 2 $ ,: VERBFONT;'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR
+SIZESFORCLASSRANKVERB =: 1 1.6
 
+COLORSFORCLASSSHAPE =: (SHAPETEXTCOLORS ;"1 SHAPECOLORS) , RESULTSHAPETEXTCOLOR;RESULTSHAPECOLOR
+
+NB. Calculate a font from a class and selection
+NB. x is the class of the characters:
+NB.  0=verb in rank stack
+NB.  1=shape/selection (in rank stack or in shape/sel line
+NB. y is selection[,decoration]
+NB. selection is a number that is meaningful to the class
+NB. decoration is a choice from below
+NB. Result is the font spec for use by sizetext/drawtext:
+NB.   (background color[;pen color,width]);text color;text font;text size;yx margin around text (scalar or yx or 2 2 $ tlbr);(split LF-delimited texts into lines (kludge))
+NB.   background color may be RGBA, where A is the stipple pattern: 0=none, 1=downleft, 2=downright, 3=both
+'FONTCLASSRANKVERB FONTCLASSSHAPE' =: i. 2
+FONTDECORATIONSTIPPLE =: 3
+FONTDECORATIONITALIC =: 4
+FONTDECORATIONBOLD =: 8
+FONTDECORATIONSIZE =: 16bf0   NB. 0=no adj, 4-bit signed field, each representing 10%
+cfmforclass =: 4 : 0"0 1
+'font pen margin tcolor bcolor size' =. cfmforclassrankverb`cfmforclassshape@.x {. y
+if. 1 < #y do.
+  'sizeadj bolditalic stipple' =. 16 4 4 #: 128 + 1 { y
+  font =. font , bolditalic {:: '';' bold';' italic';' bold italic'
+  size =. <.&.-: 1 + size * 0.2 0.1 p. sizeadj
+  bcolor =. bcolor bwor 24 bwlsl stipple
+end.
+if. #pen do. bcolor =. bcolor;pen end.
+bcolor;tcolor;font;size;margin
+)
+
+NB. The center column of the rank stack.
+NB. Selection is 0 (normal) or 1 (for the verb at the bottom) 
+cfmforclassrankverb =: 3 : 0
+(VERBFONT;'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR) , < <.&.-: 1 + (y { SIZESFORCLASSRANKVERB) * minimumfontsizex { FONTSIZECHOICES
+)
+NB. shape/selection, and shapes in the rank stack
+NB. y is sellevel if positive, or negative for special types (_1 = result-cell)
+cfmforclassshape =: 3 : 0
+(SHAPEFONT;'';SHAPEMARGIN),((y <. <:#STATUSCOLOR) { COLORSFORCLASSSHAPE) , < minimumfontsizex { FONTSIZECHOICES
+)
 
 NB. *********** create DOs
 cocurrent 'dissectobj'
@@ -3632,9 +3675,11 @@ NB. Remove lines with no display symbol
   nonemptylevrank =. 2 ({."1 ,. |.@:}."1) (#~   ('';0) -.@:e.~ {."1) displaylevrank
   rolledlevrank =. <./@,&.>/\. &.(,&(<_)) &.|. 2 }."1 nonemptylevrank
   newrankmsk =. 1:"_1 rolledlevrank =. (a: = 2 }."1 nonemptylevrank)} rolledlevrank ,: <' '
-  DOranklevels =. (<:#cfmshape) <. (3 : 'sellevel__y'"0) DOranklocales =: newrankmsk # 1 {"1 nonemptylevrank
+NB. obsolete   DOranklevels =. (<:#cfmshape) <. (3 : 'sellevel__y'"0) DOranklocales =: newrankmsk # 1 {"1 nonemptylevrank
+  DOranklevels =. (3 : 'sellevel__y'"0) DOranklocales =: newrankmsk # 1 {"1 nonemptylevrank
   DOranks =: (":&.> newrankmsk # rolledlevrank) (}:"1@[ ,. ] ,. {:"1@[) newrankmsk # {."1 nonemptylevrank
-  DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) cfmlabel ,:"1 (DOranklevels { cfmshape)
+NB. obsolete   DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) cfmlabel ,:"1 (DOranklevels { cfmshape)
+  DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) (FONTCLASSRANKVERB cfmforclass"0 (1) {.~ -#DOranklevels) ,:"1 (FONTCLASSSHAPE cfmforclass"0 DOranklevels)
   rankrects =. DOrankcfm sizetext"1 0 DOranks
 NB. Make the left rank left-justified, the right rank right justified.  Align each stack
 NB. vertically({."1 displaylevrank) ({."1@] ,. [ ,. }."1@])
@@ -3724,7 +3769,9 @@ end.
 if. #DOshapes do.
   NB. Convert the shapes to characters, and get the pixel extent of each string.  Start at the selection level
   NB. of this object
-  shapeext =. ((sellevel__inheritedtailforselectinfo + i. {:$DOshapes) ((<. <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes
+  DOshapecfm =: FONTCLASSSHAPE cfmforclass"0 (_1) ,~ sellevel__inheritedtailforselectinfo + i. <:{:$DOshapes
+NB. obsolete   shapeext =. ((sellevel__inheritedtailforselectinfo + i. {:$DOshapes) ((<. <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes
+  shapeext =. DOshapecfm sizetext"1 0"_ 1 DOshapes
   NB. Create a rect object for the shape/selections
   shapedesc =. (<ALIGNCENTER) addalignmentgroup (<ALIGNSPREAD)&addalignmentgroup@,."1@|: ALIGNSPREAD addalignmentrect shapeext
 else.
@@ -4433,9 +4480,11 @@ NB. Draw the shapes/selections.  Start at the selection level of this object
 NB. get the text,position for the shapes/selections, which are a rank-2 array
   shapeseltext =. DOshapes ,"0 actyx2&+&.> |: (,"3) 0 _1 |: > DOshapepos
 NB. draw frame/selections, which are all but the last column
-  ((sellevel__inheritedtailforselectinfo + i. <: {:$DOshapes) ((<. #) { ]) cfmshape) drawtext"2^:(*@#@[) }:"2 shapeseltext
+NB. obsolete   ((sellevel__inheritedtailforselectinfo + i. <: {:$DOshapes) ((<. #) { ]) cfmshape) drawtext"2^:(*@#@[) }:"2 shapeseltext
+  (}: DOshapecfm) drawtext"2^:(*@#@[) }:"2 shapeseltext
 NB. Draw the result-cell shape, the last column of the first row
-  RESULTSHAPECFM drawtext (<0 _1) { shapeseltext
+  ({: DOshapecfm) drawtext (<0 _1) { shapeseltext
+NB. obsolete   RESULTSHAPECFM drawtext (<0 _1) { shapeseltext
 end.
 
 NB. draw the status string, if any
@@ -4985,9 +5034,9 @@ elseif. (0 = #inputselopshapes) +. (0 = #selector) do.
 elseif. _ *./@:= vranks do.
   NB. If verb has infinite rank, just say so here.  We don't use the frame because u/ etc has pseudoframe and we want to 
   NB. report NOFRAME for them
-  res =. ,: EXEGESISFRAMENOFRAME;'Verb has infinite rank and always applies to its entire argument',((2=#inputselopshapes)#'s'),'.',LF    NB. If only 1 cell, can't analyze
+  res =. ,: EXEGESISFRAMENOFRAME;'This verb has infinite rank and always applies to its entire argument',((2=#inputselopshapes)#'s'),'.',LF    NB. If only 1 cell, can't analyze
 elseif. 0 = #frame do.
-  res =. ,: EXEGESISFRAMENOFRAME;'Verb operates on a single cell',((2=#inputselopshapes)#' of each argument'),'.',LF    NB. If only 1 cell, can't analyze
+  res =. ,: EXEGESISFRAMENOFRAME;'This verb is operating on a single cell',((2=#inputselopshapes)#' of each argument'),'.',LF    NB. If only 1 cell, can't analyze
 elseif. do.
   NB. There is a frame.  Describe it
   shapes =. $^:(0<L.)&.> inputselopshapes
@@ -5031,12 +5080,21 @@ NB. obsolete     vstring =. '.'
     ftext =. ftext , 'The frame, ' , (":frame) , ' ' , (0{::ctense) , ' prepended to the result of the ',cvstring
   case. do.
     if. 1 = #vranks do.
-      ftext =. 'The argument is broken into ' , (exegesisfmtframe (0{::shapes);frame) , (exegesisfmtcell (0{::shapes);frame) , ', which will be supplied one by one to the ',vstring,'.',LF
+      ftext =. 'The frame is ',(":frame),'.',LF
+      ftext =. ftext , 'The argument is broken into ' , (exegesisfmtframe (0{::shapes);frame) , (exegesisfmtcell (0{::shapes);frame) , ', which will be supplied one by one to the ',vstring,'.',LF
     else.
+      select. *@#@> frames
+      case. 1 0 do.
+        ftext =. 'The frame of x is ',(": 0 {:: frames),'.',LF
+      case. 0 1 do.
+        ftext =. 'The frame of y is ',(": 1 {:: frames),'.',LF
+      case. do.
+        ftext =. 'The frame of x is ',(": 0 {:: frames),' and the frame of y is ',(": 1 {:: frames),'.',LF
+      end.
       if. # 0 {:: frames do.
-        ftext =. 'x is broken into ' , (exegesisfmtframe shapes ,&(0&{) frames) , (exegesisfmtcell shapes ,&(0&{) frames),'.',LF
+        ftext =. ftext , 'x is broken into ' , (exegesisfmtframe shapes ,&(0&{) frames) , (exegesisfmtcell shapes ,&(0&{) frames),'.',LF
       else.
-        ftext =. 'x is a single cell (',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),') that will be replicated for use with each cell of y.',LF
+        ftext =. ftext , 'x is a single cell (',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),') that will be replicated for use with each cell of y.',LF
       end.
       if. # 1 {:: frames do.
         ftext =. ftext , 'y is broken into ' , (exegesisfmtframe shapes ,&(1&{) frames) , (exegesisfmtcell shapes ,&(1&{) frames),'.',LF
@@ -5203,7 +5261,7 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     NB. We pass the title string into the line as y, and a flag set to 1 if this locale appears twice in the stack, as x.
     NB. We process bottom-up to leave explanations in reverse order, at the top of the tooltip
     QP^:DEBEXEGESIS'displaylevrank '
-    if. DEBEXEGESIS do. for_l. 1{"1 displaylevrank do. QP'defstring__l]0 ' end. end.
+    if. DEBEXEGESIS do. for_l. 1{"1 displaylevrank do. QP 'defstring__l]0 ' end. end.
     if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (;~"1 0  [: (= +/\) *@#@>@{."1) |. 2 {."1 displaylevrank end.
   else.
     tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
