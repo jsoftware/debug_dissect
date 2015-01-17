@@ -1083,7 +1083,8 @@ if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh '
   if. initfromsess do. xywh =. 1 0 3 2 { (getsessionyx'') , +/ 2 2 $ cyxhw
   else. xywh =. (0 ". wdqform'') >. 0 0 , |. +/ 2 2 $ cyxhw
   end.
-  if. IFQT do. wdpmove ": xywh else. wd 'pas 6 6' end.  NB. J6 ignores pmove; JQt ignores pas
+  wdpmove ": xywh 
+  if. -. IFQT do. wd 'pas 6 6' end.  NB. JQt ignores pas
 NB. obsolete   if. IFQT do.
 NB. obsolete   else.
 NB. obsolete     wd 'pas 1 1'
