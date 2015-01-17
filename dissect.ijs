@@ -45,14 +45,14 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Use italics or the like to distinguish verb-starts from verb-ends
-NB. Launch Jwiki from hotlinks in tooltips
-NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Support u :: v
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
 NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
+NB. Use italics or the like to distinguish verb-starts from verb-ends
+NB. Launch Jwiki from hotlinks in tooltips
+NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name
@@ -65,7 +65,6 @@ NB. change rank stack in partitions (test /."0), don't dup /.
 NB. Re-select of selected cell of @. should remove expansion
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. if a recursion produces no result, flag that fact
-NB. dissect '>:L:0"0 (1;''a'';3;4)'   doesn't crosshatch unexecd cells.  Seems that it should: fillmask is right for it   rectcolorfromfillmask neexds to insert stippling
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
 NB. dissect '(* $:@:<:)^:(1&<) 7'    select result 1 - no detail displayed inside ^:
 NB.  this is because there are multiple possible results, so we skeletalu.  But should the wiring bypass the skeletalu?
@@ -1864,7 +1863,10 @@ NB. vranks - the rank(s) of the operand. 1 or 2 numbers, but empty for a noun or
 NB. rankhistory - 1{y holds the table of previous ranks.  We append vranks to it, to produce the rank stack for this operand.  The format of the rank stack is
 NB.  (string form of name to display);(locale (NOT boxed));(rank r)[;(rank l)
 NB.  If the string form is instead 0, it means that this rankhistory is a 'heavy' locale marker that should always float down to u operands
-NB. resultlevel - indicates boxing of result: '' = none, normal; 0 = result replaces ops in hierarvhy (L:); 1 = box is added (&.>); 2=collection error
+NB. resultlevel - indicates boxing of result: '' = none, normal; 0 = result replaces ops in hierarchy (L:); 1 = box is added (&.> or expansion); 2=collection error
+NB. nvalidresults - the number of valid selresults when we started this node.  We have to calculate this here, because inheritance of an error cell into a higher result may add a selresult, and we need
+NB.  to make sure we don't try to select one beyond THAT cell.
+
 traversedowncalcselect =: 3 : 0
 assert. 1 = #$y
 assert. 3 <: #y
@@ -1898,7 +1900,7 @@ inheritedto =: inheritedfrom =: <'dissect'
 NB. initialselection is set for expansion nodes, to indicate where a click will cause an expansion,
 NB. and what the initial value should be
 initialselection =: 0$a:
-qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%selections%$y%y%rankhistory%'
+qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%4!:55<''fillmask''%selections%$y%y%rankhistory%'
 qprintf^:DEBHLIGHT 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%y%sellevel%selections%'
 if. 3 = #y do.
 NB. No selector: we can't do much
@@ -2150,6 +2152,9 @@ NB. recalculate selopshapes now that we have the selection
   
 end.
 assert. 1 = #$selresult
+NB. Remember the number of results that we started with.  We must never try to select more than 1 beyond this count,
+NB. even if we add a selresult cobbled together from lower-level result
+nvalidresults =: #selresult
 NB. Now selresult (a list) contains the unopened and unframed results.  frame contains the frame.
 NB. We will calculate a faux
 NB. shape for the result, by looking at the values without opening selresult.  If they have a common
@@ -2171,7 +2176,6 @@ NB. which is 0=OK, 2=first missing item, 3=later missing item.  No 'first missin
 NB. If the result is uncollectable, note that in the fillmask too
     collecterror =. (0=#fillatom) *. (0=#resultlevel)  NB. If there is a resultlevel, it always collects
     fillmask =: ((FILLMASKNOCOLLECT * collecterror) + FILLMASKSELLEVEL * sellevel) + tickettonatural frame $!.FILLMASKUNEXECD (FILLMASKNORMAL #~ #selresult) , (errorcode e. EEXEC,EUNEXECD,EABORTED,ENOEXECD) # FILLMASKERROR
-
 NB. Combine the per-item and per-atom parts of the fillmask
 NB. The fillmask just created has one atom per selection value.
 NB. If we have result cells, calculate a fillmask for each.  The per-item fillmask
@@ -2228,7 +2232,6 @@ NB. we qualified, and we just add one to the next level if selection here was po
 NB. Set the indicator that this node can take a selector.  It can if
 NB. this verb has a selection frame OR a level
 bnsellevel =: < sellevel + selectable
-
 qprintf^:DEBTRAVDOWN 'edisp'''' frame selframe $selresult selresult $selresultshape selresultshape selector selopinfovalid fillmask selections rankhistory selectable '
 NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
 NB.?lintsaveglobals
@@ -2471,7 +2474,7 @@ if. errorcode <: EOK do.
   
 NB. If u has the error source then u@v should have failed short.   If u@v has no results,
 NB. inherit the u locale to replace it
-elseif. errorcode__loc e. EGENERR do.
+elseif. errorcode__loc e. EGENERR do.  NB. all errors but NOEXECD,UNEXECD
   assert. errorcode e. EPROPERR [ 'u@v died but u@v was OK'  NB. if u died, u@v should be sick
   if. errorcode e. EHASFILLMASK do.
     NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
@@ -2524,7 +2527,7 @@ if. replaceresult do.
     NB. If this is &.> or collection error, box the fillmask.  Leave the result single-boxed: it represents the result of the lower boxing level and will
     NB.  have another level added.
     selresult =: ,< fillmask__loc frameselresult__loc selresult__loc
-    fillmask =: frame $!.(<FILLMASKUNEXECD) < fillmask__loc
+    fillmask =: tickettonatural frame $!.(<FILLMASKUNEXECD) < fillmask__loc
   case. do.
     NB. In other cases, format the selresult according to ITS settings, and then save it according to the way it will
     NB. be formatted (i. e. by collection using the fillmask)
@@ -4895,6 +4898,11 @@ NB. y is the titlestring in the line for this locale
 NB. Result is a table of retcode;text
 exegesisrankoverall =: (0 2$a:)"_
 
+NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
+exegesisverbdesc =: 3 : 0
+'The result of the verb:',LF,(defstring 0),CR
+)
+
 NB. Get the locale of the verb containing the collection point
 NB. y is the locale of the child of this node
 NB. result is the locale whose verb will collect the results
@@ -5454,7 +5462,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     t =. t,LF
   else.
     NB. Not a noun.
-    t =. 'The result of the verb:',LF,(defstring 0),CR
+    t =. exegesisverbdesc 0
   end.
   disp =. disp , EXEGESISDATASOURCE ; t , LF
   if. sellevel <: #selections do.
@@ -6297,7 +6305,7 @@ getfailingisf =: #:
 NB. y is the new selection (boxed, and possibly with an initialselection following)
 NB. Result is 1 if selection is OK, 0 if not
 auditselection =: 3 : 0
-(selframe #. >@{.^:(0<L.) > {. y) <: #selresult
+(selframe #. >@{.^:(0<L.) > selectiontoticket {. y) <: nvalidresults
 )
 
 NB. y is #selx; result is 1 if it indicates that cells were executed.  The difference between no execs and some is significant
@@ -6471,10 +6479,13 @@ NB. y is in ticket order, i. e. execution order
 NB. Result is the array reordered to natural order, i. e. selection order (some primitives process out of order; we reorder to match selection)
 tickettonatural =: |.
 
-NB. y is boxed selection (number only, no SFOPEN) in natural order; result is boxed selection in execution order
+NB. y is boxed selection in natural order; result is boxed selection in execution order
+NB. For travdowncalcselect we get the selection number without the SFOPEN; for auditselection we get
+NB. the full selectipon including the SFOPEN; so we discard anything past the first
+NB. atom.  For this node we know we have a list of cells
 selectiontoticket =: 3 : 0
 NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
-< ({.frame) | _1 - >y
+< ({.frame) | _1 - > {. >y
 )
 
 NB. x is the frame of the full expected result
@@ -8453,6 +8464,11 @@ else.
 end.
 )
 
+NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
+exegesisverbdesc =: 3 : 0
+'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'Each intermediate result is shown in its own box.',LF
+)
+
 NB. *** traversal support ***
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
 NB. y is natural frame(s) of the executed verb
@@ -9068,6 +9084,11 @@ if. DLRCOMPEND -: linetext do.
 else.
   0 2$a:
 end.
+)
+
+NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
+exegesisverbdesc =: 3 : 0
+'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'Each intermediate result is shown in its own box.',LF
 )
 
 
@@ -11316,6 +11337,10 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect '5 ($: <:@crash9_dissect_)^:(1<]) 11'
 2 dissect '>:@crash9_dissect_^:1 2 3 i. 2 4'
 2 dissect '>^:1 2 3 i. 2 4'
+2 dissect 'crash9_dissect_/ 1 2 9 3 4'
+2 dissect 'crash9_dissect_"0/ i. 4 2 2'
+2 dissect 'crash9_dissect_"0/ z' [ z =. i. 6 2 3
+2 dissect 'crash9_dissect_"0/ z' [ z =. i. 6 1 3
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
