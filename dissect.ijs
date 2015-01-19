@@ -30,7 +30,7 @@ DEBROUTE_dissect_ =: 0   NB. display routing details
 DEBGRAF_dissect_ =: 0   NB. display all drawn graphics
 DEBOBJ_dissect_ =: 0  NB. display drawn-object details
 DEBDOL_dissect_ =: 0  NB. display drawing details
-DEBINHU_dissect_ =: 0  NB. display inheritu
+DEBINHU_dissect_ =: 0 NB. display inheritu
 DEBDOL2_dissect_ =: 0  NB. display drawing locales
 DEBDOvn_dissect_ =: 0  NB. display object headers
 DEBPICK_dissect_ =: 0  NB. display pick progress
@@ -45,11 +45,13 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
 NB. Support u :: v
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
 NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
+NB. dissect 'i.@> z' [ z =. 1;2;'a'  select non-error result cell; error cell is still shaded.  Should shade only when last+1 result selected
 NB. Use italics or the like to distinguish verb-starts from verb-ends
 NB. Launch Jwiki from hotlinks in tooltips
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
@@ -1894,7 +1896,7 @@ NB. If a compound is bypassed for display (for example, u@:v where u fails, hold
 NB. u rather than u@:v.  But then, selection will leave out the u@:v locale.  So, each locale keeps the
 NB. name of the locale in which propsel should start; this is set to u@:v in this case
 NB.
-NB. inheritroot will always point to the base of the inherirtance tree: the node with the finest detail
+NB. inheritroot will always point to the base of the inheritance tree: the node with the finest detail
 inheritroot =: coname ''
 NB. We have an inheritance chain, which ends in the stubs in 'dissect' locale
 inheritedto =: inheritedfrom =: <'dissect'
@@ -2174,9 +2176,14 @@ if. errorcode e. EHASVALIDFILLMASK do.
   if. 1 < */ frame do.
 NB. Calculate the per-item part of fillmask: the selection level (upper bits), plus validity,
 NB. which is 0=OK, 2=first missing item, 3=later missing item.  No 'first missing item' unless there is an error here
-NB. If the result is uncollectable, note that in the fillmask too
+    NB. If the result is uncollectable, note that in the fillmask too
     collecterror =. (0=#fillatom) *. (0=#resultlevel)  NB. If there is a resultlevel, it always collects
-    fillmask =: ((FILLMASKNOCOLLECT * collecterror) + FILLMASKSELLEVEL * sellevel) + tickettonatural frame $!.FILLMASKUNEXECD (FILLMASKNORMAL #~ #selresult) , (errorcode e. EEXEC,EUNEXECD,EABORTED,ENOEXECD) # FILLMASKERROR
+    errorfillcell =. (errorcode e. EEXEC,EUNEXECD,EABORTED,ENOEXECD) # FILLMASKERROR
+    NB. If we have an error here, and the selection points to the error, start the fillmask for the error cell at the NEXT
+    NB. selection level so that even if nothing lower gets inherited into the cell, it shows its selection level
+    NB. kludge this leaves the error cell shaded even when another cell is selected
+    if. selectable *. sellevel < #selections do. errorfillcell =. errorfillcell + FILLMASKSELLEVEL * 0 = auditselection sellevel { selections end.
+    fillmask =: ((FILLMASKNOCOLLECT * collecterror) + FILLMASKSELLEVEL * sellevel) + tickettonatural frame $!.FILLMASKUNEXECD (FILLMASKNORMAL #~ #selresult) , errorfillcell
 NB. Combine the per-item and per-atom parts of the fillmask
 NB. The fillmask just created has one atom per selection value.
 NB. If we have result cells, calculate a fillmask for each.  The per-item fillmask
@@ -2536,7 +2543,7 @@ if. replaceresult do.
     NB. frame of the upper node.
     fillmask =: frame $!.(<^:(*L.fillmask__loc) FILLMASKUNEXECD) ,: fillmask__loc
     if. #resultlevel__loc do.
-      NB. If the lower node has resultshape, that means that each atom of the fillmask has the structure for the
+      NB. If the lower node has resultlevel, that means that each atom of the fillmask has the structure for the
       NB. corresponding atom of the selresult, so we box those atoms and run them into a list.
       selresult =: , <"0 fillmask__loc frameselresult__loc selresult__loc
     else.
@@ -3723,29 +3730,77 @@ statusdesc =. ALIGNSPREAD addalignmentrect thw
 NB. Create the shape/selector line if we can
 NB. The shape is the concatenation of the frames, so that in an expansion node it includes the expansion.
 NB. We also append the shape of the max result cell in the last node, to get the total shape of the result
-NB. Create displayable frame for each selection.  This is a list of boxed strings
-DOshapes =: <@;@(": L:0)@;/./ |: 0 1 {"1 af =. accumframe__inheritedtailforselectinfo''
-DOshapelocales =: {:/./ |: 0 2 {"1 af   NB. The locale that makes the selection
-if. #af do.
-  NB. The last locale returned by accumframe is the last one that had valid output, i. e. the last one whose
-  NB. frame was used to select a result.  We use the result-cell info from THAT node to supply result info.
-  NB. If the result is a noun, this will simply be the sole locale in the chain
-  lastexecutednode =: {: DOshapelocales
+NB. obsolete NB. Create displayable frame for each selection.  This is a list of boxed strings
+NB. obsolete DOshapes =: <@;@(": L:0)@;/./ |: 0 1 {"1 af =. accumframe__inheritedtailforselectinfo''
+if. #af =. accumframe__inheritedtailforselectinfo''  do.
+  DOshapes =: <@;/./ |: 0 1 {"1 af  NB. boxes, each containing a (level-1 or -2) isf
+  DOshapelocales =: {:/./ |: 0 2 {"1 af   NB. The locale that makes the selection, for each selection level
+  NB. Remember the locale of the last verb executed
+  lastexecutednode =: {:DOshapelocales
   NB.?lintonly lastexecutednode =: <'dissectobj'
-  cellshapedisp =: (": maxcellresultshape__lastexecutednode) , (fillrequired__lastexecutednode *. 0 = #resultlevel__lastexecutednode) # ' (fill)'
+NB. If the last verb does not allow a selection (ex: i.@>), remove it from the shapes so that it doesn't show a selection block,
+  NB. and also the fill status from the last selection goes through to the result-cell
+  if. -. selectable__lastexecutednode do.
+    DOshapes =: }: DOshapes
+    DOshapelocales =: }: DOshapelocales
+  end.
+  NB. For each selection level, and for one more level representing the result of the last level, we create the shape display, which is
+  NB.   shape [optional * if this selection requires fill]
+  NB. For each selecting level, get the fill info for the NEXT level, i. e. the result of the selecting level
+  fillinfo =. 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(":maxcellresultshape__y),'')'''"0 DOshapelocales
+  NB. Append the result-shape of the last verb
+  DOshapes =: DOshapes , <,<maxcellresultshape__lastexecutednode
+  if. #;DOshapes do.
+    NB. There is a shape.  Format it and add selections
+    NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
+    cellshapedisp =: (<0 _1) {:: DOshapes =: ,: ;&.> (a:,fillinfo) <@(({.@] , [ , }.@]) >)"0 ":L:0 isftorank2 DOshapes
+
+    NB. append selections if any
+    if. #currselections =. sellevel__inheritedtailforselectinfo }. (sellevel__inheritroot + selectable__inheritroot) ((<. #) {. ]) selections__inheritroot do.
+      NB. Convert to rank-2 ISF, then convert each box to displayable.  Add as second row
+      DOshapes =: DOshapes , ;&.> ":L:0 isftorank2 currselections
+    end.
+  elseif. (0 < #selresult) *. (errorcode e. EHASVALIDFILLMASK) *. (0 ~: #fillatom) do.
+    NB. The value, which has no shape, is a valid data value, viz an atom.  Display that shape to distinguish it
+    NB. from an unselected value.  This is perforce the cell color, so make it the last thing in the list
+    DOshapes =: ,: ,<'atom'
+    cellshapedisp =: ''
+    DOshapelocales =: 0$a:
+  elseif. do.
+    NB. No display because no selection
+    DOshapes =: 0 0 $ <''
+    NB.?lintonly cellshapedisp =: ''
+  end.
 else.
-  NB. If there are NO valid selections (it's a block that has to wait for a selection), there is no result-shape.
+  NB. If there are NO valid selections (it's a block that has to wait for a selection), there is no shape-line
+  DOshapes =: 0 0 $ <''
+  DOshapelocales =: 0$a:
   lastexecutednode =: 0$a:
   cellshapedisp =: ''
 end.
+NB. obsolete   NB. The last locale returned by accumframe is the last one that had valid output, i. e. the last one whose
+NB. obsolete   NB. frame was used to select a result.  We use the result-cell info from THAT node to supply result info.
+NB. obsolete   NB. If the result is a noun, this will simply be the sole locale in the chain.
+NB. obsolete   NB. So that we get the final result-cell shape including fill, we use the last locale that performed a selection,
+NB. obsolete   NB. or the last locale if there is no selection
+NB. obsolete  lastexecutednode =: {: DOshapelocales
+NB. obsolete   NB.?lintonly lastexecutednode =: <'dissectobj'
+NB. obsolete   if. 0 = selectable__lastexecutednode do. lastexecutednode =: _2 { lastexecutednode , DOshapelocales end.
+NB. obsolete   lastexecutednode =: {.DOshapelocales
+NB. obsolete   NB.?lintonly lastexecutednode =: <'dissectobj'
+NB. obsolete   cellshapedisp =: (": maxcellresultshape__lastexecutednode) , (fillrequired__lastexecutednode *. 0 = #resultlevel__lastexecutednode) # ' (fill)'
+NB. obsolete else.
+NB. obsolete   NB. If there are NO valid selections (it's a block that has to wait for a selection), there is no result-shape.
+NB. obsolete   lastexecutednode =: 0$a:
+NB. obsolete   cellshapedisp =: ''
 NB. obsolete NB. Get the frame before the first sropdown; any surplus displayed shape must be the result-cell shape
 NB. obsolete rankbeforedrop =. # ; SFOPEN (i.~ {. ]) ; 1 {"1 af
 QP^:DEBDOvn'defstring]0 $shapetouse shapetouse errorcode sellevel selectable selections '
 QP^:DEBDOvn'defstring__inheritroot]0 sellevel__inheritedtailforselectinfo sellevel__inheritroot selections__inheritroot '
 QP^:DEBDOvn'maxcellresultshape__inheritroot '
-NB. If we have no shape, either it's a scalar, or we have empty frame with unknown shape.
+NB. obsolete NB. If we have no shape, either it's a scalar, or we have empty frame with unknown shape.
 NB. obsolete cellshapedisp =. (": maxcellresultshape__inheritroot) , (fillrequired *. 0 = #resultlevel) # ' (fill)'
-if. #(;DOshapes),cellshapedisp do.
+NB. obsolete if. #(;DOshapes),cellshapedisp do.
 NB. obsolete   NB. The frames may include values that are beyond the last selection.  This is OK as long as they don't drop down:
 NB. obsolete   NB. they are just indicating the frames of the successive verbs; after the frame of the last verb we should append
 NB. obsolete   NB. the shape of the last result cell.  But if unselected nodes drop down, we have no idea what the frames or cellshapes
@@ -3753,7 +3808,7 @@ NB. obsolete   NB. should be, so we have to delete them.
 NB. obsolete   NB. After that's done, we have to reconstruct what value to use for the 'shape of the result cell', which is always
 NB. obsolete   NB. appended as the last value in DOshapes (it is given the special result color when it is drawn).  This value will
 NB. obsolete   NB. be empty if a dropdown erased it.
-  currselections =. sellevel__inheritedtailforselectinfo }. (sellevel__inheritroot + selectable__inheritroot) ((<. #) {. ]) selections__inheritroot
+NB. obsolete   currselections =. sellevel__inheritedtailforselectinfo }. (sellevel__inheritroot + selectable__inheritroot) ((<. #) {. ]) selections__inheritroot
 NB. obsolete   NB. Get surplus frames, and result shape; delete any characters after >, delete any boxes after >
 NB. obsolete   unselectedframes =. ({.~    1 (e. + i.~) '>' = {:@>) '>'&((>:@i.~ {. ])^:e.)&.> inituframes =. ((#currselections) }. DOshapes) , <cellshapedisp
 NB. obsolete   NB. put the unselected frame back onto the selected ones
@@ -3763,28 +3818,27 @@ NB. obsolete   NB. Trim down the number of locales to match the valid selections
 NB. obsolete   DOshapelocales =: DOshapes (<.&# {. ]) DOshapelocales
 NB. obsolete   NB. If we snipped off the last box (containing the special result-cell shape),
 NB. obsolete   NB. add one to carry the special color and indicate that we don't know the exact frame
-NB. append the final result-shape
-NB. Also, at this point expand DOshapes to a table: first row shapes, second row (optional) selections
+NB. obsolete NB. append the final result-shape
+NB. obsolete NB. Also, at this point expand DOshapes to a table: first row shapes, second row (optional) selections
 NB. obsolete   DOshapes =: ,: DOshapes , (inituframes >&# unselectedframes) # <'?'
-  DOshapes =: ,: DOshapes , <cellshapedisp
-NB. If there are selections, line them up under the boxes in the shape containing selectable values
-NB. (i. e. more than one cell)
-  if. #currselections do.
-    NB. Get the selections, convert to rank-2 ISF, then convert each box to displayable.  Add as second row
-    DOshapes =: DOshapes , ;&.> ": L:0 isftorank2 currselections
-  end.
-elseif. (0 < #selresult) *. (errorcode e. EHASVALIDFILLMASK) *. (0 ~: #fillatom) do.
-  NB. The value, which has no shape, is a valid data value, viz an atom.  Display that shape to distinguish it
-  NB. from an unselected value.  This is perforce the cell color, so make it the last thing in the list
-  DOshapes =: ,: ,<'atom'
-  DOshapelocales =: 0$a:
-elseif. do.
-  NB. No display because no selection
-  DOshapes =: 0 0 $ <''
-end.
+NB. obsolete   DOshapes =: ,: DOshapes , <cellshapedisp
+NB. obsolete NB. If there are selections, line them up under the boxes in the shape containing selectable values
+NB. obsolete NB. (i. e. more than one cell)
+NB. obsolete   if. #currselections do.
+NB. obsolete     NB. Get the selections, convert to rank-2 ISF, then convert each box to displayable.  Add as second row
+NB. obsolete     DOshapes =: DOshapes , ;&.> ": L:0 isftorank2 currselections
+NB. obsolete   end.
+NB. obsolete elseif. (0 < #selresult) *. (errorcode e. EHASVALIDFILLMASK) *. (0 ~: #fillatom) do.
+NB. obsolete   NB. The value, which has no shape, is a valid data value, viz an atom.  Display that shape to distinguish it
+NB. obsolete   NB. from an unselected value.  This is perforce the cell color, so make it the last thing in the list
+NB. obsolete   DOshapes =: ,: ,<'atom'
+NB. obsolete   DOshapelocales =: 0$a:
+NB. obsolete elseif. do.
+NB. obsolete   NB. No display because no selection
+NB. obsolete   DOshapes =: 0 0 $ <''
+NB. obsolete end.
 if. #DOshapes do.
-  NB. Convert the shapes to characters, and get the pixel extent of each string.  Start at the selection level
-  NB. of this object
+  NB. Get the pixel extent of each string.  Start at the selection level of this object
   DOshapecfm =: FONTCLASSSHAPE cfmforclass"0 (_1) ,~ sellevel__inheritedtailforselectinfo + i. <:{:$DOshapes
 NB. obsolete   shapeext =. ((sellevel__inheritedtailforselectinfo + i. {:$DOshapes) ((<. <:@#) { ]) cfmshape) sizetext"1 0"_ 1 DOshapes
   shapeext =. DOshapecfm sizetext"1 0"_ 1 DOshapes
@@ -5334,7 +5388,7 @@ hoverDOshapepos =: 4 : 0
 tt =. ,: EXEGESISTUTORIAL ; hoverDOshapepostutorial
 exp =. x
 if. #r =. (exp{DOshapepospickrects) findpickhits y do.
-  if. #vranks do.
+  if. #DOshapelocales do.
     'ix pyx' =. {. r   NB. index of pickrect found
     if. ix < #DOshapelocales do.
       l =. ix { DOshapelocales   NB. the locale of the selection
@@ -5365,7 +5419,7 @@ if. #r =. (exp{DOshapepospickrects) findpickhits y do.
     NB.?lintonly l =. <'dissectverb'
     tt =. 'frame of ' , defstring__l 0
   else.
-    tt =. (*#vranks) {:: 'shape of noun'; 'result shape of ' ,(defstring__lastexecutednode 0) , (')' = {: cellshapedisp) # ' (fill added)'
+    tt =. (*#DOshapelocales) {:: 'shape of noun'; 'result shape of ' ,(defstring__lastexecutednode 0) , (')' = {: cellshapedisp) # ' (fill added)'
   end.
 else. tt =. ''
 end.
@@ -6085,8 +6139,8 @@ NB. obsolete   propsel (sellevel {. selections) , selectionfound
   NB. traversed up to the point where we could select from it.  If we are pushing an initialselection, this will not
   NB. be the case, because the new block might not even have been traversed at all lacking the selection.  So, we don't
   NB. audit initialselections, and assume they're valid since we generate them internally.
-  if. #usinginitialselection do. selok =. 1 else. selok =. auditselection ,selectionfound end.
-  if. selok do.
+  if. #usinginitialselection do. selok =. _1 else. selok =. auditselection ,selectionfound end.  NB. _1=normal cell, 0=error cell, 1 = invalid
+  if. selok ~: 1 do.
     NB. Propagate the new selection
     makeselection , selectionfound
 NB. obsolete NB. Clear the scroll point in all the nodes for which the selection has changed.  The old scroll point may be invalid
@@ -6304,9 +6358,9 @@ NB. result is index list of the failing location, in natural order
 getfailingisf =: #:
 
 NB. y is the new selection (boxed, and possibly with an initialselection following)
-NB. Result is 1 if selection is OK, 0 if not
+NB. Result is signum of (sel - error spot): 1 if invalid, 0 if on the error, _1 if no error
 auditselection =: 3 : 0
-(selframe #. >@{.^:(0<L.) > selectiontoticket {. y) <: nvalidresults
+(selframe #. >@{.^:(0<L.) > selectiontoticket {. y) *@- nvalidresults
 )
 
 NB. y is #selx; result is 1 if it indicates that cells were executed.  The difference between no execs and some is significant
@@ -7298,8 +7352,8 @@ NB. We say that a cell was executed if it started, regardless of whether it fini
 cellswereexecuted =: 3 : '*#startlocs'
 
 NB. y is the new selection (boxed, and possibly with an initialselection following)
-NB. Result is 1 if selection is OK, 0 if not
-auditselection =: 1:  NB. We can never select out of bounds, since only started recursions show up in the display
+NB. Result is signum of (sel - error spot): 1 if invalid, 0 if on the error, _1 if no error
+auditselection =: _1:  NB. We can never select out of bounds, since only started recursions show up in the display
 
 
 NB. y is a selector: any shape, but each selector has shape ,2; so $=?,2
@@ -8217,11 +8271,11 @@ end.
 )
 
 NB. y is the new selection (boxed, and possibly with an initialselection following)
-NB. Result is 1 if selection is OK, 0 if not
+NB. Result is signum of (sel - error spot): 1 if invalid, 0 if on the error, _1 if no error
 auditselection =: 3 : 0
 if. levelunused +. cop -: 'S:' do. auditselection_dissectobj_ f. y
 else.
-((SFOPEN -.~ ,>y) {:: resultseqmap) <: #selresult  NB. kludge - , used because selection is a table - but should it be??
+((SFOPEN -.~ ,>y) {:: resultseqmap) *@- #selresult  NB. kludge - , used because selection is a table - but should it be??
 end.
 )
 
@@ -8893,7 +8947,7 @@ x #: (i. >./) (edir { 1 _1 1) * flatvval
 NB. y is the new selection (boxed, and possibly with an initialselection following)
 NB. Result is 1 if selection is OK, 0 if not
 NB. There is no way for this selection to fail, since there is only one result, and if we have anything we have everything
-auditselection =: 1:
+auditselection =: _1:
 
 NB. y is the current selection (a: if forced)
 NB. We never generate a highlight.  This level deals only with selections.
@@ -11342,6 +11396,15 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 'crash9_dissect_"0/ i. 4 2 2'
 2 dissect 'crash9_dissect_"0/ z' [ z =. i. 6 2 3
 2 dissect 'crash9_dissect_"0/ z' [ z =. i. 6 1 3
+2 dissect 'i.@> z' [ z =. 1;2;3
+2 dissect 'i.@> z' [ z =. 1;2;'a'
+2 dissect 'i.@> z' [ z =. 'a';2;3
+2 dissect 'i.@> z' [ z =. 1;'a';3
+2 dissect 'i.@> z' [ z =. 1;2;3 4
+2 dissect 'i.@>@> z' [ z =. 2 3;(2;3);4
+2 dissect 'i.@>@> z' [ z =. 2 3;(2;3);2 2 $2 5 2 3
+2 dissect 'i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3
+2 dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
