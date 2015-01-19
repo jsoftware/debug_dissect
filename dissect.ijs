@@ -1018,6 +1018,7 @@ NB. If we crashed, do an initial traversal to set selection flags to find the er
 maxnoundisplaysizes =: 2 2$0  NB. Init to small display for sniff, for speed
 
 wd 'pn *Dissecting ' , usersentence
+'fmstatline' wdsettext ''
 
 wd 'pshow'  NB. On QT, you can't calculate the size of graphics unless you are showing the form
 
@@ -3750,10 +3751,11 @@ NB. If the last verb does not allow a selection (ex: i.@>), remove it from the s
   fillinfo =. 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(":maxcellresultshape__y),'')'''"0 DOshapelocales
   NB. Append the result-shape of the last verb
   DOshapes =: DOshapes , <,<maxcellresultshape__lastexecutednode
+  NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
+  DOshapes =: ,: ;&.> (a:,fillinfo) <@(({.@] , [ , }.@]) >)"0 ":L:0 isftorank2 DOshapes
   if. #;DOshapes do.
     NB. There is a shape.  Format it and add selections
-    NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
-    cellshapedisp =: (<0 _1) {:: DOshapes =: ,: ;&.> (a:,fillinfo) <@(({.@] , [ , }.@]) >)"0 ":L:0 isftorank2 DOshapes
+    cellshapedisp =: (<0 _1) {:: DOshapes
 
     NB. append selections if any
     if. #currselections =. sellevel__inheritedtailforselectinfo }. (sellevel__inheritroot + selectable__inheritroot) ((<. #) {. ]) selections__inheritroot do.
