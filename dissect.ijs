@@ -17,7 +17,8 @@ ALLOWNONQTTOOLTIP_dissect_ =: 1
 
 NB. obsolete NB. set SINGLESELECTION to clear previous selections when a new selection branch is opened
 NB. obsolete SINGLESELECTION_dissect_ =: 1
-NB. obsolete 
+NB. obsolete
+NB. if any of the debugging switches is turned on, printf is required
 NOCLEANUP_dissect_ =: 0  NB. set to 1 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
@@ -45,8 +46,11 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. Run labs from the help menu: fmlab1_button
+NB. #    load 'labs/labs'
+NB. #    lab_jlab_ '~addons/labs/labs/core/intro.ijt'
 NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
-NB. Support u :: v - tooltips are wrong
+NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
 NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
@@ -74,7 +78,6 @@ NB. should we show leading singleton axes?  Should we shoe datatype, for chars a
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
 NB. support axis permutations for display, for u;.
 NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
-NB. Display failing node of u/ as error cell; don't set to all fill
 
 NB. Need different text color for digits/text, and for nouns with leading 1s in the shape
 
@@ -84,7 +87,6 @@ NB. handle clicking on verb-name part to select tree
 NB. create pickrects for displayed sentence, and handle clicks there
 NB. plan: save preferences; debug globals
 NB. Add space between the label/shape/status blocks - add to bbox layout in alignrects
-NB. green lines between ranks-3s don't show up if there's fill
 NB. test errorlevel, including for fill cells.
 NB. A way to display error encountered during fill cell?
 
@@ -121,7 +123,6 @@ NB. The verb z458095869 returns a table of defined local names.  It is a table o
 z458095869 =: (([ ,. <"0@] ,. (".@[`(rankinv_dissect_@[)`(rankinv_dissect_@[)`(rankinv_dissect_@[))@.]&.>) (4!:0)) @ ((<'z458095869') -.~ 4!:1@i.@4:)
 
 require 'strings gl2'
-require '~addons/format/printf/printf.ijs'
 cocurrent 'dissect'
 coinsert 'jgl2'
 
@@ -129,7 +130,7 @@ dissectinstance =: 0$a:
 
 defstring =: 'start of traversal'"_   NB. for debugging only
 
-getsentence =: (' ' takeafter LF (i:~ }. ]) [: }:^:(LF={:) (13!:12))^:(0=#)
+getsentence =: (' ' takeafter LF (i:~ }. ]) [: }:^:(LF={:) (13!:12)@(''"_))`(LF (>:@i:~ }. ]) LF , [: }:^:(LF={:) CR -.~ [: wd 'clippaste'"_)`]@.((0;1) i. <)
 
 NB. Maximum line length that we will try to display in a grid cell
 
@@ -152,11 +153,11 @@ case. 0 do.
     (LF taketo&.|. ({.fs) {. ft) , LF taketo ({.fs) }. ft
   end.
 case. 1 do.
-  ''  NB. empty line means 'last error'
+  0  NB. 0 means 'last error'
 case. 2 do.
-  {.^:(0=#) wd 'clippaste'   NB. fail 'no sentence' if nothing on clipboard
+  1  NB. 1 means 'clipboard'
 case. do.
-  ' '  NB. Will fail with 'no sentence'
+  ''  NB. Will give usage message
 end.
 )
 
@@ -398,6 +399,9 @@ NB. sentence in, and define all the user names in it, before running it
 parsemain =: 3 : 0   NB. runs in object locale
 defnames =. }. y  NB. table of names
 'options loc sentence' =. {. y
+if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
+  failmsg 'The sentence to be dissected must be a string.' return. 
+end.
 sandbox =.  * 1 bwand {.!.0 options
 returnobject_dissect_ =: * 2 bwand {.!.0 options
 
@@ -418,7 +422,9 @@ end.
 NB.?lintonly usersentence =: ''
 
 NB. If the sentence is empty, abort
-if. 0 = #queue do. failmsg 'No sentence' return. end.
+if. 0 = #queue do.
+  failmsg 'Usage: dissect ''sentence''',LF,LF,'Try   dissect ''0'' to see example screen' return.
+end.
 
 NB. Append an end-of-queue mark to the sentence, and initialize the stack.
 NB. The stack is type;value;tokennums where value is the locale of the object producing the result, for verb and noun;
@@ -631,19 +637,23 @@ NB. Make the stack entry for the new name
       
     elseif. do.
 NB. Must be a primitive.  Get its type and stack it
-      ". 'exeobj =. ' , qend
-      select. 4!:0 <'exeobj'
-        case. 0 do.
-          ntypeval =. createnoun qend;'';(#queue)
-        case. 1 do.
-          ntypeval =. adv;qend;(#queue)
-        case. 2 do.
-          ntypeval =. conj;qend;(#queue)
-        case. 3 do.
-          ntypeval =. createverb qend;(#queue)
-        case. do.
-          failmsg 'invalid type for primitive'
-          return.
+      try. 
+        ". 'exeobj =. ' , qend
+        select. 4!:0 <'exeobj'
+          case. 0 do.
+            ntypeval =. createnoun qend;'';(#queue)
+          case. 1 do.
+            ntypeval =. adv;qend;(#queue)
+          case. 2 do.
+            ntypeval =. conj;qend;(#queue)
+          case. 3 do.
+            ntypeval =. createverb qend;(#queue)
+          case. do.
+            failmsg 'invalid type for primitive'
+            return.
+        end.
+      catch.
+        failmsg 'Invalid word in sentence: ' , qend return.
       end.
       stack =. ntypeval,stack
       
@@ -825,6 +835,10 @@ menupopz;
 menupop "&Help";
 menu fmhelplearning "Learning Dissect";
 menu fmhelpusing "Using Dissect";
+rem menusep;
+rem menupop "&Labs";
+rem menu fmlab1 "Introduction to Dissect";
+rem menupopz;
 menupopz;
 xywh 3 4 20 12;cc fmshowerror button;cn "<<";
 xywh 26 4 20 12;cc fmbwd button;cn "<";
@@ -868,6 +882,10 @@ menupopz;
 menupop "&Help";
 menu fmhelplearning "Learning Dissect";
 menu fmhelpusing "Using Dissect";
+menusep;
+menupop "&Labs";
+menu fmlab1 "Introduction to Dissect";
+menupopz;
 menupopz;
 bin vhh0;
 minwh 6 28;cc fmshowerror button;cn "<<";
@@ -1316,6 +1334,18 @@ dissect_fmhelplearning_button =: helpshow_dissecthelplearning_
 
 dissect_fmhelpusing_button =: helpshow_dissecthelpusing_
 
+dissect_fmlab1_button =: 3 : 0
+try.
+  NB. See if labs are installed
+  require 'labs/labs'
+  NB. Run our lab - will give message of not found
+  lab_jlab_ '~addons/labs/labs/debug/dissect1.ijt'
+catch.
+  wdinfo 'Labs Addon Required',DEL,'To get the J Labs, use Package Manager and select labs/labs'
+end.
+0 0$0
+)
+
 dissect_dissectisi_char =: 3 : 0
 NB. If user presses ctrl-J, treat it as 'labrun'
 NB.?lintonly sysdata =. ''
@@ -1335,7 +1365,6 @@ usentence =. x
 NB. Reselect in case explorers were drawn
 wd 'psel ' , winhwnd
 glsel 'dissectisi'
-
 NB. Create table of token#,level.  Decrement token # to account for queue-end added at front.
 NB. This also deletes any boxes of y that contain 0 token numbers - these will have been added for
 NB. emulation purposes, for example vi@:u to handle &.
@@ -1452,7 +1481,7 @@ NB. obsolete NB. Selections in nodes at level y and above have any selections pa
 NB. obsolete discardselectionsabovelevel =: 'propselall'&((3 : 'if. sellevel >: y do. selections =: (y + (sellevel = y) *. ((sellevel+selectable) < #selections)) (] {.~ (<. #)) selections end. y') traversedown 0:)
 NB. obsolete 
 NB. Clear all selections.  Called in the locale of the base of the tree.
-clearselect =: 3 : 'selections =: 0$a: [ ishighlightnode =: 0'
+clearselect =: 3 : 'displaysellevel =: 0 [ selections =: 0$a: [ ishighlightnode =: 0'
 clearselections =: 'propselall'&(clearselect traversedown 0:)
 
 NB. Set ishighlightnode for as many levels as there are selections (so clicking initialselection highlights expansion)
@@ -1695,7 +1724,7 @@ y
 )
 NB.propsel0 =: 'propselstopatnoun'&((3 : 'y [ selections =: selectiontodisplay y') traversedown 0:)
 propsel0 =: 'propselstopatnoun'&(installsel traversedown 0:)
-propsel1 =: 'propselstopatxy'&((3 : ('displaysellevel =: y')) traversedown 0:)
+propsel1 =: 'propselstopatxy'&((3 : ('y [ displaysellevel =: y')) traversedown 0:)
 propsel =: propsel1@# [ propsel0
 
 
@@ -1745,13 +1774,16 @@ NB. We process each selection in turn.  If the selection went through the endhig
 NB. mark the locale of the selection as an inhighlightnode (which will enable highlighting for it)
 applyselection =: 3 : 0   NB. runs in instance locale
 clearselections__resultroot 0
-if. selectionct do.
+NB. It turns out that having multiple selections active is confusing, even if they are for different
+NB. monad/dyad execs.  So, show selections only for the last selection at each level (and delete any that are out of order)
+seltouse =. ({~    [: (#~ (= >./\)) ({."1 {:/. i.@#)) selectionct {. selectionsqueue
+if. #seltouse do.
   NB. Get the locale of the last selection.  This node, and selectors contributing to it, will be enabled for highlighting
   NB.?lintmsgsoff
-  lastsel =. (<(<:selectionct),2) {:: selectionsqueue
+  lastsel =. _1 2 {:: seltouse
   NB.?lintmsgson
   NB.?lintonly lastsel =. <'dissectobj'
-  for_s. selectionct {. selectionsqueue do.
+  for_s. seltouse do.
     endhighlightnode__lastsel =: 1
     'lvl sel loc' =. s
     NB.?lintonly loc =. <'dissectobj'
@@ -1942,8 +1974,8 @@ inheritedto =: inheritedfrom =: <'dissect'
 NB. initialselection is set for expansion nodes, to indicate where a click will cause an expansion,
 NB. and what the initial value should be
 initialselection =: 0$a:
-qprintf^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%4!:55<''fillmask''%selections%$y%y%rankhistory%'
-qprintf^:DEBHLIGHT 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%y%sellevel%selections%'
+QP^:DEBTRAVDOWN 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%>uop%>vop%>cop%vranks%sellevel%4!:55<''fillmask''%selections%$y%y%rankhistory%'
+QP^:DEBHLIGHT 'snifferror__COCREATOR%,loc=?>coname''''%,type=?0{::copath coname''''%defstring 0%y%sellevel%selections%'
 if. 3 = #y do.
 NB. No selector: we can't do much
   'selframe frame frames arglevel resultlevel errorcode selresult selector selopinfovalid' =: ($0);($0);a:;($0);($0);ENOSEL;(0$a:);(0$a:);0 0
@@ -1959,7 +1991,7 @@ NB. It's a noun (either an SDT or the result of a verb exec).  It should have 1 
 NB. Use the selector to cull the operand - this will be used only for recursion.  For normal nouns, we traverse with
 NB. a selector that selects everything.  For recursions, the operand values for each level of recursion are logged in the
 NB. locale of the noun when the recursion starts.
-    qprintf^:DEBTRAVDOWN '#logvalues '
+    QP^:DEBTRAVDOWN '#logvalues '
 NB. selector and selop already set, keep them
     NB. Since nouns appearing in u&v (ex: =&(i."0) are executed twice, so in that case
     NB. discard all but the first one.
@@ -2065,7 +2097,7 @@ NB. If we get to here, the operand being presented will be collected, as in u@:v
     errorcode =: EOK
 NB. Also, the number of results should match the number of cells in the frame, except
 NB. when the frame contains 0, in which case there will be 0 or 1 result.
-    qprintf^:DEBTRAVDOWN '$selopshapes $&.>selopshapes selopshapes $frames frames $frame frame resultlevel arglevel $selx '
+    QP^:DEBTRAVDOWN '$selopshapes $&.>selopshapes selopshapes $frames frames $frame frame resultlevel arglevel $selx '
     if. 0 e. frame do.
 NB. Execution on a cell of fills.  We should have 0 or 1 result.  If 0, it means that the
 NB. execution on the cell of fills failed, and we will use a scalar numeric as the replacement
@@ -2111,7 +2143,7 @@ NB. wanted to select at the root, they could have.
 NB. The error selector must have the correct structure for the current node
 NB. obsolete             propsel (sellevel {. selections) , < selframe getfailingisf #selx
             makeselection , < selframe getfailingisf #selx
-            qprintf^:DEBTRAVDOWN 'edisp'''' $selections selections '
+            QP^:DEBTRAVDOWN 'edisp'''' $selections selections '
           end.
         end.
 NB. Set the errorcode: if we are at the failure point, indicate the appropriate type of error; otherwise
@@ -2134,7 +2166,7 @@ NB. We also ignore a forced selection (ex: u/ when y has 2 items), which shows u
 NB. we get predictable sellevels, but it is known not to be needed (i. e. it is created only when we have seen that the current
 NB. selection is forced, on a previous traversal).  If we get a change of selection this gets reexamined.
     'seltype thissel' =. getselection rawselx  NB. classify the type of selection.  Selections not normally needed (recursion uses them)
-qprintf^:DEBTRAVDOWN'seltype thissel sellevel selections '
+    QP^:DEBTRAVDOWN'seltype thissel sellevel selections '
     select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 4=autoselect of node with no frame
     case. 2 do.
       NB. Forced selection: if this is the first time we see it, perform the forced selection, propagating it to lower nodes
@@ -2179,11 +2211,11 @@ NB. based on frame, so we suppress lower analysis
       newp =. calcphysandhighlights thissel
       NB. Whether we keep the highlight or not, honor the change-of-valence it represents, by replicating the old highlight as needed
       physreqandhighlights =: physreqandhighlights ($&.|.~ #) newp
-      qprintf^:DEBHLIGHT'ishighlightnode '
+      QP^:DEBHLIGHT'ishighlightnode '
       if. ishighlightnode do.
 NB. obsolete         physreqandhighlights (($&.|.~ #) ,"1&.> ]) ,&(<sellevel)&.> newp
         physreqandhighlights =: physreqandhighlights ,"1&.> ,&(<sellevel)&.> newp
-        qprintf^:DEBHLIGHT'physreqandhighlights '
+        QP^:DEBHLIGHT'physreqandhighlights '
       end.
 NB. recalculate selopshapes now that we have the selection
       selopshapes =: calcselectedshapes thissel
@@ -2243,7 +2275,6 @@ NB. Framing error is always fatal; stop any ongoing sniff
         resultlevel =: 2   NB. Signify 'collection error'
       end.
     end.
-NB. debug qprintf 'collected%frame%$L:0 selresult%selresult%y%'
   else.
 NB. The value is displayable, but it has only one item, so we know it's going to collect.   Use the
 NB. shape of the (one or none) result, and the current selection level.  Note that there is no display
@@ -2279,7 +2310,7 @@ NB. we qualified, and we just add one to the next level if selection here was po
 NB. Set the indicator that this node can take a selector.  It can if
 NB. this verb has a selection frame OR a level
 bnsellevel =: < sellevel + selectable
-qprintf^:DEBTRAVDOWN 'edisp'''' frame selframe $selresult selresult $selresultshape selresultshape selector selopinfovalid fillmask selections rankhistory selectable '
+QP^:DEBTRAVDOWN 'edisp'''' frame selframe $selresult selresult $selresultshape selresultshape selector selopinfovalid fillmask selections rankhistory selectable '
 NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
 NB.?lintsaveglobals
 )
@@ -11323,7 +11354,8 @@ runtests_base_ =: 0 : 0
 2 dissect '+/"1 i. 3 2'
 2 dissect '+/@,/"1 i. 3 2'
 'Invalid sequence: Noun Noun' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '3 ''a'''
-'No sentence' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '   '
+('Usage: dissect ''sentence''',LF,LF,'Try   dissect ''0'' to see example screen') (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect ''
+'The sentence to be dissected must be a string.' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 5 6 7
 2 dissect '3 4 5&*"1 i. 5 3'
 2 dissect '+/"2 i. 3 4 8'  NB. Failed during selection
 2 dissect '+:^:0 (1)'
@@ -11614,6 +11646,8 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 'i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3
 2 dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3
 2 dissect 'crash9_dissect_ :: >:"0 (3 6 9 12)'
+2 dissect 'crash9_dissect_@+/ 4 3 3 2 1'
+2 dissect 'crash9_dissect_@+/ 0 , 1 , 2 , 3 ,: i. 2 2'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
