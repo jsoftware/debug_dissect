@@ -46,9 +46,6 @@ NB. obsolete 0!:1 ; <@(LF ,~ 'dissectinstanceforregression_dissect_ 4 : ''(i. 0 
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Run labs from the help menu: fmlab1_button
-NB. #    load 'labs/labs'
-NB. #    lab_jlab_ '~addons/labs/labs/core/intro.ijt'
 NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
@@ -82,16 +79,13 @@ NB. if there is an error framing the forward and reverse, we don't catch it and 
 NB. Need different text color for digits/text, and for nouns with leading 1s in the shape
 
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
-NB. routing: if anything routed, the whole net must be
 NB. handle clicking on verb-name part to select tree
 NB. create pickrects for displayed sentence, and handle clicks there
 NB. plan: save preferences; debug globals
 NB. Add space between the label/shape/status blocks - add to bbox layout in alignrects
 NB. test errorlevel, including for fill cells.
 NB. A way to display error encountered during fill cell?
-
 NB. should we allow selection if final result is early error? (what shape then?)
-
 NB. worry about whether gerund needs to traverse.  Shape display of gerund is wrong, because it's calculated incorrectly.  Should use noun methods for result of `
 
 NB. dissect - 2d graphical single-sentence debugger
@@ -394,16 +388,19 @@ NB. Result is the string form of the instrumented sentence, ready to execute
 NB. As a side effect, many objects are created indicating the parse structure
 NB. In paticular, resultroot is the boxed locale of the sentence result.
 NB. If there is an error, resultroot is empty
-NB. The only option is 'sandbox', in which case we create an explicit definition to run the
-NB. sentence in, and define all the user names in it, before running it
+NB. Options: bit 0 is 'sandbox', in which case we create an explicit definition to run the
+NB.   sentence in, and define all the user names in it, before running it
+NB. bit 1 is 'return locale', which returns boxed locale (an atom) if there is no error
+NB. bit 2 is 'noassign' which neuters assignments (useful in debug)
+NB. bit 3 is 'debug', reserved for future use 
 parsemain =: 3 : 0   NB. runs in object locale
 defnames =. }. y  NB. table of names
 'options loc sentence' =. {. y
 if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
   failmsg 'The sentence to be dissected must be a string.' return. 
 end.
-sandbox =.  * 1 bwand {.!.0 options
-returnobject_dissect_ =: * 2 bwand {.!.0 options
+'fromdebugger noassignment returnobject sandbox' =.  2 2 2 2 #: {.!.0 options
+returnobject_dissect_ =: * returnobject
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 NB. Discard anything past the first LF, and remove CR
@@ -513,7 +510,7 @@ NB. and 'verb' for modifier executions
       end.
       NB. If the assignment is one we can handle, we will have one or more names.  In that case, create an
       NB. assignment block on the stack
-      stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
+      stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock;noassignment),((>:subj i: 1)}. stack)
         NB. We would like to preserve the value of the unhandleable assignment, but we can't, because
         NB. We need an assignment node to account for the assignment tokens, and we can't get a value for the
         NB. modifier because it might be complex (a train).  If we try to push the assignment tokens into
@@ -537,9 +534,13 @@ NB. obsolete         stack =. ((subj i. 1){.stack),((subj i: 1)}. stack)
       end.
       
   NB. Define the names, as nouns (J nameclass 0).
-      defnames =. (rname ,"0 1 (0;'')) , defnames
+      defnames =. (rname ,"0 1 ((0+256*noassignment);'')) , defnames
       
-    case. 8 do.  NB. ( x )
+    case. 8 do.  NB. ( x ) - but remember the token numbers of the parens
+      insideop =. (<1 1) {:: stack
+      NB.?lintmsgsoff
+      tokensource__insideop =: tokensource__insideop , ; (<0 2;2) { stack
+      NB.?lintmsgson
       stack =. (<<<0 2) { stack
       
   NB. If the stack did not have an executable combination, bring the next word onto the stack.
@@ -627,6 +628,9 @@ NB. obsolete         stack =. ((subj i. 1){.stack),((subj i: 1)}. stack)
         case. 3 do.
            NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
           ntypeval =. createverb (qend;(#queue)) , (-. LF e. objval)#<objval
+        case. 0+256 do.  NB. Special type: name previously assigned which in ignore assignment mode
+          failmsg 'The name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',(fromdebugger # ' when dissect is called from the debugger'),'.'
+          return.
         case. do.
           failmsg 'undefined name: ' , qend
           return.
@@ -675,7 +679,9 @@ QP^:DEBTIME'endparse=?6!:1'''' '
 NB. Init the estheights in every object
 calcallestheights__resultroot $0
 NB. Create the string to execute.  If we have to create a sandbox, do so
-execsentences_dissect_ =: sentence;exestring__resultroot''
+NB. The raw sentence has the user's tokens, but the the invisible ones removed (for noassign sentences).
+vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot '')&{&.;: sentence
+execsentences_dissect_ =: vissentence;exestring__resultroot''
 if. sandbox do.
   NB. create the sandbox verb in the user's locale
   NB.?lintmsgsoff
@@ -1358,7 +1364,7 @@ end.
 
 NB. Draw the user's sentence at the top, showing highlighting
 NB. x is the sentence, in the user's spacing
-NB. y is a table of (token range);display level)
+NB. y is a table of (token range);display level;tokenvisibility)
 NB. The characters are drawn, with appropriate colors
 sizesentence =: 4 : 0
 usentence =. x
@@ -1368,35 +1374,36 @@ glsel 'dissectisi'
 NB. Create table of token#,level.  Decrement token # to account for queue-end added at front.
 NB. This also deletes any boxes of y that contain 0 token numbers - these will have been added for
 NB. emulation purposes, for example vi@:u to handle &.
-toklev =. ; (<:@,@[ ,"0 ])&.>/"1 > y
+toklev =. /:~ ; (<:@,@[ ,"0 1 ])&.>/"1 > y
 
 NB. Any missing #s should be parentheses.  Assign them the level of the lowest inside token.
 NB. Assign level of _1 for (, _2 for ), and start with a stack of high-value for selection level.
 NB. Process as a state machine.  Then use the stacks to fill in gaps in
 NB. the selection levels
-toklev =. /:~ toklev , ; (;: '()') (_1 _2 ,.~&.> <@(I.@:=)"0 1) tokens =. ;: usentence
+NB. obsolete toklev =. /:~ toklev , ; (;: '()') (_1 _2 ,.~&.> <@(I.@:=)"0 1) tokens =. ;: usentence
+tokens =. ;: usentence
 assert. (-: i.@#) {."1 toklev
-toklev =. {:"1 toklev
-stack =: _
-NB. This isn't too bad if the sentences are reasonable
-lpval =. (4 : 'select. x case. _2 do. 0 [ stack =: _ , stack case. _1 do. (stack =: (<./@(2&{.) , }.) stack) ] (1 + {. stack) case. do. 0 [ stack =: (x<.{.stack) 0} stack end.')/\.&.(,&_) toklev
-rpval =. (4 : 'select. x case. _1 do. 0 [ stack =: _ , stack case. _2 do. (stack =: (<./@(2&{.) , }.) stack) ] (2 + {. stack) case. do. 0 [ stack =: (x<.{.stack) 0} stack end.')/\.&.(,&_)&.|. toklev
-toklev =. toklev + lpval + rpval
-assert. 0 *./@:<: toklev
+NB. obsolete toklev =. {:"1 toklev
+NB. obsolete stack =: _
+NB. obsolete NB. This isn't too bad if the sentences are reasonable
+NB. obsolete lpval =. (4 : 'select. x case. _2 do. 0 [ stack =: _ , stack case. _1 do. (stack =: (<./@(2&{.) , }.) stack) ] (1 + {. stack) case. do. 0 [ stack =: (x<.{.stack) 0} stack end.')/\.&.(,&_) toklev
+NB. obsolete rpval =. (4 : 'select. x case. _1 do. 0 [ stack =: _ , stack case. _2 do. (stack =: (<./@(2&{.) , }.) stack) ] (2 + {. stack) case. do. 0 [ stack =: (x<.{.stack) 0} stack end.')/\.&.(,&_)&.|. toklev
+NB. obsolete toklev =. toklev + lpval + rpval
+NB. obsolete assert. 0 *./@:<: toklev
+'toksellvl tokvisible' =. |: 1 2 {"1 toklev
 
 NB. Get the length of each token (except the last) in the user's spacing
 tokulen =. 2 -~/\ (' ' +/\@:~: usentence) I. (>: |.!.0 +/\ ' '&(+/@:~:)@> tokens)
 
 NB. Looking at pairs of tokens, insert after each the number of blanks needed to match the
 NB. user's spacing.  Give this string the proper color: the selection level if both are the same, or
-NB. _1 if they differ.  Result is token;level for token and following space.
+NB. _1 if they differ.  Result is a table, with a pair of rows for each token, the first token;level for token and the next for the following space.
 NB. Handle the last token, which is never followed by anything.
 addedblanks =. tokulen (' ' #~ (- #))&.> }: tokens
-addedlevel =. 2 _1:^:~:/\ toklev
-utokspacelevel =. (addedblanks ,. <"0 addedlevel) ({:@] ,~ (,/)@(,:"1~  }:)) tokens ,. <"0 toklev
-
-NB. Remove empty strings.
-utokspacelevel =. (#~ *@#@>@:({."1)) utokspacelevel
+addedlevel =. 2 _1:^:~:/\ toksellvl
+utokspacelevel =. (addedblanks ,. <"0 addedlevel) ({:@] ,~ (,/)@(,:"1~  }:)) tokens ,. <"0 toksellvl
+NB. Remove invisible tokens.  Remove empty strings.
+utokspacelevel =. (#~ *@#@>@:({."1)) (}: 2 # tokvisible) # utokspacelevel
 NB. Get the size of the rectangles.
 rectsize =. (cfms =. satzcfm {~ (_2 + #satzcfm) <. > 1 {"1 utokspacelevel) sizetext ,. txts =. 0 {"1 utokspacelevel
 NB. Box them into sections that fit within the allowed part of the screen, one box per line
@@ -1412,7 +1419,6 @@ rects =. ; (lw ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&
 NB. Get the max size for the string, and return the data for drawing
 NB. Draw the strings
 (>./ +/"2 rects);cfms;txts;rects
-
 )
 
 NB. Draw the sentence.  y is the result of sizesentence, except for the brect
@@ -1473,6 +1479,10 @@ NB. init parent nodes in all objects.  This must be done in a separate verb beca
 NB. Called in locale of the base of the tree
 initparentnodes =: 'propselall'&((3 : 'coname 0 # parent =: y') traversedown 0:)
 
+NB. set all tokens in a subtree invisible
+NB. Called for the left operand of assignment when assignments are suppressed
+suppresstokens =: 'propselall'&((3 : 'tokensvisible =: y') traversedown 0:)
+
 NB. Convert all the logs to each-result-boxed form.  Called once at end of traversal
 coalescealllogs =: 'propselall'&((3 : 'coalescelog 0') traversedown 0:)
 
@@ -1501,7 +1511,7 @@ calcallestheights =: 'propselall'&((3 : 'y [ dispstealthoperand =: {. stealthope
 NB. Return selection level for each token in the input string
 NB. Result is table of (token number(s));selection level
 NB. Called in locale at the base of the tree
-gettokenlevels =: 'propseltokens'&((3 : '<displaysellevel') traversedown (3 : ('<;y';':';'<,:x,y')))
+gettokenlevels =: 'propseltokens'&((3 : '<displaysellevel,tokensvisible') traversedown (3 : ('<;y';':';'<,:x,y')))
 
 
 NB. common routines used by the object locales.  Objects are subclasses of dissectobj
@@ -1535,6 +1545,7 @@ coinsert COCREATOR
 NB. The following names are not modified after the object is cloned:
 titlestring =: ''
 tokensource =: ~. > 0 { y
+tokensvisible =: 1
 
 NB. The following names are guaranteed modified in the clone after this object is cloned:
 
@@ -2928,7 +2939,7 @@ NB. Perform a trial route
 NB. Route the nets, building up occupancy as needed
   1 routenets ({:gridblocks);<nets
 NB. Score the placement: 1 point for a crossing, a zillion for occupancy>1
-  placementscores =. placementscores , score =. (1000000 * 1 +./@:< , occupancy) + +/@, 1 1 -:"1 occupancy
+  placementscores =. placementscores , score =. (1000000 * 1 +/@:< , occupancy) + +/@, 1 1 -:"1 occupancy
 NB. If the placement is perfect, or we have gotten the max occupancy OK and have tried enough, stop looking
 NB. MAXTRIALROUTES is the 3 here
 QP^:DEBROUTE'placementscores '
@@ -2947,7 +2958,7 @@ NB. Then we add up the surplus occupancy, resetting when we hit _high-value
 NB. No problem with occupancy too high, but there were wire crossings.  See if more space will get rid of them.
 NB. We will add at most one space per empty area to try to avoid crossings.
 NB. The lookup table produces 1 if both values are >0, _1000000 if either value negative, 0 otherwise
-    bumpups =. 1 <.  (0 >. +)/\.  crosspt =. (0 0 _1000000 0 1 _1000000 _1000000 _1000000 _1000000  ) {~ 3 3 #. * occupancy
+    bumpups =. 1 <.  (0 >. +)/\. crosspt =. (0 0 _1000000 0 1 _1000000 _1000000 _1000000 _1000000  ) {~ 3 3 #. * occupancy
   end.
 NB. Now, process the blocks from the bottom up.  Each block will look at the bump-up count from the state
 NB. machine, which gives the number of cells needed since the last object was processed, and then add
@@ -2974,9 +2985,12 @@ NB.?lintonly crosspt =. 2 2 $ 0
     bumpsinlastobj =. (bumps =. 0 >. >./ ((<rows;(b { gsccolplus1)) { bumpups) + rows { bumpsinlastobj) rows} bumpsinlastobj
     bumpsinobjew =. bumps b} bumpsinobjew
   end.
-NB. Now move the blocks the specified number of grid positions - by moving all the OTHER blocks down (to avoid negative placement)
-  gridblocks =. gridblocks , ({: gridblocks) +"1"2 1 gridtoyx (-"1~ >./) bumpsinobjns,.bumpsinobjew
-QP^:DEBROUTE'bumps:?gridtoyx(-"1~>./)bumpsinobjns,.bumpsinobjew '
+  NB. Now move the blocks the specified number of grid positions - by moving all the OTHER blocks down (to avoid negative placement)
+  gridblocks =. gridblocks , ({: gridblocks) +"1"2 1 bumps =. gridtoyx (-"1~ >./) bumpsinobjns,.bumpsinobjew
+  NB. It is possible that no moves were found.  This would happen if all the overlaps were above or to the left of all the blocks.
+  NB. That should be solvable in the full route, so exit here to avoid looping
+QP^:DEBROUTE'bumps '
+  if. 0 *./@:= , bumps do. break. end.
 end.
 NB. Use the placement with the best score
 bestx =. (i. <./) placementscores
@@ -3024,7 +3038,8 @@ NB. Route the nets, one by one.  Accumulate the wires
 for_n. nets do.
   nt =. >n
 NB. Convert any directly-drawable wires to wires
-  ddrawmsk =. (source =. {.nt) directdrawok dests =. }. nt
+NB. Here we allow direct-draw for a net only is all points are direct-drawable
+  ddrawmsk =. (=&2 +. 0&(*./@:~:)) (source =. {.nt) directdrawok dests =. }. nt
   wires =. wires , 0 ,.~ source ,&}:"1 ddrawmsk # dests
 NB. Route any that are left
   if. #routedests =. (-. ddrawmsk) # dests do.
@@ -3077,10 +3092,11 @@ facerange =: 1 2 3 3 , 5 6 7 7 , 7 8 0 1 ,: 3 4 5 5
 NB. OK range values for each type of second face
 revfacerange =: 1 0 3 2 { facerange
 NB. x is source, y is table of destinations.  Each is y,x,face
-NB. Result is mask, one bit per destination, indicating that it is OK to draw that wire directly
+NB. Result is mask, one bit per destination, indicating that it is OK to draw that wire directly:
+NB. 0=no direct-draw, 1=direct-draw allowed, 2=direct-draw required (if deltax is +-1 grid)
 directdrawok =: 4 : 0
 NB. Create the angle of each wire
-angles =. angleranges I. 12 o. j.~/"1 y -"1&:(2&{."1) x
+angles =. angleranges I. 12 o. j.~/"1 yxdiff =. y -"1&:(2&{."1) x
 NB. See if the angle is in the OK range for the source face, and if the negative is in the OK range for the target face
 angleok =. (angles e. (2{x) { facerange) *. angles e."0 1 (2 {"1 y) { revfacerange
 NB. Allow the wire if no vertices in the box containing the wire's corners (adjusted inward a smidgen)
@@ -3088,8 +3104,13 @@ NB. We move the wire away from the face by one gridunit more than the calculatio
 NB. Then we use those values as corners, and look to see whether the region is clear.  We allow direct routing if so.
 movedpoints =. <. yxtogrid (0 1&{"1 +"1 ((, |."1) (0 ,~ -standoff) ,: (0 ,~ standoff+gridsize)) {~ 2&{"1) x , y  NB. Note other comp produced end+1; so does this
 interiorok =. 0 = (0 > {."1 occupancy) +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoints
-angleok *. interiorok
+NB. If the deltax is no more than 1 grid, FORCE direct-draw.  This is because we have no good way to jog over exactly 1 unit, so that
+NB. in close quarters a shift of 1 goes haywire.  We could fix this by having a jog primitive move; till then we draw direct.
+NB. We should remove direct-draw for exactly vertical runs, lest they overlap another wire.  But we don't.
+forcedirect =. ((2 * ROUTINGGRIDSIZE) > | 1 {"1 yxdiff) NB. +. (*./"1 (3 * ROUTINGGRIDSIZE) > yxdiff)
+(angleok ([ + *) forcedirect) * interiorok
 )
+routeno   =: 0   NB. Used in debugging
 
 NB. y is face direction, result is y,x move perpendicular and away from the face
 faceperpdir =: _1 0 , 1 0 , 0 _1 ,: 0 1
@@ -3119,7 +3140,7 @@ NB. be a gridpoint, is the closest gridpoint on the boundary or outside.  This w
 NB. the same parallel coordinate as the true routeend, but the other coordinate may be adjusted.
 trueroutend =. <. 2 {."1 y
 routend =. <. yxtogrid trueroutend + (gridsize-1) * 1 bwand  faces =. 2 {"1 y
-QP^:DEBROUTE'routenet:routend=?routend '
+QP^:DEBROUTE'routenet:routend=?routend trialroute '
 NB. Set the distance to all endpoints as high-value, to allow moving to that boundary point.  Use a flag value so we know when we ended
 NB. Record a distance of 0 to the source, so that our initial condition is, we just moved to the source point
 NB. ?should do this only in correct direction?
@@ -3141,8 +3162,19 @@ currdist =. 1
 ndestsfound =. 1  NB. the starting point has automatically been routed
 if. DEBROUTE do.
 routedeblog =: 0$a:
-end.   NB.?lintonly routedeblog =: 0$a:
+  if. -.trialroute do. routeno =: >: routeno end.
+  nrouteloops =: 0
+end.   NB.?lintonly routedeblog =: 0$a: [ nrouteloops =: 0
+
 while. ndestsfound < #routend do.
+
+if. DEBROUTE do.
+  nrouteloops =: >: nrouteloops
+  if. (routeno=_1) *. (nrouteloops=10) do.
+    qprintf'coname$0 '
+    13!:8 (1)
+  end.
+end.
   NB. Activate points that were put in the penalty box for being close to another route.
   NB. When they come back into play they are allowed to turn.
   actpoints =. actpoints , (0 {:: penaltypoints)
@@ -3225,14 +3257,17 @@ wires =. 0 5 $0
 for_d. }. routend,.faces do.
 NB. get the starting position / direction for the wire
   wirestart =. currpos =. 2 {. d
-NB. initialize the distance that got us to the endpoint
-  currdist =. <./ (<wirestart) { routdist
 NB. Init the variables that we will use to calculate next step:
 NB. The direction of movement, initialized to perpendicular to the destination face.  Add this to currpos to get nextpos
   dir =. (2{d) { faceperpdir
 NB. The layer number corresponding to the OPPOSITE of the direction of movement (we are
 NB. going back up the wire; the distance was stored for the other direction when we came down the wire
   currlayer =. dirtodistx -dir
+NB. initialize the distance that got us to the endpoint.  We have to look at the direction opposite the
+NB. direction of movement.  Not good enough to use the smallest direction, because the endpoint may be in the
+NB. routing area, and crossing directions may be smaller than the allowed direction
+NB. obsolete  currdist =. <./ (<wirestart) { routdist
+  currdist =. (<currpos,currlayer) { routdist
 NB. 0 if we are going ns, 1 if ew
   ew =. 0={.dir  NB. current direction of movement
 NB. The distance from nextpos to the turn positions (these are directions, amounts to add to nextpos)
@@ -3302,7 +3337,10 @@ occ =: 3 : 0
 :
 if. -. ifdefined 'trialroute' do. trialroute =. 1 end.
 if. trialroute do.
-  ((0 <: <./) {  '*' , ":@(>./))"1 (2 2 $,x) ];.0 occupancy
+  c =. ((0 <: <./) {  '*' , ":@(>./))"1 (2 2 $,x) ];.0 occupancy
+  n =. ((0 <: ]) {  '*' , ":@])@:{."1 (2 2 $,x) ];.0 occupancy
+  e =. ((0 <: ]) {  '*' , ":@])@:{:"1 (2 2 $,x) ];.0 occupancy
+  c ,. ' ' ,. n ,. ' ' ,. e
 else.
   ((0 <: <./ ) { '*' , ' -|+' {~ [: #. 0&>.)"1 (2 2 $,x) ];.0 occupancy
 end.
@@ -4833,11 +4871,10 @@ NB. If there are subDOLs, process each of them.  The operand was boxed.
   if. 3 < #vf do.
     sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
     NB.  Adjust each inner box position
-    (sdol ,"0 1 usedd ,"0 1 (<"0^:(0=L.) sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
-NB. Draw mesh for the rectangles - unless the boxing is because of collection error
-    if. -. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel do.
-      (BOXBORDERCOLOR,1) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
-    end.
+    (sdol ,"0 1 usedd ,"0 1 ((_1-FILLMASKNOCOLLECT)&bwand^:(0=L.)&.> sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
+    NB. Draw mesh for the rectangles - dotted if the boxing is because of collection error
+    collecterr =. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel
+    (BOXBORDERCOLOR,1,collecterr # PS_DOT) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
   else.
 NB. Not boxed data; draw each cell.  If the cell is error/unexecd, delete the text, since the cell
 NB. doesn't really have a value.  We leave its space as a reminder of how big it might have been
@@ -5506,6 +5543,8 @@ This error is reported as a 'length error' in the J session.
 The verb completed correctly on each cell, but the result-cells are of different types and cannot be assembled into a single result.
 
 This error is reported as 'domain error' in the J session.
+
+The result-cells that could not be assembled are shown below, with each result inside its own dashed box, so that you can see where the incompatibility arises.
 ?invalid verb
 This combination was rejected before it was even executed on its arguments.
 ?error
@@ -7118,7 +7157,7 @@ auditstg '(' , (logstring '') , (exestring__uop '') , ' (' , (exestring__yop '')
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-(<^:(0=L.)@".@>^:(0 <: y) ;: 'uop'),(yop #~ y > 1)
+(<^:(0=L.)@".@>^:(0 <: y) (1 , y=3) # ;: 'uop tokensource'),(yop #~ y > 1)
 )
 
 NB. Traversal up and down the tree.
@@ -7226,7 +7265,7 @@ estheights =: , >./ , (estheights__xop ,: estheights__yop) combineheights ,. est
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-(xop #~ y > 1),(<^:(0=L.)@".@>^:(0 <: y) ;: 'uop'),(yop #~ y > 1)
+(xop #~ y > 1),(<^:(0=L.)@".@>^:(0 <: y) (1 , y=3) # ;: 'uop tokensource'),(yop #~ y > 1)
 )
 
 NB. Traversal up and down the tree.
@@ -7513,6 +7552,7 @@ NB. Assignment does nothing and has no display (for now).  We just have to keep 
 
 NB. Assignment.  y is the stack block of the assignment fragment
 create =: 3 : 0
+'y noassign' =. y
 NB. not clonable
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -7528,6 +7568,11 @@ NB. by the object of assignment.  We will take resultissdt from the assigner.  W
 NB. the value is a noun
 if. noun bwand (<2 0) {:: y do.
   coinsert vop
+end.
+NB. If assignment is suppressed, turn off visibility in the left side
+if. noassign do.
+  tokensvisible =: 0
+  if. -. uopisname do. suppresstokens__uop 0 end.
 end.
 NB.?lintonly uop =: vop =: <'dissectverb'
 NB. Return the part of speech of the assigned value
@@ -7563,9 +7608,9 @@ NB. y is ignored - always 0 1 1
 exestring =: 3 : 0
 initloggingtable ''
 if. uopisname do.
-  auditstg '(' , uop , ' ' , cop , (exestring__vop '') , ')'
+  auditstg '(' , (tokensvisible # uop , ' ' , cop) , (exestring__vop '') , ')'
 else.
-  auditstg '((' , (exestring__uop '') , ' )' , cop , (exestring__vop '') , ')'
+  auditstg '(' , (tokensvisible # '(' , (exestring__uop '') , ' )' , cop) , (exestring__vop '') , ')'
 end.
 )
 
@@ -8070,7 +8115,8 @@ if. ('&.' -: (<1 1) {:: y) *. (verb -: (<2 0) {:: y) do.
     create ({.y) ,: adv;''; ; (<1 2;2) { y return.
   end.
 end.
-create_dissectobj_ f. (<2 1) { y
+NB. obsolete create_dissectobj_ f. (<2 1) { y
+create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
 'uop0 cop0 vop0' =: 'uop cop vop' =: 1 {"1 y  NB. Save under private names so we can return defstring
 NB.?lintonly uop0 =: vop0 =: vop =: <'dissectverb' [ cop0 =: '&.:'
@@ -9037,7 +9083,8 @@ coinsert 'dissectdisplaytwo dissectselectshape dissectobj'
 
 NB. y is locale of u;titlestring to display in rank stack
 create =: 3 : 0
-create_dissectobj_ f. '';$0   NB. no string, no tokens
+NB. obsolete create_dissectobj_ f. '';$0   NB. no string, no tokens
+create_dissectobj_ f. a:   NB. no string, no tokens
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the locale of u
@@ -9065,7 +9112,7 @@ NB.?lintsaveglobals
 )
 
 calcestheights =: 3 : 0
-estheights =: estheights__uop combineheights ,1     NB. add 1 for expansion node
+estheights =: estheights__uop  NB. u is inherited, so just keep its height
 )
 
 NB. return string form of operands, not including instrumentation
@@ -9536,7 +9583,7 @@ defstring__uop y
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-<^:(0=L.)@".@>^:(0 <: y) ,<'uop'
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3)) # ;: 'uop tokensource'
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -10776,7 +10823,7 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop uops
 NB. Return the locales for propsel
 proplocales =: 3 : 0
 NB. Include u if we want non-nouns (including clone), or if it's a verb
-<^:(0=L.)@".@>^:(0 <: y) (((y~:0)+.vvv),1 1) # ;: 'uop cop vop'
+<^:(0=L.)@".@>^:(0 <: y) (((y~:0)+.vvv),1 1,y=3) # ;: 'uop cop vop tokensource'
 )
 
 NB. Traversal up and down the tree.
@@ -10874,7 +10921,7 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') 
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-<^:(0=L.)@".@>^:(0 <: y) ;: 'uop vop'
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3), 1) # ;: 'uop tokensource vop'
 )
 
 NB. Traversal up and down the tree.
@@ -11648,6 +11695,14 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 'crash9_dissect_ :: >:"0 (3 6 9 12)'
 2 dissect 'crash9_dissect_@+/ 4 3 3 2 1'
 2 dissect 'crash9_dissect_@+/ 0 , 1 , 2 , 3 ,: i. 2 2'
+2 dissect 1 [ wd 'clipcopy *' , '3 + 5'
+2 dissect ". :: 0: '2 3 + 4 5 6'
+2 dissect '<^:(0 > '''' $ ])"0 (1 _1 2)'
+'The name ''t'' was previously assigned in this sentence, but assignments are ignored.' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect 't + 2 * t =. 4'
+'The name ''t'' was previously assigned in this sentence, but assignments are ignored when dissect is called from the debugger.' (0 0 $ 13!:8@1:^:(-.@-:)) 14 dissect 't + 2 * t =. 4'
+a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 4 dissect 'a =: 5' [ 'a b' =. 3 4
+a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 4 dissect '(''a'') =: 5' [ 'a b' =. 3 4
+(a,b) (] [ 3 4 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 4 dissect '''a b'' =: 5' [ 'a b' =. 3 4
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
@@ -11673,4 +11728,3 @@ crash9 =: ([ [ 13!:8^:]@(9 e. ,))"0
 0!:1 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 )
-   
