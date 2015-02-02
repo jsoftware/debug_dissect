@@ -42,12 +42,10 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. tooltips for dual are confusing
-NB.   in localeat, use trailing space to suppress title; use '@: ' as name
-NB.   in localecompose, remove . in cop; keep name of &.[:] in dual
-NB.   in localecompose, tooltip correctly if . in cop
-NB. finish tooltip details starting with &.
-NB. dissect '+/@> 3 4;5 6 7'  tooltips are confusing: However in > and no compound mentioned in +/
+NB. dissect '+:`*:`%:@.]"0@> 1 2 0;_1 0'   select, then hover over " - gives 'intermediate result' msg 
+NB. be less wordy when multiple compounds end simultaneously
+NB. dissect '*:@:(* +:)@+:^:2 i. 5'   labels for ^: node need work - especially when power 0 or 1 is selected.
+NB. In (*: +:)/, the / line for the u of hook has rank _, should be 1
 NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
@@ -2088,7 +2086,7 @@ NB. we detect the failure at the same point J would: so 1.5 u/ y would fail on u
 NB. Continue narrowing the search for the error
 NB. If there is a frame, select the first non-executing cell.  For us to get here, any selectable higher levels
 NB. must have selected, so we will be adding to a selection chain.
-          if. selectable do.
+          if. #failingisf =. selframe getfailingisf #selx do. 
 NB. we should have had errors at higher levels, which will have set the previous selectors
             assert. sellevel <: #selections  [ 'error in sniff'
 NB. During sniff, each error is propagated down separately.  We append the new error to the previous.
@@ -2099,7 +2097,7 @@ NB. In normal debugging, selectors are added from the root outward.  If a select
 NB. the root, we don't propagate the selection back to the root, on the theory that if the user
 NB. wanted to select at the root, they could have.
 NB. The error selector must have the correct structure for the current node
-            makeselection , < selframe getfailingisf #selx
+            makeselection , failingisf
             QP^:DEBTRAVDOWN 'edisp'''' $selections selections '
           end.
         end.
@@ -4975,16 +4973,21 @@ NB. Some may be entended with selection levels when they are created.
 NB. The number is the detail level at which the value is display
 exegesismorphemes =. 3&{.@;:;._2 (0 : 0)
 EXEGESISTUTORIAL 2 Tutorial
+EXEGESISRANKOVERALLNODISP 0 Description
+EXEGESISRANKOVERALLCOMPEND 0 Description
+EXEGESISRANKOVERALLNOOPS 0 Description
 EXEGESISRANKOVERALLEXPLAIN 0 Description
 EXEGESISRANKSTACKEXPLAIN 0 Description
 EXEGESISRANKSTACKPOWERSTART 0 Description
 EXEGESISRANKSTACKPARTITIONSTART 0 Description
-EXEGESISFRAMENOFRAME 1 Frame
+EXEGESISVERBDESC 0 Verb
+EXEGESISONELINEDESC 0 Verb
 EXEGESISFRAMENUGATORY 1 Frame
 EXEGESISFRAMENONNOUN 1 Frame
 EXEGESISFRAMENOSHAPE 1 Frame
 EXEGESISFRAMEVALID 1 Frame
 EXEGESISFRAMESURROGATE 1 Frame
+EXEGESISFRAMENOFRAME 1 Frame
 EXEGESISSHAPESELECTINGVERB 0
 EXEGESISSHAPEFRAME 0
 EXEGESISSHAPERESULT 0
@@ -4993,30 +4996,55 @@ EXEGESISDATASHAPE 1
 EXEGESISDATAPATH 1
 EXEGESISDATAARRANGEMENT 1
 EXEGESISDATAEXPLORABLE 0
-EXEGESISVERBDESC 0 Verb
-EXEGESISONELINEDESC 0 Verb
 )
 ({."1 exegesismorphemes) =: i. # exegesismorphemes
 exegesislevels =: (1) 0&".@{::"1 exegesismorphemes
 exegesislabels =: 2 {"1 exegesismorphemes
+
+NB. Instructions for pruning
+NB.
+NB. Type: set of tags;set of excluded tags.  Excluded tags are deleted if they appear after a tag in the set
+NB. the filter is applied BEFORE sorting into grammatical order
+tagsexcludebefore =: _2 ]\ (EXEGESISRANKOVERALLNODISP) ; (EXEGESISRANKOVERALLCOMPEND,EXEGESISRANKOVERALLNOOPS) ; (EXEGESISRANKOVERALLNOOPS) ; (EXEGESISRANKOVERALLNOOPS)
+NB. Type: set of tags;set of excluded tags.  Excluded tags are deleted if they appear after a tag in the set
+NB. the filter is applied AFTER sorting into grammatical order
+tagsexcludeafter =: _2 ]\ (EXEGESISFRAMENUGATORY,EXEGESISFRAMENOSHAPE,EXEGESISFRAMENONNOUN,EXEGESISFRAMEVALID,EXEGESISFRAMESURROGATE) ; (EXEGESISFRAMENOFRAME)
+
+NB. Instructions for formatting
+NB. Type: tag set A;tag set B    if an A is followed by a B, add a LF to the A
+taginsertLF =: _2 ]\ (EXEGESISRANKOVERALLCOMPEND);(EXEGESISRANKOVERALLCOMPEND,EXEGESISRANKOVERALLNOOPS)
+
+NB. y is string
+NB. we look for %strt%...%end%; after finding it, we remove any matching strings from the remainder of the file,
+NB. and recur on the remnant
+remstrtend =: 3 : 0
+if. 0 = #suff =. '%strt%' dropto y do. y return. end.
+pref =. '%strt%' taketo y
+stg =. '%end%' dropafter suff
+rest =. remstrtend ('%end%' takeafter suff) rplc stg;''
+pref,(_5 }. 6 }. stg),rest
+)
 
 NB. y is a table of morphemes; turn them into a displayable string
 exegesisgrammar =: 3 : 0
 tt =. y
 NB. Cull the morphemes that are below the user's culling level
 tt =. (tooltipdetailx >: exegesislevels {~ 0 {::"1 tt) # tt
+NB. Cull excluded tags
+tt =. tt #~ -. +./ (> 0 {"1  tt) ([: (*. |.!.0)~/ (e. >)"_ 0)"1 tagsexcludebefore
 NB. Order them in grammatical order
 tt =. tt /: > 0 {"1 tt
-NB. The 'no frame' line is provided only to prevent dead air.  Delete it if there is anything else to say about frame.
+NB. Cull excluded tags
+tt =. tt #~ -. +./ (> 0 {"1  tt) ([: (*. |.!.0)~/ (e. >)"_ 0)"1 tagsexcludeafter
+NB. Insert LF as required
+tt =. ({."1 tt) ,. ({:"1 tt) (, #&LF)&.>   +./ (> 0 {"1  tt) ([: (*.   1 |.!.0 ])/ (e. >)"_ 0)"1 taginsertLF
 tags =.  > 0 {"1 tt
-if. ((#tags) > nft =. tags i. EXEGESISFRAMENOFRAME) *. (EXEGESISFRAMENUGATORY,EXEGESISFRAMENOSHAPE,EXEGESISFRAMENONNOUN,EXEGESISFRAMEVALID,EXEGESISFRAMESURROGATE) +./@:e. tags do.
-  tt =. (<<<nft) { tt
-  tags =. (<<<nft) { tags
-end.
 NB. Insert fences before each new nonnull topic
 fencewords =. (] ((~:@] *. a: ~: [) #&.> ]) ((LF,'---') , ('---------------------',LF) ,~ ])&.>) tags { exegesislabels
 NB. Run the result together, and delete all but the last LF, and any leading LF, and allow no more than 3 consecutive LF
 runtext =. (#~   [: -. (LF,LF,LF)&E.) (}.~    LF i.&0@:= ]) ({.~ 2 + LF i:&0@:= ]) ; fencewords ,. 1 {"1 tt
+NB. Remove duplicated strt,end pairs
+runtext =. remstrtend runtext
 NB. Delete the first %al1%, replace others by 'also'
 runtext =. '%al1%' (taketo , takeafter) runtext
 if. #sx =. '%al1%' ss runtext do. runtext =. 'also ' (sx +/ i. #'also ')} runtext end.
@@ -5068,7 +5096,11 @@ elseif. _ *./@:= vranks do.
   NB. report NOFRAME for them
   res =. ,: EXEGESISFRAMENOFRAME;'This verb has infinite rank and always applies to its entire argument',((2=#inputselopshapes)#'s'),'.',LF    NB. If only 1 cell, can't analyze
 elseif. 0 = #frame do.
-  res =. ,: EXEGESISFRAMENOFRAME;'This verb is operating on a single cell',((2=#inputselopshapes)#' of each argument'),'.',LF    NB. If only 1 cell, can't analyze
+  if. 2=#inputselopshapes do.
+    res =. ,: EXEGESISFRAMENOFRAME;'Each argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
+  else.
+    res =. ,: EXEGESISFRAMENOFRAME;'The argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
+  end.
 elseif. do.
   NB. There is a frame.  Describe it
   shapes =. $^:(0<L.)&.> inputselopshapes
@@ -5150,6 +5182,36 @@ elseif. do.
 end.
 res
 )
+
+NB. ********** rankoverall exegesis lines ************************
+
+NB. y is appearstwice;startlabel if any
+NB. Result is type;string for end-of-computation that has operands
+exegisisrankoverallcompend =: 3 : 0
+'appearstwice tit vname' =. 3 {. y , <'verb'
+select. appearstwice , errorcode e. EHASFILLMASK
+case. 1 1 do.
+  EXEGESISRANKOVERALLCOMPEND;'This block %al1%calculates and displays the ',vname,':',LF,(defstring 0),CR
+case. 0 1 do.
+  EXEGESISRANKOVERALLCOMPEND;'This block %al1%displays the result of the ',vname,':',LF,(defstring 0),CR,'%strt%and shows the last verb in the computation',tit,'.',LF,'%end%'
+case. 1 0 do.
+  EXEGESISRANKOVERALLNOOPS;'This block will %al1%highlight the result of the ',vname,':',LF,(defstring 0),CR,'after a selection has been made.',LF
+case. do.
+  EXEGESISRANKOVERALLNOOPS;'This block will %al1%highlight the result of the ',vname,':',LF,(defstring 0),CR,'after a selection has been made.',LF
+end.
+)
+NB. y is appearstwice;startlabel if any
+NB. Result is type;string for end-of-computation that has no display
+exegisisrankoverallnodisp =: 3 : 0
+'appearstwice tit vname' =. 3 {. y , <'verb'
+if. appearstwice do.
+  t =. 'This block will %al1%calculate and display the ',vname,':',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
+else.
+  t =. 'This block will %al1%display the result of the ',vname,':',LF,(defstring 0),CR,'and show the last verb in the computation',tit,'.  Sufficient selections must be made for this result to appear.',LF
+end.
+EXEGESISRANKOVERALLNODISP;t
+)
+
 
 NB. ******************* class-dependent portion of display and pick support **********************
 cocurrent 'dissectobj'
@@ -6266,8 +6328,10 @@ operationfailed =: 0:
 
 NB. x is the frame of the full expected result
 NB. y is the number of results we actually got
-NB. result is index list of the failing location, in natural order
-getfailingisf =: #:
+NB. result is selection to apply: boxed index list of the failing location, in natural order, or empty if no selection
+getfailingisf =: 4 : 0
+if. selectable do. < x #: y else. '' end.
+)
 
 NB. y is the new selection (boxed, and possibly with an initialselection following)
 NB. Result is signum of (sel - error spot): 1 if invalid, 0 if on the error, _1 if no error
@@ -6457,12 +6521,13 @@ NB.?lintonly 'selopshapes frame selections sellevel' =: (2$a:);($0);(1$a:);0
 
 NB. x is the frame of the full expected result
 NB. y is the number of results we actually got
-NB. result is index list of the failing location, in natural order.
+NB. result is selection to apply: boxed index list of the failing location, in natural order, or empty if no selection
 NB. Since only expansion nodes come through here, append SFOPEN to complete the selection
 getfailingisf =: 4 : 0
-NB.?lintonly SFOPEN =. SFOPEN_dissectobj_
-SFOPEN ;~ x #: _1 - y  NB. count back from the end
+NB.?lintonly SFOPEN =. SFOPEN_dissectobj_ [ selectable =: 0
+if. selectable do. < SFOPEN ;~ x #: _1 - y else. '' end. NB. count back from the end
 )
+
 
 cocurrent 'dissectallnouns'
 
@@ -7254,12 +7319,12 @@ NB.?lintsaveglobals
 
 NB. x is the frame of the full expected result
 NB. y is the number of results we actually got
-NB. result is index list of the failing location, in natural order (i. e. selector order)
+NB. result is selection to apply: boxed index list of the failing location, in natural order, or empty if no selection
 getfailingisf =: 4 : 0
 NB. We need to select the starting index of the recursion that would have been next to finish - that is
 NB. where the error is
 NB. We add a dropdown, since this is a selection node
-(< ,endforstart i. y) , SFOPEN
+if. selectable do. < (< ,endforstart i. y) , SFOPEN else. '' end.
 )
 
 NB. We say that a cell was executed if it started, regardless of whether it finished.
@@ -7618,13 +7683,13 @@ else.
   t =. 'This is the first part of the verb:',LF,(defstring 0),CR
   select. appearstwice, datapresent
   case. 0 0 do.
-    t =. t , '  This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
+    t =. t , 'This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
   case. 0 1 do.
-    t =. t , '  This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
+    t =. t , 'This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
   case. 1 0 do.
-    t =. t , '  When a single result-cell is selected, this block will contain the result.',LF
+    t =. t , 'When a single result-cell is selected, this block will contain the result.',LF
   case. do.
-    t =. t , '  This block contains the result.',LF
+    t =. t , 'This block contains the result.',LF
   end.
    res =. ,: EXEGESISRANKSTACKEXPLAIN;t
 end.
@@ -7636,18 +7701,13 @@ appearstwice =. x
 'datapresent endflag linetext' =. y
 if. DLRCOMPEND -: linetext do.
   NB. This is the 'end-of-computation' node.  Put out the description
-  tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring 
-  select. appearstwice , datapresent
-    case. 0 0 do. NB. start is elsewhere, no display
-    t =. 'This block will %al1%display the result of the verb:',LF,(defstring 0),CR,'and show the last verb in the computation',tit,'.  Sufficient selections must be made for this result to appear.',LF
-    case. 0 1 do. NB. start is elsewhere, with display
-    t =. 'This block %al1%displays the result of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation',tit,'.',LF
-    case. 1 0 do. NB. start and end here, no display
-    t =. 'This block will %al1%calculate and display the verb:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
-    case. do. NB. start and end here, with display
-    t =. 'This block %al1%calculates and displays the verb:',LF,(defstring 0),CR
+  tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
+  if. datapresent do.
+    res =. exegisisrankoverallcompend appearstwice;tit
+  else.
+    res =. exegisisrankoverallnodisp appearstwice;tit
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t,LF,LF
+  res
 else.
   0 2$a:
 end.
@@ -7808,13 +7868,13 @@ else.
   t =. 'This is the first part of the verb:',LF,(defstring 0),CR
   select. appearstwice, datapresent
   case. 0 0 do.
-    t =. t , '  This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
+    t =. t , 'This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
   case. 0 1 do.
-    t =. t , '  This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
+    t =. t , 'This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
   case. 1 0 do.
-    t =. t , '  When a single result-cell is selected, this block will contain the result.',LF
+    t =. t , 'When a single result-cell is selected, this block will contain the result.',LF
   case. do.
-    t =. t , '  This block contains the result.',LF
+    t =. t , 'This block contains the result.',LF
   end.
    res =. ,: EXEGESISRANKSTACKEXPLAIN;t
 end.
@@ -7827,17 +7887,12 @@ appearstwice =. x
 if. DLRCOMPEND -: linetext do.
   NB. This is the 'end-of-computation' node.  Put out the description
   tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring 
-  select. appearstwice , datapresent
-    case. 0 0 do. NB. start is elsewhere, no display
-    t =. 'This block will %al1%display the result of the verb:',LF,(defstring 0),CR,'and show the last verb in the computation',tit,'.  Sufficient selections must be made for this result to appear.',LF
-    case. 0 1 do. NB. start is elsewhere, with display
-    t =. 'This block %al1%displays the result of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation',tit,'.',LF
-    case. 1 0 do. NB. start and end here, no display
-    t =. 'This block will %al1%calculate and display the verb:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
-    case. do. NB. start and end here, with display
-    t =. 'This block %al1%calculates and displays the verb:',LF,(defstring 0),CR
+  if. datapresent do.
+    res =. exegisisrankoverallcompend appearstwice;tit
+  else.
+    res =. exegisisrankoverallnodisp appearstwice;tit
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t,LF,LF
+  res
 else.
   0 2$a:
 end.
@@ -8037,13 +8092,13 @@ else.
   t =. 'This is the first part of the verb:',LF,(defstring 0),CR
   select. appearstwice, datapresent
   case. 0 0 do.
-    t =. t , '  This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
+    t =. t , 'This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
   case. 0 1 do.
-    t =. t , '  This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
+    t =. t , 'This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
   case. 1 0 do.
-    t =. t , '  When a single result-cell is selected, this block will contain the result.',LF
+    t =. t , 'When a single result-cell is selected, this block will contain the result.',LF
   case. do.
-    t =. t , '  This block contains the result.',LF
+    t =. t , 'This block contains the result.',LF
   end.
    res =. ,: EXEGESISRANKSTACKEXPLAIN;t
 end.
@@ -8055,18 +8110,14 @@ appearstwice =. x
 'datapresent endflag linetext' =. y
 if. DLRCOMPEND -: linetext do.
   NB. This is the 'end-of-computation' node.  Put out the description
-  tit =. (*#titlestring) # 'which started in the block(s) marked with ',titlestring 
-  select. appearstwice , datapresent
-    case. 0 0 do. NB. start is elsewhere, no display
-    t =. 'This block will %al1%display the result of the verb:',LF,(defstring 0),CR,tit,', and will contain the computation of the inverse.  Sufficient selections must be made for this result to appear.',LF
-    case. 0 1 do. NB. start is elsewhere, with display
-    t =. 'This block %al1%displays the result of the verb:',LF,(defstring 0),CR,tit,' and contains the computation of the inverse.  Inverses cannot be probed and are displayed in a single block.',LF
-    case. 1 0 do. NB. start and end here, no display
-    t =. 'This block will %al1%calculate and display the verb:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
-    case. do. NB. start and end here, with display
-    t =. 'This block %al1%calculates and displays the verb:',LF,(defstring 0),CR
+  tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring,', '
+  tit =. tit , 'and contains the computation of the inverse.  Inverses cannot be probed and are displayed in a single block.'
+  if. datapresent do.
+    res =. exegisisrankoverallcompend appearstwice;tit
+  else.
+    res =. exegisisrankoverallnodisp appearstwice;tit
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t,LF,LF
+  res
 else.
   0 2$a:
 end.
@@ -8194,16 +8245,16 @@ else.
   if. lastinblock do.   NB. If we are the last block, save description for the end
     res =. 0 2$a:
   else.
-    t =. 'The verb is:',LF,(defstring__uop 0),CR
+    t =. 'The verb is:',LF,(defstring 0),CR
     select. appearstwice, datapresent
     case. 0 0 do.
-      t =. t , '  This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
+      t =. t , 'This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
     case. 0 1 do.
-      t =. t , '  This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
+      t =. t , 'This block contains an intermediate result for the verb.  The overall result is shown in the final block of the verb.',LF
     case. 1 0 do.
-      t =. t , '  When a single result-cell is selected, this block will contain the result.',LF
+      t =. t , 'When a single result-cell is selected, this block will contain the result.',LF
     case. do.
-      t =. t , '  This block contains the result.',LF
+      t =. t , 'This block contains the result.',LF
     end.
 
     res =. ,: EXEGESISRANKSTACKEXPLAIN;t
@@ -8217,17 +8268,13 @@ appearstwice =. x
 'datapresent endflag linetext' =. y
 if. DLRCOMPEND -: linetext do.
   NB. This is the 'end-of-computation' node.  Put out the description
-  select. appearstwice , datapresent
-    case. 0 0 do. NB. start is elsewhere, no display
-    t =. 'This block will %al1%display the result of the verb:',LF,(defstring 0),CR,'and show the last verb in the computation, which started in the block(s) marked with ',titlestring,' .  Sufficient selections must be made for this result to appear.',LF
-    case. 0 1 do. NB. start is elsewhere, with display
-    t =. 'This block %al1%displays the result of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation, which started in the block(s) marked with ',titlestring,' .',LF
-    case. 1 0 do. NB. start and end here, no display
-    t =. 'This block will %al1%calculate and display the verb:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
-    case. do. NB. start and end here, with display
-    t =. 'This block %al1%calculates and displays the verb:',LF,(defstring 0),CR
+  tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
+  if. datapresent do.
+    res =. exegisisrankoverallcompend appearstwice;tit
+  else.
+    res =. exegisisrankoverallnodisp appearstwice;tit
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t,LF,LF
+  res
 else.
   0 2$a:
 end.
@@ -8384,29 +8431,23 @@ appearstwice =. x
 'datapresent endflag linetext' =. y
 if. DLRCOMPEND -: linetext do.
   NB. This is the 'end-of-computation' node.  Put out the description
-  select. appearstwice , datapresent
-    case. 0 0 do. NB. start is elsewhere, no display
-    t =. 'This block will %al1%display the result of the verb:',LF,(defstring 0),CR,'and show the last verb in the computation, which started in the block(s) marked with ',titlestring,' .  Sufficient selections must be made for this result to appear.',LF
-    case. 0 1 do. NB. start is elsewhere, with display
-    t =. 'This block %al1%displays the result of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation, which started in the block(s) marked with ',titlestring,' .',LF
-    case. 1 0 do. NB. start and end here, no display
-    t =. 'This block will %al1%calculate and display the verb:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
-    case. do. NB. start and end here, with display
-    t =. 'This block %al1%calculates and displays the verb:',LF,(defstring 0),CR
+  tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
+  if. datapresent do.
+    res =. exegisisrankoverallcompend appearstwice;tit
+  else.
+    res =. exegisisrankoverallnodisp appearstwice;tit
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t,LF,LF
+  res
 else.
   0 2$a:
 end.
 )
 
 
-NB. x is the frame of the full expected result
-NB. y is the number of results we actually got
-NB. result is selector of the failing location, in natural order
 getfailingisf =: 4 : 0
-if. levelunused +. cop -: 'S:' do. x getfailingisf_dissectobj_ f. y
-else. 1j1 #!.SFOPEN > resultseqmap pathfromindex y
+if. -. selectable do. ''
+elseif. levelunused +. cop -: 'S:' do. x getfailingisf_dissectobj_ f. y
+elseif. do. < 1j1 #!.SFOPEN > resultseqmap pathfromindex y
 end.
 )
 
@@ -8485,7 +8526,6 @@ else.
 end.
 )
 
-NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 NB. **** m/ u/ ****
 primlocale '/'
 
@@ -8574,9 +8614,8 @@ forcedsel =. displayautoexpand2 *. nitems = 2
 NB. Expansion is called for if there is a forced selection OR if the user has clicked on our result, which we detect by
 NB. seeing our initialselection in the selections
 shouldexpand =: forcedsel +. sellevel < #selections
-NB. Expansion-click is allowed whenever there is more than 1 item in the input, except when the selection is forced
+NB. Allow forced-select only if there is something to see
 if. (-. forcedsel) *. 1 < nitems do. initialselection =: <(<,0),SFOPEN end.
-
 NB. Run the expansion
 resdol =. x traverse__uop forcedsel;shouldexpand;< travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
 if. forcedsel do.
@@ -8597,6 +8636,11 @@ resdol
 NB.?lintsaveglobals
 )
 
+getfailingisf =: 4 : 0
+<(<,0),SFOPEN
+)
+
+NB. We treat this as an overall since it does only one thing
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
 if. datapresent do.
@@ -8607,10 +8651,11 @@ if. datapresent do.
   else.
     t =. t , 'Click on the result to see the details of the calculation.',LF
   end.
+  res =. EXEGESISRANKOVERALLCOMPEND;t
 else.
-  t =. 'This will %al1%display the final result of the verb:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
+  res =. exegisisrankoverallnodisp 1;''
 end.
-,: EXEGESISRANKSTACKEXPLAIN;t
+res
 )
 
 NB. The dyadic valence:
@@ -8758,11 +8803,12 @@ NB.?lintsaveglobals
 )
 
 exegesisrankstack =: 3 : 0
+'appearstwice lastinblock datapresent' =. y
 if. formatcode = 0 do.
   NB. This is the special '/ on 2 items' box.
   ,: EXEGESISRANKSTACKEXPLAIN;'The monadic verb ',LF,(defstring 0),CR,'is applied to an array with 2 items. It is displayed as a dyad, with both x and y arguments coming from the input to the monad.',LF,LF,'This block is a starting point for the dyad.',LF
 else.
-  select. y
+  select. appearstwice,lastinblock
   case. 1 0 do.  NB. All computation in this block
      ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the intermediate results of the verb:',LF,(defstring 0),CR
   case. 0 0 do.  NB. Computation ends in another block
@@ -9124,13 +9170,15 @@ if. datapresent do.
     case.  do.   NB. traverseu, expansion or u created
       t =. t , astg , LF,'The block feeding into this one shows the powers that were calculated. To remove the detail, click in the result of this block.',LF
     end.
+    type =. EXEGESISRANKOVERALLCOMPEND
   else.
     t =. t , astg , LF,'Select a result-cell to see the powers that produced it.'
+    type =. EXEGESISRANKOVERALLNOOPS
   end.
 else.
-  t =. 'This will display the final result of the verb:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
+  'type t' =. exegisisrankoverallnodisp 1;titlestring
 end.
-,: EXEGESISRANKSTACKEXPLAIN;t
+,: type;t
 )
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
@@ -9158,27 +9206,30 @@ NB. y is the number of results we actually got
 NB. result is index list of the failing location, in natural order
 NB. This turns ticket order to selection order
 getfailingisf =: 4 : 0
-NB. Calculating the failing index for ^: is a chore.  We have to figure out what failed - the forward
-NB. or the inverse - and then get an index to whichever failed.  That will set up the selector to find the
-NB. failure in the expansion.  To decide what failed, we have to nose around in the expansion data
-NB. First, we have to find the matching indexes in the expansion
-selx =. ; findselection__uop > selector
-NB. Calculate the expected frame/inversect: the number of results expected (including the 0 'result') and
-NB. the number of negative results expected.  _ means 'don't know'.  If there are both positive.  This is needed
-NB. so we can detect an error during sniff
-fi =. (>./ , [: - <./) 0 , flatvval =. , (- *)@>^:(1 = L.) vval
-NB. Count the number of forward and inverse executions
-fix =. -/\. (# , +/) selx { logvaluesd__uop
-NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
-NB.  or if there is a mix of forward and backward execs
-throwaway =. (1 1 -: * fi) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) (-.logvaluesd__uop) #&(selx&{) logvalues__uop
-NB. correct the number of executions: forward includes the 0 value, and also counts a throwaway execution sometimes
-fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
-NB. Decide which direction failed - if any.  Infinities can only come up when we are going in one direction
-edir =. fi i.&1@:> fix
-NB. If neither direction failed, the error must have happened during framing.  Ignore that for the nonce
-NB. Find the member of vval that is the largest in the direction of error.  That will be the one we select
-x #: (i. >./) (edir { 1 _1 1) * flatvval
+if. selectable do.
+  NB. Calculating the failing index for ^: is a chore.  We have to figure out what failed - the forward
+  NB. or the inverse - and then get an index to whichever failed.  That will set up the selector to find the
+  NB. failure in the expansion.  To decide what failed, we have to nose around in the expansion data
+  NB. First, we have to find the matching indexes in the expansion
+  selx =. ; findselection__uop > selector
+  NB. Calculate the expected frame/inversect: the number of results expected (including the 0 'result') and
+  NB. the number of negative results expected.  _ means 'don't know'.  If there are both positive.  This is needed
+  NB. so we can detect an error during sniff
+  fi =. (>./ , [: - <./) 0 , flatvval =. , (- *)@>^:(1 = L.) vval
+  NB. Count the number of forward and inverse executions
+  fix =. -/\. (# , +/) selx { logvaluesd__uop
+  NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
+  NB.  or if there is a mix of forward and backward execs
+  throwaway =. (1 1 -: * fi) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) (-.logvaluesd__uop) #&(selx&{) logvalues__uop
+  NB. correct the number of executions: forward includes the 0 value, and also counts a throwaway execution sometimes
+  fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
+  NB. Decide which direction failed - if any.  Infinities can only come up when we are going in one direction
+  edir =. fi i.&1@:> fix
+  NB. If neither direction failed, the error must have happened during framing.  Ignore that for the nonce
+  NB. Find the member of vval that is the largest in the direction of error.  That will be the one we select
+  < x #: (i. >./) (edir { 1 _1 1) * flatvval
+else. ''
+end.
 )
 
 NB. y is the new selection (boxed, and possibly with an initialselection following)
@@ -9361,20 +9412,24 @@ exegesisrankoverall =: 4 : 0
 appearstwice =. x
 'datapresent endflag linetext' =. y
 if. DLRCOMPEND -: linetext do.
+  tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
   NB. Display overall explanation only on the end-of-computation marker
   if. appearstwice do.  NB. start and end in same block
-    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'and displays the last verb of the computation. Computation of the power starts in the block(s) labeled ^: .',LF
+    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'and displays the selected result. '
   else.
-    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'and displays the selected result.'
+    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'%strt%and shows the last verb in the computation',tit,'.',LF,'%end%'
   end.
-  if. selectedpower = 0 do.
-    t =. t , 'In this case, the power being computed is 0, so there is no computation to view.',LF
+  NB. Get the selection that has been inited or clicked
+  sel1 =. > {. > isfensureselection isftorank2 sellevel { selections
+  if. sel1 = 0 do.
+    t =. t , 'In this case, the power selected is 0, which is the original y: there is no computation to view.',LF
   else.
     t =. t , LF,'The boxes in the display shows the results of succeeding applications of the verb. The first box shows power 0 (the original y argument), '
     t =. t , 'the second shows power ',(":*selectedpower),', and so on. '
-    t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. ',LF
+    t =. t , 'Currently the selected power is ',(": sel1),'. '
+    t =. t , 'Select any power to see how it was calculated. Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. ',LF
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t
+  ,: EXEGESISRANKOVERALLCOMPEND;t
 else.
   0 2$a:
 end.
@@ -9872,40 +9927,38 @@ appearstwice =. x
 'datapresent endflag linetext' =. y
 NB. This block is pointed to 3 times: u/. in the selector, 0 in the expansion, and /. at the start of computation
 if. DLRCOMPEND -: linetext do.
-  NB. This block has the expansion result, and possibly the whole thing
+  NB. This block has the expansion result, and possibly the whole expansion.  There will always be data, unless there is an error
 NB. obsolete   if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
-  if. datapresent do.
-    if. selectable *. sellevel < #selections do.
-      'ctext stext' =. (x{::'shows the result of';'calculates');''
-    else.
-      'ctext stext' =. (x{::'will show the result of';'will calculate');'after a selection is made.',LF
-    end.
-  else.
-    'ctext stext' =. (x{::'will show the result of';'will calculate');'after a single partition has been selected.',LF
-  end.
+  tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
   if. appearstwice do.
-    t =. 'This block %al1%',ctext,' the selected partition of',LF,(defstring 0),CR,stext
+    t =. 'This block %al1%calculates the selected partition of',LF,(defstring 0),CR,'This partition ',(exegesispartitiondesc''),'.',LF
   else.
-    t =. 'This block %al1%',ctext,' the selected partition of',LF,(defstring 0),CR,'including the last verb of the computation. Computation of the partition starts in the block(s) labeled ',cop,' .',LF
+    t =. 'This block %al1%shows the result of the selected partition of',LF,(defstring 0),CR,'including the last verb of the computation',tit,'.  This partition ',(exegesispartitiondesc''),'.',LF
   end.
+  res =. ,: EXEGESISRANKOVERALLCOMPEND;t
 elseif. endflag do.
   NB. u/. 
-  t =. LF,'This block %al1%shows the result of the verb:',LF,(defstring 0),CR,'which ',(exegesispartitiondesc''),'.',LF
-  if. #selframe do.
-    t =. t , LF,'The results of execution on the partitions are assembled into ',(exegesisindefinite exegesisfmtcell selframe;''),' of result-cells.',LF
-  end.
-  if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
-    if. selectable *. sellevel < #selections do.
-      t =. t , LF ,'The computation of the selected partition starts in the block(s) labeled ',cop,' and ends in the block feeding into this one.',LF
-    else.
-      t =. t , LF,'To see the calculation of a single partition, select its result',LF
+  if. datapresent do.
+    t =. LF,'This block %al1%shows the result of the verb:',LF,(defstring 0),CR,'which ',(exegesispartitiondesc''),'.',LF
+    if. #selframe do.
+      t =. t , LF,'The results of execution on the partitions are assembled into ',(exegesisindefinite exegesisfmtcell selframe;''),' of result-cells.',LF
     end.
+    if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
+      if. selectable *. sellevel < #selections do.
+        t =. t , LF ,'The computation of the selected partition starts in the block(s) labeled ',cop,' and ends in the block feeding into this one.',LF
+      else.
+        t =. t , LF,'To see the calculation of a single partition, select its result',LF
+      end.
+    end.
+    res =. ,: EXEGESISRANKOVERALLEXPLAIN;t
+  else.
+    res =. ,: exegisisrankoverallnodisp appearstwice;''
   end.
 elseif. do.
   NB. must be /. to start a computation.  That displays only as rankstack, never as overall
-  t =. ''
+  res =. 0 2$a:
 end.
-,: EXEGESISRANKOVERALLEXPLAIN;t
+res
 )
 
 NB. conjunction partitions ;.
@@ -10533,6 +10586,7 @@ NB. is hope for a later traversal.  If there is no selection, we don't know whic
 NB.?lintonly vval =: 0
 if. (errorcode__vop > EOK) +. -. *./ selopinfovalid do.
   vselect =. <EMPTYPRH   NB. Indic no v highlight
+  rankhistory =: (<defstring 0) (<_1 0)} rankhistory
 elseif. do.
   NB. v ran, and there is only one choice for the selection.  We will be able to display u
   NB. Get the actual result of v.  We know v collected successfully
@@ -10547,6 +10601,8 @@ elseif. do.
     (EINVALIDOP;'non-atomic v') earlyerror x return.
   end.
   NB.?lintonly selectedop =. <'dissectverb'
+  NB. Insert an end-of-computation marker for the expansion
+  seloperands =. ,&(DLRCOMPEND ; (coname'')) applyintree 1 seloperands
   NB. Traverse the selected operand and allocate a layout for it.  This result of u will become the input to the display
   NB. of this node, replacing the original x
   x =. joinlayoutsl x traverse__selectedop seloperands
@@ -10557,10 +10613,10 @@ elseif. do.
   NB. Turn it into a highlight record
   vselect =. < (2 1 $ vselect) , <0
   NB. Since we have used the rankhistory in the detail node, don't repeat it on the summary
-  rankhistory =: _1 {. rankhistory
+  rankhistory =: (<'Final ' , defstring 0) (<_1 0)} _1 {. rankhistory
 end.
 NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
-'displayhandlesin displayhandleout displaylevrank' =: ((#x) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
+'displayhandlesin displayhandleout displaylevrank' =: ((#x) { ($0);(,0);_0.3 0.3),1;< rankhistory
 NB. Bring v in as a third input to the result, wherever it came from.
 NB. The v result (coming in from the right) is placed in a third box of
 NB. the result (present only when there is a right-hand operand).  This box contains
@@ -10584,19 +10640,33 @@ end.
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
 'datapresent endflag linetext' =. y
-if. linetext -: ,'@.' do.
-  t =. 'This block %al1%starts the calculation of the selected gerund.',LF
-else. 
+tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
+if. -. datapresent do.
+  NB. No data.  Must not be the expansion
+  res =. ,: exegisisrankoverallnodisp appearstwice;tit
+elseif. linetext -: DLRCOMPEND do.
+  NB. This is the node for u.  There is data
+  'type t' =. exegisisrankoverallcompend appearstwice;tit
+  t =. t , 'The gerund displayed here was selected by the Final block below.',LF
+  res =. ,: type;t
+elseif. -. endflag do.
+  res =. 0 2$a:
+elseif. linetext -: titlestring do.
+  NB. Start of computation
+  res =. ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the calculation of the selected gerund.',LF
+elseif. do.
+  NB. The final node, with data
   t =. 'This block %al1%displays the result of executing',LF,(defstring 0),CR,'The selection of executed verb comes in from the right.',LF
   if. (errorcode__vop <: EOK) do.
     if. *./ selopinfovalid do.
-      t =. t,LF,'The calculation for the selected result is shown ending in the block feeding into this one.',LF,'Computation starts in the block(s) labeled @. .'
+      t =. t,LF,'The calculation for the selected result is shown ending in the block feeding into this one.',LF,'Computation starts in the block(s) labeled ',titlestring,' .'
     else.
       t =. t,LF,'Select a result-cell to see how it was calculated.',LF
     end.
   end.
+  res =. ,: EXEGESISRANKOVERALLCOMPEND;t
 end.
-,: EXEGESISRANKOVERALLEXPLAIN;t
+res
 )
 
 NB. **** :: ****
@@ -10724,7 +10794,11 @@ end.
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
 'datapresent endflag linetext' =. y
-if. endflag do.
+tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
+if. -. datapresent do.
+  NB. No data.  Must not be the expansion
+  ,: exegisisrankoverallnodisp appearstwice;tit
+elseif. endflag do.
   select. linetext
   case. 0 do.
     if. appearstwice do.
@@ -10732,7 +10806,7 @@ if. endflag do.
     else.
       t =. 'This block %al1%displays the result of the error path for the verb:',LF,(defstring 0),CR
     end.
-    ,: EXEGESISRANKOVERALLEXPLAIN;t
+    ,: EXEGESISRANKOVERALLCOMPEND;t
   case. '' do.
     NB. If there are no errors, we don't explain anything
     0 0$a:
@@ -10744,7 +10818,7 @@ if. endflag do.
     end.
     ,: EXEGESISRANKOVERALLEXPLAIN;t
   end.
-else. 0 0$a:
+elseif. do. 0 2$a:
 end.
 )
 
@@ -10966,11 +11040,11 @@ appearstwice =. x
 'datapresent endflag linetext' =. y
 if. endflag do.
   if. datapresent do.
-    t =. 'This block %al1%shows the result of the fork:',LF,(defstring 0),CR
+  NB. No data.  Must not be the expansion
+    ,: exegisisrankoverallcompend appearstwice;'';'fork'
   else.
-    t =. 'This block will %al1%show the result of the fork:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
+    ,: exegisisrankoverallnodisp appearstwice;'';'fork'
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t
 else. 0 2$a:
 end.
 )
@@ -11063,11 +11137,11 @@ appearstwice =. x
 'datapresent endflag linetext' =. y
 if. endflag do.
   if. datapresent do.
-    t =. 'This block %al1%shows the result of the hook:',LF,(defstring 0),CR
+  NB. No data.  Must not be the expansion
+    ,: exegisisrankoverallcompend appearstwice;'';'hook'
   else.
-    t =. 'This block will %al1%show the result of the hook:',LF,(defstring 0),CR,'after sufficient selections have been made.',LF
+    ,: exegisisrankoverallnodisp appearstwice;'';'hook'
   end.
-  ,: EXEGESISRANKOVERALLEXPLAIN;t
 else. 0 2$a:
 end.
 )
@@ -11187,9 +11261,9 @@ calcdispframe =: 4 : 0
 
 NB. x is the frame of the full expected result
 NB. y is the number of results we actually got
-NB. result is selector of the failing location, in natural order
+NB. result is selection to apply: boxed index list of the failing location, in natural order, or empty if no selection
 getfailingisf =: 4 : 0
-SFOPEN ;~ x getfailingisf_dissectobj_ f. y
+if. selectable do. ;&SFOPEN&.> x getfailingisf_dissectobj_ f. y else. '' end.
 )
 
 NB. ******************************** help windows ********************************************
@@ -11822,8 +11896,10 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect 'a =: 5' [ 'a b' =. 3 4
 a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 4
 (a,b) (] [ 3 4 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '''a b'' =: 5' [ 'a b' =. 3 4
 2 dissect '+:@*:L:0 (1;2;<<3)'
-2 dissect '*:@(+:"0)@+: i. 3'
+2 dissect '*:@+:@(+:"0)@+: i. 3'
+2 dissect '(*:@(+:"0))@+: i. 3'
 2 dissect '>:@>:&.>*: i. 3'
+2 dissect '*:@:(* +:)@+:^:2 i. 5'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
