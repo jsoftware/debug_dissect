@@ -42,9 +42,9 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '+:`*:`%:@.]"0@> 1 2 0;_1 0'   select, then hover over " - gives 'intermediate result' msg 
-NB. be less wordy when multiple compounds end simultaneously
-NB. dissect '*:@:(* +:)@+:^:2 i. 5'   labels for ^: node need work - especially when power 0 or 1 is selected.
+NB. Selectable print precision
+NB. dissect '>:^:-: i. 3'   does not diagnose the error properly
+NB.    Audit for invalid powers
 NB. In (*: +:)/, the / line for the u of hook has rank _, should be 1
 NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
@@ -286,6 +286,9 @@ end.
 Jenvirons =: (9!:38 '')
 NB.?lintsaveglobals
 )
+NB. Restore on any return to immediate mode.
+NB. If we are returning after the last destroy, we also restore the timer.
+NB. This makes sure we leave the user in his original state always
 restoreJenvirons =: 3 : 0   NB. called AFTER removing instance from the list
 9!:39 Jenvirons
 if. (0 = #dissectionlist_dissect_) *. (ALLOWNONQTTOOLTIP *. -. IFQT) do.
@@ -934,7 +937,7 @@ NB. Either nodisplay or display is always called.  The clearing of dissectinstan
 NB. y is the error message, which we pass through
 NB. Always called in dissect locale
 nodisplay =: 3 : 0
-destroy__dissectinstance ''   NB. This will clear dissectinstance
+destroy__dissectinstance ''   NB. This will clear dissectinstance and restore
 y
 )
 
@@ -947,6 +950,7 @@ if. #dissectinstance do.
     dissectinstance =: 0$a:
     QP^:DEBTIME'enddisplay=?6!:1'''' '
     NB. Normal return: quiet return, unless user asked for the object id
+    restoreJenvirons''
     ret
   catch.
     if. 0 = #errormessage do.
@@ -1134,6 +1138,7 @@ NB. y is 1 for an internal call that needs to refigure the placement
 dissect_dissectisi_paint =: 3 : 0
 NB. To avoid an error loop, terminate quietly if there is an error
 try.
+  NB. Establish local J environment.  The user's environment was saved when we started
 NB. if we need to refigure the placement because of a change like selection or a display parameter, do so.
   if. 1 = {. y do. placeddrawing =: calcplacement'' end.
 NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
@@ -1149,7 +1154,7 @@ NB. give the user the option of changing the display size
   enablesz =. '01' {~ actualpctused >:"0 1 |.!.0 MAXNOUNPCTCHOICES  NB. Prepend 0 so that 9 eg will enable 10
   (0 { enablesz) (wdsetenable~   'fmmaxnounsizex' , ":)"0 MAXNOUNPCTCHOICES
   (1 { enablesz) (wdsetenable~   'fmmaxnounsizey' , ":)"0 MAXNOUNPCTCHOICES
-NB. If there are stealth operands on the display, enable the nutton and caption it
+NB. If there are stealth operands on the display, enable the button and caption it
 NB. according to whether we are displaying them
   if. stealthopencountered do.
     'fmshowstealth' wdsetvalue ": displaystealth
@@ -1161,6 +1166,8 @@ NB. according to whether we are displaying them
   
 NB. stealthopencountered =: 0   NB. Set if there is a stealth op on the display
   
+  NB. Restore the user's environment before returing to immediate mode
+  restoreJenvirons''
 catch.
   smoutput 'error in paint'
   smoutput > (errnum =. <:13!:11'') { 9!:8''  NB. string form of emsg
@@ -9050,8 +9057,8 @@ NB. If the selector is invalid, and the totality of v has at least one positive 
 NB. skeletal display, and make that the (v-type) result, with no expansion node.
     
 NB. If the selector is invalid and v has no positive values, there is no need to traverse u.  Open twice in case of boxed v
-    traverseu =. +./ , 0&(+./@:<)@>@> logvalues__vop
-    
+    traverseu =. +./ , 0&(+./@:<)@(_:^:(0=#))@>@> logvalues__vop
+
 NB. If the v value for the current selection does not require an expansion (<_1, <0, or <1), we will traverse to get
 NB. a v-type display of u.  If the current selection is <0 or <_1, u^: will invalidate the selector to get a skeletal display of u.
     'skeletalu noexpansion' =. 2 3 > (<@,"0 (_1 0 1)) i. < ~. , vval
@@ -9062,13 +9069,13 @@ NB. If all the v results are <1, we never need a selector and can simply expand 
 NB. Figure out what v value has been selected by the current selection.  If selection has not been performed,
 NB. the expansion will not expand, so there must be a unique v value.  Pass that into the traversal: we will
 NB. display only the powers whose sign matches the selection, and we will display only up to the selection.
-    if. ($0) -: $vval do. selectedpower =. (- *)@>^:(1 = L.) vval
+    if. ($0) -: $vval do. selectedpower =. (- *)@({.!._)@>^:(1 = L.) vval
     elseif. sellevel < #selections do.
       sel1 =. {. > isfensureselection isftorank2 sellevel { selections  NB. first level of selection, boxed
       selectedpower =. (- *)@>^:(1 = L.) sel1 { vval
     elseif. do. selectedpower =. 0
     end.
-    
+
 NB. Create the initial selection to use when this result is clicked.  Since the initialselection is for an expansion node, append SFOPEN to it.
 NB. we select according to which type (forward or inverse) will be displayed in the expansion.
 NB. Create the initialselection only if we are ready to use it, i. e. if we have selected down to a single value to expand
@@ -9313,7 +9320,6 @@ NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
 'traverseu skeletalu noexpansion vis1 selectedpower visnoun travy' =: y   NB. Unpack the added operands, info about v
 assert. (6 0$0) -: $@".@> ;: 'traverseu skeletalu noexpansion vis1 selectedpower visnoun'
-QP^:DEBTRAVDOWN'traverseu skeletalu noexpansion vis1 selectedpower visnoun '
 titlestring =: 0 fulltitlestring cop
 traversedowncalcselect travy
 if. errorcode e. EEARLYERROR do. (earlyerror x);0 return. end.
@@ -9422,12 +9428,15 @@ if. DLRCOMPEND -: linetext do.
   NB. Get the selection that has been inited or clicked
   sel1 =. > {. > isfensureselection isftorank2 sellevel { selections
   if. sel1 = 0 do.
-    t =. t , 'In this case, the power selected is 0, which is the original y: there is no computation to view.',LF
+    t =. t , 'In this case, the power selected is 0, which is the original y unchanged: there is no computation to view.',LF
   else.
     t =. t , LF,'The boxes in the display shows the results of succeeding applications of the verb. The first box shows power 0 (the original y argument), '
-    t =. t , 'the second shows power ',(":*selectedpower),', and so on. '
-    t =. t , 'Currently the selected power is ',(": sel1),'. '
-    t =. t , 'Select any power to see how it was calculated. Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. ',LF
+    t =. t , 'the second shows power ',(":*selectedpower),', and so on.  '
+    if. selectedpower < 0 do.
+      t =. t , 'Negative powers call for application of the inverse, which cannot be examined internally.  '
+    end.
+    t =. t , 'Currently the selected power is ',(": sel1),'.  '
+    t =. t , 'Select any result to see how it was calculated.  Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. ',LF
   end.
   ,: EXEGESISRANKOVERALLCOMPEND;t
 else.
@@ -11900,6 +11909,9 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(*:@(+:"0))@+: i. 3'
 2 dissect '>:@>:&.>*: i. 3'
 2 dissect '*:@:(* +:)@+:^:2 i. 5'
+2 dissect '(0 >. <:)^:a: 5'
+2 dissect '(-:`(>:@(3&*))`1: @. (1&= + 2&|))^:a: 9'
+2 dissect '>:^:-: i. 3'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
