@@ -42,7 +42,6 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Selectable print precision
 NB. dissect '>:^:-: i. 3'   earlyerror should display v too.  Is v error detected properly?
 NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
@@ -61,7 +60,7 @@ NB. Highlight net on a click/hover of a wire
 NB. Hovering over selected cell to detail computation there?
 NB. can simplify combineyxsels
 NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?
-NB. dissect '5 ($: <:@crash9_dissect_)^:(2*1<]) 4' display is confusing.  the $: node is really powers of the big verb.  Prhaps label expansion differently?
+NB. dissect '5 ($: <:@crash9_dissect_)^:(2*1<]) 4' display is confusing.  the $: node is really powers of the big verb.  Perhaps label expansion differently?
 NB. change rank stack in partitions (test /."0), don't dup /.
 NB. Re-select of selected cell of @. should remove expansion
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
@@ -770,8 +769,11 @@ NB. Following lines must match the menus!
 FONTSIZECHOICES =: 8 10 12 14 16 20 24
 TOOLTIPFONTSIZECHOICES =: 8 10 12 14
 MAXNOUNPCTCHOICES =: 10 20 30 40 50 60 70 80 90
+DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 
 MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
+
+DISPLAYPRECCHOICESDEFAULT =: 2   NB. 3 places by default
 
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
@@ -787,11 +789,12 @@ TOOLTIPDETAILCHOICES =: ('0';'1';'2') ,. ('laconic';'verbose';'tutorial') ,. <"0
 
 fontlines =. ; <@('menu fmfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 FONTSIZECHOICES
 ttfontlines =. ; <@('menu fmttfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 TOOLTIPFONTSIZECHOICES
+preclines =. ; <@('menu fmprec' , ": , ' "' , ": , '";' , LF"_ )"0 DISPLAYPRECCHOICES
 sizexlines =. ; <@('menu fmmaxnounsizex' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
 sizeylines =. ; <@('menu fmmaxnounsizey' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
 ttdlines =. ; ('menu fmtooltipdelay' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {."1 TOOLTIPDELAYCHOICES
 ttdetlines =. ; ('menu fmtooltipdetail' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {."1 TOOLTIPDETAILCHOICES
-DISSECT=: ((,&LF&.> 'rem font;';'rem ttfont;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0
+DISSECT=: ((,&LF&.> 'rem font;';'rem ttfont;';'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0
 pc dissect;
 menupop "&Preferences";
 menupop "&Font Size";
@@ -799,6 +802,9 @@ rem font;
 menupopz;
 menupop "&Tooltip Font Size";
 rem ttfont;
+menupopz;
+menupop "Display precision for floats";
+rem prec;
 menupopz;
 menu fmshowstealth "Show ][";
 menu fmshowcompmods "Show full compound-names";
@@ -838,7 +844,7 @@ pas 0 0;
 rem form end;
 )
 
-DISSECT =: (((,&LF&.> 'rem font;';'rem ttfont;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0) [^:IFQT DISSECT
+DISSECT =: (((,&LF&.> 'rem font;';'rem ttfont;';'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0) [^:IFQT DISSECT
 pc dissect;
 menupop "&Preferences";
 menupop "&Font Size";
@@ -846,6 +852,9 @@ rem font;
 menupopz;
 menupop "&Tooltip Font Size";
 rem ttfont;
+menupopz;
+menupop "Display precision for floats";
+rem prec;
 menupopz;
 menu fmshowstealth "Show ][";
 menu fmshowcompmods "Show full compound-names";
@@ -1010,6 +1019,8 @@ maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
 maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 calccfms minimumfontsizex { FONTSIZECHOICES
 displaystealth =: 0
+displayprecisionx =: DISPLAYPRECCHOICESDEFAULT   NB. default display precision
+('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue '1'
 
 NB. Convert the logged values from high-speed-collecting form to analysis form (one box per result)
 coalescealllogs__resultroot 0
@@ -1245,6 +1256,7 @@ dissect_dissectisi_paint 1
 ". 'dissect_fmfontsize' , (":x) , '_button =: dissect_fmfontsize_button@(', (":y) ,'"_)'
 )
 
+NB. We use dissect locale for ttfontsize, because it is shared between instances
 dissect_fmttfontsize_button =: 3 : 0
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '0'
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex_dissect_ =: y) wdsetvalue  '1'
@@ -1282,6 +1294,18 @@ dissect_fmtooltipdetail_button =: 3 : 0
 (4 : 0&> i.@#) 0 {"1 TOOLTIPDETAILCHOICES
 ". 'dissect_fmtooltipdetail' , x , '_button =: dissect_fmtooltipdetail_button@(', (":y) ,'"_)'
 )
+
+NB. We do not use dissect locale for displayprecision, because it is not shared between instances
+dissect_fmprec_button =: 3 : 0
+NB.?lintonly fmfontsize_select =. '0'
+('fmprec' , ": DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue  '0'
+('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx =: y) wdsetvalue  '1'
+dissect_dissectisi_paint 1
+)
+(4 : 0"0 i.@#) DISPLAYPRECCHOICES
+". 'dissect_fmprec' , (":x) , '_button =: dissect_fmprec_button@(', (":y) ,'"_)'
+)
+
 
 dissect_fmhelplearning_button =: helpshow_dissecthelplearning_
 
@@ -2675,6 +2699,35 @@ QP^:DEBINHU'endingecode=?edisp'''' fillmask $selresult selresult '
 (<coname'') 1} y
 )
 
+NB. Extract selected cell from selresult.  Nilad
+NB. The current node must have a selection.  We return the (boxed) selected cell of the selresult.
+NB. This logic follows the logic in inheritu that is used to update the selected cell
+extractselectedcell =: 3 : 0
+NB. sel1 is the path to the selection.  It may go down multiple levels, but it will
+NB. always end with a dropdown if there is a dropdown.  If the fillmask is boxed, there will
+NB. be a dropdown as long as this node is selectable (it isn't in the case of L: wiehn the arguments
+NB. are initially at level).
+NB. So, we convert the selection to path form, which merely requires removing the dropdowns.
+sel1 =. SFOPEN -.~ > isfensureselection isftorank2 sellevel { selections
+NB. If the current fillmask is boxed, it has internal structure, and we
+NB. should replace the selected portion with the fillmask and data that was calculated in u
+select. resultlevel
+NB. tmodx gives the index into selresult of the selection.  For L: we get it from
+NB. the result map; for others we calculate from the index
+NB. fillmask, which describes what ought to be, is in natural order.
+NB. selresult, which describes what is, is in ticket order.
+case. 0 do.
+  NB.?lintonly resultseqmap =: ''
+  NB. L:
+  tmodx =. sel1 {:: resultseqmap
+case. do.
+  NB. expansion/each, and collection error are treated like regular selections, where we 
+  tmodx =. selframe&#.&.> selectiontoticket sel1
+end.
+NB. Return the selected cell
+tmodx { :: ((<'?')"_) selresult
+)
+
 NB. called in locale of an operand
 NB. null rankcalculus for cases where we can take no action
 NB. Nilad.  We know that the current node has no selection but has valid selopshapes.
@@ -3665,7 +3718,8 @@ NB. If the noun is not boxed, just get the height/width for each atom
 NB. We also come here for the top level, which is boxed because it might not collect
     subDOLs =. 0$a:  NB. no subnouns unless boxed
     glfontextent font , ": fontsize
-    hw =. (+/ 2 2 ($,) margin) +"1 |."1 glqextent@":@> value
+NB. obsolete    hw =. (+/ 2 2 ($,) margin) +"1 |."1 glqextent@(":!.displayprecision)@> value
+    hw =. (+/ 2 2 ($,) margin) +"1 |."1 glqextent@(":!.displayprecision)"0 value
   end.
   
 NB. combine the height/widths for the row & columns to get the size of each row/column
@@ -3788,11 +3842,15 @@ NB. If the last verb does not allow a selection (ex: i.@>), remove it from the s
     DOshapelocales =: }: DOshapelocales
   end.
   NB. For each selection level, and for one more level representing the result of the last level, we create the shape display, which is
-  NB.   shape [optional * if this selection requires fill]
+  NB.   shape [optional (filledsize) if this selection requires fill]
   NB. For each selecting level, get the fill info for the NEXT level, i. e. the result of the selecting level
   fillinfo =. 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(":maxcellresultshape__y),'')'''"0 DOshapelocales
-  NB. Append the result-shape of the last verb
-  DOshapes =: DOshapes , <,<maxcellresultshape__lastexecutednode
+  NB. Append the result-shape of the last verb.  If a result is selected, use the shape of the selected result; otherwise use the max result
+  if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
+    DOshapes =: DOshapes , <,$&.> extractselectedcell__lastexecutednode''
+  else.
+    DOshapes =: DOshapes , <,<maxcellresultshape__lastexecutednode
+  end.
   NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
   DOshapes =: ,: ;&.> (a:,fillinfo) <@(({.@] , [ , }.@]) >)"0 ":L:0 isftorank2 DOshapes
   if. #;DOshapes do.
@@ -4732,7 +4790,7 @@ NB. Not boxed data; draw each cell.  If the cell is error/unexecd, delete the te
 NB. doesn't really have a value.  We leave its space as a reminder of how big it might have been
 NB. Install checkboard, so it shows up at all levels
      sel =. (<:#cfmdata) checkerboardfillmask sel
-    (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":)&.> usedd) (,<)"0 2 rects
+    (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
   end.
   
 NB. Draw borders at any boundary (except the first) where a rank rolls over.  The width of the line
@@ -8057,10 +8115,11 @@ NB. Handle the special form we recognize: &.>
 if. ('&.' -: (<1 1) {:: y) *. (verb -: (<2 0) {:: y) do.
   vloc =. (<2 1) {:: y
   NB.?lintonly vloc =. <'dissectverb'
-  if. (,'>') -: execform__vloc do.
+  NB. We check the execform, which may have been translated from a name.  Only verbs have execforms
+  if. 0 = 4!:0 <'execform__vloc' do. if. (,'>') -: execform__vloc do.
     changeobjtypeto 'dissecteach'
     create ({.y) ,: adv;''; ; (<1 2;2) { y return.
-  end.
+  end. end.
 end.
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -11934,6 +11993,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(-:`(>:@(3&*))`1: @. (1&= + 2&|))^:a: 9'
 2 dissect '>:^:-: i. 3'
 2 dissect '>:^:crash9_dissect_ 9'
+2 dissect '<.@(0.5&+)&.(10&*) 3.14159'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
