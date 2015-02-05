@@ -43,9 +43,7 @@ testsandbox_base_ 1
 )
 NB. TODO:
 NB. Selectable print precision
-NB. dissect '>:^:-: i. 3'   does not diagnose the error properly
-NB.    Audit for invalid powers
-NB. In (*: +:)/, the / line for the u of hook has rank _, should be 1
+NB. dissect '>:^:-: i. 3'   earlyerror should display v too.  Is v error detected properly?
 NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
@@ -9008,9 +9006,20 @@ formatcode =: 0   NB. early error
 NB. We need vval for calculating the selframe of u; but it may not be valid, in case vop failed.
 NB. We have fixed calcdispframe so that it doesn't look at vval if vop failed, so we just need to
 NB. get vval defined when it is valid
-if. errorcode__vop -.@e. ENOOPS,ENOSEL do. vval =: fillmask__vop frameselresult__vop selresult__vop end.
+if. errorcode__vop e. EFAILED do. vval =: 0
+elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do. vval =: fillmask__vop frameselresult__vop selresult__vop
+NB.?lintonly elseif. do. vval =: 0
+end.
 NB. Perform selections for u - needed for display whether v ran or not
 traversedowncalcselect y
+NB. If v invalid, detect domain error
+if. errorcode__vop e. EFAILED do.
+  errorcode =: EINVALIDVERB
+elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do.
+  if. (0 < L. vval) *. ((1 < L. vval) +. -. ('';,0) e.~ $&.> vval) do. errorcode =: EINVALIDVERB
+  elseif. (-.@-: <.) > vval do. errorcode =: EINVALIDVERB
+  end.
+end.
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. In case we are formatting this node (the usual case), save the input DOLs to it
 resdol =. x ,&< coname''
@@ -11130,6 +11139,17 @@ NB. If this is a monad, make a reference for y.  Assign the original to v UNLESS
 NB. (we don't use the comparative size of u because we have to place v above u)
 if. 1 = #x do. x =. |.^:(0 <: {: estheights__uop) (, createreference) x end.
 dol =. joinlayoutsl (0 1 # x) traverse__vop travops (TRAVOPSKEEPINLIGHT 0 1 2);TRAVOPSPHYSKEEP;(vopval _1 { selopinfovalid);selopshapes;_1
+NB. Calculate the rankhistory to use for u.  The point is to take all the modifiers that apply to the left operand of (u v)
+NB. as the rankhistory of u
+NB. If (u v) is a monad, we need to take each line, which is title;loc;y and turn it into title;loc;empty;x
+NB. if (u v) is a dyad, we need to take title;loc;y;x and turn it into title;loc;empty;x
+NB. If rankhistory has monad info, make that the x info
+if. 3 = {:@$ rankhistory do. rankhistory =: 1 1 0 1&#^:_1"1 rankhistory
+NB. If rankhistory has dyad info, look at lines that contain only monad info (i. e. x=a:) and move y to x
+else. rankhistory =: (0 1 3 2&{^:(a:-:{:))"1 rankhistory
+end.
+NB. Below we will remove the y rankhistory for u
+NB.
 NB. Use selop0 for x, and selresult for y - but only if selop0 exists, and no travdownuops error
 NB. replace the rank with the left rank of the hook, alone.  Preserve previous highlighting from u to the left operand
 NB. We keep the highlights from the input, to both the left and right ops.  This will not be needed EXCEPT when v is ][.  Other times,
@@ -11138,7 +11158,8 @@ NB. But if v is ][, then highlights from u (or below) might reach through this n
 NB. lower sellevels, so we need to make sure the lower selections are as they would have been for the omitted ][.  The way to do this is
 NB. to start the physreqs with the values that they would have had to start v.
 NB. Tell inheritu to add an end-of-computation mark to the display stack
-1 inheritu (dol ,~ 0 {  x) traverse__uop ((0 1&{"1 ,. (<_) ,. _1&{"1)`'') travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);((vopval 0 { selopinfovalid) >. (uopval vop));<({. selopshapes),< selresultshape__vop
+NB. obsolete 1 inheritu (dol ,~ 0 {  x) traverse__uop ((0 1&{"1 ,. (<_) ,. _1&{"1)`'') travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);((vopval 0 { selopinfovalid) >. (uopval vop));<({. selopshapes),< selresultshape__vop
+1 inheritu (dol ,~ 0 {  x) traverse__uop ((a: 2}"1 ])`'') travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);((vopval 0 { selopinfovalid) >. (uopval vop));<({. selopshapes),< selresultshape__vop
 )
 
 exegesisrankoverall =: 4 : 0
@@ -11912,6 +11933,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(0 >. <:)^:a: 5'
 2 dissect '(-:`(>:@(3&*))`1: @. (1&= + 2&|))^:a: 9'
 2 dissect '>:^:-: i. 3'
+2 dissect '>:^:crash9_dissect_ 9'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
