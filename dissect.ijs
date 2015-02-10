@@ -44,15 +44,10 @@ testsandbox_base_ 1
 NB. TODO:
 NB. Use box trick to avoid special case in ;.3
 NB. Test selection of displays with 0 in shape
-NB. dissect '(i.0)"_/ i. 5'   fails selecting empty results
-NB. dissect '(i.0)"_/"1 i. 5 2' fails in calcselect after selecting an empty result
-NB. recursivesel to check for empty in sel
-NB. Display empty nouns with empty spaces, using length of 1 for the empty axes; but don't allow selection if frame contains 0
-NB. dissect 'isecn/"1 e,.pi' [ e =. 2 7 1 8 2 8 1 8 2 8 [ pi =. 3 1 4 1 5 9 2 6 5 3   gives unselectable box.  Should 9 0 give some size for each empty?
-NB.    isecn =. ([: /:~ [: ~. e. # [)"1
-NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
+NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
+NB.   in ^:0, remove the wire from end of u to final, replace it with one direct from y input?  Or just elide u?
 NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
@@ -75,8 +70,6 @@ NB. if a recursion produces no result, flag that fact
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
 NB. dissect '(* $:@:<:)^:(1&<) 7'    select result 1 - no detail displayed inside ^:
 NB.  this is because there are multiple possible results, so we skeletalu.  But should the wiring bypass the skeletalu?
-NB. should we show leading singleton axes?  Should we shoe datatype, for chars at least?
-NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
 NB. support axis permutations for display, for u;.
 NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
 
@@ -2669,7 +2662,7 @@ NB. should replace the selected portion with the fillmask and data that was calc
       NB. Normal fillmasks, which may or may not be boxed (they will be boxed if they contained some boxed detail such as
       NB. L: or each)
       NB. We install the lower fillmask directly into the upper.  No change is made to selresult.
-      NB. We expand the lower fillmask to the size of a cell of the upper.
+      NB. We expand the lower fillmask to the size of a cell of the upper - and vice versa.
       NB. If the fillmasks have different boxing status, we box atoms of whichever is unboxed
       NB. The value to use for filling cells in the u fillmask depends on the errorcode for u.  If there
       NB. is no error, it's just normal fill
@@ -2679,9 +2672,25 @@ NB. should replace the selected portion with the fillmask and data that was calc
       end.
       sel1 =. {. sel1   NB. only 1 atom allowed; make it an atom
       fillval =. <^:(*L.fillmask__loc) (FILLMASKSELLEVEL * sellevel) + (FILLMASKUNEXECD,(2#FILLMASKERROR),FILLMASKFILL) {~ (EUNEXECD,EEXEC,EFRAMINGEXEC) i. errorcode__loc
-      fillmask =: (((#>sel1) }. $fillmask) ([ {.!.fillval (({.!.1 $)~ -@#)~ ($,) ]) fillmask__loc) sel1} fillmask
+      NB. Find the size of a cell of the merged fillmasks
+      maxcellresultshape =: ($fillmask__loc) >./@(,:!.1)&.|. fillcellshape =. (#$frame) }. $ fillmask
+      NB. Bring the old fillmask up to the new merged size, if that is larger.  This can happen only if
+      NB. the lower result contains a failure that never made it up to the higher during initial allocation
+      if. maxcellresultshape -.@-: fillcellshape do.
+        fillmask =: (maxcellresultshape {.!.(<^:(*L.fillmask) FILLMASKFILL + FILLMASKSELLEVEL * sellevel) ,:^:(maxcellresultshape -&# fillcellshape))"(#fillcellshape) fillmask
+      end.
+      NB. Bring the new fillmask up to the new merged size, if that is larger
+      NB. Insert new fillmask into old
+NB. obsolete       fillmask =: (((#>sel1) }. $fillmask) ([ {.!.fillval (({.!.1 $)~ -@#)~ ($,) ]) fillmask__loc) sel1} fillmask
+      fillmask =: (maxcellresultshape ([ {.!.fillval (({.!.1 $)~ -@#)~ ($,) ]) fillmask__loc) sel1} fillmask
+      NB. Install the new value into selresult - needed only if it is an error value and thus an addon at the end
+      if. (#selresult) = frame #. >sel1 do.
+        NB. Install the new value into selresult - needed only if it is an error value and thus an addon at the end
+        selresult =: selresult , (< fillmask__loc frameselresult__loc selresult__loc)
+        NB. Also refigure cell information, since there may now be collection error
+        'maxcellresultshape fillatom fillrequired' =: checkframing selresult
+      end.
     end.
-NB. Perhaps we should modify selresult here too?
   else.
     NB.  If this level does not have a selection, the lower
     NB. fillmask must cover the same cells as this level, and this level might have no frame and
@@ -3457,8 +3466,9 @@ NB. is different from the shape color, to keep them separate
 DATACOLORS =: (255 255 255 (0}) SHAPECOLORS)
 
 NB. Now spread out the data colors, providing the checkerboard
+NB. Make the dim one come first, so an empty cell displays a visible rectangle (which lets us pick it)
 NB. This is an nx2x3 table
-DATACOLORS =: <. DATACOLORS  *"1/ 1 1 1 ,: 0.88 0.83 0.88
+DATACOLORS =: <. DATACOLORS  *"1/ 0.88 0.83 0.88 ,: 1 1 1
 
 DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
 
@@ -12163,6 +12173,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '${.^: (1 = $)  }:^:(a: = {:) 3 ; i.0'
 2 dissect '(i.0)"_/ i. 5'
 2 dissect '(i.0)"_/"1 i. 5 2'
+2 dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
