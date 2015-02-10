@@ -42,7 +42,14 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '>:^:-: i. 3'   earlyerror should display v too.  Is v error detected properly?
+NB. Use box trick to avoid special case in ;.3
+NB. Test selection of displays with 0 in shape
+NB. dissect '(i.0)"_/ i. 5'   fails selecting empty results
+NB. dissect '(i.0)"_/"1 i. 5 2' fails in calcselect after selecting an empty result
+NB. recursivesel to check for empty in sel
+NB. Display empty nouns with empty spaces, using length of 1 for the empty axes; but don't allow selection if frame contains 0
+NB. dissect 'isecn/"1 e,.pi' [ e =. 2 7 1 8 2 8 1 8 2 8 [ pi =. 3 1 4 1 5 9 2 6 5 3   gives unselectable box.  Should 9 0 give some size for each empty?
+NB.    isecn =. ([: /:~ [: ~. e. # [)"1
 NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   looks like installing the error result needed to change selresultshape, or something like that.  Why 0s?
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
@@ -304,6 +311,8 @@ saveJenvirons''
 dissectionlist_dissect_ =: dissectionlist_dissect_ , coname''
 objtable =: 0$a:   NB. list of parse objects
 ticket =: 0   NB. sequential log number
+loggingallowed =: 1   NB. allow logging
+
 winhwnd =: ''  NB. Init to no window
 NB. Use lightweight locales - we use less than 100 entries usually
 9!:39 (1) 1} 9!:38 ''
@@ -1622,24 +1631,29 @@ NB.?lintsaveglobals
 ''
 )
 
-NB. add to log.  Always called in the locale of the parse object.  x, if given, is the suffix to use for this logentry
+NB. add to log.  Always called in the locale of the parse object.  x, if given, is the values log intot he secondary area logvaluesd
 NB. y is the value to log; it becomes the result
 addlog =: 3 : 0
 NB.?lintmsgsoff
-logticket =: logticket , ticket__COCREATOR =: >: ticket__COCREATOR
-if. 0 = #logvalues do.
-  logvalues =: 0 $ ,: y
-elseif. y (=&(3!:0) *: (-: }.)&$) logvalues do.
-  logvaluesarchive =: logvaluesarchive , <logvalues
-  logvalues =: 0 $ ,: y
+NB. If we detect a restarted primitive, we suppress logging while the restart is in progress.
+if. loggingallowed__COCREATOR do.
+  logticket =: logticket , ticket__COCREATOR =: >: ticket__COCREATOR
+  if. 0 = #logvalues do.
+    logvalues =: 0 $ ,: y
+  elseif. y (=&(3!:0) *: (-: }.)&$) logvalues do.
+    logvaluesarchive =: logvaluesarchive , <logvalues
+    logvalues =: 0 $ ,: y
+  end.
+  logvalues =: logvalues , y
 end.
-logvalues =: logvalues , y
 NB.?lintmsgson
 y
 :
 NB. Dyad: log x to the dyad area
-logvaluesd =: logvaluesd , x
-addlog y
+if. loggingallowed__COCREATOR do.
+  logvaluesd =: logvaluesd , x
+end.
+addlog_dissectobj_ f. y  NB. In case addlog has a cover in the calling locale, try THIS monad
 )
 
 NB. Nilad.  Convert the log to one boxed value for each result
@@ -1911,7 +1925,8 @@ NB.  unselected result has a frame with multiple cells, and is undefined otherwi
 'FILLMASKNORMAL FILLMASKFILL FILLMASKUNEXECD FILLMASKERROR' =: i. 4
 FILLMASKNOCOLLECT =: 4
 FILLMASKCHECKER =: 1 bwlsl FILLMASKNOCOLLECT
-FILLMASKSELLEVEL =: 1 bwlsl FILLMASKCHECKER
+FILLMASKEXTRAAXES =: 1 bwlsl FILLMASKCHECKER
+FILLMASKSELLEVEL =: 1 bwlsl FILLMASKEXTRAAXES
 NB. errorlevel - a copy of errorlevel__COCREATOR at the time this is parsed, this indicates whether we were in a try block during
 NB.  execution of this verb.  When it comes time to display error info, we don't use the result failure type for anything except
 NB.  top-level errors
@@ -2381,11 +2396,12 @@ NB. Use the fillmask to give the color for each cell.  Low-order 2 bits are 0=no
 NB. bit 2 is set if uncollectable;
 NB.  bit 3 is 0 (filled in by checkerboard); higher bits are selection levels
 NB. We just add in the checkerboard
-NB. x is the upper limit on selection level (after checkerboard added), y is the fillmask to create a checkerboard for
+NB. x is the upper limit on selection level (before checkerboard added), y is the fillmask to create a checkerboard for
 NB. if y is boxed, this must be a selection node, and we recur on the selected node, to put the checkerboard there
+NB. We use the shape of the fillmask to detect extra axes: if there is a leading 1, set extra-axis
 checkerboardfillmask =: 4 : 0
 assert. 0 = L. y
-sel =. ((x * FILLMASKSELLEVEL) <. (-FILLMASKCHECKER) bwand y) bwor (<:FILLMASKCHECKER) bwand y
+sel =. ((x * FILLMASKSELLEVEL) <. (-FILLMASKSELLEVEL) bwand y) bwor (<:FILLMASKCHECKER) bwand y
 NB. Checkerboard: works for scalars too.  Create a checkerboard cell of rank no more than 2, then
 NB. replicate as needed for higher rank, so that there is a predictable odd/even pattern within each rank-2 cell
 sel + (({.   (0,FILLMASKCHECKER) $~ 1&bwor) ({.~ -@(2<.#)) $ sel)"2 sel
@@ -2419,12 +2435,17 @@ end.
 NB. Signal early error
 NB. Agreement error requires insertion of a node showing the location of the error.  For the nonce,
 NB. we will abort traversal at that point.
-NB. y is the dol (x operand to traverse)
+NB. y is either the dols (x operand to traverse) or a list of (dols ; rightoperand)
+NB.   where rightoperand is dol;highlights suitable for joinlayoutsl
 NB. result is a suitable return value from traverse, viz y ,&< locale
 earlyerror =: 3 : 0
 NB. Since we abort the traversal, roll up the failing part and install it as the last name in the rank stack
 'displayhandlesin displayhandleout displaylevrank' =: (valence { '';(,0);_0.3 0.3),1;<(<defstring 0) (<_1 0)} rankhistory
-y ,&< coname''
+if. 2 > #$y do.
+  1 0 1&(#!.(<coname'')^:_1) y
+else.
+  y ,&< coname''
+end.
 :
 NB. The dyad is used for errors detected during traversal, eg u@.v where v creates a non-atom,
 NB. or datatype errors.  We might be able to give a better description of the error.
@@ -3436,7 +3457,8 @@ NB. is different from the shape color, to keep them separate
 DATACOLORS =: (255 255 255 (0}) SHAPECOLORS)
 
 NB. Now spread out the data colors, providing the checkerboard
-DATACOLORS =: <. ,/ DATACOLORS  *"1/ 1 1 1 ,: 0.88 0.83 0.88
+NB. This is an nx2x3 table
+DATACOLORS =: <. DATACOLORS  *"1/ 1 1 1 ,: 0.88 0.83 0.88
 
 DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
 
@@ -3465,7 +3487,8 @@ WIRECOLOR =: 0 0 0   NB. Color of wires
 BOXMARGIN =: 2 ($,) 2   NB. Space to leave around boxed results
 BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
 
-EMPTYEXTENT =: <@,"0 ] 5 5   NB. Size to use for displaying empty
+NB. obsolete EMPTYEXTENT =: <@,"0 ] 5 5   NB. Size to use for displaying empty
+EMPTYEXTENT =: 15 10   NB. Size to use for displaying empty
 
 MAXDATASIZEYX =: 200 200
 
@@ -3478,12 +3501,13 @@ calccfms =: 3 : 0
 nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;NOUNFONT;(y+NOUNFONTSIZE);NOUNMARGIN
 nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
-nouncfm =: nouncfm , < (DATACOLORS ;"1 DATATEXTCOLORS) ,"1 DATAFONT;(y+DATAFONTSIZE);DATAMARGIN
+nouncfm =: nouncfm , < ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold') ": y+DATAFONTSIZE) ,. <DATAMARGIN
 
 verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(y+VERBFONTSIZE);VERBMARGIN
 verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
-verbcfm =: verbcfm , < (DATACOLORS ;"1 DATATEXTCOLORS) ,"1 DATAFONT;(y+DATAFONTSIZE);DATAMARGIN
+verbcfm =: verbcfm , < ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
+NB. obsolete verbcfm =: verbcfm , < ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1/ DATAFONTS ,"0 _ (y+DATAFONTSIZE);DATAMARGIN
 
 RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;RESULTSHAPEFONT;(y+RESULTSHAPEFONTSIZE);RESULTSHAPEMARGIN
 NB.?lintsaveglobals
@@ -3676,8 +3700,6 @@ NB.   each containing a selector for that frame.  The list of selectors may be s
 NB.   in which case lower selectors are omitted.
 NB. y is information about formatting (font size for the data)
 NB. result is the layout, saved in globals in the locale
-NB.  formatinfoused is information about the format that was finally selected:
-NB.   pointsize
 NB.  valueformat is shape;y endpixels;x endpixels[;array of boxed subnouns, with shape of the boxed noun, each box containing a DOL]
 NB.   y endpixels is the ending position of each row in the display.  The number of atoms will be */ (even items of shape, counting from the end)
 NB.    a gap of 1 pixel is left between blocks of rank 3, 5, etc.  This is included in the y endpixels values
@@ -3687,7 +3709,7 @@ NB.
 NB.  The actual result of createDOL is the size of the allocated data area, in pixels, hw
 createDOL =: 3 : 0
 NB. The monad is what is called externally.  It uses the top-level values saved in the locale
-formatinfoused =: y
+NB. obsolete formatinfoused =: y
 NB. Create the data for the selresult.  We have to try to collect it, because the verb may have encountered
 NB. an error before we tried to collect it, possibly leaving an uncollectable result (i. e. it would have
 NB. had a framing error if it survived long enough to collect).  If collection succeeds, we use the
@@ -3696,47 +3718,56 @@ NB. the uncollectable value we will suppress the outer boxing in the display.
 NB. If collection succeeds, we fill out an incomplete execution with fills of the appropriate type;
 NB. if collection fails, we fill with spaces (OK since the values are boxed immediately, and we don't want
 NB. the fills to have text)
-(fillmask frameselresult selresult) createDOL formatinfoused  NB. top result is boxed
+(fillmask frameselresult selresult) createDOL y  NB. top result is boxed
 NB.?lintsaveglobals
 :
 NB. The dyad does the work, and calls itself if the value is boxed.  The dyad returns
 NB. valueformat, which is (unused);y endpixels;x endpixels[;subDOLs]
-'font fontsize margin' =. y
+fontdesc =. y
+NB. obsolete 'font fontsize margin' =. y
 value =. x
-NB. If the noun is empty, we can't very well calculate its display size,
-NB. so just use a canned size
+NB. obsolete NB. If the noun is empty, we can't very well calculate its display size,
+NB. obsolete NB. so just use a canned size
+NB. obsolete if. 0 e. $value do.
+NB. obsolete   'subDOLs rcextents' =. (0$a:);<EMPTYEXTENT
+NB. obsolete else.
 if. 0 e. $value do.
-  'subDOLs rcextents' =. (0$a:);<EMPTYEXTENT
-else.
-NB. If the noun is boxed, get a DOL for each box; extract the height/width from it
-NB. and add left/right margin and left line; if the CONTENTS
-NB. was also boxed, add the right margin for its closing line
-  if. 32 = 3!:0 value do.
-    hw =. (BOXLINEWIDTH + +: BOXMARGIN) +"1 (extractdatasize + BOXLINEWIDTH * 3 < #)@> > subDOLs =. < createDOL&y&.> value
-  else.
-NB. If the noun is not boxed, just get the height/width for each atom
-NB. We also come here for the top level, which is boxed because it might not collect
-    subDOLs =. 0$a:  NB. no subnouns unless boxed
-    glfontextent font , ": fontsize
+  subDOLs =. 0$a:  NB. no subnouns unless boxed
+  NB. If the noun is empty, create a display value out of the non-empty part of the shape.
+  NB. We will display an empty rectangle for each such value
+  value =. (({.~ i.&0) $ value) $ 0
+  hw =. ($ value) $ ,: EMPTYEXTENT
+elseif. 32 = 3!:0 value do.
+  NB. If the noun is boxed, get a DOL for each box; extract the height/width from it
+  NB. and add left/right margin and left line; if the CONTENTS
+  NB. was also boxed, add the right margin for its closing line
+  hw =. (BOXLINEWIDTH + +: BOXMARGIN) +"1 (extractdatasize + BOXLINEWIDTH * 3 < #)@> > subDOLs =. < createDOL&y&.> value
+elseif. do.
+  NB. If the noun is not boxed, just get the height/width for each atom
+  NB. We also come here for the top level, which is boxed because it might not collect
+  subDOLs =. 0$a:  NB. no subnouns unless boxed
+NB. obsolete     glfontextent font , ": fontsize
+  glfontextent ; (<(1 = {. $ value);0 1) { fontdesc
 NB. obsolete    hw =. (+/ 2 2 ($,) margin) +"1 |."1 glqextent@(":!.displayprecision)@> value
-    hw =. (+/ 2 2 ($,) margin) +"1 |."1 glqextent@(":!.displayprecision)"0 value
-  end.
+  hw =. (+/ 2 2 ($,) (<0 2) {:: fontdesc) +"1 |."1 glqextent@(":!.displayprecision)"0 value
+end.
   
 NB. combine the height/widths for the row & columns to get the size of each row/column
 NB. Get the transposition vector: we bring the odd axes (starting from the end) in front of the even
 NB. axes to get the display order.
-  axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@#@$ value   NB. 1;0 2   or 0 2;1 3
-  sizes =. (*/@> rcshapes =. axes ({&.:>"0 _ $) value) ($,)"_ _1 (_1 , ;axes) |: hw
+axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@#@$ value   NB. 1;0 2   or 0 2;1 3
+sizes =. (*/@> rcshapes =. axes ({&.:>"0 _ $) value) ($,)"_ _1 (_1 , ;axes) |: hw
 NB. Take max across rows to get column extents; across columns to get row extents.
 NB. row info (y endpixels) comes first
-  rcextents =. (>./"1@[ ; >./@])/ sizes
+rcextents =. (>./"1@[ ; >./@])/ sizes
 NB. Insert spacing between rank boundaries.  The extent values (nominally ending positions) will be the
 NB. starting positions after we prepend a 0.  So we want to add the spacing to the last number at a rank,
 NB. which will become the first of the next rank - except for the last, which doesn't have spacing after.
 NB. Since the 1-pixel-wide line seems too narrow, add 1 extra space to each nonzero boundary
-  bdynos =. rcshapes (+ *)@(1&(|.!.0))@:(0&(i.&1@:~:)@|."1)@(#: i.@#)&.> rcextents
-  rcextents =. +/\&.> bdynos +&.> rcextents
-end.
+bdynos =. rcshapes (+ *)@(1&(|.!.0))@:(0&(i.&1@:~:)@|."1)@(#: i.@#)&.> rcextents
+rcextents =. +/\&.> bdynos +&.> rcextents
+
+NB. obsolete end.
 NB. Assemble final result
 ($value);rcextents,subDOLs
 NB.?lintsaveglobals
@@ -3915,8 +3946,8 @@ NB. Get size of shape string, plus margin.
 NB. shape of result is shape of fillmask; box according to shapes of selectors
 NB. Stack vertically: string/rank,shape,status,data
 
-NB. Find the sizes to display: main, and explorer if allowed.  A table of 1 or 2 rows
-  hwtable =. calcformsize valueformat =: createDOL ((<_1;2 3 4) { cfmdata)
+NB. Find the sizes to display: main, and explorer if allowed.  A table of 2 rows, one for each data type (normal and hidden-axes)
+  hwtable =. calcformsize valueformat =: createDOL ((<0 2;2 3 4) { cfmdata)
 QP^:DEBDOL'valueformat '
 NB. Keep track of the size of the largest noun encountered
   maxactualnounsize__COCREATOR =: maxactualnounsize__COCREATOR >. extractDOLsize valueformat
@@ -4725,90 +4756,98 @@ SM^:DEBDOL 'drawDOL: ' , > coname''
 QP^:DEBDOL'vf data sel xsizes ysizes '
 NB. If the data is empty, draw nothing (but signal validity).  The size
 NB. of the empty was accounted for when the block was created
-if. 0 e. $data do.
-  0   NB.  valid return
-else.
+NB. obsolete if. 0 e. $data do.
+NB. obsolete   0   NB.  valid return
+NB. obsolete else.
   
 NB.  If there are subDOLs, adjust the rects to leave a box margin
-  boxyx =. dataorigin
-  if. DEBOBJ do.
-    'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' printf (<"0 |. y),xsizes;ysizes
-  end.
+boxyx =. dataorigin
+if. DEBOBJ do.
+  'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' printf (<"0 |. y),xsizes;ysizes
+end.
   
-  usedd =. data
+if. emptydata =. 0 e. $ usedd =. data do.
+  sel =. 0
+  usedd =. (({.~ i.&0) $ usedd) $ 0
+end.
 NB. Get the y and x endpoint lists, prepend a zero to give the start of the first cell,  and then
 NB. adjust for the starting position of te object
-  yxpositions =. boxyx (+ 0&,)&.> 1 2 { vf
+yxpositions =. boxyx (+ 0&,)&.> 1 2 { vf
 NB. The shape of the array of rectangles.  We will shape the user's data and the fillmask into this shape
-  flatshape =. <: #@> yxpositions   NB. <: to remove the leading 0
+flatshape =. <: #@> yxpositions   NB. <: to remove the leading 0
 NB. Convert the array, of whatever rank, to a table
 NB. axes is 2 boxes, giving the axis numbers that are assigned to vertical and horizontal.  We assign
 NB. axes alternately, starting from the right, with the last axis always going to x
-  axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@#@$ usedd  NB. 1;0 2   or 0 2;1 3
+axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@#@$ usedd  NB. 1;0 2   or 0 2;1 3
 NB. axisshapes is the lengths of each axis assigned to y/x.  sizes is the total size of y/x
-  sizes =. */@> axisshapes =. axes ({&.:>"0 _ $) usedd
-  usedd =. sizes ($,) (;axes) |: usedd
+sizes =. */@> axisshapes =. axes ({&.:>"0 _ $) usedd
+NB. reshape the data into a table, regardless of original rank
+usedd =. sizes ($,) (;axes) |: usedd
 NB. Calculate the mask of rows/columns that fit on the screen
 NB. Get start/end+1 of box; a rect is OK if its left nbr end+1 is below the window end+1, AND
 NB. its end+1 is above the window start.
 NB. This version has shape that matches the rectangles to be displayed
-  onscreenmsk =. yxpositions ((}:@[ < {:@]) *. (}.@[ > {.@]))&.> <"1 |: cliptlbr
+onscreenmsk =. yxpositions ((}:@[ < {:@]) *. (}.@[ > {.@]))&.> <"1 |: cliptlbr
 NB. To get rectangle extents, you need the onscreenmsk extended to include the end of the rightmost offscreen
 NB. rect, which gives the left end of the leftmost oncreen rect.   This is used to select from an endpoint
 NB. vector that has been extended by adding a leftmost 0, and has shape that matches the boundaries to be displayed
-  onscreenmskext =. (+. 1&(|.!.0))@(0&,)&.> onscreenmsk
+onscreenmskext =. (+. 1&(|.!.0))@(0&,)&.> onscreenmsk
 NB. Create the rectangles for each atom.  This will be mxnx2x2.
-  rects =. ,."1/&(}: ,. 2&(-~/\))&>/ onscreenbdys =. onscreenmskext #&.> yxpositions
+rects =. ,."1/&(}: ,. 2&(-~/\))&>/ onscreenbdys =. onscreenmskext #&.> yxpositions
 NB. Cut the data down to the displayable part
-  usedd =. onscreenmsk scissortoscreen usedd
+usedd =. onscreenmsk scissortoscreen usedd
 NB. Extract and reshape the selection information, too.  sel should either be an atom or have
 NB. one atom per data cell.  The data may be truncated, though, so we bring sel up to the
 NB. rank of the shapeused, and then truncate it to shapeused size (using sel as a fill, in case sel
 NB. was an atom).  Then shape to 2D, and trim to the displayable part
 NB. But if this is a selection node, suppress rectangles, force lines, leave rectangles for next level
-   if. sel -:&$ usel =. ''"_`>@.(2>L.) sel do.
-    sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |: shapeused {.!.({.,sel) ((-$shapeused) {.!.1 $sel) ($,) sel
+if. sel -:&$ usel =. ''"_`>@.(2>L.) sel do.
+  sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |: shapeused {.!.({.,sel) ((-$shapeused) {.!.1 $sel) ($,) sel
 NB. Before filling the cells the first time, initialize the rectangles to the colors given by the fillmask.  This
 NB. is to give the right color to cells that are not drawn at all (empty contents) or whose contents do not fill
 NB. the cell, because of other larger values.
-    (cfmdata rectcolorfromfillmask >sel) drawrect"0 2 rects
-  else.
-NB. Selector node
-NB. usedd has been converted to a table - do the same for sel
-    sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |:  sel
-  end.
+  (cfmdata rectcolorfromfillmask >sel) drawrect"0 2 rects
+else.
+  NB. Selector node
+  NB. usedd has been converted to a table - do the same for sel
+  sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |:  sel
+end.
 NB. If there are subDOLs, process each of them.  The operand was boxed.
-  if. 3 < #vf do.
-    sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
-    NB.  Adjust each inner box position
-    (sdol ,"0 1 usedd ,"0 1 ((_1-FILLMASKNOCOLLECT)&bwand^:(0=L.)&.> sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
-    NB. Draw mesh for the rectangles - dotted if the boxing is because of collection error
-    collecterr =. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel
-    (BOXBORDERCOLOR,1,collecterr # PS_DOT) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
-  else.
-NB. Not boxed data; draw each cell.  If the cell is error/unexecd, delete the text, since the cell
-NB. doesn't really have a value.  We leave its space as a reminder of how big it might have been
-NB. Install checkboard, so it shows up at all levels
-     sel =. (<:#cfmdata) checkerboardfillmask sel
-    (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
-  end.
+if. 3 < #vf do.
+  sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
+  NB.  Adjust each inner box position
+  (sdol ,"0 1 usedd ,"0 1 ((_1-FILLMASKNOCOLLECT)&bwand^:(0=L.)&.> sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
+  NB. Draw mesh for the rectangles - dotted if the boxing is because of collection error
+  collecterr =. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel
+  (BOXBORDERCOLOR,1,collecterr # PS_DOT) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
+else.
+  NB. Not boxed data; draw each cell.  If the cell is error/unexecd, delete the text, since the cell
+  NB. doesn't really have a value.  We leave its space as a reminder of how big it might have been
+  NB. Install checkboard, so it shows up at all levels
+   sel =. (FILLMASKEXTRAAXES * 1 = {. $ data) + (<:#cfmdata) checkerboardfillmask sel
+   if. emptydata do.
+     (cfmdata rectcolorfromfillmask sel) drawrect"0 2 rects
+   else.
+     (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
+   end.
+end.
   
 NB. Draw borders at any boundary (except the first) where a rank rolls over.  The width of the line
 NB. is the number of ranks that rolled over simultaneously.  We see which rectangles start
 NB. on a new boundary, and use the start position to get the line
 NB. Get number of boundaries for each row/col: 0=not a bdy, 1=rank-2 bdy, etc
 NB. Add 1 pixel of width to nonzero boundaries
-  bdynos =. axisshapes (+ *)@}.@:(0&(i.&1@:~:)@|."1)@(#: i.)&.> flatshape
+ bdynos =. axisshapes (+ *)@}.@:(0&(i.&1@:~:)@|."1)@(#: i.)&.> flatshape
 NB. Create table of startpoint,width for each line.  Discard first point of bdynos (always a big
 NB. value for the first cell) and the last point of sizes (gives position of the last cell).  We
 NB. are left with internal boundaries.  Back up the position by the width of the boundary, and discard
 NB. zero boundaries
-  if. +/ #@> startwidth =. bdynos (*@[ # ,.~)&.> (<<<0 _1)&{&.> yxpositions do.
-    (RANKCOLOR ,"1 PS_SOLID ,.~ {:"1 ; startwidth) drawmesh ({."1&.> startwidth) ,: |.   0 _1&{&.> yxpositions
-  end.
-  
-  0
+if. +/ #@> startwidth =. bdynos (*@[ # ,.~)&.> (<<<0 _1)&{&.> yxpositions do.
+  (RANKCOLOR ,"1 PS_SOLID ,.~ {:"1 ; startwidth) drawmesh ({."1&.> startwidth) ,: |.   0 _1&{&.> yxpositions
 end.
+  
+0
+NB. obsolete end.
 )
 
 
@@ -5577,6 +5616,15 @@ This is the data area, where the result of the verb is displayed.
 The maximum size of the data area can be set in the Sizes menu.  If the result does not fit, scrollbars are provided; in addition you can right-click in the data area to create a fullscreen explorer window that will show the result.
 )
 
+NB. y is table of path;shape
+NB. Result is character-string description
+NB. We use 'atom' for an atom; '(atom)' for a boxed atom; ';' for dropdown; 'empty(shape)' for an empty 
+isftodisplayablepath =: 3 : 0
+boxindexes =. (":&.>@{.) ` (('empty(' , ')' ,~ ":)&.>@{:) ` ((<'<atom>')"_)  @.(([: #. ''&-: , 0&e.)@:(1&{::))"1 y  NB. nonempty, empty, atom
+NB. Remove <> from last box, and put ';' after all previous
+; (,&'; '&.>@}: , -.&'<>'&.>@{:) boxindexes
+)
+
 hoverDOdatapos =: 4 : 0
 exp =. x
 hoveryx =. y
@@ -5607,31 +5655,33 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
     NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
     NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
-    selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
+    selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
 
-    NB. Convert the isf to a path.  Put SFOPEN at the end, then cut on SFOPEN and run boxes together.
-    NB. If the last box is empty, remove it
-    selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
-    if. #selpath do.
-      NB. If there are selection options, display the path
+    NB. Convert the isf to a path.
+NB. obsolete NB.   Put SFOPEN at the end, then cut on SFOPEN and run boxes together.
+NB. obsolete     NB. If the last box is empty, remove it
+NB. obsolete     selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
+NB. obsolete     if. #selpath do.
+NB. obsolete       NB. If there are selection options, display the path
+NB. obsolete 
+NB. obsolete       if. 1 >: #selpath do.
+NB. obsolete         disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (": ; selpath),'.',LF,LF
+NB. obsolete       else.
+NB. obsolete         disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath),'.',LF,LF
+NB. obsolete       end.
+    disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom with path=' , (isftodisplayablepath selx),'.',LF,LF
 
-      if. 1 >: #selpath do.
-        disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (": ; selpath),'.',LF,LF
+    NB. If this has rank higher than 2, explain the display
+    if. 2 < #rshape do.
+      if. 2 | #rshape do.
+        NB. Odd number of axes
+        t =. 'This array is displayed as a list of ', (":{.rshape) , ' ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ }.rshape) , '.'
       else.
-        disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath),'.',LF,LF
+        t =. 'This array is displayed as a ', ((":@{. , 'x' , ":@{:) 2{.rshape) , ' table of ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ 2 }.rshape) , '.'
       end.
-
-      NB. If this has rank higher than 2, explain the display
-      if. 2 < #rshape do.
-        if. 2 | #rshape do.
-          NB. Odd number of axes
-          t =. 'This array is displayed as a list of ', (":{.rshape) , ' ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ }.rshape) , '.'
-        else.
-          t =. 'This array is displayed as a ', ((":@{. , 'x' , ":@{:) 2{.rshape) , ' table of ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ 2 }.rshape) , '.'
-        end.
-        disp =. disp , EXEGESISDATAARRANGEMENT ; t,LF,'Boundaries above rank 2 are indicated by blue lines, with wider lines used for higher boundaries.',LF,LF
-      end.
+      disp =. disp , EXEGESISDATAARRANGEMENT ; t,LF,'Boundaries above rank 2 are indicated by blue lines, with wider lines used for higher boundaries.',LF,LF
     end.
+NB. obsolete     end.
   end.
   NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
   if. 1 < #DOsize do.
@@ -5659,12 +5709,13 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   else. text =. defstring 0
   end.
   if. sellevel <: #selections do.
-    rshape =. 0{::valueformat
-    if. 1 < */ rshape do.
-      selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
-      selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
-      text =. text , '         path=' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath)
-    end.
+NB. obsolete     rshape =. 0{::valueformat
+NB. obsolete     if. 1 < */ rshape do.
+    selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
+NB. obsolete       selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
+NB. obsolete       text =. text , '         path=' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath)
+    text =. text , '         path=' , isftodisplayablepath selx
+NB. obsolete     end.
   end.
 else. text =. ''
 end.
@@ -6068,27 +6119,54 @@ flatyxtopixel =: 3 : 0
 y ({ 0&,)&>"1 (1 2 { valueformat)
 )
 
-NB. x is DOL descriptor, y is flatyx, result is CSF for path within the noun.  No shortcuts are used in the result
-yxtopath =: 4 : 0
+NB. obsolete NB. x is DOL descriptor, y is flatyx, result is table of (selection);(shape at level)
+NB. obsolete yxtopathshape =: 4 : 0
+NB. obsolete flatrc =. (>: y) (I.~ }:)&> 1 2 { x  NB. Look up to find containing row/col
+NB. obsolete s =. 0 {:: x   NB. shape of the noun
+NB. obsolete NB. Split the shapeused into vert;horiz, ending on horiz.  OK to add high-order 0s to
+NB. obsolete NB. ensure that there is some infix of length 2.
+NB. obsolete NB. Convert row/col to indexes.  Interleave the indexes for row/col to get cell indexes.  Remove 0
+NB. obsolete NB. if it was added
+NB. obsolete NB. Box the indexlist
+NB. obsolete indexlist =. < (-#s) {. , |: (|. |: _2&(]\)&.|. 0 0 , s) #: flatrc
+NB. obsolete NB. If there is no lower boxing level, indexlist is the result
+NB. obsolete if. 3 < #x do.
+NB. obsolete   NB. Boxed noun.  Recur to look up the next level.  Offset the yx to within the subbox
+NB. obsolete   NB. Start by selecting at this level and dropping down, followed by the later levels
+NB. obsolete   NB. Offset within the inner box by the margin plus the leading linewidth
+NB. obsolete   < (indexlist , SFOPEN) ; > ((3;indexlist) {:: x) yxtopathshape y - (BOXLINEWIDTH + BOXMARGIN) + flatrc ({ 0&,)&> 1 2 { x
+NB. obsolete else.
+NB. obsolete   NB. Return the indexlist as a boxed CSF (rank-3)
+NB. obsolete   <,<indexlist
+NB. obsolete end.
+NB. obsolete )
+NB. x is DOL descriptor, y is flatyx, result is table of (selection);(shape at level)
+yxtopathshape =: 4 : 0
+if. empty =. 0 e. s =. 0 {:: x do. s =. ({.~ i.&0) s end.  NB. shape of the noun
 flatrc =. (>: y) (I.~ }:)&> 1 2 { x  NB. Look up to find containing row/col
-s =. 0 {:: x   NB. shape of the noun
 NB. Split the shapeused into vert;horiz, ending on horiz.  OK to add high-order 0s to
 NB. ensure that there is some infix of length 2.
 NB. Convert row/col to indexes.  Interleave the indexes for row/col to get cell indexes.  Remove 0
 NB. if it was added
+NB. Append _1 to end to indicate empty.
 NB. Box the indexlist
-indexlist =. < (-#s) {. , |: (|. |: _2&(]\)&.|. 0 0 , s) #: flatrc
+indexlist =. (empty # _1) ,~ (-#s) {. , |: (|. |: _2&(]\)&.|. 0 0 , s) #: flatrc
 NB. If there is no lower boxing level, indexlist is the result
 if. 3 < #x do.
   NB. Boxed noun.  Recur to look up the next level.  Offset the yx to within the subbox
   NB. Start by selecting at this level and dropping down, followed by the later levels
   NB. Offset within the inner box by the margin plus the leading linewidth
-  < (indexlist , SFOPEN) ; > ((3;indexlist) {:: x) yxtopath y - (BOXLINEWIDTH + BOXMARGIN) + flatrc ({ 0&,)&> 1 2 { x
+  (indexlist ; s) , ((3;indexlist) {:: x) yxtopathshape y - (BOXLINEWIDTH + BOXMARGIN) + flatrc ({ 0&,)&> 1 2 { x
 else.
   NB. Return the indexlist as a boxed CSF (rank-3)
-  <,<indexlist
+  ,: indexlist ; s
 end.
 )
+
+NB. Older interface:
+NB. x is DOL descriptor, y is flatyx, result is CSF for path within the noun.  No shortcuts are used in the result
+yxtopath =: _2 <\ [: }:@, SFOPEN (<a:;1)} yxtopathshape
+
 
 NB. Nilad.  Returns the next locale in the inheritance chain for the current node.
 NB. This will usually be the next in chain, but some nodes (such as u^: when the user is selecting item 0)
@@ -6177,7 +6255,7 @@ else.
     NB. at this level.
     NB. But: if the frame contains 0, no selection can be valid (it will perforce contain an index error)
     NB. and we must abort with a status code indicating the fact
-    if. 0 e. selframe do. _2 return. end.
+    if. (0 e. selframe) +. (_1 e. localf) do. _2 return. end.
     if. 0 = #localf do.
     NB. Forced selection.  It was propagated when first detected, so we just ignore the node and
     NB. keep looking
@@ -6227,7 +6305,7 @@ processdataclick =: 4 : 0
 NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
 NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
 NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
-selx =. ; > valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + y
+selx =. ; valueformat yxtopath BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + y
 QP^:DEBPICK 'y selx '
 QP^:DEBPICK 'sellevel #selections selections '
 NB. If sellevel exceeds the number of selections, there's nothing really here - it must be an empty
@@ -9065,10 +9143,16 @@ formatcode =: 0   NB. early error
 NB. We need vval for calculating the selframe of u; but it may not be valid, in case vop failed.
 NB. We have fixed calcdispframe so that it doesn't look at vval if vop failed, so we just need to
 NB. get vval defined when it is valid
-if. errorcode__vop e. EFAILED do. vval =: 0
-elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do. vval =: fillmask__vop frameselresult__vop selresult__vop
-NB.?lintonly elseif. do. vval =: 0
+if. errorcode__vop e. EHASVALIDFILLMASK do. vval =: fillmask__vop frameselresult__vop selresult__vop
+else. vval =: 0   NB. Make sure it's defined
 end.
+
+NB. obsolete NB. Calculate a flag needed for shape analysis: if the v value is not an atom, and it contains positive values, Roger
+NB. obsolete NB. will restart the power if it returns a boxed value.  Create a flag indicating that condition.  It doesn't apply if
+NB. obsolete NB. vval is boxed.
+NB. obsolete boxrestart =: 0
+NB. obsolete if. (0 = L. vval) do. if. '' -.@-: $vval do. if. 0 < >./vval do. boxrestart =: 1 end. end. end.
+NB. obsolete 
 NB. Perform selections for u - needed for display whether v ran or not
 traversedowncalcselect y
 NB. If v invalid, detect domain error
@@ -9079,7 +9163,8 @@ elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do.
   elseif. (-.@-: <.) > vval do. errorcode =: EINVALIDVERB
   end.
 end.
-if. errorcode e. EEARLYERROR do. earlyerror x return. end.
+if. errorcode e. EEARLYERROR do. earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return. end.
+
 NB. In case we are formatting this node (the usual case), save the input DOLs to it
 resdol =. x ,&< coname''
 NB. If v didn't run, there is really nothing we can do about u; just display it.  If v failed because it didn't select, there
@@ -9291,13 +9376,19 @@ if. selectable do.
   NB. the number of negative results expected.  _ means 'don't know'.  If there are both positive.  This is needed
   NB. so we can detect an error during sniff
   fi =. (>./ , [: - <./) 0 , flatvval =. , (- *)@>^:(1 = L.) vval
-  NB. Count the number of forward and inverse executions
-  fix =. -/\. (# , +/) selx { logvaluesd__uop
-  NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
-  NB.  or if there is a mix of forward and backward execs
-  throwaway =. (1 1 -: * fi) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) (-.logvaluesd__uop) #&(selx&{) logvalues__uop
-  NB. correct the number of executions: forward includes the 0 value, and also counts a throwaway execution sometimes
-  fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
+  NB. Count the number of total and inverse executions, and convert to 'forward' and inverse, where forward includes the original value
+  fix =. -/\. (# , _1&(+/@:=)) selx { logvaluesd__uop
+NB. obsolete NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
+NB. obsolete NB.  or if there is a mix of forward and backward execs
+NB. obsolete throwaway =. (1 1 -: * fi) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) fwdvals =. (-.logvaluesd__uop) #&(selx&{) logvalues__uop
+NB. obsolete NB. Also discard first forward execution if v is non-atomic and the first result is boxed.  Roger restarts the operation in that case
+NB. obsolete throwaway =. throwaway +. boxrestart *. (32 = 3!:0 > {. fwdvals)
+NB. obsolete NB. correct the number of executions: forward includes the 0 value, and also counts a throwaway execution sometimes
+NB. obsolete   fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
+NB. obsolete   fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
+  NB. Since we filtered out restarts, the forward/inverse counts are correct EXCEPT when there is a mix of negative and zero
+  NB. vvals: then we should have NO forward execs, but we show one.  Remove its count
+  fix =. fix <. _ ,~ >: 0 >. >./ vval
   NB. Decide which direction failed - if any.  Infinities can only come up when we are going in one direction
   edir =. fi i.&1@:> fix
   NB. If neither direction failed, the error must have happened during framing.  Ignore that for the nonce
@@ -9368,7 +9459,80 @@ exestring =: 3 : 0
 initloggingtable 1
 NB. If u has an unused operand, we should put @] or @[ after the inverse, because Roger can't handle x u@[^:_1 y but he can handle x u@[^:_1@[ y
 monadstring =. ('@]';'@[';'') {::~ estheights__uop i.&0@:>: 0
-auditstg '(' , (verblogstring '') , '(' , (logstring 0) , '@:' , (exestring__uop '') , ') :. ( ' , (logstring 1), '@:(' , (logstring__uop'') , ')@:(' , (defstring__uop 2) , '^:_1',monadstring,')))'
+NB. obsolete auditstg '(' , (verblogstring '') , '(' , (logstring 0) , '@:' , (exestring__uop '') , ') :. ( ' , (logstring 1), '@:(' , (logstring__uop'') , ')@:(' , (defstring__uop 2) , '^:_1',monadstring,')))'
+NB. We log 5 types: 0 for the original input, 1 for the forward input , _1 for the inverse input, 2 for forward output, _2 for inverse output, and we sort them out in the local addlog
+NB. Type 0 was logged back in the original ^: string
+if. 1 = valence do.
+  auditstg '(' , (verblogstring '') , '(' , (logstring 2) , '@:' , (exestring__uop '') ,'@:' , (logstring 1) , ') :. ( ' , (logstring _2), '@:(' , (logstring__uop'') , ')@:(' , (defstring__uop 2) , '^:_1',monadstring,'@:(',(logstring _1),')) ) )'
+else.
+  auditstg '(' , (verblogstring '') , '(' , (logstring 2) , '@:(' , (exestring__uop '') ,' ' , (logstring 1) , ')) :. ( ' , (logstring _2), '@:((' , (logstring__uop'') , ')@:(' , (defstring__uop 2) , '^:_1',monadstring,' (',(logstring _1),'))) ) )'
+end.
+)
+
+NB. ********** addlog for ^: expansion ************
+NB. We have to filter out repeats and restarts.  When a forward or reverse input is received, it is checked against
+NB. the original input to see if it is a restart.  If so, we back over the first result.  We allow at most 1 restart per direction.
+NB. After the restart-if-any, the input should match the previous output, which will be the last value saved.
+addlog =: 4 : 0
+NB. The first call must always be the original input.  We save it & initialize state
+NB.?lintonly originput =: state =: 0
+select. x
+case. 0 do.   NB. initial y
+  originput =: y
+  state =: 0
+  0 addlog_dissectobj_ f. y
+case. 1 do.   NB. input to forward verb
+  logok =. 1
+  if. (y -: originput) do.
+    select. state
+    case. 0 do.
+      NB. Initial forward exec.  Indicate that it has happened.
+      state =: 1
+    case. 1 do.
+      NB. A second forward exec whose input it the same as the first.  We can't be sure, but this is probably a restart.
+      NB. Don't log it.
+      state =: 2   NB. we are now past the restart zone
+      NB. Stop logging, for here and all descendants, until the restart is complete
+      logok =. 0
+    case. do.  NB. Must be state 2.  From here on all input must match the previous output.  They may all be the same, but
+      NB. we log them all
+      assert. y -: {: logvalues [ 'unexpected restart during ^:'
+    end.
+  else.
+    assert. state ~: 0 [ 'unexpected first ^:'
+    assert. y -: {: logvalues [ 'chain break during ^:'
+    state =: 2   NB. restart should only come as first exec.
+  end.
+  loggingallowed__COCREATOR =: logok , loggingallowed__COCREATOR
+case. _1 do.   NB. input to inverse
+  logok =. 1
+  if. y -: originput do.
+    select. state
+    case. 0;1;2 do.
+      NB. Initial inverse exec.  Indicate that it happened
+      state =: _1
+    case. _1 do.
+      NB. Repeat inverse.  Probably a restart - ignore it
+      state =: _2
+      NB. Stop logging, for here and all descendants, until the restart is complete
+      logok =. 0    
+    case. do.
+      NB. State _2.  input must match previous output
+      assert. y -: {: logvalues [ 'unexpected restart during ^: inverse'
+    end.
+  else.
+    assert. state -.@e. 0 1 2 [ 'unexpected first ^: inverse'
+    assert. y -: {: logvalues [ 'chain break during ^: inverse'
+    state =: _2   NB. restart should only come as first exec.
+  end.
+  loggingallowed__COCREATOR =: logok , loggingallowed__COCREATOR
+case. do.
+  NB. Result of execution, either forward or inverse
+  (*x) addlog_dissectobj_ f. y
+  NB. Unstack the logging-allowed flag
+  loggingallowed__COCREATOR =: }. loggingallowed__COCREATOR
+end.
+y
 )
 
 NB. Return the locales for propsel.
@@ -9547,7 +9711,6 @@ NB. seems to happen whenever the v result is an array containing a negative valu
 NB. We can say that if the results contain an inverse, the first execution of u, if any, is throwaway.
 
 NB. Find the indexes corresponding to the input selector, and extract the corresponding fwd/inverse types
-NB. The first value is the input, the second is the suspect throwaway, others are actual executions.
 NB. The number of valid values will become the frame.
 NB. If we know from v what should be produced, use that.  Otherwise figure it out by looking at the result
 if. noexpansion do.
@@ -9557,7 +9720,8 @@ elseif. selectedpower -.@e. _ __ do.
 elseif. a: ~: selector do.
 NB. Frame unknown, use whatever we actually did, of the correct sign
   selx =. calcdispselx ; findselection > selector
-  frm =. , (selectedpower<0) ([ + +/@:=) selx { logvaluesd  NB. Add 1 on inverse to include the 0 power
+NB. obsolete   frm =. , (selectedpower<0) ([ + +/@:=) selx { logvaluesd  NB. Add 1 on inverse to include the 0 power
+  frm =. , #selx
 elseif. do.
 NB. rank-calculus probe, return empty frame since we can't do rank-calculus
   frm =. $0
@@ -9567,18 +9731,19 @@ NB. Level 1 (output only) if we have an expansion
 )
 
 NB. y is the indexes that matched; result is the indexes to use, in execution order.
-NB. We discard the second forward value (the first result of executing the forward) if it
-NB. exists and there is an execution of the inverse.
 NB. If the expansion node is to be omitted, the only use of this node is no provide
 NB. an operand for u; that will be the unmodified y; so make that the only input
 calcdispselx =: 3 : 0
-keepmask =: (selectedpower<0) = y { logvaluesd
+NB. Restarts were filtered during addlog
+keepmask =: (1 1 _1 {~ *selectedpower) = y { logvaluesd
 keepmask =: 1 (0)} keepmask
-NB. If both valences were executed, the first execution (the second value) is bogus
-NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
-NB.  or if there is a mix of forward and backward execs
-throwaway =. ( 0 1 *./@:e. }. y { logvaluesd) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) }. (-.logvaluesd) #&(y&{) logvalues
-if. throwaway do. keepmask =: 0 (1)} keepmask end.
+NB. obsolete NB. If both valences were executed, the first execution (the second value) is bogus
+NB. obsolete NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
+NB. obsolete NB.  or if there is a mix of forward and backward execs
+NB. obsolete throwaway =. ( 0 1 *./@:e. }. y { logvaluesd) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) }. fwdvals =. (-.logvaluesd) #&(y&{) logvalues
+NB. obsolete NB. Also discard first forward execution if v is non-atomic and the first result is boxed.  Roger restarts the operation in that case
+NB. obsolete throwaway =. throwaway +. boxrestart *. (32 = 3!:0 > {. 1&|. fwdvals)
+NB. obsolete if. throwaway do. keepmask =: 0 (1)} keepmask end.
 1 {.^:noexpansion (>:|selectedpower) ((<. #) {. ]) keepmask # y
 NB.?lintsaveglobals
 )
@@ -10671,11 +10836,11 @@ elseif. do.
   try.
     selectedop =. ulocales {~ fillmask__vop frameselresult__vop selresult__vop
   catch.
-    EINVALIDOP earlyerror x return.
+    (EINVALIDOP;'invalid v value') earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return.
   end.
   NB. The selection must be a scalar.
-  if. ($0) -.@-: $selectedop do. 
-    (EINVALIDOP;'non-atomic v') earlyerror x return.
+  if. ($0) -.@-: $selectedop do.
+    (EINVALIDOP;'non-atomic v') earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return.
   end.
   NB.?lintonly selectedop =. <'dissectverb'
   NB. Insert an end-of-computation marker for the expansion
@@ -11994,6 +12159,10 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '>:^:-: i. 3'
 2 dissect '>:^:crash9_dissect_ 9'
 2 dissect '<.@(0.5&+)&.(10&*) 3.14159'
+2 dissect '1:`2: @. (2<$) i.10'
+2 dissect '${.^: (1 = $)  }:^:(a: = {:) 3 ; i.0'
+2 dissect '(i.0)"_/ i. 5'
+2 dissect '(i.0)"_/"1 i. 5 2'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
