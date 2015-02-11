@@ -42,16 +42,13 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Use box trick to avoid special case in ;.3
 NB. Test selection of displays with 0 in shape
+NB. Use box trick to avoid special case in ;.3
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
-NB. dissect '5 ($: <:)^:(1<]) 4'  select last recursion; the y input passes through because of ^:0; display of u should be removed?  On lowlighted?
-NB.   in ^:0, remove the wire from end of u to final, replace it with one direct from y input?  Or just elide u?
 NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
-NB. dissect 'i.@> z' [ z =. 1;2;'a'  select non-error result cell; error cell is still shaded.  Should shade only when last+1 result selected
 NB. Use italics or the like to distinguish verb-starts from verb-ends
 NB. Launch Jwiki from hotlinks in tooltips
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
@@ -62,24 +59,16 @@ NB. Highlight net on a click/hover of a wire
 NB. Hovering over selected cell to detail computation there?
 NB. can simplify combineyxsels
 NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?
-NB. dissect '5 ($: <:@crash9_dissect_)^:(2*1<]) 4' display is confusing.  the $: node is really powers of the big verb.  Perhaps label expansion differently?
 NB. change rank stack in partitions (test /."0), don't dup /.
 NB. Re-select of selected cell of @. should remove expansion
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. if a recursion produces no result, flag that fact
 NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
-NB. dissect '(* $:@:<:)^:(1&<) 7'    select result 1 - no detail displayed inside ^:
-NB.  this is because there are multiple possible results, so we skeletalu.  But should the wiring bypass the skeletalu?
 NB. support axis permutations for display, for u;.
-NB. if there is an error framing the forward and reverse, we don't catch it and don't select it
-
-NB. Need different text color for digits/text, and for nouns with leading 1s in the shape
 
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
 NB. handle clicking on verb-name part to select tree
 NB. create pickrects for displayed sentence, and handle clicks there
-NB. plan: save preferences; debug globals
-NB. Add space between the label/shape/status blocks - add to bbox layout in alignrects
 NB. test errorlevel, including for fill cells.
 NB. A way to display error encountered during fill cell?
 NB. should we allow selection if final result is early error? (what shape then?)
@@ -9232,13 +9221,13 @@ NB. If all the v results are <1, we never need a selector and can simply expand 
 NB. Figure out what v value has been selected by the current selection.  If selection has not been performed,
 NB. the expansion will not expand, so there must be a unique v value.  Pass that into the traversal: we will
 NB. display only the powers whose sign matches the selection, and we will display only up to the selection.
-    if. ($0) -: $vval do. selectedpower =. (- *)@({.!._)@>^:(1 = L.) vval
+    if. ($0) -: $vval do.
+      if. 0 = selectedpower =. (- *)@({.!._)@>^:(1 = L.) vval do. traverseu =. 0 end.
     elseif. sellevel < #selections do.
       sel1 =. {. > isfensureselection isftorank2 sellevel { selections  NB. first level of selection, boxed
-      selectedpower =. (- *)@>^:(1 = L.) sel1 { vval
+      if. 0 = selectedpower =. (- *)@>^:(1 = L.) sel1 { vval do. traverseu =. 0 end.
     elseif. do. selectedpower =. 0
     end.
-
 NB. Create the initial selection to use when this result is clicked.  Since the initialselection is for an expansion node, append SFOPEN to it.
 NB. we select according to which type (forward or inverse) will be displayed in the expansion.
 NB. Create the initialselection only if we are ready to use it, i. e. if we have selected down to a single value to expand
@@ -9600,10 +9589,10 @@ NB. No positive values in v, so no way ever to run u
 else.
 NB. This node will be an expansion node, if it exists.  If no selection has been made, it doesn't.
   if. (0 < {.frame) *. (sellevel < #selections) do.
+    sel1 =. {. > isfensureselection isftorank2 sellevel { selections  NB. first level of selection, boxed
 NB. If the selection is 2 or higher, or _2 or lower, we need a selfreference.  If 2 or higher, the selfreference
 NB. will go to u; if _2 or lower, it will go to u^: .  But we will need to make sure that y is still
 NB. displayed, just with the wire removed
-    sel1 =. {. > isfensureselection isftorank2 sellevel { selections  NB. first level of selection, boxed
     if. floatingy =. 1 < | > sel1 do.
       ydol =. {: x
       x =. (createselfreference 1.4) (,_1)} x
@@ -9612,7 +9601,12 @@ NB. If this v contains a nonpositive value, that means the y value might get thr
 NB. In that case, we need a wire from y to the selector.  If also the selector is 1, both the expansion and u will
 NB. need to connect to y, so we will need a reference.  We will connect the reference to u, because the connection
 NB. to the expansion is secure, but the connect to u might be deleted by a stealthop.
-    
+    NB. If the user has selected power 0, don't show u.  This is because if u is complex there is no direct path from y
+    NB. to the expansion, and it is puzzling to see the result coming as if from nowhere.  We would like to put x
+    NB. out of the picture as well, but we're afraid it might contain references
+    if. 0 = > sel1 do.
+      traverseu =: 0  NB. wire straight to input
+    end.
 NB. Turning this into the arguments to the expansion and u:
     if. traverseu do.
 NB. The arguments to u are:
@@ -9688,7 +9682,7 @@ end.
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'Each intermediate result is shown in its own box.',LF
+'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'Each successive power is shown in its own box.',LF
 )
 
 
