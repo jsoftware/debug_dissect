@@ -3,9 +3,10 @@ NB. Copyright (c) Henry H. Rich, 2012-2015.  All rights reserved.
 locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector nadverb conjunction'
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
 NB. The 2 1 gives the name-table sizes: 2 1 0 0 0 ...
-NB. The dissectionlist thing is to preserve the list over reloads, for debugging.
+NB. The dissectionlist thing is to preserve the list over reloads, for debugging.  This is also its initialization
 NB. Don't delete a locale that we have switched to, to prevent interaction unpleasantness
-3 : 'dissectionlist_dissect_ =: d [ ((cocreate ([ coerase))"0~   2 1 {.~ #) y [ d =. ".''dissectionlist_dissect_''' (coname'') -.~ locales
+NB. 10 10 here is the starting position of the first window
+3 : 'dissectionlist_dissect_ =: d [ ((cocreate ([ coerase))"0~   2 1 {.~ #) y [ d =. (,:($0);10 10)&[^:(0=#) ".''dissectionlist_dissect_''' (coname'') -.~ locales
 
 NB. DISSECTLEVEL is updated from time to time whenever there is a change to an external interface, indicating the dissect release level
 NB. at the time of the change
@@ -261,7 +262,7 @@ NB. Make the timer check only when starting the first instance
 NB. If a timer was NOT created because of earlier sys_timer, stub out wdtimer in the instance;
 NB. otherwise allow it to go through to the definition in dissect locale
 if. ALLOWNONQTTOOLTIP *. -. IFQT do.
-  if. 0 = #dissectionlist_dissect_ do.
+  if. 0 = #a: -.~ {."1 dissectionlist_dissect_ do.
     if.  0 > 4!:0 <'sys_timer_base_' do.
       sys_timer_z_ =: sys_timer_dissect_
     end.
@@ -277,7 +278,7 @@ NB. If we are returning after the last destroy, we also restore the timer.
 NB. This makes sure we leave the user in his original state always
 restoreJenvirons =: 3 : 0   NB. called AFTER removing instance from the list
 9!:39 Jenvirons
-if. (0 = #dissectionlist_dissect_) *. (ALLOWNONQTTOOLTIP *. -. IFQT) do.
+if. (0 = #a: -.~ {."1 dissectionlist_dissect_) *. (ALLOWNONQTTOOLTIP *. -. IFQT) do.
   if. (<'sys_timer_dissect_') -: 5!:1 <'sys_timer_z_' do.
     NB. If we created a timer, remove it
     4!:55 <'sys_timer_z_'
@@ -286,11 +287,25 @@ end.
 0 0$0 
 )
 
+CASCADEOFFSET =: 20 20   NB. Amount to offset a new window-level from the last previous window-level
 NB. Initialization
 create =: 3 : 0
 NB. Save the initial environment BEFORE we indicate instance running
 saveJenvirons''
-dissectionlist_dissect_ =: dissectionlist_dissect_ , coname''
+slottouse =. ({."1 dissectionlist_dissect_) i. a:
+if. slottouse = #dissectionlist_dissect_ do.
+  NB. new window position.
+  NB. Figure out the initial position for the new window.  It is at a cascade offset from the
+  NB. position of the last window.  We have to ask the window its position, since we don't
+  NB. get an event for a pmove 
+  lastparent =. (<_1 0) { dissectionlist_dissect_
+  NB.?lintmsgsoff
+  wd 'psel ' , winhwnd__lastparent
+  NB.?lintmsgson
+  initpos =. CASCADEOFFSET + 1 0 { 0 ". wdqform''
+  dissectionlist_dissect_ =: dissectionlist_dissect_ , ($0);initpos
+end.
+dissectionlist_dissect_ =: (coname'') (<slottouse,0)}  dissectionlist_dissect_
 objtable =: 0$a:   NB. list of parse objects
 ticket =: 0   NB. sequential log number
 loggingallowed =: 1   NB. allow logging
@@ -918,15 +933,15 @@ runningtimerloc_dissect_ =: coname ''
 wd 'timer ' , ": y
 )
 
-sessionyx =: 10 10   NB. Initial position of the first window
+NB. obsolete sessionyx =: 10 10   NB. Initial position of the first window
 NB. Set the initial value to use for the form, so we remember it from call to call
 NB. Called whenever we think the control might have moved
 setsessionyx =: 3 : 0
-  sessionyx_dissect_ =: 1 0 { 0 ". wdqform''
+dissectionlist_dissect_ =: (<1 0 { 0 ". wdqform'') (<(({."1 dissectionlist_dissect_) i. coname''),1)} dissectionlist_dissect_
 )
 NB. Get the starting value
 getsessionyx =: 3 : 0
-sessionyx_dissect_
+((({."1 dissectionlist_dissect_) i. coname''),1) {:: dissectionlist_dissect_
 )
 
 NB. ************** start of the display section (after the parse is over) ****************
@@ -1198,7 +1213,9 @@ if. #winhwnd do.
   wd 'pclose'
   winhwnd =: ''  NB. not required
 end.
-dissectionlist_dissect_ =: dissectionlist_dissect_ -. coname''
+if. (coname'') e. {."1 dissectionlist_dissect_ do.
+  dissectionlist_dissect_ =: a: (<((coname'') i.~ {."1 dissectionlist_dissect_),0)} dissectionlist_dissect_
+end.
 if. ALLOWNONQTTOOLTIP *. -. IFQT do.
   NB. Turn off timer to avoid late interrupt
   runningtimerloc_dissect_ =: 0$a:
@@ -11680,6 +11697,7 @@ Reverse crosshatching indicates cells that were not executed owing to earlier er
 )
 
 cocurrent 'dissect'
+
 NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ dissectinstanceforregression_dissect_ 4 : ''destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 NB. wd@('psel dissect;pclose'"_)"0 i. 100
 runtests_base_ =: 0 : 0
