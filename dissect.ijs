@@ -43,7 +43,6 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '+/ 6 8'; select result; show u on 2; remove show u on 2; crash.  Seems the force selection persists.  Solution might be to reselect after change of autodyad (didn't work)
 NB. Test selection of displays with 0 in shape
 NB. Use box trick to avoid special case in ;.3
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
@@ -434,10 +433,10 @@ NB. or the string form, for a modifier.  Tokennums are the input token numbers t
 queue =. mark ; queue
 stack =. 4 2 $ mark;''
 
-NB. We keep track of $: verbs encountered, and insert an expansion node if there are any.  The expansion
-NB. is before the monad/dyad execution containing the $: .  We clear the flag indicating recursion to begin with, and after any monad/dyad.
-recursionencountered =: 0
-
+NB. obsolete NB. We keep track of $: verbs encountered, and insert an expansion node if there are any.  The expansion
+NB. obsolete NB. is before the monad/dyad execution containing the $: .  We clear the flag indicating recursion to begin with, and after any monad/dyad.
+NB. obsolete recursionencountered =: 0
+NB. obsolete 
 NB. In case of parse failure, we remember whether we executed a user modifier.  If we did, our assumption that it produced
 NB. a verb may have caused the failure, and we give a suitably couched error message
 usermodifierencountered =: 0
@@ -1248,7 +1247,6 @@ dissect_dissectisi_paint 1
 NB. Toggle the state of structmod display
 dissect_fmautoexpand2_button =: 3 : 0
 'fmautoexpand2' wdsetvalue ": displayautoexpand2_dissect_ =: -. displayautoexpand2
-applyselection ''   NB. Reestablish selections in new context (fails)
 dissect_dissectisi_paint 1
 )
 
@@ -2164,17 +2162,18 @@ NB. we get predictable sellevels, but it is known not to be needed (i. e. it is 
 NB. selection is forced, on a previous traversal).  If we get a change of selection this gets reexamined.
     'seltype thissel' =. getselection rawselx  NB. classify the type of selection.  Selections not normally needed (recursion uses them)
     QP^:DEBTRAVDOWN'seltype thissel sellevel selections '
-    select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 4=autoselect of node with no frame
+    select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 4=autoselect of node with no frame,
+                     NB. 5=removal of forced selection
     case. 2 do.
       NB. Forced selection: if this is the first time we see it, perform the forced selection, propagating it to lower nodes
       if. unforcedselection'' do. makeselection , thissel end.
       NB. If forced selection, don't apply thissel, because it would result in multiple ranges.  Just keep
       NB. the selector we had.
     case. 1 do.
-    NB. Here we select for the unforced selection
-NB. Calculate the selection interval corresponding to each selected result.  Put result intervals into selection order, then choose one
-NB. But if there is 0 in the frame (meaning we ran on a cell of fills), selection is perfunctory and we will simply
-NB. keep the old selector
+      NB. Here we select for the unforced selection
+      NB. Calculate the selection interval corresponding to each selected result.  Put result intervals into selection order, then choose one
+      NB. But if there is 0 in the frame (meaning we ran on a cell of fills), selection is perfunctory and we will simply
+      NB. keep the old selector
       if. -. 0 e. frame do.
         selector =: <^:(0=L.) thissel selectusingisf tickettonatural frame $ selector selectticketintervals rawselx
         assert. <:/"1 > selector
@@ -7142,18 +7141,19 @@ NB. Save the operands
 'uop yop' =: 1 {"1 y
 NB.?lintonly uop =: <'dissectverb' [ yop =: <'dissectnoun'
 resultissdt =: resultissdt__uop
+executingvalence__COCREATOR =: 1
+NB. clear the flag that we use to see whether there is recursion inside this monad/dyad exec
+recursionencountered__COCREATOR =: 0
+NB. Tell the verb its valence; the result is the operands that are needed for display.  Here, in this non-verb,
+NB. we save the operands needed by the first verb.  The rule is, we will pass to a verb ONLY the operands that
+NB. it says it can use.  For comp. ease we may compute an operand but then immediately discard it.
+uop =: setvalence__uop ,resultissdt__yop
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop
 if. recursionhere =: recursionencountered__COCREATOR do.
   NB. If there is a recursion inside this execution, insert a recursion point
   uop =: 'dissectrecursionpoint' 1 createmodifier uop,yop
 end.
-NB.?lintonly uop =: <'dissectrecursionpoint'
-NB. Tell the verb its valence; the result is the operands that are needed for display.  Here, in this non-verb,
-NB. we save the operands needed by the first verb.  The rule is, we will pass to a verb ONLY the operands that
-NB. it says it can use.  For comp. ease we may compute an operand but then immediately discard it.
-executingvalence__COCREATOR =: 1
-uop =: setvalence__uop ,resultissdt__yop
-NB.?lintonly uop =: <'dissectverb'
-resultissdt =: resultissdt__uop
 NB.?lintonly uop =: <'dissectrecursionpoint'
 noun;(coname'');''
 NB.?lintsaveglobals
@@ -7253,15 +7253,17 @@ NB. Save the operands
 'xop uop yop' =: 1 {"1 y
 NB.?lintonly uop =: <'dissectverb' [ xop =: yop =: <'dissectnoun'
 resultissdt =: resultissdt__uop
+NB.?lintonly uop =: <'dissectverb' [ yop =: xop =: coname''
+executingvalence__COCREATOR =: 2
+NB. clear the flag that we use to see whether there is recursion inside this monad/dyad exec
+recursionencountered__COCREATOR =: 0
+uop =: setvalence__uop resultissdt__xop,resultissdt__yop
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop
 if. recursionhere =: recursionencountered__COCREATOR do.
   NB. If there is a recursion inside this execution, insert a recursion point
   uop =: 'dissectrecursionpoint' 1 createmodifier uop,yop,xop
 end.
-NB.?lintonly uop =: <'dissectverb' [ yop =: xop =: coname''
-executingvalence__COCREATOR =: 2
-uop =: setvalence__uop resultissdt__xop,resultissdt__yop
-NB.?lintonly uop =: <'dissectverb'
-resultissdt =: resultissdt__uop
 NB.?lintonly uop =: <'dissectrecursionpoint'
 noun;(coname'');''
 NB.?lintsaveglobals
@@ -7360,7 +7362,10 @@ newobj__COCREATOR coname''
 uop =: {. y   NB. The verb locale
 NB.?lintonly uop =: <'dissectverb'
 yxop =: }. y  NB. The operand locale(s)
-recursionencountered__COCREATOR =: 0
+NB. obsolete recursionencountered__COCREATOR =: 0
+NB. Since this is called after setvalence, we insert valence-related stuff here
+valence =: <: #y
+resultissdt =: resultissdt__uop
 coname''
 )
 
@@ -7368,17 +7373,17 @@ destroy =: 3 : 0
 destroy_dissectobj_ f. ''
 )
 
-NB. Set the valence used for executing this verb, and propagate to descendants
-setvalence =: 3 : 0
-valence =: #y
-uop =: setvalence__uop y
-NB.?lintonly uop =: <'dissectverb'
-resultissdt =: resultissdt__uop
-NB. Return the dispoperands from v
-coname''
-NB.?lintsaveglobals
-)
-
+NB. obsolete NB. Set the valence used for executing this verb, and propagate to descendants
+NB. obsolete setvalence =: 3 : 0
+NB. obsolete valence =: #y
+NB. obsolete uop =: setvalence__uop y
+NB. obsolete NB.?lintonly uop =: <'dissectverb'
+NB. obsolete resultissdt =: resultissdt__uop
+NB. obsolete NB. Return the dispoperands from v
+NB. obsolete coname''
+NB. obsolete NB.?lintsaveglobals
+NB. obsolete )
+NB. obsolete 
 calcestheights =: 3 : 0
 estheights =: estheights__uop combineheights ,1     NB. add 1 for expansion node
 )
@@ -8914,7 +8919,10 @@ NB. The result is the DOL, up through the result of u
 traverse =: 4 : 0
 'forcedsel shouldexpand y' =. y
 NB. Create display type:
-titlestring =: 0 fulltitlestring cop 
+titlestring =: 0 fulltitlestring cop
+NB. Fix up a problem with disabling u/ on 2.  We leave this node showing a forced selection.  In that case, we
+NB. rescind the forced selection, replacing it with the initialselection
+if. -. forcedsel +. unforcedselection'' do. makeselection ,<(<,0),SFOPEN end.
 traversedowncalcselect y
 if. forcedsel do.
   NB. This is the code for the '(u on 2)' display.  It has been removed because users didn't like it.
@@ -9014,11 +9022,11 @@ NB. Result boxing level will be 1 if the frame is longer than 1
 )
 
 NB. Nilad.  Result is the selection for this node:  type;selection where type=
-NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only
+NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 5=removal of forced selection
 getselection =: 3 : 0
 if. selectable *. (sellevel < #selections) do.
   if. displayautoexpand2 *. frame -: ,1 do. 2 ,&< a:   NB. forced selection if 2 items
-  else. 1 ;<  sellevel { selections
+  else.  1 ;<  sellevel { selections
   end.
 else. 0 0
 end.
@@ -11112,8 +11120,6 @@ create =: 3 : 0
 r =. create_dissectverb_ f. y
 NB. Changes for $:
 resultissdt =: 0   NB. $: is NOT an sdt
-NB. Indicate that this verb-phrase contains a recursion
-recursionencountered__COCREATOR =: 1
 r
 NB.?lintsaveglobals
 )
@@ -11126,6 +11132,8 @@ setvalence =: 3 : 0
 if. executingvalence__COCREATOR ~: #y do.
   failmsg 'dissect restriction: recursion must have the same valence as the original execution'
 end.
+NB. Indicate that this verb-phrase contains a recursion
+recursionencountered__COCREATOR =: 1
 setvalence_dissectverb_ f. y
 )
 
@@ -12188,6 +12196,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(i.0)"_/ i. 5'
 2 dissect '(i.0)"_/"1 i. 5 2'
 2 dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3
+2 dissect '$:@:}.^:(2<#) i. 15' 
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
