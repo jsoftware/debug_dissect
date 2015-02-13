@@ -43,6 +43,7 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. dissect '+/ 6 8'; select result; show u on 2; remove show u on 2; crash.  Seems the force selection persists.  Solution might be to reselect after change of autodyad (didn't work)
 NB. Test selection of displays with 0 in shape
 NB. Use box trick to avoid special case in ;.3
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
@@ -1247,6 +1248,7 @@ dissect_dissectisi_paint 1
 NB. Toggle the state of structmod display
 dissect_fmautoexpand2_button =: 3 : 0
 'fmautoexpand2' wdsetvalue ": displayautoexpand2_dissect_ =: -. displayautoexpand2
+applyselection ''   NB. Reestablish selections in new context (fails)
 dissect_dissectisi_paint 1
 )
 
@@ -7207,7 +7209,7 @@ if. 1 = #ures =. (joinlayoutsl`<@.recursionhere ylayo) traverse__uop travops TRA
   'displayhandlesin displayhandleout displaylevrank' =: ((,0));1;<,: 'Result after all recursions';(coname''),<_
   ures =. ures ,< coname''
 else.
-  ures =. inheritu ures
+  ures =. 0 0 inheritu ures  NB. Don't inherit stealh - we want to show a result
 end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
@@ -7315,7 +7317,7 @@ if. 1 = #ures =. (xlayo ,&(joinlayoutsl`<@.recursionhere) ylayo) traverse__uop t
   'displayhandlesin displayhandleout displaylevrank' =: ((,0));1;<,: 'Result after all recursions';(coname''),2#<_
   ures =. ures ,< coname''
 else.
-  ures =. inheritu ures
+  ures =. 0 0 inheritu ures  NB. Don't inherit stealh - we want to show a result
 end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
@@ -9008,7 +9010,7 @@ NB. result is (selframe);(frame);(frames of value to display);(selopshapes for n
 calcdispframe =: 4 : 0
 NB. frame is 1 less than the number of items - if there is more than 1 item.  empty otherwise
 NB. Result boxing level will be 1 if the frame is longer than 1
-((nframe > 1) { ($0);1) _2} x calcdispframe_dissectobj_ f. , < (#~ >&0) nframe =. <: '' ($,) {.@($^:(0<L.))@> x
+((1 < nframe + -. displayautoexpand2) { ($0);1) _2} x calcdispframe_dissectobj_ f. , < (#~ >&0) nframe =. <: '' ($,) {.@($^:(0<L.))@> x
 )
 
 NB. Nilad.  Result is the selection for this node:  type;selection where type=
