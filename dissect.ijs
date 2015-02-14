@@ -43,38 +43,29 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '<"1 z' [ z =. 3 2 3 $ 'a'  click in < node - inheritu error
+NB. dissect '+:`*:@.(2&|)"0 i. 5'  reselecting result does not remove expansion - because the selection is in " .  Should that remove selection?
+NB.  probably not, since that would penalize overclicking on verbs.  But then how to handle @.?  Should it have a selection toggle?  Then how would that be reset?
+NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?  yes it should - collect rank-stack modifiers that inherit - but how?
+NB. change rank stack in partitions (test /."0), don't dup /.
+NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
 NB. Test selection of displays with 0 in shape
-NB. Use box trick to avoid special case in ;.3
-NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
-NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. Test display of fill-cells incl errors
 NB.  Do better job of showng where error in fill-cell exec occurred
 NB.  Distinguish between the two previous on 'error'
-NB. Use italics or the like to distinguish verb-starts from verb-ends
+NB.  test errorlevel
+NB. Use box trick to avoid special case in ;.3
+NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
+NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
+NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
+NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
+NB. clicking on vbname (if tacit) should launch sandbox for that name.  Assignments to noun operands?
 NB. Launch Jwiki from hotlinks in tooltips
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
-NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
-NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
-NB. clicking on vbname (if tacit) should launch sandbox for that name
 NB. Highlight net on a click/hover of a wire
-NB. Hovering over selected cell to detail computation there?
 NB. can simplify combineyxsels
-NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?
-NB. change rank stack in partitions (test /."0), don't dup /.
-NB. Re-select of selected cell of @. should remove expansion
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. if a recursion produces no result, flag that fact
-NB. dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8   the error cell is empty, so no crosshatching is seen.  Should it be taller?
-NB. support axis permutations for display, for u;.
-
-NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
-NB. handle clicking on verb-name part to select tree
-NB. create pickrects for displayed sentence, and handle clicks there
-NB. test errorlevel, including for fill cells.
-NB. A way to display error encountered during fill cell?
-NB. should we allow selection if final result is early error? (what shape then?)
-NB. worry about whether gerund needs to traverse.  Shape display of gerund is wrong, because it's calculated incorrectly.  Should use noun methods for result of `
+NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
 
 NB. dissect - 2d graphical single-sentence debugger
 
@@ -1551,10 +1542,10 @@ names =: 4!:1
 NB. y is a short string, usually the name of the modifier that creates a verb.
 NB. result is the value to use for titlestring.
 NB. x indicates the context: (this is structural modifier)
-NB. if y contains a space, that's a signal that we should always return empty for the modifier
+NB. if y begins with a space, that's a signal that we should always return empty for the modifier
 fulltitlestring =: 4 : 0
 isstruct =. x
-if. ' ' e. y do. ''
+if. ' ' = {. y do. ''
 elseif. isstruct *. -. displaystructmods do. ''
 elseif. displaycompmods do. defstring 0
 elseif. do. y
@@ -2392,6 +2383,10 @@ elseif. do.
 end.
 )
 
+NB. x is max sellevel supported
+NB. y is a fillmask code
+NB. result is new fillmask code, clamped to the sellevel in x
+colorlimitsellevel =:  ((<. *&FILLMASKSELLEVEL)~ (-FILLMASKSELLEVEL)&bwand) bwor (<:FILLMASKSELLEVEL) bwand ]
 
 NB. Use the fillmask to give the color for each cell.  Low-order 2 bits are 0=normal 1=fill 2=error 3=unexecd;
 NB. bit 2 is set if uncollectable;
@@ -2402,7 +2397,8 @@ NB. if y is boxed, this must be a selection node, and we recur on the selected n
 NB. We use the shape of the fillmask to detect extra axes: if there is a leading 1, set extra-axis
 checkerboardfillmask =: 4 : 0
 assert. 0 = L. y
-sel =. ((x * FILLMASKSELLEVEL) <. (-FILLMASKSELLEVEL) bwand y) bwor (<:FILLMASKCHECKER) bwand y
+NB. obsolete sel =. ((x * FILLMASKSELLEVEL) <. (-FILLMASKSELLEVEL) bwand y) bwor (<:FILLMASKCHECKER) bwand y
+sel =. x colorlimitsellevel y
 NB. Checkerboard: works for scalars too.  Create a checkerboard cell of rank no more than 2, then
 NB. replicate as needed for higher rank, so that there is a predictable odd/even pattern within each rank-2 cell
 sel + (({.   (0,FILLMASKCHECKER) $~ 1&bwor) ({.~ -@(2<.#)) $ sel)"2 sel
@@ -2890,6 +2886,7 @@ sel =. sval # oval {:: selector;selector;<a:
 
 NB. Custom selection, used in picking.  If this returns 1, it means that the pick has been handled in the locale
 selectionoverride =: 0:
+postselectionoverride =: 0:
 
 NB. **************** code for display objects *********************
 
@@ -3476,7 +3473,7 @@ DATACOLORS =: (255 255 255 (0}) SHAPECOLORS)
 NB. Now spread out the data colors, providing the checkerboard
 NB. Make the dim one come first, so an empty cell displays a visible rectangle (which lets us pick it)
 NB. This is an nx2x3 table
-DATACOLORS =: <. DATACOLORS  *"1/ 0.88 0.83 0.88 ,: 1 1 1
+DATACOLORS =: <. DATACOLORS  *"1/ 1 1 1 ,: 0.88 0.83 0.88
 
 DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
 
@@ -3486,6 +3483,8 @@ NB. its shape selector; but we reeduce the intensity to a max value to ensure co
 NB. background.
 HIGHLIGHTCOLORS =:  <. (*    1 <. 110 % RGBTOLUMINANCE) (0 0 0 (0}) SHAPECOLORS)
 
+NB. Colors to use for empty, including a checkerboard
+EMPTYCOLORS =: <. (120 120 120)  *"1/ 1 1 1 ,: 0 0 0
 
 FRINGECOLOR =: (128 128 128 , 200 200 0 , 255 0 0 ,: 255 255 255) ;"1 (0 0 0 1)   NB. color/border of fringes: in order label,shape,status,data
 
@@ -3531,6 +3530,10 @@ RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;RESULTSHAPEFONT;(y+RESUL
 NB.?lintsaveglobals
 ''
 )
+
+NB. For empty nouns, use a dark rectangle.  There is no text
+emptycfm =: (-: FILLMASKSELLEVEL_dissectobj_%FILLMASKCHECKER_dissectobj_) # EMPTYCOLORS ;"1 a: , a: , a: , <DATAMARGIN
+
 
 NB. For the displayed sentence
 satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 SATZFONT;SATZFONTSIZE;SATZMARGIN
@@ -3743,7 +3746,7 @@ NB. The dyad does the work, and calls itself if the value is boxed.  The dyad re
 NB. valueformat, which is (unused);y endpixels;x endpixels[;subDOLs]
 fontdesc =. y
 NB. obsolete 'font fontsize margin' =. y
-value =. x
+origshape =. $value =. x
 NB. obsolete NB. If the noun is empty, we can't very well calculate its display size,
 NB. obsolete NB. so just use a canned size
 NB. obsolete if. 0 e. $value do.
@@ -3787,7 +3790,7 @@ rcextents =. +/\&.> bdynos +&.> rcextents
 
 NB. obsolete end.
 NB. Assemble final result
-($value);rcextents,subDOLs
+origshape;rcextents,subDOLs
 NB.?lintsaveglobals
 )
 
@@ -4783,9 +4786,11 @@ boxyx =. dataorigin
 if. DEBOBJ do.
   'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' printf (<"0 |. y),xsizes;ysizes
 end.
-  
+
 if. emptydata =. 0 e. $ usedd =. data do.
+  NB. The noun is empty.  Display it as empties, with shape up to the first 0 in the nounshape
   sel =. 0
+  shapeused =. ({.~ i.&0) shapeused
   usedd =. (({.~ i.&0) $ usedd) $ 0
 end.
 NB. Get the y and x endpoint lists, prepend a zero to give the start of the first cell,  and then
@@ -4824,12 +4829,13 @@ if. sel -:&$ usel =. ''"_`>@.(2>L.) sel do.
 NB. Before filling the cells the first time, initialize the rectangles to the colors given by the fillmask.  This
 NB. is to give the right color to cells that are not drawn at all (empty contents) or whose contents do not fill
 NB. the cell, because of other larger values.
-  (cfmdata rectcolorfromfillmask >sel) drawrect"0 2 rects
+  (cfmdata rectcolorfromfillmask (<:#cfmdata) colorlimitsellevel >sel) drawrect"0 2 rects
 else.
   NB. Selector node
   NB. usedd has been converted to a table - do the same for sel
   sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |:  sel
 end.
+
 NB. If there are subDOLs, process each of them.  The operand was boxed.
 if. 3 < #vf do.
   sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
@@ -4844,7 +4850,7 @@ else.
   NB. Install checkboard, so it shows up at all levels
    sel =. (FILLMASKEXTRAAXES * 1 = {. $ data) + (<:#cfmdata) checkerboardfillmask sel
    if. emptydata do.
-     (cfmdata rectcolorfromfillmask sel) drawrect"0 2 rects
+     (emptycfm rectcolorfromfillmask (<:#emptycfm) colorlimitsellevel sel) drawrect"0 2 rects
    else.
      (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
    end.
@@ -5674,7 +5680,6 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
     NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
     selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
-
     NB. Convert the isf to a path.
 NB. obsolete NB.   Put SFOPEN at the end, then cut on SFOPEN and run boxes together.
 NB. obsolete     NB. If the last box is empty, remove it
@@ -6160,7 +6165,9 @@ NB. obsolete end.
 NB. obsolete )
 NB. x is DOL descriptor, y is flatyx, result is table of (selection);(shape at level)
 yxtopathshape =: 4 : 0
-if. empty =. 0 e. s =. 0 {:: x do. s =. ({.~ i.&0) s end.  NB. shape of the noun
+NB. If the noun is empty, we make it nonempty for display by discarding all elements of the shape starting with
+NB.  the first 0.  We do this so as always to leave something pickable.
+if. empty =. 0 e. s =. origs =. 0 {:: x do. s =. ({.~ i.&0) s end.  NB. shape of the noun, both original and as displayed
 flatrc =. (>: y) (I.~ }:)&> 1 2 { x  NB. Look up to find containing row/col
 NB. Split the shapeused into vert;horiz, ending on horiz.  OK to add high-order 0s to
 NB. ensure that there is some infix of length 2.
@@ -6177,7 +6184,7 @@ if. 3 < #x do.
   (indexlist ; s) , ((3;indexlist) {:: x) yxtopathshape y - (BOXLINEWIDTH + BOXMARGIN) + flatrc ({ 0&,)&> 1 2 { x
 else.
   NB. Return the indexlist as a boxed CSF (rank-3)
-  ,: indexlist ; s
+  ,: indexlist ; origs
 end.
 )
 
@@ -6307,6 +6314,9 @@ if. #$selectionfound do.
     _3  NB. Invalid selection
   end.
 else.
+  NB. Before we leave this block to look at the next, give the block a chance to perform an action
+  NB. Returns nonzero if it handled the pick
+  if. t =. postselectionoverride'' do. t return. end.
   SM^:DEBPICK'recursion'
   NB. get locale to use next; if empty, use our closer locale
   if. 0 = #recurloc =. getnextpickloc'' do. recurloc =. <'dissect' end.
@@ -8232,8 +8242,8 @@ NB. First, the verb v^:_1
 iop =. 1 {:: COCREATOR createverb ((defstring__vop 2),'^:_1');($0)
 NB. Now create an object for vi@:u
 NB. Remove the . from &.&.: and create vi@:u
-NB. Use space in the conjunction to create a node that never creates a titlestring
-uop =: 1 {:: localeat 1 createmodifier (_3 [\ verb;iop;($0);conj;'@: ';($0)) , 0 { y
+NB. Use leading space in the conjunction to create a node that never creates a titlestring
+uop =: 1 {:: localeat 1 createmodifier (_3 [\ verb;iop;($0);conj;' @:';($0)) , 0 { y
 NB.?lintonly uop =: <'dissectverb'
 
 NB. Now change this locale to &&: and create i&v
@@ -8494,7 +8504,6 @@ enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
 )
 
 NB. return string form of operands, including instrumentation
-NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
 exestring =: 3 : 0
 initloggingtable ''
 auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , cop , '(' , (exestring__vop '') , '))'
@@ -10943,6 +10952,16 @@ elseif. do.
   res =. ,: EXEGESISRANKOVERALLCOMPEND;t
 end.
 res
+)
+
+NB. Called when we have passed through this block without performing a selection.  If this block is already selected,
+NB. that means we have an expansion, and we should remove it
+postselectionoverride =: 3 : 0
+if. selectable *. sellevel < #selections do.
+  makeselection 0$a:
+  1
+else. 0
+end.
 )
 
 NB. **** :: ****
