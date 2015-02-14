@@ -43,6 +43,7 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. dissect '<"1 z' [ z =. 3 2 3 $ 'a'  click in < node - inheritu error
 NB. Test selection of displays with 0 in shape
 NB. Use box trick to avoid special case in ;.3
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection
@@ -2680,7 +2681,7 @@ NB. should replace the selected portion with the fillmask and data that was calc
       sel1 =. {. sel1   NB. only 1 atom allowed; make it an atom
       fillval =. <^:(*L.fillmask__loc) (FILLMASKSELLEVEL * sellevel) + (FILLMASKUNEXECD,(2#FILLMASKERROR),FILLMASKFILL) {~ (EUNEXECD,EEXEC,EFRAMINGEXEC) i. errorcode__loc
       NB. Find the size of a cell of the merged fillmasks
-      maxcellresultshape =: ($fillmask__loc) >./@(,:!.1)&.|. fillcellshape =. (#$frame) }. $ fillmask
+      maxcellresultshape =: ($fillmask__loc) >./@(,:!.1)&.|. fillcellshape =. (#frame) }. $ fillmask
       NB. Bring the old fillmask up to the new merged size, if that is larger.  This can happen only if
       NB. the lower result contains a failure that never made it up to the higher during initial allocation
       if. maxcellresultshape -.@-: fillcellshape do.
@@ -9257,8 +9258,10 @@ NB. display only the powers whose sign matches the selection, and we will displa
     end.
 NB. Create the initial selection to use when this result is clicked.  Since the initialselection is for an expansion node, append SFOPEN to it.
 NB. we select according to which type (forward or inverse) will be displayed in the expansion.
-NB. Create the initialselection only if we are ready to use it, i. e. if we have selected down to a single value to expand
-    if. *./selopinfovalid do.
+NB. Create the initialselection only if we are ready to use it, i. e. if we have selected down to a single value to expand.
+NB. We must not create an initialselection unless we are prepared to back it up with an expansion node - otherwise the
+NB. initialselection will pass on to a later block, creating chaos
+    if. (-. noexpansion) *. *./selopinfovalid do.
       initialselection =: <(0:^:(=&_) |selectedpower);SFOPEN
     end.
 
@@ -12197,6 +12200,8 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(i.0)"_/"1 i. 5 2'
 2 dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3
 2 dissect '$:@:}.^:(2<#) i. 15' 
+2 dissect '<"1 z' [ z =. 3 2 3 $ 'a'   NB. click in final result for error
+2 dissect ',&.:(<"1)@((] ,"0 1"_1 (1&($:\.)))^:(1<#)) ''abc'''  NB.Click in 'Final' node for error
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
