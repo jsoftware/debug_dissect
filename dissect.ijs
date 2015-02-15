@@ -45,7 +45,6 @@ testsandbox_base_ 1
 NB. TODO:
 NB. dissect '+:`*:@.(2&|)"0 i. 5'  reselecting result does not remove expansion - because the selection is in " .  Should that remove selection?
 NB.  probably not, since that would penalize overclicking on verbs.  But then how to handle @.?  Should it have a selection toggle?  Then how would that be reset?
-NB. change rank stack in partitions (test /."0), don't dup /.
 NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
 NB. Test selection of displays with 0 in shape
 NB. Test display of fill-cells incl errors
@@ -64,6 +63,7 @@ NB. Highlight net on a click/hover of a wire
 NB. can simplify combineyxsels
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. if a recursion produces no result, flag that fact
+NB. Add single-jog to router options to avoid down-and-up turn
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
 
 NB. dissect - 2d graphical single-sentence debugger
@@ -10181,16 +10181,18 @@ if. *./ selopinfovalid do.
   rankhistory =: rankhistory , DLRCOMPEND ; (coname'')
   udol =. joinlayoutsl (_1 {. x) traverse__uop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE ,_2);(vopval selopinfovalid);selopshapes;_1
   NB. Now that we have displayed u, which has the incoming rank stack plus the line for this partition,
-  NB. remove the lines for this partition (including the COMPEND for this block) but keep the rest to be displayed on the Final for this block
-  rankhistory =: _2 }. rankhistory
+  NB. remove the COMPEND added here, but keep the rest to be displayed on the Final (the /. added above will be removed below)
+  rankhistory =: }: rankhistory
   x =. ({.udol) _1} x
 end.
 NB. Create a display for this node, as if it were a u-type verb.  This display will be inherited into the selector.
 NB. We initialize the rank stack, and it is that that will give the label for this display.
 NB. The /. node always displays the entire partitioning verb, with 'Final' prepended when the /. is selectable
 NB. and there has been a selection.
-rankstack =. rankhistory , (('Final ' #~ selectable *. sellevel < #selections) , defstring 0) ; (coname'') , <"0  |. vranks
-'displayhandlesin displayhandleout displaylevrank' =: (valence {:: ($0);(,0);_0.3 0.3);1;<rankstack
+NB. We remove the /. start-of-computation line - it is used only when the calculation is detailed
+NB. obsolete rankstack =. (}: rankhistory) , (('Final ' #~ selectable *. sellevel < #selections) , defstring 0) ; (coname'') , <"0  |. vranks
+rankhistory =: (< ('Final ' #~ selectable *. sellevel < #selections) , defstring 0) (<_1 0)} rankhistory
+'displayhandlesin displayhandleout displaylevrank' =: (valence {:: ($0);(,0);_0.3 0.3);1;<rankhistory
 NB. The highlights for x (if any) are preserved, but the ones for y are reset, since there is no selection from u/. into u
 physreqandhighlights =: (<EMPTYPRH) _1} physreqandhighlights
 NB. The result of u becomes the last argument to the display of this node, along with the original x operand if
@@ -10901,8 +10903,10 @@ elseif. do.
   NB. Turn it into a highlight record
   vselect =. < (2 1 $ vselect) , <0
   NB. Since we have used the rankhistory in the detail node, don't repeat it on the summary
-  rankhistory =: (<'Final ' , defstring 0) (<_1 0)} _1 {. rankhistory
+NB. obsolete   rankhistory =: (<'Final ' , defstring 0) (<_1 0)} _1 {. rankhistory
+  rankhistory =: (<'Final ' , defstring 0) (<_1 0)} rankhistory
 end.
+
 NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
 'displayhandlesin displayhandleout displaylevrank' =: ((#x) { ($0);(,0);_0.3 0.3),1;< rankhistory
 NB. Bring v in as a third input to the result, wherever it came from.
