@@ -45,7 +45,6 @@ testsandbox_base_ 1
 NB. TODO:
 NB. dissect '+:`*:@.(2&|)"0 i. 5'  reselecting result does not remove expansion - because the selection is in " .  Should that remove selection?
 NB.  probably not, since that would penalize overclicking on verbs.  But then how to handle @.?  Should it have a selection toggle?  Then how would that be reset?
-NB. dissect '1 2 1 </."2 i. 2 3 4'   " shows on /. - should be on final as well?  yes it should - collect rank-stack modifiers that inherit - but how?
 NB. change rank stack in partitions (test /."0), don't dup /.
 NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
 NB. Test selection of displays with 0 in shape
@@ -5478,7 +5477,9 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     NB. We process bottom-up to leave explanations in reverse order, at the top of the tooltip
     QP^:DEBEXEGESIS'tt displaylevrank '
     if. DEBEXEGESIS do. for_l. 1{"1 displaylevrank do. QP 'defstring__l]0 ' end. end.
-    if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (<datapresent) ,. (;~"1 0    [: (= +/\) *@#@>@{."1) |. 2 {."1 displaylevrank end.
+    isfirsttitled =. [: (*. (= +/\)) (DLRCOMPEND;a:) -.@e.~ {."1
+NB. obsolete     if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (<datapresent) ,. (;~"1 0    [: (= +/\) *@#@>@{."1) |. 2 {."1 displaylevrank end.
+    if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (<datapresent) ,. (;~"1 0   isfirsttitled) |. 2 {."1 displaylevrank end.
   else.
     tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
     NB. If the display was text, we will pass that text into the overall for the node
@@ -10179,7 +10180,9 @@ if. *./ selopinfovalid do.
   NB. This will not show, but it will mark the node that performs the computation of the selected node (if there is one)
   rankhistory =: rankhistory , DLRCOMPEND ; (coname'')
   udol =. joinlayoutsl (_1 {. x) traverse__uop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE ,_2);(vopval selopinfovalid);selopshapes;_1
-  rankhistory =: 0 $ rankhistory
+  NB. Now that we have displayed u, which has the incoming rank stack plus the line for this partition,
+  NB. remove the lines for this partition (including the COMPEND for this block) but keep the rest to be displayed on the Final for this block
+  rankhistory =: _2 }. rankhistory
   x =. ({.udol) _1} x
 end.
 NB. Create a display for this node, as if it were a u-type verb.  This display will be inherited into the selector.
