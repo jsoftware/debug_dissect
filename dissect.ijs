@@ -43,6 +43,7 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. dissect 'a;b;c' [ a=:42 [b=:,:42 [c=:,:,:42 no italic if unboxed
 NB. dissect '+:`*:@.(2&|)"0 i. 5'  reselecting result does not remove expansion - because the selection is in " .  Should that remove selection?
 NB.  probably not, since that would penalize overclicking on verbs.  But then how to handle @.?  Should it have a selection toggle?  Then how would that be reset?
 NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
@@ -3517,7 +3518,7 @@ calccfms =: 3 : 0
 nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;NOUNFONT;(y+NOUNFONTSIZE);NOUNMARGIN
 nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
-nouncfm =: nouncfm , < ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold') ": y+DATAFONTSIZE) ,. <DATAMARGIN
+nouncfm =: nouncfm , < ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
 
 verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(y+VERBFONTSIZE);VERBMARGIN
 verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
