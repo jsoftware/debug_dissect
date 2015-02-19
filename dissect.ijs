@@ -43,16 +43,18 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. think about whether stealth in u@v should clear rankstack.  It seems not to play well with dyad u&n; perhaps keep lines that have &?  The problem is that
+NB.  u&n, whether monad or dyad, is a dyad that turns into a monad & therefore has detail that is lost by pruning.  Maybe keep such detail only.  Or have a list of what
+NB.  to lose: / " L: etc: all things that can go away.  Best probably to preserve &.  But make sure u&n only (& watch out for verbose debug mode)
+NB. check about stealth inheritance on hook
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
 NB.   Also, set errorlevel at end, after the current node has fill marked
 NB.   Think about having multiple failurepoints, depending on {.errorlevel
-NB. dissect '2x&*&1&1 (3)'   select a result; the ranks on the & rankstack are weird
-NB.   clicking a result seems to require 2 clicks to expand
-NB. dissect '0 (1 2 3 , ])"0 $0'  "0 missing from display (eaten by stealth)
 NB. dissect '+:`*:@.(2&|)"0 i. 5'  reselecting result does not remove expansion - because the selection is in " .  Should that remove selection?
 NB.  probably not, since that would penalize overclicking on verbs.  But then how to handle @.?  Should it have a selection toggle?  Then how would that be reset?
 NB. Worry about getting the shape right if the rank stack contains a non-calculus entry (like L:)
 NB. Use box trick to avoid special case in ;.3
+NB. Add rank-calculus for primitives with known behavior
 NB. put a fence around route to save time?  Take hull of points, then a Manhattan standoff distance
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
 NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
@@ -2890,7 +2892,7 @@ TRAVOPSKEEPLIGHT =: TRAVOPSKEEPINLIGHT a:
 
 TRAVOPSPHYSNEW =: 0
 TRAVOPSPHYSKEEP =: 1
-TRAVOPSPHYSCHOOSE =: ]   NB. choose the ops, 0=left, _2=right, _1=empty
+TRAVOPSPHYSCHOOSE =: ,   NB. choose the ops, 0=left, _2=right, _1=empty
 NB. if a list, it gives indexes to keep
 travops =: 3 : 0
 ]`'' travops y
@@ -4763,7 +4765,7 @@ NB. Restore cliprect to just the data area
       glclip 0 0 1 1 + , |."1 -~/\ cliptlbr
     end.
   end.
-  
+  SM^:DEBHLIGHT'finished drawing hlights'
 NB. If there are scrollbars, draw them
   if. +./ displayscrollbars do.
     't l b r' =. , DOyx +"1 +/\ DOdatapos  NB. t l b r of region
@@ -6930,7 +6932,7 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand, as the display and executable form (we may modify the display form later)
 'execform titlestring' =: ,&.> boxopen 0 {:: y
-stealthoperand =: 1 2 3 4 5 6 0 {~ ((;:'][[:'),']';']]';'[[') i. <titlestring  NB. '[' scalar is always-display. '[[' and ']]' are always-invisible forms
+stealthoperand =: 1 2 3 4 5 6 0 {~ ((;:'][[:'),']';']]';'[[') i. <titlestring  NB. ']' scalar is always-display. '[[' and ']]' are always-invisible forms
 titlestring =: stealthoperand {:: titlestring; ;: '][[:]]['
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
@@ -7935,8 +7937,20 @@ x =. joinlayoutsl x traverse__vop travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopv
 NB. execute u
 NB. If v is a stealth operand, rankhistory and highlighting that would have been applied on v will have disappeared,
 NB. so in that case we transfer them to u
+NB. We pass rankhistory though in toto - it is still work in progress to pass only one side through, because u&n starts as a monad and ends as a dyad.
+NB. We pass only the side of the physsels that is applicable: that's all if it's a monad, or one side if it's a dyad
+NB. obsolete rankstackcode =. (dispstealthoperand__vop  bwand 3) {:: TRAVOPSSTARTHEAVY ; (TRAVOPSKEEPINALL 0 1 2) ; (TRAVOPSKEEPINALL 0 1 _1) ;< TRAVOPSSTARTHEAVY   NB. none ] [ [:
+if. 0 = stealthcode =. 3 bwand dispstealthoperand__vop do.
+  rankstackcode =. TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW
+else.
+  rankstackcode =. TRAVOPSKEEPALL;(valence=2) { TRAVOPSPHYSKEEP;(TRAVOPSPHYSCHOOSE stealthcode { _1 _2 0 _1  )   NB. 0=left _2=right
+NB. obsolete   rankhistory =: (#~     ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
+NB. obsolete   rankhistory =: (#~     ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1))    a: (<a:;4-stealthcode)} rankhistory
+end.
+
 NB. Space in cop is used for hidden nodes, so no end-of-comp record then
-(' ' -.@e. cop) inheritu x traverse__uop travops ((dispstealthoperand__vop e. 1 2 5 6) { (TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW),:(TRAVOPSKEEPALL;TRAVOPSPHYSNEW)),(uopval vop);<<selresultshape__vop
+(' ' ~: {. cop) inheritu x traverse__uop travops (rankstackcode),(uopval vop);<<selresultshape__vop
+NB. obsolete (' ' -.@e. cop) inheritu x traverse__uop travops ((dispstealthoperand__vop e. 1 2 5 6) { (TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW),:(TRAVOPSKEEPALL;TRAVOPSPHYSNEW)),(uopval vop);<<selresultshape__vop
 )
 
 NB. obsolete exegesisrankoverall =: 4 : 0
@@ -8211,7 +8225,7 @@ NB. We will return the locale of the overall verb
   uatrpwrl =. 1 {:: localepower 1 createmodifier _3 [\ verb;uatr;($0);  conj;'';($0);  verb;lbkt;$0  NB. u&m@]^:[  don't display ^:
   NB.?lintonly uatrpwrl =. localepower
   rank =. 1 {:: COCREATOR createnoun ('_ 0 _');'';($0)  NB. 0 1 0
-  final =. 1 {:: localerank 1 createmodifier _3 [\ verb;uatrpwrl;($0);  conj;'';($0);  noun;rank;$0  NB. u&m@]^:["0 1 0  don't display "
+  final =. 1 {:: localerank 1 createmodifier _3 [\ verb;uatrpwrl;($0);  conj;'';($0);  noun;rank;$0  NB. u&m@]^:["_ 0 _  don't display "
   NB.?lintonly final =. localerank
   setvalence__final y
   '' insertoverride__uatrpwrl 'dissectvandnmdyad'
@@ -8281,8 +8295,11 @@ if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 dol =. verboperandx |. x , joinlayoutsl NOLAYOUTS traverse__nounop TRAVNOUN
 NB. As we are moving from monad to dyad, add the appropriate column to the existing rankhistory to put previous monad ops on the correct side
 NB. The rank value just added is now in the column the verb will be in, so its rank must be replicated on both sides.
-NB. Remember, rankhistory holds yrank[,xrank], so if our verbop is index 0 (x) it goes to the RIGHT
-rankhistory =: 0 1 3 2 {"1^:(-.verboperandx) (<_) (<_1 _1)} 4 {."1 rankhistory
+NB. Get the actual rank of the noun operand.  We'll put this into the last line.  The rankstack will then hold
+NB. label,locale,y,empty/mn.  If the verb is m&v, this will be correct; if it's u&n, we need to switch it.
+NB. verboperandx, the index of the verb operand, is 0 for u&n
+nounrank =. #@$@>@{. selresult__nounop 
+rankhistory =: 0 1 3 2 {"1^:(-.verboperandx) (<":nounrank) (<_1 _1)} 4 {."1 rankhistory
 inheritu dol traverse__verbop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE verboperandx |. 0 _1);(vopval selopinfovalid);<verboperandx |. selopshapes,<selresultshape__nounop
 )
 
@@ -9374,7 +9391,7 @@ NB. Create the initialselection only if we are ready to use it, i. e. if we have
 NB. We must not create an initialselection unless we are prepared to back it up with an expansion node - otherwise the
 NB. initialselection will pass on to a later block, creating chaos
     if. (-. noexpansion) *. *./selopinfovalid do.
-      initialselection =: <(0:^:(=&_) |selectedpower);SFOPEN
+      initialselection =: <(, 0:^:(=&_) |selectedpower);SFOPEN  NB. Make a list to match what's produced during selection
     end.
 
 NB. Run the expansion node for u^: (as a v-type node); pass in the analysis of v.  The result is either
@@ -10281,7 +10298,7 @@ if. *./ selopinfovalid do.
   NB. To assist tooltipping, we insert a heavy rank line for this locale at the end of the rankstack.
   NB. This will not show, but it will mark the node that performs the computation of the selected node (if there is one)
   rankhistory =: rankhistory , DLRCOMPEND ; (coname'')
-  udol =. joinlayoutsl (_1 {. x) traverse__uop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE ,_2);(vopval selopinfovalid);selopshapes;_1
+  udol =. joinlayoutsl (_1 {. x) traverse__uop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE _2);(vopval selopinfovalid);selopshapes;_1
   NB. Now that we have displayed u, which has the incoming rank stack plus the line for this partition,
   NB. remove the COMPEND added here, but keep the rest to be displayed on the Final (the /. added above will be removed below)
   rankhistory =: }: rankhistory
@@ -11432,12 +11449,25 @@ NB. nvv.  Traverse n as a noun; but keep sellevel so that highlighting is calcul
   dolv =. joinlayoutsl x traverse__vop travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
   dolu =. joinlayoutsl NOLAYOUTS traverse__uop bnsellevel 0} TRAVNOUN
 end.
+NB. If u or v are stealth, we need to preserve the original rank-stack info associated with the inputs, and route that info to
+NB. the correct side.  We always need to preserve the heavy inputs
+NB. We will create a new rankstack to pass in if either operand is stealth.  This will have x and y arguments, each of which is
+NB. chosen from (x,y,empty) as called for by the stealthness of u or v.  If neither operand is stealth, we will just do
+NB. STARTHEAVY on the original rankhistory.
+if. 0 0 -: stealthcode =. 3 bwand dispstealthoperand__vop , dispstealthoperand__uop do.
+  rankstackcode =. TRAVOPSSTARTHEAVY
+else.
+  rankstackcode =. TRAVOPSKEEPALL
+NB. obsolete   rankhistory =: (#~     a:  +./@:~:"1  (0 2 3)&{"1) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
+  rankhistory =: (#~    ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
+end.
 NB. We keep the highlights from the input, to both the left and right ops.  This will not be needed EXCEPT when u or v is ][.  Other times,
 NB. the highlights go from u to v, and they are at the same sellevel (since u has infinite rank), so nothing that happened below u's sellevel matters.
 NB. But if uv is ][, then highlights from c (or below) might reach through this node and highlight a higher node - and those nodes may have
 NB. lower sellevels, so we need to make sure the lower selections are as they would have been for the omitted ][.  The way to do this is
 NB. to start the physreqs with the values that they would have had to start uv.
-1 inheritu (dolu,dolv) traverse__cop travops TRAVOPSSTARTHEAVY;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
+NB. obsolete 1 inheritu (dolu,dolv) traverse__cop travops TRAVOPSSTARTHEAVY;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
+1 inheritu (dolu,dolv) traverse__cop travops rankstackcode;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
 )
 
 exegesisrankoverall =: 4 : 0
@@ -12346,6 +12376,11 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   NB. error during fill-cell calc
 2 dissect '5 (6 + 5 + 4 , +)"0 i. 2 0'   NB. No error, result has shape 2
 2 dissect '5 ('' '' + 5 + 4 , +)"0 i. 2 0'   NB. error at end of fillcell calc
+2 dissect '(i. 2) +:@]"2 i. 2'  NB. inheritance of one-sided rank stack
+2 dissect '(i. 2  2 2) +:@]"2 i. 2'
+2 dissect '(i. 2  2 2) +:@["2 i. 2'
+2 dissect '(i. 2 2 4) +:@["2 i. 2'   NB. Selecting last block fails
+2 dissect 'a crash9_dissect_@["2 b' [ a =. 3 + i. 2 2 4 [ b =. i. 2
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
