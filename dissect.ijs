@@ -43,10 +43,9 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. think about whether stealth in u@v should clear rankstack.  It seems not to play well with dyad u&n; perhaps keep lines that have &?  The problem is that
-NB.  u&n, whether monad or dyad, is a dyad that turns into a monad & therefore has detail that is lost by pruning.  Maybe keep such detail only.  Or have a list of what
-NB.  to lose: / " L: etc: all things that can go away.  Best probably to preserve &.  But make sure u&n only (& watch out for verbose debug mode)
-NB.   New plan: in @ don't handle dispstealth of 5 or 6.  Remove column for 1/2, but only if none marked with !.  Use ! to indicate important rank.  Turn ! into bold italic at display.
+NB. dissect '10 ([:, t (+/ . *)^:(<@[` (])) ])1 2 3 4 5' [ t =. i. 5 5
+NB. support u^:gerund
+NB. support u . v y
 NB. check about stealth inheritance on hook
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
 NB.   Also, set errorlevel at end, after the current node has fill marked
@@ -185,6 +184,22 @@ end.
 (4!:0 <'x' [ ".'x =. ',y){noun,adv,conj,verb
 )
 NB. *** end of copied stuff
+
+NB. Other utilities
+
+NB. result is 1 if y is empty
+isempty =: 0 e. $
+
+NB. Result is 1 if y is numeric type (regardless of empty)
+isnumtype =: 1 4 8 16 64 128 1024 4092 8192 16384 e.~ 3!:0
+
+NB. Result is 1 if y is numeric or empty
+isnumeric =: isnumtype@[^:(0=]) isempty
+
+NB. Result is 0 if y is nonnumeric, 1 is numeric noninteger, 2 if integer (after conversion)
+isinteger =: (+   9&o. -: <.)~^:] isnumeric
+
+ NB. *** end of utilities
 
 NB. possible starting variables, in name;type;value form
 startvbls =: 'xymunv' (,@[ ; '' ;~ ])"0 noun,noun,noun,(verb+sideeff),noun,(verb+sideeff)
@@ -3985,12 +4000,15 @@ NB. If the last verb does not allow a selection (ex: i.@>), remove it from the s
   if. displayshowfillcalc do.
     fillinfo =. (0 ,~ (0 e. [: ; -.&SFOPEN)@> DOshapes) (, #&'*')&.>~ fillinfo
   end.
-
+  resultisfilled =. *#>{:fillinfo
   NB. Append the result-shape of the last verb.  If a result is selected, use the shape of the selected result; otherwise use the max result
   if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
-    DOshapes =: DOshapes , <,$&.> extractselectedcell__lastexecutednode''
+    NB. User selected a result.  Display its shape.  If the shape is filled, replace an empty selected-shape with
+    NB. 'atom' to call the user's attention to it
+    DOshapes =: DOshapes , <, 'atom'&[^:(resultisfilled *. 0 = #)@$&.> extractselectedcell__lastexecutednode''
   else.
-    DOshapes =: DOshapes , <,<maxcellresultshape__lastexecutednode
+    NB. If the unselected result filled, don't repeat the shape - it will be in the fill
+    DOshapes =: DOshapes , <,<(-. resultisfilled) # maxcellresultshape__lastexecutednode
   end.
   NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
   NB. The first box of each box of DOshapes is selection, the rest are dropdown(s)
@@ -9249,9 +9267,18 @@ NB. **** ^: ****
 localepower_dissect_ =: primlocale '^:'
 
 create =: 3 : 0
+vop =: (<2 1) {:: y
+NB.?lintonly uop =: <'dissectobj'
 if. 0 = verb bwand (<0 0) {:: y do.
   failmsg 'domain error: left operand to ',((<1 1){::y),' must be a verb'
 end.
+NB. Switch to general verb if v is a gerund
+if. # querygerund__vop '' do.
+  changeobjtypeto localedefault
+  create y
+  return.
+end.
+
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
@@ -9263,6 +9290,7 @@ NB. node that looks like a modifier, i. e. u*^:v where * is the expansion.
 NB. The display of the result of u^:v (as an inheritable u) comes from
 NB. this locale; the expansion (as a v) comes from *.
 NB. All we need to pass in is the locale of u and the titlestring (which may be different from '^:'
+NB. obsolete uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
 uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
 NB. Save the display form of the conjunction and the locale of v.
 NB. If the display form of the conjunction is not '^:', we are acting as a surrogate for another function like dyad u&m
@@ -9348,6 +9376,10 @@ if. errorcode__vop e. EHASVALIDFILLMASK do. vval =: fillmask__vop frameselresult
 else. vval =: 0   NB. Make sure it's defined
 end.
 
+NB. If n produced a gerund at execution time, in other words if it constructed an AR, we're beat, because we don't have
+NB. the moxie to analyze that at execution time.
+if. isgerund vval do. failmsg 'u^:n produced a gerund n without using ` - dissect doesn''t support that' end.
+
 NB. obsolete NB. Calculate a flag needed for shape analysis: if the v value is not an atom, and it contains positive values, Roger
 NB. obsolete NB. will restart the power if it returns a boxed value.  Create a flag indicating that condition.  It doesn't apply if
 NB. obsolete NB. vval is boxed.
@@ -9361,7 +9393,8 @@ if. errorcode__vop e. EFAILED do.
   errorcode =: EINVALIDVERB
 elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do.
   if. (0 < L. vval) *. ((1 < L. vval) +. -. ('';,0) e.~ $&.> vval) do. errorcode =: EINVALIDVERB
-  elseif. (-.@-: <.) > vval do. errorcode =: EINVALIDVERB
+NB. obsolete  elseif. (-.@-: <.) > vval do. errorcode =: EINVALIDVERB
+  elseif. 2 ~: isinteger > vval do. errorcode =: EINVALIDVERB
   end.
 end.
 if. errorcode e. EEARLYERROR do. earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return. end.
@@ -9377,14 +9410,14 @@ if. errorcode__vop > EOK do.
     physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
   end.
   'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
-NB. v ran. Get the actual result of v.  We know v collected successfully
-elseif. isgerund vval  do.
-  formatcode =: 1  NB. gerund
-NB. If v produced a gerund, give up and display the value of this node
-NB. Replace the end of the rank stack with the whole mess
-  'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
+NB. obsolete elseif. isgerund vval  do.
+NB. obsolete   formatcode =: 1  NB. gerund
+NB. obsolete NB. If v produced a gerund, give up and display the value of this node
+NB. obsolete NB. Replace the end of the rank stack with the whole mess
+NB. obsolete   'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
 elseif. do.
-NB. No gerund.
+NB. v ran. Get the actual result of v.  We know v collected successfully
+NB. obsolete NB. No gerund.
   
 NB. Inspecting ALL the results from v, if every selection is either <0 or <_1, we will have no need for u^:
   if. logvalues__vop *./@:e. 0;_1 do.
@@ -12427,7 +12460,10 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(i. 2 2 4) +:@["2 i. 2'   NB. Selecting last block fails
 2 dissect 'a crash9_dissect_@["2 b' [ a =. 3 + i. 2 2 4 [ b =. i. 2
 2 dissect '2x&*&1&1 (3)'
+2 dissect '(2&<.#) ''abcde'''
+dissect '10 ([:, t (+/ . *)^:(<@[` (])) ])1 2 3 4 5' [ t =. i. 5 5
 )
+
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
 vn_base_ =: 'abc'
