@@ -46,6 +46,7 @@ NB. TODO:
 NB. think about whether stealth in u@v should clear rankstack.  It seems not to play well with dyad u&n; perhaps keep lines that have &?  The problem is that
 NB.  u&n, whether monad or dyad, is a dyad that turns into a monad & therefore has detail that is lost by pruning.  Maybe keep such detail only.  Or have a list of what
 NB.  to lose: / " L: etc: all things that can go away.  Best probably to preserve &.  But make sure u&n only (& watch out for verbose debug mode)
+NB.   New plan: in @ don't handle dispstealth of 5 or 6.  Remove column for 1/2, but only if none marked with !.  Use ! to indicate important rank.  Turn ! into bold italic at display.
 NB. check about stealth inheritance on hook
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
 NB.   Also, set errorlevel at end, after the current node has fill marked
@@ -1989,10 +1990,11 @@ end.
 if. #vranks  do.  NB. forceinfinite overrides the observed verb ranks
   NB. Calculate the effective rank: the rank, but no larger than the actual rank of the argument.
   NB. If there is no argument shape, leave the ranks empty (will turn to space later)
-  if. 0 = #inputselopshapes do. effranks =. a:"0 vranks
-  else. effranks =. vranks (<. #@($^:(0<L.)))&.> inputselopshapes
+  if. 0 = #inputselopshapes do. effranks =. (<'')"0 vranks
+NB. obsolete   else. effranks =. vranks (  (<. #@($^:(0<L.))))&.> inputselopshapes
+  else. effranks =. vranks ((('!' #~ <) , ":@<.) #@($^:(0<L.)))&.> inputselopshapes
   end.
-  rankhistory =: rankhistory , (;:^:_1^:(0<L.) titlestring) ; (coname'') , ":&.> |. effranks
+  rankhistory =: rankhistory , (;:^:_1^:(0<L.) titlestring) ; (coname'') , |. effranks
 end.
 selectable =: 0  NB. Init unselectable unless we set otherwise
 selx =. a:  NB. In case we don't set it, we need this to pick up 'all logvalues' for display purposes
@@ -3615,14 +3617,18 @@ NB.   background color may be RGBA, where A is the stipple pattern: 0=none, 1=do
 FONTDECORATIONSTIPPLE =: 3
 FONTDECORATIONITALIC =: 4
 FONTDECORATIONBOLD =: 8
-FONTDECORATIONSIZE =: 16bf0   NB. 0=no adj, 4-bit signed field, each representing 10%
+FONTDECORATIONSIZE =: 16b10   NB. 0=no adj, 4-bit signed field, each representing 10%
 cfmforclass =: 4 : 0"0 1
 'font pen margin tcolor bcolor size' =. cfmforclassrankverb`cfmforclassshape@.x {. y
 if. 1 < #y do.
   'sizeadj bolditalic stipple' =. 16 4 4 #: 128 + 1 { y
-  font =. font , bolditalic {:: '';' bold';' italic';' bold italic'
+NB. obsolete   font =. font , bolditalic {:: '';' italic';' bold';' bold italic'
   size =. <.&.-: 1 + size * 0.2 0.1 p. sizeadj
-  bcolor =. bcolor bwor 24 bwlsl stipple
+  size =. (": size) , bolditalic {:: '';' italic';' bold';' bold italic'
+  if. stipple do. bcolor =. bcolor , stipple end.
+  NB. kludge if field is italic, add 1 to right-hand margin.  Normal sizing seems to get it wrong.
+  if. 1 bwand bolditalic do. margin =. (2 2 $ 0 0 _2 2) + 2 2 ($,) margin end.
+NB. obsolete   bcolor =. bcolor bwor 24 bwlsl stipple
 end.
 if. #pen do. bcolor =. bcolor;pen end.
 bcolor;tcolor;font;size;margin
@@ -3903,15 +3909,34 @@ NB. string; no ranks
   end.
 else.
 NB. table; contains string;locale;rank[;rank].
-NB. Audit the rank to enforce descending order (empty values have no effect); then we
-NB. reset empty cells in the original to space; then delete rows that have no effect in the
-NB. rolled-up value.  Rows (except the first) containing only infinities are known to have no effect
-NB. Remove lines with no display symbol; reverse order from y[,x] to [x,]y
-  nonemptylevrank =. 2 ({."1 ,. |.@:}."1) (#~   ('';DLRCOMPEND) -.@:e.~ {."1) displaylevrank
-  DOranklevels =. (3 : 'sellevel__y'"0) DOranklocales =: 1 {"1 nonemptylevrank
-  NB. Replace empty with space - the rectangle looks better
-  DOranks =: (([: {.^:(0=#) ":)&.> 2 }."1 nonemptylevrank) (}:"1@[ ,. ] ,. {:"1@[) {."1 nonemptylevrank
-  DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) (FONTCLASSRANKVERB cfmforclass"0 (1) {.~ -#DOranklevels) ,:"1 (FONTCLASSSHAPE cfmforclass"0 DOranklevels)
+NB. Remove lines with no display symbol
+NB. obsolete   nonemptylevrank =. 2 ({."1 ,. |.@:}."1) (#~   ('';DLRCOMPEND) -.@:e.~ {."1) displaylevrank
+  nonemptylevrank =. (#~   ('';DLRCOMPEND) -.@:e.~ {."1) displaylevrank
+NB. obsolete   DOranklevels =. (3 : 'sellevel__y'"0) DOranklocales =: 1 {"1 nonemptylevrank
+  NB. Get the titles (verbs & modifiers)
+  verblines =. 0 {"1 nonemptylevrank
+  NB. Get the locales for each row
+  DOranklocales =: 1 {"1 nonemptylevrank
+  NB. Get the rank box(es) for each row.  Convert empty box to a more pleasing single space.  This is a table, with each row in y[,x] order
+  ranklines =. ([: {.^:(0=#) ":)&.> 2 }."1 nonemptylevrank
+  NB. Create the level,decoration for each rank label: the selection level, followed by a value, for each rank box, set if
+  NB. the rank box contains ! indicating that the rank affected the result
+NB. obsolete   ranklevels =. ranklines (4 : 'sellevel__y ,"0 ((FONTDECORATIONSIZE*3)+FONTDECORATIONBOLD+FONTDECORATIONITALIC) * ''!'' = {.@> x'"1 0) DOranklocales  NB. table for each locale, 1 row per rank, y[x] order
+  ranklevels =. (3 : 'sellevel__y'"0 DOranklocales) ,"0 ((FONTDECORATIONSIZE*3)+FONTDECORATIONBOLD+FONTDECORATIONITALIC) * '!' = {.@> ranklines NB. table for each locale, 1 row per rank, y[x] order
+  NB. Interleave rank and verb to produce [x,]v,y.  Remove the ! flag from the rank
+  DOranks =: (-.&'!'&.> ranklines) (}.@[ , ] , {.@[)"1 0 verblines
+  NB. Create the font class for [x,]v,y
+  fontclass =. (-{:$DOranks) {.!.FONTCLASSSHAPE FONTCLASSRANKVERB,FONTCLASSSHAPE
+  NB. Create the size,decoration for the verb cells: normal size except large in the last; no decoration
+  NB. Interleavel size,decor with sellevel,decor to produce a table per row of display, each row a size,decor, [x,]v,y order
+  fontseldecor =. ranklevels ((}.@[ , ]) , {.@[)"2 1 ((,:1 0) {.~ -#ranklevels)
+  NB. Calculate the font for each box
+  DOrankcfm =: fontclass cfmforclass"0 1"1 2 fontseldecor
+NB. obsolete   DOranks =: (([: {.^:(0=#) ":)&.> 2 }."1 nonemptylevrank) (}:"1@[ ,. ] ,. {:"1@[) {."1 nonemptylevrank  NB. [x] v y
+NB. obsolete   NB. Calculate (verb font ,: rank font) for each row; that's it for v y; replicate if x v y
+NB. obsolete   DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) (FONTCLASSRANKVERB cfmforclass"0 (1) {.~ -#DOranklevels) ,:"1 (FONTCLASSSHAPE cfmforclass"0 DOranklevels)
+NB. obsolete   NB. Remove flag chars from ranks
+  NB. Size the characters for each box
   rankrects =. DOrankcfm sizetext"1 0 DOranks
 NB. Make the left rank left-justified, the right rank right justified.  Align each stack
 NB. vertically({."1 displaylevrank) ({."1@] ,. [ ,. }."1@])
@@ -6957,7 +6982,8 @@ NB.?lintsaveglobals
 )
 
 calcestheights =: 3 : 0
-estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;0;1;0) ,: (1 1;_1 0;0 _1;0 0;0 0;_1 0;0 _1)
+NB. obsolete estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;0;1;0) ,: (1 1;_1 0;0 _1;0 0;0 0;_1 0;0 _1)
+estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;1;0;0) ,: (1 1;_1 0;0 _1;0 0;0 0;_1 0;0 _1)
 )
 
 NB. return string form of operands, not including instrumentation
@@ -7937,19 +7963,38 @@ x =. joinlayoutsl x traverse__vop travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopv
 NB. execute u
 NB. If v is a stealth operand, rankhistory and highlighting that would have been applied on v will have disappeared,
 NB. so in that case we transfer them to u
-NB. We pass rankhistory though in toto - it is still work in progress to pass only one side through, because u&n starts as a monad and ends as a dyad.
 NB. We pass only the side of the physsels that is applicable: that's all if it's a monad, or one side if it's a dyad
 NB. obsolete rankstackcode =. (dispstealthoperand__vop  bwand 3) {:: TRAVOPSSTARTHEAVY ; (TRAVOPSKEEPINALL 0 1 2) ; (TRAVOPSKEEPINALL 0 1 _1) ;< TRAVOPSSTARTHEAVY   NB. none ] [ [:
-if. 0 = stealthcode =. 3 bwand dispstealthoperand__vop do.
-  rankstackcode =. TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW
-else.
-  rankstackcode =. TRAVOPSKEEPALL;(valence=2) { TRAVOPSPHYSKEEP;(TRAVOPSPHYSCHOOSE stealthcode { _1 _2 0 _1  )   NB. 0=left _2=right
+NB. stealth type 5, ]], is used by dyad u&n.  It causes problems because it turns the u leg of u&n into a monad, but then subsumes its display into
+NB. the hidden power which is a dyad.  This causes loss of detail is the u really does need to be a dyad, for example if it contains another u&n.  Our best
+NB. solution is not to treat it as stealth
+select. dispstealthoperand__vop
+case. 1;2;6 do.
+  stealthcode =. 3 bwand dispstealthoperand__vop
+  NB. We figure out which column is to be deleted (if any).  If that column has important rank (indicated by '!'), don't delete the column - this
+  NB. means that the unseen data has an important effect on the result rank.
+  if. valence = 1 do.
+    rankhistcode =. TRAVOPSKEEPALL
+  else.
+    coltolose =. stealthcode { 0 3 2  NB. x ] [   to lose column x x y
+    NB. We keep the unselected column if it has important data, or if it has a rank and the other column doesn't
+    if. ('!' e. ; coltolose {"1 rankhistory) +. +./ >/"1 *@#@> (coltolose,5-coltolose) {"1 rankhistory do.
+      rankhistcode =. TRAVOPSKEEPALL
+    else.
+      rankhistcode =. TRAVOPSKEEPINALL 0 1 2 3 -. coltolose
+    end.
+  end.
+  rankphyscode =. rankhistcode;(valence=2) { TRAVOPSPHYSKEEP;(TRAVOPSPHYSCHOOSE stealthcode { _1 _2 0 _1  )   NB. 0=left _2=right
+case. 5 do.
+  NB. For the internal case of u&n, keep the whole rankstack.  Ignore highlights, since they go through the power selector anyway
+  rankphyscode =. TRAVOPSKEEPALL;TRAVOPSPHYSNEW
+case. do.
+  rankphyscode =. TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW
 NB. obsolete   rankhistory =: (#~     ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
 NB. obsolete   rankhistory =: (#~     ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1))    a: (<a:;4-stealthcode)} rankhistory
 end.
-
 NB. Space in cop is used for hidden nodes, so no end-of-comp record then
-(' ' ~: {. cop) inheritu x traverse__uop travops (rankstackcode),(uopval vop);<<selresultshape__vop
+(' ' ~: {. cop) inheritu x traverse__uop travops rankphyscode,(uopval vop);<<selresultshape__vop
 NB. obsolete (' ' -.@e. cop) inheritu x traverse__uop travops ((dispstealthoperand__vop e. 1 2 5 6) { (TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW),:(TRAVOPSKEEPALL;TRAVOPSPHYSNEW)),(uopval vop);<<selresultshape__vop
 )
 
@@ -8218,7 +8263,7 @@ setvalence =: 3 : 0
 if. 2 = #y do.
 NB. Dyad case.  Emulate as u&n@]^:["_ 0 _
 NB. We will return the locale of the overall verb
-  rbkt =. 1 {:: COCREATOR createverb (']');($0)  NB. ']'
+  rbkt =. 1 {:: COCREATOR createverb (']]');($0)  NB. ']', never displayed
   uatr =. 1 {:: localeat 1 createmodifier _3 [\ verb;(coname'');($0);  conj;'@:';($0);  verb;rbkt;$0  NB. u&m@]
   NB.?lintonly uatr =. localeat
   lbkt =. 1 {:: COCREATOR createverb ('[');($0)  NB. '['
@@ -8299,7 +8344,7 @@ NB. Get the actual rank of the noun operand.  We'll put this into the last line.
 NB. label,locale,y,empty/mn.  If the verb is m&v, this will be correct; if it's u&n, we need to switch it.
 NB. verboperandx, the index of the verb operand, is 0 for u&n
 nounrank =. #@$@>@{. selresult__nounop 
-rankhistory =: 0 1 3 2 {"1^:(-.verboperandx) (<":nounrank) (<_1 _1)} 4 {."1 rankhistory
+rankhistory =: 0 1 3 2 {"1^:(-.verboperandx) (<'!',":nounrank) (<_1 _1)} 4 {."1 rankhistory
 inheritu dol traverse__verbop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE verboperandx |. 0 _1);(vopval selopinfovalid);<verboperandx |. selopshapes,<selresultshape__nounop
 )
 
@@ -12381,6 +12426,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(i. 2  2 2) +:@["2 i. 2'
 2 dissect '(i. 2 2 4) +:@["2 i. 2'   NB. Selecting last block fails
 2 dissect 'a crash9_dissect_@["2 b' [ a =. 3 + i. 2 2 4 [ b =. i. 2
+2 dissect '2x&*&1&1 (3)'
 )
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
