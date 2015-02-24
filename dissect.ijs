@@ -43,8 +43,8 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '10 ([:, t (+/ . *)^:(<@[` (])) ])1 2 3 4 5' [ t =. i. 5 5
 NB. support u^:gerund
+NB.   test rankstack with " on ^:
 NB. support u . v y
 NB. check about stealth inheritance on hook
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
@@ -309,11 +309,19 @@ if. slottouse = #dissectionlist_dissect_ do.
   NB. position of the last window.  We have to ask the window its position, since we don't
   NB. get an event for a pmove 
   lastparent =. (<_1 0) { dissectionlist_dissect_
+  NB.?lintonly lastparent =. <'dissect'
   NB.?lintmsgsoff
   wd 'psel ' , winhwnd__lastparent
   NB.?lintmsgson
-  initpos =. CASCADEOFFSET + 1 0 { 0 ". wdqform''
-  dissectionlist_dissect_ =: dissectionlist_dissect_ , ($0);initpos
+  try. 
+    initpos =. CASCADEOFFSET + 1 0 { 0 ". wdqform''
+    dissectionlist_dissect_ =: dissectionlist_dissect_ , ($0);initpos
+  catch.
+    NB. error reading form position for last slot.  It must have failed before the form started.
+    NB. close it and reuse its slot and initial position
+    destroy__lastparent 1
+    slottouse =. <: slottouse
+  end.
 end.
 dissectionlist_dissect_ =: (coname'') (<slottouse,0)}  dissectionlist_dissect_
 objtable =: 0$a:   NB. list of parse objects
@@ -1439,10 +1447,13 @@ traversedown =: 2 : 0
 assert. 'travdown monadic'
 :
 NB.?lintonly proplocales =: ]
+NB. Run the downward traversal on a node before asking that node for its descendants.  We rely on this to
+NB. let a node with initialselection decide which descendants it should forward a selection to
+uy =. u y
 if. #nloc =. x~ '' do.
-  nloc ([:  v   (v (1&{::))`(u (2 : (':';'l ([ cocurrent)~ (u traversedown v)&>/ y [ (cocurrent x) [ l =. coname''''')) v)@.(2 = 3!:0@>@[)"0 _ ) x ,&< u y
+  nloc ([:  v   (v (1&{::))`(u (2 : (':';'l ([ cocurrent)~ (u traversedown v)&>/ y [ (cocurrent x) [ l =. coname''''')) v)@.(2 = 3!:0@>@[)"0 _ ) x ,&< uy
 else.
-  '' v u y
+  '' v uy
 end.
 )
 
@@ -1459,7 +1470,8 @@ propseltokens =: proplocales@3:  NB. list of tokens for creating sentence displa
 cocurrent 'dissect'
 
 NB. Clear scroll point (at nodes leafward from the starting node).  y is 1 to start, and the assignment is made only if <: 0
-propscroll =: 'propselstopatnoun'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
+NB. obsolete propscroll =: 'propselstopatnoun'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
+propscroll =: 'propselall'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
 
 NB. init parent nodes in all objects.  This must be done in a separate verb because only a named verb resets the locale
 NB. Called in locale of the base of the tree
@@ -1653,6 +1665,7 @@ NB. add to log.  Always called in the locale of the parse object.  x, if given, 
 NB. y is the value to log; it becomes the result
 addlog =: 3 : 0
 NB.?lintmsgsoff
+if. NOCLEANUP_dissect_ do. if. -. ifdefined 'logvaluesarchive' do. logvaluesarchive =: 0$a: end. end.
 NB. If we detect a restarted primitive, we suppress logging while the restart is in progress.
 if. loggingallowed__COCREATOR do.
   logticket =: logticket , ticket__COCREATOR =: >: ticket__COCREATOR
@@ -1981,10 +1994,23 @@ NB.  If the string form is instead 0, it means that this rankhistory is a 'heavy
 NB. resultlevel - indicates boxing of result: '' = none, normal; 0 = result replaces ops in hierarchy (L:); 1 = box is added (&.> or expansion); 2=collection error
 NB. nvalidresults - the number of valid selresults when we started this node.  We have to calculate this here, because inheritance of an error cell into a higher result may add a selresult, and we need
 NB.  to make sure we don't try to select one beyond THAT cell.
+dummytraversedowncalcselect =: 3 : 0   NB. used to set the essential variables needed by travops
+if. 3 = #y do.
+  'sellevel rankhistory selopinfo' =: y
+  selector =: 0$a:
+else.
+  'sellevel rankhistory selopinfo' =: 3 {. y
+  selector =: 3 { y
+end.
+physreqandhighlights =: {.@> selopinfo
+inputselopshapes =: selopshapes =: , }.@> selopinfo
+bnsellevel =: <sellevel
+''
+)
 
 traversedowncalcselect =: 3 : 0
 assert. 1 = #$y
-assert. 3 <: #y
+assert. (#y) e. 3 4
 NB. Initialize the locales where detail is to come from.  We will inherit these locales from u as long as u is valid
 'sellevel rankhistory selopinfo' =: 3 {. y
 physreqandhighlights =: {.@> selopinfo
@@ -6601,7 +6627,7 @@ if. ({: ;: x) *.&('0123456789_' e.~ {.@>) ({. ;: y) do. x =. '(' ([`(' '&(i.&0@:
 x , y
 )
 
-NB. x is height(s) of v; y is height of u: always a list with 1 atom (must be the single height out of u)
+NB. x is height(s) of v; y is height of u: always an atom or a list with 1 atom (must be the single height out of u)
 NB. Result is combined heights of u-then-v: the sum, but if either operand is _1, result must be _1
 combineheights =: (+`_1:@.(0><.)"0 {.)"1
 
@@ -8987,7 +9013,7 @@ elseif. do.
   NB. No expansion node created, display this result as a simple result
   resdol =. x ,&< coname''
   'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< (<defstring 0) (<_1 0)} rankhistory
-  physreqandhighlights__inheritroot =: NOPHYSREQ
+NB. obsolete   physreqandhighlights__inheritroot =: NOPHYSREQ
 end.
 
 resdol
@@ -9267,22 +9293,22 @@ NB. **** ^: ****
 localepower_dissect_ =: primlocale '^:'
 
 create =: 3 : 0
-vop =: (<2 1) {:: y
-NB.?lintonly uop =: <'dissectobj'
+NB. Save the original v, whether gerund, noun, or verb
+vvop =: (<2 1) {:: y
+NB.?lintonly vvop =: <'dissectverb'
 if. 0 = verb bwand (<0 0) {:: y do.
   failmsg 'domain error: left operand to ',((<1 1){::y),' must be a verb'
 end.
-NB. Switch to general verb if v is a gerund
-if. # querygerund__vop '' do.
-  changeobjtypeto localedefault
-  create y
-  return.
-end.
+NB. obsolete NB. Switch to general verb if v is a gerund
+NB. obsolete if. 0: # querygerund__vvop '' do.
+NB. obsolete   changeobjtypeto localedefault
+NB. obsolete   create y
+NB. obsolete   return.
+NB. obsolete end.
 
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
-visnoun =: * noun bwand (<2 0) {:: y  NB. Remember whether it's u^:n or u^:v
 NB. We implement u^:v with two locales, because there are two levels of
 NB. selection: first the selection from v, is that result is not an atom; then
 NB. the expansion node and selection of powers.  We create a new
@@ -9292,9 +9318,18 @@ NB. this locale; the expansion (as a v) comes from *.
 NB. All we need to pass in is the locale of u and the titlestring (which may be different from '^:'
 NB. obsolete uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
 uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
-NB. Save the display form of the conjunction and the locale of v.
+NB. Save the display form of c, the locale of v, and the gerund locales if any
 NB. If the display form of the conjunction is not '^:', we are acting as a surrogate for another function like dyad u&m
 'cop vop' =: (<1 2;1) { y
+NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
+NB. Save gerund locales if any
+if. #gops =: querygerund__vop '' do.
+  NB. If there are gerund locales, the next-to-last will be the one that survives for use as v
+  vop =: _2 { gops  NB.?lintonly =: 3$a:
+  visnoun =: 0   NB. Gerund is always u^:v
+else.
+  visnoun =: * noun bwand (<2 0) {:: y  NB. Remember whether it's u^:n or u^:v
+end.
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
 NB. Ignore ]@ etc.
 NB. Set resultissdt for modifier processing
@@ -9315,9 +9350,9 @@ NB.?lintonly uop =: <'dissectverb'
 if. visnoun do.
   resultissdt =: resultissdt__uop
 else.
-  vop =: setvalence__vop y
-  NB.?lintonly vop =: <'dissectverb'
-  resultissdt =: resultissdt__uop *. resultissdt__vop
+  vvop =: setvalence__vvop y
+  NB.?lintonly vvop =: <'dissectverb'
+  resultissdt =: resultissdt__uop *. resultissdt__vvop
 end.
 NB. Return the dispoperands from v
 coname''
@@ -9328,28 +9363,114 @@ calcestheights =: 3 : 0
 NB. Add 1 unit to height of u to account for this node; 1/2 unit to v since it starts lower.
 NB. Overall height is the larger of the two.  If v is a noun, it will have just 1 height regardless
 NB. of valence; we turn that into an atom so it will replicate
-estheights =: (estheights__uop combineheights ,1) >. {.^:visnoun estheights__vop combineheights ,0.5
+estheights =: (estheights__uop combineheights ,1) >. {.^:visnoun estheights__vvop combineheights ,0.5
 )
 
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
-enparen^:(y=3) (defstring__uop 2) jd (defstring__vop 3)
+enparen^:(y=3) (defstring__uop 2) jd (defstring__vvop 3)
 )
 
 NB. return string form of operands, including instrumentation
 exestring =: 3 : 0
 initloggingtable ''
-auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') , ' ^: (' , (exestring__vop '') , '))^:(1:`(',(logstring__uop 0),'@])))'
+initlogstring =.  '^:(1:`(',(logstring__uop 0),'@]))'  NB. string to insert to log input to u
+if. #gops do.
+  gopx =. (3 : '< exestring__y '''''"0) gops
+  gopx =. (('(' , ')' ,~ ((logstring__uop 0),'@:') , ])&.> _1 { gopx) _1} gopx
+  auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') , ' ^: (' , (}: ; (,&'`'&.>) gopx) , ')))'
+else.
+  auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') , ' ^: (' , (exestring__vvop '') , '))' ,initlogstring,')'
+end.
 )
 
-NB. Return the locales for propsel.  If we got here through capped fork, we have to format accordingly
+NB. Return the locales for propsel.
 proplocales =: 3 : 0
-<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3), 1) # ;: 'uop tokensource vop'
+NB. For stopatxy (which propagates a normal selection), we mustn't propagate the initialselection to anything but the expansion (it wouldn't
+NB. hurt to propagate it to v, but fatal to go to gerunds v0 or v2).  We know that we have already installed the new selection in this node,
+NB. so we don't propagate to vvop if the number of selections here is greater than sellevel
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3), ((y~:0)+.(sellevel >: #selections))) # ;: 'uop tokensource vvop'
 )
 
 NB. Traversal up and down the tree.
 NB. The result is the DOL, up through the result of u
 traverse =: endtraverse@:(4 : 0)
+NB. Create a y argument for the pre-u verbs: v and any gerund xy.  Replace the rankstack in y with a rankstack containing only the light lines
+dummytraversedowncalcselect y  NB. Set the main global names only
+xyy =. (< (#~ (<DLRCOMPEND) ~: 0&{"1) rankhistory) 1} y
+
+NB. Handle gerund operands if any, and figure the drawing connections to use for u & v
+if. visnoun do.
+  NB. Noun v: no references required, just traverse u on x and y
+  ux =. x   NB.?lintonly [ vx =. x
+else.
+  NB. verb/gerund v.  We must create replicate [x]y, either for each gerund or for u and v.  Do so, and
+  NB. arrange them in descending order of estheight for each argument so as to put the source at the highest point where
+  NB. it won't be deleted
+  if. 0 = #refs =. |. _2 |. gops do. refs =. uop,vop end.  NB. refs =. [xop] yop vop or uop vop
+  sourceref =. (,: createreference)"1 x  NB. source,:ref for each argument (1 or 2) x 2 x 4
+  NB. Get the estheights for each operand.  For vop, use as is.  For x and y, add in the appropriate height from u
+  eh =. (3 : 'estheights__y'"0) refs  NB. estheight for each locale, n x (1 or 2)
+  if. #gops do.
+    NB. If this is v1`v2 dyad, we have to treat is as [`v1`v2, so add an xop of [ (=height 0 _1)
+    if. valence > <: #refs do. eh =. 0 _1 , eh end.
+    NB. combine the [x]y heights with the heights from u.  Leave heights of v unchanged
+    eh =. ((}: eh) combineheights ,. estheights__uop) , {: eh
+  end.
+  srx =. *@:(/:@\:)"1&.|: eh   NB. source (0) or ref (1) for each argument, (1 or 2) x n, taking the largest height for each
+  sr =. srx {"0 2"1 3 sourceref   NB. The actual inputs to use, n x (1 or 2) x 4
+  NB. The v op is always last
+  vx =. {: sr
+  if. 0 = #gops do.
+    NB. If this is u^:v, we just use the source/refs for processing u and v below
+    ux =. {. sr
+  else.
+    NB. There are other gerund(s).  Realize them; their results become the input to u.  We treat the xy verbs as occurring
+    NB. BEFORE the u^:v.  Any selection performed in u^:v applies to the results of the xy verbs, not the original xy.  So,
+    NB. we run the xy verbs BEFORE calcselect here.  That means that travops cannot be used.  But we have to do the same kind of
+    NB. work as in fork: the light rank-lines and phys selections must be passed from the input y to the xy verbs, and
+    NB. the heavy rank-lines must be kept for u.  Moreover, if an xy verb is stealth, we need to pass rank lines that it
+    NB. did not show on to u.
+    NB. We end up by replacing y with a new y that shows the result of the xy verbs and the selection operations.
+
+    NB. Execute the [x]y verbs and realize their display
+
+    NB. traverse the xy ops and save their result as ux, to be passed into uop
+    xylocs =. }: refs  NB. The locales
+    NB. For v0`v1`v2 and v1`v2 monad, }:sr matches the number of locales.  For v1`v2 dyad, we selected an extra operand above, to stand
+    NB. for the implied v0=[ .  This is the first item of sr; it must be omitted when traversing gops
+    travargs =. ((-#xylocs) {. }: sr) ,&<"2 1 xyy  NB. Traverse args for each locale x ; y
+    ld =. travargs (4 : '((<selresultshape__y);dispstealthoperand__y);~(joinlayoutsl traverse__y&>/ x)')"1 0 xylocs  NB. use ;~ to run traverse before inspecting results
+    NB. If xop omitted for dyad, default it to [ by taking the x from the calculated input/ref, the shape from the first
+    NB. shape input, and stealth of 2 (=[)
+    if. valence > #xylocs do.
+      NB. We calculated an extra reference for y, which we will discard since we know the y height to v0 is _1 & therefore we couldn't have allocated the main ref to it
+      ld =. ld ,~ ((<(,0);0) { sr) ; (, {. inputselopshapes) ; 2
+    end.
+    'ux srs stealth' =. <@;"1 |: ld
+    NB. Create the y to use for u, with the heavy lines unless stealth caused an xy verb to be omitted
+    if. 0 = +/ stealthcode =. 3 bwand stealth do.
+      NB. Not stealth: keep heavies
+      rankstackcode =. TRAVOPSSTARTHEAVY
+    elseif. valence = 1 do.
+      NB. monad with stealth; just keep all the original lines
+      rankstackcode =. TRAVOPSKEEPALL
+    elseif. do.
+      rankstackcode =. TRAVOPSKEEPALL
+      NB. dyad with one or both stealth.  Create new rankhistory, where each column is chosen to be the
+      NB. value selected by that stealthop, or empty if not stealth.  Delete lines that end up with no rank
+      NB. This is copied from fork, except that we never generate highlights
+      rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 |."1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
+    end.
+    NB. If the input y had no operands, we leave it that way.  Everything else doesn't matter.  We might have added
+    NB. a default operand here and we shouldn't try to traverse
+    if. #inputselopshapes do. y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
+  end.
+end.
+NB. Create references as needed
+NB. Traverse & realize x and y operands for gerund cases
+
+NB. Now ux has the traverse x inputs for u (the [x]y inputs to u), vx has the ones for v if any
 NB. traverse v, either as a noun or as a verb using the current selector
 if. visnoun do.
   vdol =. NOLAYOUTS traverse__vop TRAVNOUN
@@ -9360,9 +9481,10 @@ NB. u^:v: Create references for the input(s) and assign the correct one to u and
 NB. x is a list of layouts (each layout a list); create a table of layouts, each (rank-2) row having orig,reference
 NB. Start with original to u, ref to v; reverse if u height < v height.  The reference will go to the lower
 NB. Add 1/2 unit to u since v starts lower
-  xx =. (</ ((estheights__uop combineheights ,0.5) ,: estheights__vop)) |."0 2 (,: createreference)"1 x
-  vdol =. (1 {"2 xx) traverse__vop y
-  x =. 0 {"2 xx   NB. Pass the other operands into u^: or this node
+NB. obsolete   xx =. (</ ((estheights__uop combineheights ,0.5) ,: estheights__vop)) |."0 2 (,: createreference)"1 x
+NB. obsolete  vdol =. (1 {"2 xx) traverse__vop y
+  vdol =. vx traverse__vop xyy
+NB. obsolete   x =. 0 {"2 xx   NB. Pass the other operands into u^: or this node
 end.
 NB. Create the layout for v
 vlayo =. joinlayoutsl vdol
@@ -9397,16 +9519,16 @@ NB. obsolete  elseif. (-.@-: <.) > vval do. errorcode =: EINVALIDVERB
   elseif. 2 ~: isinteger > vval do. errorcode =: EINVALIDVERB
   end.
 end.
-if. errorcode e. EEARLYERROR do. earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return. end.
+if. errorcode e. EEARLYERROR do. earlyerror ux ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return. end.
 
 NB. In case we are formatting this node (the usual case), save the input DOLs to it
-resdol =. x ,&< coname''
+resdol =. ux ,&< coname''
 NB. If v didn't run, there is really nothing we can do about u; just display it.  If v failed because it didn't select, there
 NB. is hope for a later traversal
 NB.?lintonly vval =: 0
 if. errorcode__vop > EOK do.
   if. cop -.@-: '^:' do.   NB. m&v or u&n
-    resdol =. ((estheights__uop > 0) # x) ,&< coname''
+    resdol =. ((estheights__uop > 0) # ux) ,&< coname''
     physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
   end.
   'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
@@ -9418,7 +9540,7 @@ NB. obsolete   'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resd
 elseif. do.
 NB. v ran. Get the actual result of v.  We know v collected successfully
 NB. obsolete NB. No gerund.
-  
+
 NB. Inspecting ALL the results from v, if every selection is either <0 or <_1, we will have no need for u^:
   if. logvalues__vop *./@:e. 0;_1 do.
 NB. One-line request: create request, with appropriate labeling, depending on the possible values of v
@@ -9430,7 +9552,7 @@ NB. remove the x operand
     else.
       formatcode =: 3   NB. dyad &
       labelstg =. defstring 0
-      resdol =. ((estheights__uop > 0) # x) ,&< coname''
+      resdol =. ((estheights__uop > 0) # ux) ,&< coname''
       physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
     end.
     'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<labelstg) (<_1 0)} rankhistory
@@ -9478,7 +9600,12 @@ NB.  u: u expanded, but there is no expansion node.  If vis1, we treat this resu
 NB.   we treat it as a v-type result and realize it it, then connect it to u^:v (but if the selector is 0, we
 NB.   connect it to the y input instead
 NB. expansion: realize it as a v-type result
-    'expdol code' =. x traverse__uop traverseu;skeletalu;noexpansion;vis1;selectedpower;visnoun;< travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
+
+    NB. The operands for the expansion depend on the type of power.  For non-gerund, u simply takes the x and y inputs in full.
+    NB. For gerund, x and y have already been realized, including light tags, so we should keep only heavy tags.  But if x and y were stealth, we
+    NB. want to pass the corresponding rankstack through.  This is all similar to fork
+
+    'expdol code' =. ux traverse__uop traverseu;skeletalu;noexpansion;vis1;selectedpower;visnoun;< travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
     formatcode =: 4+code   NB. 4-7: expansions
     select. code
   NB. Return type: 0=vis1, 1=noexpansion, 2=skeletalu(unwired), 3=full u or expansion
@@ -9490,8 +9617,8 @@ NB. expansion: realize it as a v-type result
   NB. If u doesn't use one of the operands, there will be a confusing extra wire connecting that operand to u
   NB. (if u were expanded, the wire would be removed).  We remove the wire here in that case.  It is most
   NB. important for u&m dyad, where we added the @] unbeknownst to the user
-        if. (2 = #x) do.
-          resdol =. ((estheights__uop > 0) # x) ,&< coname''
+        if. (2 = #ux) do.
+          resdol =. ((estheights__uop > 0) # ux) ,&< coname''
           physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
         end.
         'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol){'';(,0);_0.3 0.3),1;< (<(defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
@@ -9499,7 +9626,7 @@ NB. expansion: realize it as a v-type result
   NB. skeletalu: u is there for show only; the actual value comes from y.  Create a reference to y and add it as the first input.
   NB. Make the handle for the u result _1, meaning 'no wire'
         resdol =. joinlayoutsl expdol
-        resdol =. resdol , createreference _1 { x
+        resdol =. resdol , createreference _1 { ux
         'displayhandlesin displayhandleout displaylevrank' =: (0 _1);1;< (<'Final ' , (defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
   NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
   NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
@@ -11537,7 +11664,11 @@ if. 0 0 -: stealthcode =. 3 bwand dispstealthoperand__vop , dispstealthoperand__
 else.
   rankstackcode =. TRAVOPSKEEPALL
 NB. obsolete   rankhistory =: (#~     a:  +./@:~:"1  (0 2 3)&{"1) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
-  rankhistory =: (#~    ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
+NB. obsolete   rankhistory =: (#~    ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
+  NB. Create a: y y or a: y x, then select using 0 ] [ to give the following selections:
+  NB. nonstealth=a:  monad stealth=y   dyad ]=y   dyad [=x  (for dyads, each argument is selected separately)
+  NB. Then discard rows that have nonatom in the title (so not heavy) and empty in both columns
+  rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 |."1 (2) }."1 rankhistory
 end.
 NB. We keep the highlights from the input, to both the left and right ops.  This will not be needed EXCEPT when u or v is ][.  Other times,
 NB. the highlights go from u to v, and they are at the same sellevel (since u has infinite rank), so nothing that happened below u's sellevel matters.
@@ -12461,7 +12592,18 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect 'a crash9_dissect_@["2 b' [ a =. 3 + i. 2 2 4 [ b =. i. 2
 2 dissect '2x&*&1&1 (3)'
 2 dissect '(2&<.#) ''abcde'''
-dissect '10 ([:, t (+/ . *)^:(<@[` (])) ])1 2 3 4 5' [ t =. i. 5 5
+2 dissect '10 ([:, t (+/ . *)^:(<@[` (])) ])1 2 3 4 5' [ t =. i. 5 5
+2 dissect '$:@:}.@:(2&|.)^:(2<#) i. 15' 
+2 dissect '+:^:(2:`(1+])) 3 4'
+2 dissect '+:^:([`(1+])) 3 4'
+2 dissect '+:^:(+/`]) 3 4'
+2 dissect '+:^:(+/`+:) 3 4'
+2 dissect '5 +^:((+/@])`(+:@[)`({.@])) 3 4'
+2 dissect '5 +^:({.@]`[`]) 3 4'
+2 dissect '5 +^:(]`[`]) 3 4'
+2 dissect '5 +^:((+:@[)`({.@])) 3 4'
+2 dissect '5 +^:([`]) 3 4'
+2 dissect '5 +^:([`]) 3 4'
 )
 
 testsandbox_base_ =: 3 : 0
