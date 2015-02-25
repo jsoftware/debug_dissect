@@ -451,10 +451,6 @@ NB. or the string form, for a modifier.  Tokennums are the input token numbers t
 queue =. mark ; queue
 stack =. 4 2 $ mark;''
 
-NB. obsolete NB. We keep track of $: verbs encountered, and insert an expansion node if there are any.  The expansion
-NB. obsolete NB. is before the monad/dyad execution containing the $: .  We clear the flag indicating recursion to begin with, and after any monad/dyad.
-NB. obsolete recursionencountered =: 0
-NB. obsolete 
 NB. In case of parse failure, we remember whether we executed a user modifier.  If we did, our assumption that it produced
 NB. a verb may have caused the failure, and we give a suitably couched error message
 usermodifierencountered =: 0
@@ -952,7 +948,6 @@ runningtimerloc_dissect_ =: coname ''
 wd 'timer ' , ": y
 )
 
-NB. obsolete sessionyx =: 10 10   NB. Initial position of the first window
 NB. Set the initial value to use for the form, so we remember it from call to call
 NB. Called whenever we think the control might have moved
 setsessionyx =: 3 : 0
@@ -1470,7 +1465,6 @@ propseltokens =: proplocales@3:  NB. list of tokens for creating sentence displa
 cocurrent 'dissect'
 
 NB. Clear scroll point (at nodes leafward from the starting node).  y is 1 to start, and the assignment is made only if <: 0
-NB. obsolete propscroll =: 'propselstopatnoun'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
 propscroll =: 'propselall'&((3 : 'if. y <: 0 do. scrollpoints =: 0 2$0 end. <: y') traversedown 0:)
 
 NB. init parent nodes in all objects.  This must be done in a separate verb because only a named verb resets the locale
@@ -2032,7 +2026,6 @@ if. #vranks  do.  NB. forceinfinite overrides the observed verb ranks
   NB. Calculate the effective rank: the rank, but no larger than the actual rank of the argument.
   NB. If there is no argument shape, leave the ranks empty (will turn to space later)
   if. 0 = #inputselopshapes do. effranks =. (<'')"0 vranks
-NB. obsolete   else. effranks =. vranks (  (<. #@($^:(0<L.))))&.> inputselopshapes
   else. effranks =. vranks ((('!' #~ <) , ":@<.) #@($^:(0<L.)))&.> inputselopshapes
   end.
   rankhistory =: rankhistory , (;:^:_1^:(0<L.) titlestring) ; (coname'') , |. effranks
@@ -2488,7 +2481,6 @@ NB. if y is boxed, this must be a selection node, and we recur on the selected n
 NB. We use the shape of the fillmask to detect extra axes: if there is a leading 1, set extra-axis
 checkerboardfillmask =: 4 : 0
 assert. 0 = L. y
-NB. obsolete sel =. ((x * FILLMASKSELLEVEL) <. (-FILLMASKSELLEVEL) bwand y) bwor (<:FILLMASKCHECKER) bwand y
 sel =. x colorlimitsellevel y
 NB. Checkerboard: works for scalars too.  Create a checkerboard cell of rank no more than 2, then
 NB. replicate as needed for higher rank, so that there is a predictable odd/even pattern within each rank-2 cell
@@ -2782,7 +2774,6 @@ NB. should replace the selected portion with the fillmask and data that was calc
       end.
       NB. Bring the new fillmask up to the new merged size, if that is larger
       NB. Insert new fillmask into old
-NB. obsolete       fillmask =: (((#>sel1) }. $fillmask) ([ {.!.fillval (({.!.1 $)~ -@#)~ ($,) ]) fillmask__loc) sel1} fillmask
       fillmask =: (maxcellresultshape ([ {.!.fillval (({.!.1 $)~ -@#)~ ($,) ]) fillmask__loc) sel1} fillmask
       NB. Install the new value into selresult - needed only if it is an error value and thus an addon at the end
       if. (#selresult) = frame #. >sel1 do.
@@ -3601,7 +3592,6 @@ WIRECOLOR =: 0 0 0   NB. Color of wires
 BOXMARGIN =: 2 ($,) 2   NB. Space to leave around boxed results
 BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
 
-NB. obsolete EMPTYEXTENT =: <@,"0 ] 5 5   NB. Size to use for displaying empty
 EMPTYEXTENT =: 15 10   NB. Size to use for displaying empty
 
 MAXDATASIZEYX =: 200 200
@@ -3615,13 +3605,10 @@ calccfms =: 3 : 0
 nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;NOUNFONT;(y+NOUNFONTSIZE);NOUNMARGIN
 nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
-NB. obsolete nouncfm =: nouncfm , < ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
 
 verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(y+VERBFONTSIZE);VERBMARGIN
 verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
-NB. obsolete verbcfm =: verbcfm , < ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
-NB. obsolete verbcfm =: verbcfm , < ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1/ DATAFONTS ,"0 _ (y+DATAFONTSIZE);DATAMARGIN
 
 cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
 
@@ -3663,13 +3650,11 @@ cfmforclass =: 4 : 0"0 1
 'font pen margin tcolor bcolor size' =. cfmforclassrankverb`cfmforclassshape@.x {. y
 if. 1 < #y do.
   'sizeadj bolditalic stipple' =. 16 4 4 #: 128 + 1 { y
-NB. obsolete   font =. font , bolditalic {:: '';' italic';' bold';' bold italic'
   size =. <.&.-: 1 + size * 0.2 0.1 p. sizeadj
   size =. (": size) , bolditalic {:: '';' italic';' bold';' bold italic'
   if. stipple do. bcolor =. bcolor , stipple end.
   NB. kludge if field is italic, add 1 to right-hand margin.  Normal sizing seems to get it wrong.
   if. 1 bwand bolditalic do. margin =. (2 2 $ 0 0 _2 2) + 2 2 ($,) margin end.
-NB. obsolete   bcolor =. bcolor bwor 24 bwlsl stipple
 end.
 if. #pen do. bcolor =. bcolor;pen end.
 bcolor;tcolor;font;size;margin
@@ -3835,7 +3820,6 @@ NB.
 NB.  The actual result of createDOL is the size of the allocated data area, in pixels, hw
 createDOL =: 3 : 0
 NB. The monad is what is called externally.  It uses the top-level values saved in the locale
-NB. obsolete formatinfoused =: y
 NB. Create the data for the selresult.  We have to try to collect it, because the verb may have encountered
 NB. an error before we tried to collect it, possibly leaving an uncollectable result (i. e. it would have
 NB. had a framing error if it survived long enough to collect).  If collection succeeds, we use the
@@ -3850,13 +3834,7 @@ NB.?lintsaveglobals
 NB. The dyad does the work, and calls itself if the value is boxed.  The dyad returns
 NB. valueformat, which is (shape of noun);y endpixels;x endpixels[;subDOLs]
 fontdesc =. y
-NB. obsolete 'font fontsize margin' =. y
 origshape =. $value =. x
-NB. obsolete NB. If the noun is empty, we can't very well calculate its display size,
-NB. obsolete NB. so just use a canned size
-NB. obsolete if. 0 e. $value do.
-NB. obsolete   'subDOLs rcextents' =. (0$a:);<EMPTYEXTENT
-NB. obsolete else.
 if. 0 e. $value do.
   subDOLs =. 0$a:  NB. no subnouns unless boxed
   NB. If the noun is empty, create a display value out of the non-empty part of the shape.
@@ -3872,9 +3850,7 @@ elseif. do.
   NB. If the noun is not boxed, just get the height/width for each atom
   NB. We also come here for the top level, which is boxed because it might not collect
   subDOLs =. 0$a:  NB. no subnouns unless boxed
-NB. obsolete     glfontextent font , ": fontsize
   glfontextent ; (<(1 = {. $ value);0 1) { fontdesc
-NB. obsolete    hw =. (+/ 2 2 ($,) margin) +"1 |."1 glqextent@(":!.displayprecision)@> value
   hw =. (+/ 2 2 ($,) (<0 2) {:: fontdesc) +"1 |."1 glqextent@(":!.displayprecision)"0 value
 end.
   
@@ -3893,7 +3869,6 @@ NB. Since the 1-pixel-wide line seems too narrow, add 1 extra space to each nonz
 bdynos =. rcshapes (+ *)@(1&(|.!.0))@:(0&(i.&1@:~:)@|."1)@(#: i.@#)&.> rcextents
 rcextents =. +/\&.> bdynos +&.> rcextents
 
-NB. obsolete end.
 NB. Assemble final result
 origshape;rcextents,subDOLs
 NB.?lintsaveglobals
@@ -3951,9 +3926,7 @@ NB. string; no ranks
 else.
 NB. table; contains string;locale;rank[;rank].
 NB. Remove lines with no display symbol
-NB. obsolete   nonemptylevrank =. 2 ({."1 ,. |.@:}."1) (#~   ('';DLRCOMPEND) -.@:e.~ {."1) displaylevrank
   nonemptylevrank =. (#~   ('';DLRCOMPEND) -.@:e.~ {."1) displaylevrank
-NB. obsolete   DOranklevels =. (3 : 'sellevel__y'"0) DOranklocales =: 1 {"1 nonemptylevrank
   NB. Get the titles (verbs & modifiers)
   verblines =. 0 {"1 nonemptylevrank
   NB. Get the locales for each row
@@ -3962,7 +3935,6 @@ NB. obsolete   DOranklevels =. (3 : 'sellevel__y'"0) DOranklocales =: 1 {"1 none
   ranklines =. ([: {.^:(0=#) ":)&.> 2 }."1 nonemptylevrank
   NB. Create the level,decoration for each rank label: the selection level, followed by a value, for each rank box, set if
   NB. the rank box contains ! indicating that the rank affected the result
-NB. obsolete   ranklevels =. ranklines (4 : 'sellevel__y ,"0 ((FONTDECORATIONSIZE*3)+FONTDECORATIONBOLD+FONTDECORATIONITALIC) * ''!'' = {.@> x'"1 0) DOranklocales  NB. table for each locale, 1 row per rank, y[x] order
   ranklevels =. (3 : 'sellevel__y'"0 DOranklocales) ,"0 ((FONTDECORATIONSIZE*3)+FONTDECORATIONBOLD+FONTDECORATIONITALIC) * '!' = {.@> ranklines NB. table for each locale, 1 row per rank, y[x] order
   NB. Interleave rank and verb to produce [x,]v,y.  Remove the ! flag from the rank
   DOranks =: (-.&'!'&.> ranklines) (}.@[ , ] , {.@[)"1 0 verblines
@@ -3973,10 +3945,6 @@ NB. obsolete   ranklevels =. ranklines (4 : 'sellevel__y ,"0 ((FONTDECORATIONSIZ
   fontseldecor =. ranklevels ((}.@[ , ]) , {.@[)"2 1 ((,:1 0) {.~ -#ranklevels)
   NB. Calculate the font for each box
   DOrankcfm =: fontclass cfmforclass"0 1"1 2 fontseldecor
-NB. obsolete   DOranks =: (([: {.^:(0=#) ":)&.> 2 }."1 nonemptylevrank) (}:"1@[ ,. ] ,. {:"1@[) {."1 nonemptylevrank  NB. [x] v y
-NB. obsolete   NB. Calculate (verb font ,: rank font) for each row; that's it for v y; replicate if x v y
-NB. obsolete   DOrankcfm =: 1 0 1 {"2^:(3={:$DOranks) (FONTCLASSRANKVERB cfmforclass"0 (1) {.~ -#DOranklevels) ,:"1 (FONTCLASSSHAPE cfmforclass"0 DOranklevels)
-NB. obsolete   NB. Remove flag chars from ranks
   NB. Size the characters for each box
   rankrects =. DOrankcfm sizetext"1 0 DOranks
 NB. Make the left rank left-justified, the right rank right justified.  Align each stack
@@ -4040,7 +4008,6 @@ NB. If the last verb does not allow a selection (ex: i.@>), remove it from the s
   NB. The first box of each box of DOshapes is selection, the rest are dropdown(s)
   NB. The fill info is (optional * if verb is applied to a cell of fills);(parenthesized shape of cellsize if fill added)
   NB. This is where we convert DOshapes to a table (selection row if any is added later)
-NB. obsolete   DOshapes =: ,: ;&.> (a:,fillinfo) <@(({.@] , [ , }.@]) >)"0 ":L:0 isftorank2 DOshapes
   NB. split DOshapes into (<frame) , dropdowns; convert to character
   DOshapes =: ((<@":@;@{. , }.)~ i.&SFOPEN)&.> isftorank2 DOshapes
   DOshapes =: ,: ;&.> fillinfo <@(({.@] , [ , }.@]) >)"0 DOshapes
@@ -4796,7 +4763,6 @@ NB. not, we have to show the boxed atoms.
 NB. position the start point so that the selected scroll data starts in the window.
 NB. y here is tlbr of the clip window;screen startpoint of the data
 NB. If the data is boxed, insert the box margin
-NB. obsolete  (valueformat;dispvalue;fillmask;0;0;<cfmdata) drawDOL cliptlbr ; boxyx
   (valueformat;dispvalue;<fillmask) drawDOL cliptlbr ; boxyx
 
 NB. After the data is drawn, draw a highlighting rectangle for the item selection(s), if any.
@@ -4916,9 +4882,6 @@ SM^:DEBDOL 'drawDOL: ' , > coname''
 QP^:DEBDOL'vf data sel xsizes ysizes '
 NB. If the data is empty, draw nothing (but signal validity).  The size
 NB. of the empty was accounted for when the block was created
-NB. obsolete if. 0 e. $data do.
-NB. obsolete   0   NB.  valid return
-NB. obsolete else.
   
 NB.  If there are subDOLs, adjust the rects to leave a box margin
 boxyx =. dataorigin
@@ -4978,7 +4941,6 @@ NB. If there are subDOLs, process each of them.  The operand was boxed.
 if. 3 < #vf do.
   sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
   NB.  Adjust each inner box position
-NB. obsolete   (sdol ,"0 1 usedd ,"0 1 ((_1-FILLMASKNOCOLLECT)&bwand^:(0=L.)&.> sel) ,"0 a:) ((((0$a:);<cfmdata) ,~ [) drawDOL ])"1 cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
   (sdol ,"0 1 usedd ,"0 (_1-FILLMASKNOCOLLECT)&bwand^:(0=L.)&.> sel)   drawDOL   cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
   NB. Draw mesh for the rectangles - dotted if the boxing is because of collection error
   collecterr =. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel
@@ -5010,7 +4972,6 @@ if. +/ #@> startwidth =. bdynos (*@[ # ,.~)&.> (<<<0 _1)&{&.> yxpositions do.
 end.
   
 0
-NB. obsolete end.
 )
 
 
@@ -5245,8 +5206,9 @@ EXEGESISRANKOVERALLEXPLAIN 0 Description
 EXEGESISRANKSTACKEXPLAIN 0 Description
 EXEGESISRANKSTACKPOWERSTART 0 Description
 EXEGESISRANKSTACKPARTITIONSTART 0 Description
-EXEGESISVERBDESC 0 Verb
 EXEGESISONELINEDESC 0 Verb
+EXEGESISVERBDESC 0 Verb
+EXEGESISVERBRANK 0 Verb
 EXEGESISFRAMEFILLSTART 1 Frame
 EXEGESISFRAMENUGATORY 1 Frame
 EXEGESISFRAMENONNOUN 1 Frame
@@ -5328,7 +5290,11 @@ NB. Result is table of (retcode;LF-delimited string, empty if there is no frame)
 NB.  retcode means: 0=non-verb, 1=no shapes, 2=no frame, 3=frame exists
 exegesisframe =: 3 : 0
 'labelloc opno' =. y
-res =. 0 2$a:  NB. Init empty return
+if. #vranks do.
+  res =. ,: EXEGESISVERBRANK ; 'The rank of the verb is ',(":vranks),'.',LF
+else.
+  res =. 0 2$a:
+end.
 NB. If the source of the operands is not the original click, we'd better start with a line
 NB. describing that fact
 if. labelloc = coname'' do.
@@ -5360,12 +5326,12 @@ elseif. (0 = #inputselopshapes) +. (0 = #selector) do.
 elseif. _ *./@:= vranks do.
   NB. If verb has infinite rank, just say so here.  We don't use the frame because u/ etc has pseudoframe and we want to 
   NB. report NOFRAME for them
-  res =. ,: EXEGESISFRAMENOFRAME;'This verb has infinite rank and always applies to its entire argument',((2=#inputselopshapes)#'s'),'.',LF    NB. If only 1 cell, can't analyze
+  res =. res , EXEGESISFRAMENOFRAME;'This verb has infinite rank and always applies to its entire argument',((2=#inputselopshapes)#'s'),'.',LF    NB. If only 1 cell, can't analyze
 elseif. 0 = #frame do.
   if. 2=#inputselopshapes do.
-    res =. ,: EXEGESISFRAMENOFRAME;'Each argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
+    res =. res , EXEGESISFRAMENOFRAME;'Each argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
   else.
-    res =. ,: EXEGESISFRAMENOFRAME;'The argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
+    res =. res , EXEGESISFRAMENOFRAME;'The argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
   end.
 elseif. do.
   NB. There is a frame.  Describe it
@@ -5629,7 +5595,6 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     QP^:DEBEXEGESIS'tt displaylevrank '
     if. DEBEXEGESIS do. for_l. 1{"1 displaylevrank do. QP 'defstring__l]0 ' end. end.
     isfirsttitled =. [: (*. (= +/\)) (DLRCOMPEND;a:) -.@e.~ {."1
-NB. obsolete     if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (<datapresent) ,. (;~"1 0    [: (= +/\) *@#@>@{."1) |. 2 {."1 displaylevrank end.
     if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (<datapresent) ,. (;~"1 0   isfirsttitled) |. 2 {."1 displaylevrank end.
   else.
     tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
@@ -5842,17 +5807,6 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
     selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
     NB. Convert the isf to a path.
-NB. obsolete NB.   Put SFOPEN at the end, then cut on SFOPEN and run boxes together.
-NB. obsolete     NB. If the last box is empty, remove it
-NB. obsolete     selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
-NB. obsolete     if. #selpath do.
-NB. obsolete       NB. If there are selection options, display the path
-NB. obsolete 
-NB. obsolete       if. 1 >: #selpath do.
-NB. obsolete         disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (": ; selpath),'.',LF,LF
-NB. obsolete       else.
-NB. obsolete         disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom whose path is ' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath),'.',LF,LF
-NB. obsolete       end.
     disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom with path=' , (isftodisplayablepath selx),'.',LF,LF
 
     NB. If this has rank higher than 2, explain the display
@@ -5865,7 +5819,6 @@ NB. obsolete       end.
       end.
       disp =. disp , EXEGESISDATAARRANGEMENT ; t,LF,'Boundaries above rank 2 are indicated by blue lines, with wider lines used for higher boundaries.',LF,LF
     end.
-NB. obsolete     end.
   end.
   NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
   if. 1 < #DOsize do.
@@ -5893,13 +5846,8 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   else. text =. defstring 0
   end.
   if. sellevel <: #selections do.
-NB. obsolete     rshape =. 0{::valueformat
-NB. obsolete     if. 1 < */ rshape do.
     selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
-NB. obsolete       selpath =. }:^:(a:-:{:) <@;;._2 selx , SFOPEN
-NB. obsolete       text =. text , '         path=' , (}: ; ,&';'&.> ''''''"_`":@.(0<#)&.> selpath)
     text =. text , '         path=' , isftodisplayablepath selx
-NB. obsolete     end.
   end.
 else. text =. ''
 end.
@@ -6303,27 +6251,6 @@ flatyxtopixel =: 3 : 0
 y ({ 0&,)&>"1 (1 2 { valueformat)
 )
 
-NB. obsolete NB. x is DOL descriptor, y is flatyx, result is table of (selection);(shape at level)
-NB. obsolete yxtopathshape =: 4 : 0
-NB. obsolete flatrc =. (>: y) (I.~ }:)&> 1 2 { x  NB. Look up to find containing row/col
-NB. obsolete s =. 0 {:: x   NB. shape of the noun
-NB. obsolete NB. Split the shapeused into vert;horiz, ending on horiz.  OK to add high-order 0s to
-NB. obsolete NB. ensure that there is some infix of length 2.
-NB. obsolete NB. Convert row/col to indexes.  Interleave the indexes for row/col to get cell indexes.  Remove 0
-NB. obsolete NB. if it was added
-NB. obsolete NB. Box the indexlist
-NB. obsolete indexlist =. < (-#s) {. , |: (|. |: _2&(]\)&.|. 0 0 , s) #: flatrc
-NB. obsolete NB. If there is no lower boxing level, indexlist is the result
-NB. obsolete if. 3 < #x do.
-NB. obsolete   NB. Boxed noun.  Recur to look up the next level.  Offset the yx to within the subbox
-NB. obsolete   NB. Start by selecting at this level and dropping down, followed by the later levels
-NB. obsolete   NB. Offset within the inner box by the margin plus the leading linewidth
-NB. obsolete   < (indexlist , SFOPEN) ; > ((3;indexlist) {:: x) yxtopathshape y - (BOXLINEWIDTH + BOXMARGIN) + flatrc ({ 0&,)&> 1 2 { x
-NB. obsolete else.
-NB. obsolete   NB. Return the indexlist as a boxed CSF (rank-3)
-NB. obsolete   <,<indexlist
-NB. obsolete end.
-NB. obsolete )
 NB. x is DOL descriptor, y is flatyx, result is table of (selection);(shape at level)
 yxtopathshape =: 4 : 0
 NB. If the noun is empty, we make it nonempty for display by discarding all elements of the shape starting with
@@ -7026,7 +6953,6 @@ NB.?lintsaveglobals
 )
 
 calcestheights =: 3 : 0
-NB. obsolete estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;0;1;0) ,: (1 1;_1 0;0 _1;0 0;0 0;_1 0;0 _1)
 estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;1;0;0) ,: (1 1;_1 0;0 _1;0 0;0 0;_1 0;0 _1)
 )
 
@@ -7538,7 +7464,6 @@ newobj__COCREATOR coname''
 uop =: {. y   NB. The verb locale
 NB.?lintonly uop =: <'dissectverb'
 yxop =: }. y  NB. The operand locale(s)
-NB. obsolete recursionencountered__COCREATOR =: 0
 NB. Since this is called after setvalence, we insert valence-related stuff here
 valence =: <: #y
 resultissdt =: resultissdt__uop
@@ -7549,17 +7474,6 @@ destroy =: 3 : 0
 destroy_dissectobj_ f. ''
 )
 
-NB. obsolete NB. Set the valence used for executing this verb, and propagate to descendants
-NB. obsolete setvalence =: 3 : 0
-NB. obsolete valence =: #y
-NB. obsolete uop =: setvalence__uop y
-NB. obsolete NB.?lintonly uop =: <'dissectverb'
-NB. obsolete resultissdt =: resultissdt__uop
-NB. obsolete NB. Return the dispoperands from v
-NB. obsolete coname''
-NB. obsolete NB.?lintsaveglobals
-NB. obsolete )
-NB. obsolete 
 calcestheights =: 3 : 0
 estheights =: estheights__uop combineheights ,1     NB. add 1 for expansion node
 )
@@ -8008,7 +7922,6 @@ NB. execute u
 NB. If v is a stealth operand, rankhistory and highlighting that would have been applied on v will have disappeared,
 NB. so in that case we transfer them to u
 NB. We pass only the side of the physsels that is applicable: that's all if it's a monad, or one side if it's a dyad
-NB. obsolete rankstackcode =. (dispstealthoperand__vop  bwand 3) {:: TRAVOPSSTARTHEAVY ; (TRAVOPSKEEPINALL 0 1 2) ; (TRAVOPSKEEPINALL 0 1 _1) ;< TRAVOPSSTARTHEAVY   NB. none ] [ [:
 NB. stealth type 5, ]], is used by dyad u&n.  It causes problems because it turns the u leg of u&n into a monad, but then subsumes its display into
 NB. the hidden power which is a dyad.  This causes loss of detail is the u really does need to be a dyad, for example if it contains another u&n.  Our best
 NB. solution is not to treat it as stealth
@@ -8034,24 +7947,11 @@ case. 5 do.
   rankphyscode =. TRAVOPSKEEPALL;TRAVOPSPHYSNEW
 case. do.
   rankphyscode =. TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW
-NB. obsolete   rankhistory =: (#~     ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
-NB. obsolete   rankhistory =: (#~     ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1))    a: (<a:;4-stealthcode)} rankhistory
 end.
 NB. Space in cop is used for hidden nodes, so no end-of-comp record then
 (' ' ~: {. cop) inheritu x traverse__uop travops rankphyscode,(uopval vop);<<selresultshape__vop
-NB. obsolete (' ' -.@e. cop) inheritu x traverse__uop travops ((dispstealthoperand__vop e. 1 2 5 6) { (TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW),:(TRAVOPSKEEPALL;TRAVOPSPHYSNEW)),(uopval vop);<<selresultshape__vop
 )
 
-NB. obsolete exegesisrankoverall =: 4 : 0
-NB. obsolete appearstwice =. x
-NB. obsolete 'datapresent endflag linetext' =. y
-NB. obsolete if. DLRCOMPEND -: linetext do.
-NB. obsolete   t =. 'This block %al1%displays the result of the verb:',LF,(defstring 0),CR
-NB. obsolete   ,: EXEGESISRANKOVERALLEXPLAIN;t
-NB. obsolete else.
-NB. obsolete   0 2$a:
-NB. obsolete end.
-NB. obsolete )
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
 if. lastinblock do.   NB. If we are the last block, save description for the end (should not occur, unless stealth)
@@ -8229,16 +8129,6 @@ dol =. dol ,~ joinlayoutsl (1 0 # x) traverse__vop0 travops (TRAVOPSKEEPINLIGHT 
 1 inheritu dol traverse__uop travops TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW;(uopval vop0,vop1);<selresultshape__vop0 ,&< selresultshape__vop1
 )
 
-NB. obsolete exegesisrankoverall =: 4 : 0
-NB. obsolete appearstwice =. x
-NB. obsolete 'datapresent endflag linetext' =. y
-NB. obsolete if. DLRCOMPEND -: linetext do.
-NB. obsolete   t =. 'This block %al1%displays the result of the verb:',LF,(defstring 0),CR
-NB. obsolete   ,: EXEGESISRANKOVERALLEXPLAIN;t
-NB. obsolete else.
-NB. obsolete   0 2$a:
-NB. obsolete end.
-NB. obsolete )
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
 if. lastinblock do.   NB. If we are the last block, save description for the end (should not occur, unless stealth)
@@ -8458,7 +8348,6 @@ NB.?lintonly uop =: <'dissectverb'
 NB. Now change this locale to &&: and create i&v
 NB. Replace the uop with the uop we just created
 NB. We leave the &. locale in the path, so that we can override
-NB. obsolete create__localecompose f. (uop;(<<<1){cop) (<0 1;1)} y
 create__localecompose f. (uop;cop) (<0 1;1)} y
 NB.?lintsaveglobals
 )
@@ -8607,17 +8496,6 @@ if. 0 = #rank do. rank =. getverbrank_dissectobj_ f. y end.
 rank
 )
 
-NB. obsolete exegesisrankstack =: 3 : 0
-NB. obsolete res =. 0 2$a:
-NB. obsolete if. cop -: ,'"' do.
-NB. obsolete   if. '' -: frame do.
-NB. obsolete     res =. ,: EXEGESISFRAMENUGATORY;'This has no effect because the argument rank',(valence{::'';' is';'s are'),' already small enough',LF
-NB. obsolete   end.
-NB. obsolete end.
-NB. obsolete res
-NB. obsolete )
-NB. obsolete 
-NB. obsolete 
 exegesisrankstack =: 3 : 0
 NB. exit fast with no result if this node is hidden
 if. cop -.@-: ,'"' do. 0 2$a: return. end.
@@ -9013,7 +8891,6 @@ elseif. do.
   NB. No expansion node created, display this result as a simple result
   resdol =. x ,&< coname''
   'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< (<defstring 0) (<_1 0)} rankhistory
-NB. obsolete   physreqandhighlights__inheritroot =: NOPHYSREQ
 end.
 
 resdol
@@ -9299,12 +9176,6 @@ NB.?lintonly vvop =: <'dissectverb'
 if. 0 = verb bwand (<0 0) {:: y do.
   failmsg 'domain error: left operand to ',((<1 1){::y),' must be a verb'
 end.
-NB. obsolete NB. Switch to general verb if v is a gerund
-NB. obsolete if. 0: # querygerund__vvop '' do.
-NB. obsolete   changeobjtypeto localedefault
-NB. obsolete   create y
-NB. obsolete   return.
-NB. obsolete end.
 
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -9316,7 +9187,6 @@ NB. node that looks like a modifier, i. e. u*^:v where * is the expansion.
 NB. The display of the result of u^:v (as an inheritable u) comes from
 NB. this locale; the expansion (as a v) comes from *.
 NB. All we need to pass in is the locale of u and the titlestring (which may be different from '^:'
-NB. obsolete uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
 uop =: 'dissectpowerexpansion' 1 createmodifier (<0 1;1) {:: y
 NB. Save the display form of c, the locale of v, and the gerund locales if any
 NB. If the display form of the conjunction is not '^:', we are acting as a surrogate for another function like dyad u&m
@@ -9481,10 +9351,7 @@ NB. u^:v: Create references for the input(s) and assign the correct one to u and
 NB. x is a list of layouts (each layout a list); create a table of layouts, each (rank-2) row having orig,reference
 NB. Start with original to u, ref to v; reverse if u height < v height.  The reference will go to the lower
 NB. Add 1/2 unit to u since v starts lower
-NB. obsolete   xx =. (</ ((estheights__uop combineheights ,0.5) ,: estheights__vop)) |."0 2 (,: createreference)"1 x
-NB. obsolete  vdol =. (1 {"2 xx) traverse__vop y
   vdol =. vx traverse__vop xyy
-NB. obsolete   x =. 0 {"2 xx   NB. Pass the other operands into u^: or this node
 end.
 NB. Create the layout for v
 vlayo =. joinlayoutsl vdol
@@ -9502,12 +9369,6 @@ NB. If n produced a gerund at execution time, in other words if it constructed a
 NB. the moxie to analyze that at execution time.
 if. isgerund vval do. failmsg 'u^:n produced a gerund n without using ` - dissect doesn''t support that' end.
 
-NB. obsolete NB. Calculate a flag needed for shape analysis: if the v value is not an atom, and it contains positive values, Roger
-NB. obsolete NB. will restart the power if it returns a boxed value.  Create a flag indicating that condition.  It doesn't apply if
-NB. obsolete NB. vval is boxed.
-NB. obsolete boxrestart =: 0
-NB. obsolete if. (0 = L. vval) do. if. '' -.@-: $vval do. if. 0 < >./vval do. boxrestart =: 1 end. end. end.
-NB. obsolete 
 NB. Perform selections for u - needed for display whether v ran or not
 traversedowncalcselect y
 NB. If v invalid, detect domain error
@@ -9515,7 +9376,6 @@ if. errorcode__vop e. EFAILED do.
   errorcode =: EINVALIDVERB
 elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do.
   if. (0 < L. vval) *. ((1 < L. vval) +. -. ('';,0) e.~ $&.> vval) do. errorcode =: EINVALIDVERB
-NB. obsolete  elseif. (-.@-: <.) > vval do. errorcode =: EINVALIDVERB
   elseif. 2 ~: isinteger > vval do. errorcode =: EINVALIDVERB
   end.
 end.
@@ -9532,14 +9392,8 @@ if. errorcode__vop > EOK do.
     physreqandhighlights__inheritroot =: (estheights__uop > 0) # physreqandhighlights__inheritroot
   end.
   'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
-NB. obsolete elseif. isgerund vval  do.
-NB. obsolete   formatcode =: 1  NB. gerund
-NB. obsolete NB. If v produced a gerund, give up and display the value of this node
-NB. obsolete NB. Replace the end of the rank stack with the whole mess
-NB. obsolete   'displayhandlesin displayhandleout displaylevrank' =: ((#0{::resdol) { ($0);(,0);_0.3 0.3),1;< (<defstring 0) (<_1 0)} rankhistory
 elseif. do.
 NB. v ran. Get the actual result of v.  We know v collected successfully
-NB. obsolete NB. No gerund.
 
 NB. Inspecting ALL the results from v, if every selection is either <0 or <_1, we will have no need for u^:
   if. logvalues__vop *./@:e. 0;_1 do.
@@ -9741,14 +9595,6 @@ if. selectable do.
   fi =. (>./ , [: - <./) 0 , flatvval =. , (- *)@>^:(1 = L.) vval
   NB. Count the number of total and inverse executions, and convert to 'forward' and inverse, where forward includes the original value
   fix =. -/\. (# , _1&(+/@:=)) selx { logvaluesd__uop
-NB. obsolete NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
-NB. obsolete NB.  or if there is a mix of forward and backward execs
-NB. obsolete throwaway =. (1 1 -: * fi) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) fwdvals =. (-.logvaluesd__uop) #&(selx&{) logvalues__uop
-NB. obsolete NB. Also discard first forward execution if v is non-atomic and the first result is boxed.  Roger restarts the operation in that case
-NB. obsolete throwaway =. throwaway +. boxrestart *. (32 = 3!:0 > {. fwdvals)
-NB. obsolete NB. correct the number of executions: forward includes the 0 value, and also counts a throwaway execution sometimes
-NB. obsolete   fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
-NB. obsolete   fix =. fix - 0 ,~ 1 + 1 1 -: * throwaway
   NB. Since we filtered out restarts, the forward/inverse counts are correct EXCEPT when there is a mix of negative and zero
   NB. vvals: then we should have NO forward execs, but we show one.  Remove its count
   fix =. fix <. _ ,~ >: 0 >. >./ vval
@@ -9822,7 +9668,6 @@ exestring =: 3 : 0
 initloggingtable 1
 NB. If u has an unused operand, we should put @] or @[ after the inverse, because Roger can't handle x u@[^:_1 y but he can handle x u@[^:_1@[ y
 monadstring =. ('@]';'@[';'') {::~ estheights__uop i.&0@:>: 0
-NB. obsolete auditstg '(' , (verblogstring '') , '(' , (logstring 0) , '@:' , (exestring__uop '') , ') :. ( ' , (logstring 1), '@:(' , (logstring__uop'') , ')@:(' , (defstring__uop 2) , '^:_1',monadstring,')))'
 NB. We log 5 types: 0 for the original input, 1 for the forward input , _1 for the inverse input, 2 for forward output, _2 for inverse output, and we sort them out in the local addlog
 NB. Type 0 was logged back in the original ^: string
 if. 1 = valence do.
@@ -10088,7 +9933,6 @@ elseif. selectedpower -.@e. _ __ do.
 elseif. a: ~: selector do.
 NB. Frame unknown, use whatever we actually did, of the correct sign
   selx =. calcdispselx ; findselection > selector
-NB. obsolete   frm =. , (selectedpower<0) ([ + +/@:=) selx { logvaluesd  NB. Add 1 on inverse to include the 0 power
   frm =. , #selx
 elseif. do.
 NB. rank-calculus probe, return empty frame since we can't do rank-calculus
@@ -10105,13 +9949,6 @@ calcdispselx =: 3 : 0
 NB. Restarts were filtered during addlog
 keepmask =: (1 1 _1 {~ *selectedpower) = y { logvaluesd
 keepmask =: 1 (0)} keepmask
-NB. obsolete NB. If both valences were executed, the first execution (the second value) is bogus
-NB. obsolete NB. We ignore the first forward execution if its result is the same as the second, and not the same as all the rest;
-NB. obsolete NB.  or if there is a mix of forward and backward execs
-NB. obsolete throwaway =. ( 0 1 *./@:e. }. y { logvaluesd) +. (-:/@:(2&{.) *. (-.@-: 1&|.)) }. fwdvals =. (-.logvaluesd) #&(y&{) logvalues
-NB. obsolete NB. Also discard first forward execution if v is non-atomic and the first result is boxed.  Roger restarts the operation in that case
-NB. obsolete throwaway =. throwaway +. boxrestart *. (32 = 3!:0 > {. 1&|. fwdvals)
-NB. obsolete if. throwaway do. keepmask =: 0 (1)} keepmask end.
 1 {.^:noexpansion (>:|selectedpower) ((<. #) {. ]) keepmask # y
 NB.?lintsaveglobals
 )
@@ -10514,7 +10351,6 @@ NB. We initialize the rank stack, and it is that that will give the label for th
 NB. The /. node always displays the entire partitioning verb, with 'Final' prepended when the /. is selectable
 NB. and there has been a selection.
 NB. We remove the /. start-of-computation line - it is used only when the calculation is detailed
-NB. obsolete rankstack =. (}: rankhistory) , (('Final ' #~ selectable *. sellevel < #selections) , defstring 0) ; (coname'') , <"0  |. vranks
 rankhistory =: (< ('Final ' #~ selectable *. sellevel < #selections) , defstring 0) (<_1 0)} rankhistory
 'displayhandlesin displayhandleout displaylevrank' =: (valence {:: ($0);(,0);_0.3 0.3);1;<rankhistory
 NB. The highlights for x (if any) are preserved, but the ones for y are reset, since there is no selection from u/. into u
@@ -10542,7 +10378,6 @@ appearstwice =. x
 NB. This block is pointed to 3 times: u/. in the selector, 0 in the expansion, and /. at the start of computation
 if. DLRCOMPEND -: linetext do.
   NB. This block has the expansion result, and possibly the whole expansion.  There will always be data, unless there is an error
-NB. obsolete   if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
   tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
   if. appearstwice do.
     t =. 'This block %al1%calculates the selected partition of',LF,(defstring 0),CR,'This partition ',(exegesispartitiondesc''),'.',LF
@@ -11227,7 +11062,6 @@ elseif. do.
   NB. Turn it into a highlight record
   vselect =. < (2 1 $ vselect) , <0
   NB. Since we have used the rankhistory in the detail node, don't repeat it on the summary
-NB. obsolete   rankhistory =: (<'Final ' , defstring 0) (<_1 0)} _1 {. rankhistory
   rankhistory =: (<'Final ' , defstring 0) (<_1 0)} rankhistory
 end.
 
@@ -11540,7 +11374,6 @@ NB.?lintonly uop =. <'dissectverb' [ cop =. ''
 else.
   'uop cop vop' =. ucvlocs
 NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
-NB. obsolete   stg =. (defstring__uop 2) jd '(' jd cop jd ')' jd (defstring__vop 3)
   stg =. (defstring__uop 2) jd  cop jd (defstring__vop 3)
 end.
 NB. We will treat this as a generic verb, except for the overrides we have in this locale
@@ -11663,8 +11496,6 @@ if. 0 0 -: stealthcode =. 3 bwand dispstealthoperand__vop , dispstealthoperand__
   rankstackcode =. TRAVOPSSTARTHEAVY
 else.
   rankstackcode =. TRAVOPSKEEPALL
-NB. obsolete   rankhistory =: (#~     a:  +./@:~:"1  (0 2 3)&{"1) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
-NB. obsolete   rankhistory =: (#~    ('';(,0);(,0))  -.@-:"1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
   NB. Create a: y y or a: y x, then select using 0 ] [ to give the following selections:
   NB. nonstealth=a:  monad stealth=y   dyad ]=y   dyad [=x  (for dyads, each argument is selected separately)
   NB. Then discard rows that have nonatom in the title (so not heavy) and empty in both columns
@@ -11675,7 +11506,6 @@ NB. the highlights go from u to v, and they are at the same sellevel (since u ha
 NB. But if uv is ][, then highlights from c (or below) might reach through this node and highlight a higher node - and those nodes may have
 NB. lower sellevels, so we need to make sure the lower selections are as they would have been for the omitted ][.  The way to do this is
 NB. to start the physreqs with the values that they would have had to start uv.
-NB. obsolete 1 inheritu (dolu,dolv) traverse__cop travops TRAVOPSSTARTHEAVY;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
 1 inheritu (dolu,dolv) traverse__cop travops rankstackcode;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
 )
 
@@ -11784,7 +11614,6 @@ NB. But if v is ][, then highlights from u (or below) might reach through this n
 NB. lower sellevels, so we need to make sure the lower selections are as they would have been for the omitted ][.  The way to do this is
 NB. to start the physreqs with the values that they would have had to start v.
 NB. Tell inheritu to add an end-of-computation mark to the display stack
-NB. obsolete 1 inheritu (dol ,~ 0 {  x) traverse__uop ((0 1&{"1 ,. (<_) ,. _1&{"1)`'') travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);((vopval 0 { selopinfovalid) >. (uopval vop));<({. selopshapes),< selresultshape__vop
 1 inheritu (dol ,~ 0 {  x) traverse__uop ((a: 2}"1 ])`'') travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);((vopval 0 { selopinfovalid) >. (uopval vop));<({. selopshapes),< selresultshape__vop
 )
 
@@ -12604,6 +12433,8 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '5 +^:((+:@[)`({.@])) 3 4'
 2 dissect '5 +^:([`]) 3 4'
 2 dissect '5 +^:([`]) 3 4'
+2 dissect '-^:(1:`(]*:)) 5'
+2 dissect '100 -^:(1:`(]*:)) 5'
 )
 
 testsandbox_base_ =: 3 : 0
