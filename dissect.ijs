@@ -44,9 +44,6 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) ,
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. support u^:gerund
-NB.   test rankstack with " on ^:
-NB. Qt: tooltips corrupt the hidden display when there is an explorer window
 NB. support u . v y
 NB. check about stealth inheritance on hook
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
@@ -1855,7 +1852,6 @@ if. selectionctatinitialerror >: selectionct do. 0 0$0 return. end.
 selectionct =: <:selectionct
 applyselection''
 NB. Refresh the display
-traverse 0
 dissect_dissectisi_paint 1
 )
 
@@ -1865,7 +1861,6 @@ if. selectionct = #selectionsqueue do. 0 0$0 return. end.
 selectionct =: >:selectionct
 applyselection''
 NB. Refresh the display
-traverse 0
 dissect_dissectisi_paint 1
 )
 
@@ -1875,7 +1870,6 @@ if. selectionctatinitialerror >: selectionct do. 0 0$0 return. end.
 selectionct =: selectionctatinitialerror
 applyselection''
 NB. Refresh the display
-traverse 0
 dissect_dissectisi_paint 1
 )
 
@@ -3510,9 +3504,13 @@ SCROLLBARENDCOLOR =: <240 240 240
 SCROLLBARENDTHICKNESS =: 10
 SCROLLBARTRAVELERCOLOR =: <128 128 128
 
-FONTNUM =: '"Courier New"'    NB. Font for 'data' - numeric data, shape, rank, etc
-FONTCHAR =: '"Lucida Console"'   NB. Font for 'char' - verb names, noun names, status messages
-FONTIMSG =: '"Arial"'    NB. Font for easy readability - tooltips, error messages
+NB. FONTNUM - Font for 'data' - numeric data, shape, rank, etc
+NB. FONTCHAR - Font for 'text' - verb names, noun names, status messages
+NB. FONTIMSG - Font for easy readability - tooltips, error messages
+'FONTNUM FONTCHAR FONTIMSG' =: ((;:'Darwin') i. <UNAME) { ".;._2 (0 : 0)
+'"Courier"' ; '"Lucida Console"' ; '"Arial"'    NB. Mec version
+'"Courier New"' ; '"Lucida Console"' ; '"Arial"'    NB. Version for all others
+)
 
 NB. for the verb-name cell
 VERBCOLOR =: 114 30 30
@@ -9337,7 +9335,7 @@ else.
     NB. Execute the [x]y verbs and realize their display
 
     NB. traverse the xy ops and save their result as ux, to be passed into uop
-    xylocs =. }: refs  NB. The locales
+    xylocs =. }: refs  NB. The locales [x] y
     NB. For v0`v1`v2 and v1`v2 monad, }:sr matches the number of locales.  For v1`v2 dyad, we selected an extra operand above, to stand
     NB. for the implied v0=[ .  This is the first item of sr; it must be omitted when traversing gops
     travargs =. ((-#xylocs) {. }: sr) ,&<"2 1 xyy  NB. Traverse args for each locale x ; y
@@ -9349,8 +9347,8 @@ else.
       ld =. ld ,~ ((<(,0);0) { sr) ; (, {. inputselopshapes) ; 2
     end.
     'ux srs stealth' =. <@;"1 |: ld
-    NB. Create the y to use for u, with the heavy lines unless stealth caused an xy verb to be omitted
-    if. 0 = +/ stealthcode =. 3 bwand stealth do.
+    NB. Create the y to use for u, with the heavy lines unless stealth caused an xy verb to be omitted.
+    if. 0 = +/ stealthcode =. 3 bwand |. stealth do.  NB. Convert to y x order to match rankhistory
       NB. Not stealth: keep heavies
       rankstackcode =. TRAVOPSSTARTHEAVY
     elseif. valence = 1 do.
@@ -12466,6 +12464,8 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '5 +^:([`]) 3 4'
 2 dissect '-^:(1:`(]*:)) 5'
 2 dissect '100 -^:(1:`(]*:)) 5'
+2 dissect '5 +^:({.@]`[`])"0 (3 4)'
+2 dissect '5 6 +^:({.@]`[`])"0 (3 4)'
 )
 
 testsandbox_base_ =: 3 : 0
