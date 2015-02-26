@@ -34,6 +34,7 @@ DEBDOL2_dissect_ =: 0  NB. display drawing locales
 DEBDOvn_dissect_ =: 0  NB. display object headers
 DEBPICK_dissect_ =: 0  NB. display pick progress
 DEBEXEGESIS_dissect_ =: 0  NB. display exegetic creation
+DEBMOUSE_dissect_ =: 0   NB. display mouse events
 DEBTIME_dissect_ =: 0  NB. Show elapsed times
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
@@ -45,6 +46,7 @@ testsandbox_base_ 1
 NB. TODO:
 NB. support u^:gerund
 NB.   test rankstack with " on ^:
+NB. Qt: tooltips corrupt the hidden display when there is an explorer window
 NB. support u . v y
 NB. check about stealth inheritance on hook
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
@@ -327,6 +329,12 @@ dissectionlist_dissect_ =: (coname'') (<slottouse,0)}  dissectionlist_dissect_
 objtable =: 0$a:   NB. list of parse objects
 ticket =: 0   NB. sequential log number
 loggingallowed =: 1   NB. allow logging
+
+NB. Variables used to control hovering in this window
+hoverinitloc =: $0   NB. Init no hover active
+
+NB. Create the name we use to get to the instance - in this locale it points to itself
+COINSTANCE =: coname''
 
 winhwnd =: ''  NB. Init to no window
 NB. Use lightweight locales - we use less than 100 entries usually
@@ -943,9 +951,18 @@ NB. timer is running for.  Kludge, but seemingly OK since only one locale can ha
 NB. in the locale of the desired return
 NB. wdtimer is the name defined in dissect locale, depending on IFQT.  The same name is copied to the instance locale
 NB. if tooltips are enabled for non-QT
-wdtimer =: (3 : 0)`([: wd 'ptimer ' , ":)@.IFQT
-runningtimerloc_dissect_ =: coname ''
+wdtimer =: 3 : 0
+runningtimerloc_dissect_ =: COINSTANCE  NB. sys_timer will emulate a ptimer call
+runningtimerloc__COINSTANCE =: coname ''
 wd 'timer ' , ": y
+NB.?lintsaveglobals
+)
+wdtimer =: wdtimer f. ` (3 : 0)@.IFQT
+runningtimerloc__COINSTANCE =: coname ''
+wd 'psel ' , winhwnd__COINSTANCE
+QP^:DEBMOUSE'settimer:y=?y >coname'''' winhwnd '
+wd__COINSTANCE 'ptimer ' , ": y  NB. Make sure the timer call is in instance locale
+wd 'psel ' , winhwnd
 )
 
 NB. Set the initial value to use for the form, so we remember it from call to call
@@ -3549,7 +3566,7 @@ SHAPETEXTCOLORS =: 0 0 0"1 SHAPECOLORS
 NB. for the shape display of the (filled) result cell
 RESULTSHAPECOLOR =: 100 50 200
 RESULTSHAPETEXTCOLOR =: 255 255 255
-RESULTSHAPEFONT =: '"Courier New"'
+RESULTSHAPEFONT =: FONTNUM
 RESULTSHAPEFONTSIZE =: 0
 RESULTSHAPEMARGIN =: 1
 
@@ -5969,9 +5986,10 @@ end.
 NB. When the timer expires, perform the hover action.  Runs in instance locale
 dissect_timer =: 3 : 0
 NB.?lintonly wdtimer =: wd
-wdtimer 0
-wd 'psel ' , winhwnd   NB. J bug on the Mac requires explicit psel
-hoverdo''
+QP^:DEBMOUSE'timer:hwnd=?winhwnd wd''qhwndp'' >runningtimerloc >coname'''' winhwnd__runningtimerloc '
+wd 'psel ' , winhwnd__runningtimerloc 
+hoverdo__runningtimerloc''
+wdtimer 0  NB. Must do this last, as it modifies runningtimer
 0 0$0
 )
 
@@ -5981,12 +5999,11 @@ NB. hoverend is called whenever anything happens to abort the hover (click, focu
 NB. is called when the timer expires: we then see where the cursor is and call the owner to get a tooltip.
 
 NB. y is the mouse position yx.  Start/continue a hover timer, clearing an old one if the mouse has moved
-hoverinitloc =: $0   NB. Init no hover active
 MAXHOVERMOVEMENT =: 1   NB. Allow this much movement from start-of-hover position
 'HOVEROFFSETY HOVEROFFSETX' =: _8 5  NB. amount to offset tooltip from the hover
 
-NB. This is called in the locale and with the psel of whatever form is active - the main or an explorer.
-NB. The timer will run in the locale this was called from
+NB. This is called in whichever locale and psel of whatever form is active - the main or an explorer.
+NB. The timer will run in the main form
 NB. x is (window type 0=main 1=exp);(1 to write to the statline (which doesn't exist on explorers))
 hoverstart =: 4 : 0
 'isexp writestat' =. x
@@ -5995,6 +6012,7 @@ if. #hoverinitloc do.  NB. We are hovering.  Does this continue the same hover?
 end.
 if. 0 = #hoverinitloc do.   NB. If no hover running (and perhaps we just cleared it), start one
 NB.?lintonly wdtimer =: wd
+QP^:DEBMOUSE'hoverstart:hwnd=?winhwnd wd''qhwndp'' '
   wdtimer (tooltipdelayx,2) {:: TOOLTIPDELAYCHOICES  NB. start the hover timer
   hoverinitloc =: y
   hoverisexp =: isexp
@@ -6008,7 +6026,7 @@ NB. Nilad.  Ask the owner for a tooltip and display it if there is one
 NB. This runs in the hovering locale, either the main form or an explorer
 hoverdo =: 3 : 0
 if. #hoverinitloc do.   NB. should always be there, but we might get a late timer event
-NB.?lintonly hoverinitloc =: 0 0
+NB.?lintonly hoverinitloc__COCREATOR =: 0 0
   NB. Get the locale of the object.  If we are on an explorer, it's just that; if on the main, we have to
   NB. look for the pickrect
   if. hoverisexp do.
@@ -6024,7 +6042,9 @@ NB.?lintonly yx =. 0 0
     end.
   end.
 NB.?lintonly pickloc =. <'dissectobj'
+  glsel 'dissectisi'  NB. reselect graphics window
   if. #pickloc do.
+QP^:DEBMOUSE'hoverdo:hwnd=?winhwnd wd''qhwndp'' hoverisexp pickloc '
     hstring =. hoverDO__pickloc hoverisexp;yx
     if. #hstring do. drawtooltip hoverinitloc;hstring end.
   end.
@@ -6117,6 +6137,7 @@ wdtimer 0
 if. 0 = 4!:0 <'tooltippixels' do.
   NB. if the tooltip has a minimum lifetime, delay until that lifetime has been exceeded (kludge).  Should be short
   if. 0.01 < reqddelay =. hoversessmin - 6!:1'' do. 6!:3 reqddelay end.
+  glsel 'dissectisi'
   glpixels (1 0 3 2 { , tooltippixpos) , tooltippixels
   glpaint''
   4!:55 <'tooltippixels'
@@ -6171,6 +6192,7 @@ NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 NB. mouse movement.  If we are scrolling, drag the pixels along
 NB. If we are dragging a scrollbar, vector to the object locale to handle that
 dissect_dissectisi_mmove =: 3 : 0
+QP^:DEBMOUSE'mainmmove:hwnd=?winhwnd wd''qhwndp'' sysdata '
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 sd =. 0 ". sysdata
 if. 0 = 4!:0 <'pickpixels' do.
@@ -6462,6 +6484,10 @@ wd '?' (taketo , (": |. -:^:(-.IFQT) {: DOsize) , takeafter) EXPLORER
 wd 'pn *Exploring ' , ({.~ 100 <. #) defstring 0
 wd 'pshow'
 winhwnd =: wd 'qhwndp'
+NB. Each explorer has its own hover position
+hoverinitloc =: $0
+NB. Create name to use to get to the instance locale
+COINSTANCE =: COINSTANCE
 NB. Draw the object on the explorer form
 1 drawDOvnall ''
 )
@@ -6496,6 +6522,7 @@ if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;#. 4 5 6 7 { sd end.
 NB. mouse movement.
 NB. If we are dragging a scrollbar, vector to the object locale to handle that
 explorer_dissectisi_mmove =: 3 : 0
+QP^:DEBMOUSE'expmmove:hwnd=?winhwnd wd''qhwndp'' sysdata '
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 sd =. 0 ". sysdata
 if. 0 = 4!:0 <'scrollinglocale__COCREATOR' do.
@@ -6523,6 +6550,10 @@ explorer_dissectisi_mblup =: 3 : 0
 if. 0 = 4!:0 <'scrollinglocale__COCREATOR' do.
   4!:55 ;: 'scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 end.
+)
+
+explorer_dissectisi_focuslost =: 3 : 0
+hoverend''
 )
 
 NB. right-click in explorer - delete the explorer window
