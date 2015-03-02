@@ -60,7 +60,8 @@ alltests''
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '<.@(0.5&+)&.(10&*) 1.23 2.35 3.54 4.66 5.22'   turn on @ @: uses @ not &. for rankstack
+NB. dissect '+ ((&.>)/)(>@:) 5' fails
+NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
 NB.   Also, set errorlevel at end, after the current node has fill marked
 NB.   Think about having multiple failurepoints, depending on {.errorlevel
@@ -483,7 +484,7 @@ NB. If the stack contains an executable combination, execute it
 NB. If part of the execution has unknown value, produce an unknown result, of type 'noun' for verb executions,
 NB. and 'verb' for modifier executions
   select.
-  NB.?lintonly stack =. (verb,verb,verb,noun);"0<''
+  NB.?lintonly stack =. (verb,verb,verb,noun);"0 1 '';''
       if. (#PTpatterns) > pline =. 1 1 1 1 i.~ * PTpatterns bwand"1 ,>4 1{.stack do.
         exeblock =. (subj =. pline{PTsubj) # 4 {. stack  NB. the executable part
         exetypes =. > subj # , 4 1 {. stack   NB. the corresponding types
@@ -513,7 +514,7 @@ NB. and 'verb' for modifier executions
         stack =. ((subj i. 1){.stack),('dissecthook' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
       elseif. (bwand/ adv , exetypes) +. (conj = +/ conj bwand exetypes) do. NB. A A, C VN, NV C
   NB. This becomes an adverb type.  The value is the exeblock, which will be executed later
-        stack =. ((subj i. 1){.stack),(adv;exeblock; ; 2 {"1 exeblock),((>:subj i: 1)}. stack)
+        stack =. ((subj i. 1){.stack),(adv;exeblock;$0),((>:subj i: 1)}. stack)
       elseif. do.
         failmsg 'Invalid sequence: ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj)
         return.
@@ -575,10 +576,18 @@ NB. and 'verb' for modifier executions
       defnames =. (rname ,"0 1 ((0+256*noassignment);'')) , defnames
       
     case. 8 do.  NB. ( x ) - but remember the token numbers of the parens
-      insideop =. (<1 1) {:: stack
-      NB.?lintmsgsoff
-      tokensource__insideop =: tokensource__insideop , ; (<0 2;2) { stack
-      NB.?lintmsgson
+      if. (noun+verb) bwand 1 { exetypes do.
+        NB. If the stackop is a verb or noun, it has a locale & we should install the tokens there
+        insideop =. (<1 1) {:: stack
+        NB.?lintmsgsoff
+        tokensource__insideop =: tokensource__insideop , ; (<0 2;2) { stack
+        NB.?lintmsgson
+      else.
+        NB. If the stackop is a modifier, we add the tokens into those for the modifier.  They will
+        NB. eventually be added into a locale
+        stack =. (< ; (<0 1 2;2) { stack) (<1 2)} stack
+      end.
+
       stack =. (<<<0 2) { stack
       
   NB. If the stack did not have an executable combination, bring the next word onto the stack.
@@ -748,28 +757,35 @@ v4768539054_dissect_ =. y
 
 NB. Here to execute a modifier.  We do that when we encounter a modified verb.
 NB. This will be from VN A or VN C VN, but the A in VN A might be a compound adverb.
-NB. We detect that if the adverb'value is boxed rather than a string.  In that case we
+NB. We detect that if the adverb's value is boxed rather than a string.  In that case we
 NB. recur on the parts of the adverb.
 NB. y is the exeblock.
 NB. Result is a line to put on the stack, coming from the execution of the modifier
 execmod =: 3 : 0
-exetypes =. 0 {::"1 exeblock =. y
+exeblock =. y
 NB. If the modifier's value is boxed, it is a compound modifier, necessarily bident.  We will classify it as
-NB. C VN, VN C, or A A, and execute it as is sppropriate.
+NB. C VN, VN C, or A A, and execute it as is appropriate.
 if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
   select. (0 {::"1 modblock) i. conj
-    case. 0 do. NB. C VN
-      ntypeval =. execmod ({.exeblock),modblock
-    case. 1 do. NB. VN C
-      ntypeval =. execmod modblock,{.exeblock
-    case. do.  NB. A A
-      ntypeval =. execmod (execmod ({.exeblock),:{.modblock) ,: {: modblock
+  case. 0 do. NB. C VN
+    ntypeval =. execmod ({.exeblock),modblock
+  case. 1 do. NB. VN C
+    ntypeval =. execmod modblock,{.exeblock
+  case. do.  NB. A A
+    ntypeval =. execmod (execmod ({.exeblock),:{.modblock) ,: {: modblock
   end.
+  NB. We have guaranteed that every modifier line of modblock has been executed, but any tokens in the second
+  NB. line of exeblock have not been assigned to any modifier.  These must be parentheses that wrapped the compound
+  NB. modifier.  We will assign them to the top-level modifier that we just created
+  topmod =. 1 {:: ntypeval
+  NB.?lintmsgsoff
+  tokensource__topmod =: tokensource__topmod , (<1 2) {:: exeblock
+  NB.?lintmsgson
 else.
 NB. If the modifier and all the operands are self-defining terms, execute the modifier, figure out the resulting
 NB. part of speech, and create an appropriate type/value for it.  This will handle things like
 NB. 3 b.   and 1!:1   and  1 : '...' .
-  if. bwand/ sdt , exetypes do.
+  if. bwand/ sdt , 0 {::"1 exeblock do.
     ". 'exeobj =. ' , defstg =. ; 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. enparen y end.'&.> (1) {"1 exeblock
     tokennums =. ; 2 {"1 exeblock
     select. 4!:0 <'exeobj'
@@ -8108,7 +8124,6 @@ if. 1 = #y do.
   NB. kludge if this locale is dual, replace the dual in the path to preserve display hooks
   if. '.' e. cop do. insertoverride localedual end.
   NB. leave the . in the conjunction for titlestring purposes - it will be removed before use
-NB. obsolete   cop =: cop -. '.'
 NB. Now that we have changed conjunctions, we need to go figure the valences based on the new conjunction
   setvalence y  NB. This will be in the new locale
 else.
@@ -11794,8 +11809,8 @@ NB. The result is the DOL, up through the result of u
 NB. We do not create a cell; we just traverse u.  There is no visible indication of the rank operator, except in the
 NB. frames
 traverse =: endtraverse@:(4 : 0)
-NB. Set the title string to the actual characters the user used
-titlestring =: 0 fulltitlestring ; (<:tokensource) { ;: usersentence__COCREATOR   NB. decr tokensource to accoutn for MARK added
+NB. Set the title string to the actual characters the user used, sorted into order
+titlestring =: 0 fulltitlestring ; (<:tokensource) ({ /: [) ;: usersentence__COCREATOR   NB. decr tokensource to accoutn for MARK added
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
@@ -12520,6 +12535,11 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '5 6 +^:({.@]`[`])"0 (3 4)'
 2 dissect '(+ ])"0 i. 5'
 2 dissect '4&(+ ])"1 i. 2'
+2 dissect '+ ((&.>)/)(>@:) 6'
+2 dissect '+ ((&.>)/)(>@:) 5 6'
+2 dissect '(3x (&*) &1) 0 1 2'
+2 dissect '((3x&*) (&1)) 0 1 2'
+2 dissect '(3x(&*) (&1)) 0 1 2'
 )
 
 testsandbox_base_ =: 3 : 0
