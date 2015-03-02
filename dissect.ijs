@@ -16,6 +16,10 @@ NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).
 NB. take over the timer interrupt
 ALLOWNONQTTOOLTIP_dissect_ =: 1
 
+NB. We need to test everything with the different modes enabled.  These are the main defaults
+defaultuon2_dissect_ =: 0
+defaultcompmods_dissect_ =: 0
+
 NB. if any of the debugging switches is turned on, printf is required
 NOCLEANUP_dissect_ =: 0  NB. set to 1 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
@@ -39,15 +43,27 @@ DEBTIME_dissect_ =: 0  NB. Show elapsed times
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
+
+alltests__ =: 3 : 0
+defaultuon2_dissect_ =: 0
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+defaultuon2_dissect_ =: 1
+0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+defaultuon2_dissect_ =: 0
+defaultcompmods_dissect_ =: 1
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+defaultcompmods_dissect_ =: 0
+)
 0 : 0
-0!:1 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+alltests''
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. dissect '<.@(0.5&+)&.(10&*) 1.23 2.35 3.54 4.66 5.22'   turn on @ @: uses @ not &. for rankstack
 NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
 NB.   Also, set errorlevel at end, after the current node has fill marked
 NB.   Think about having multiple failurepoints, depending on {.errorlevel
-NB. if a recursion produces no result, flag that fact
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
 NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
 NB. support u . v y
@@ -786,7 +802,7 @@ minimumfontsizex =: 2   NB. font size to use in main window
 ttfontsizex =: 0   NB. tooltip font size
 tooltipdelayx =: 2  NB. tooltip delay
 tooltipdetailx =: 1   NB. tooltip detail level
-displaycompmods =: 0   NB. display full modified verb, not just modifier line
+displaycompmods =: defaultcompmods   NB. display full modified verb, not just modifier line
 displaystructmods =: 0   NB. display a line for @ @: & etc
 
 
@@ -1056,7 +1072,7 @@ maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
 maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 calccfms minimumfontsizex { FONTSIZECHOICES
 displaystealth =: 0
-displayautoexpand2 =: 0   NB. Automatically show u/ on 2 items as dyad
+displayautoexpand2 =: defaultuon2   NB. Automatically show u/ on 2 items as dyad
 displayshowfillcalc =: 0   NB. Make a rankstack mark when fill-cell is used
 displayprecisionx =: DISPLAYPRECCHOICESDEFAULT   NB. default display precision
 ('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue '1'
@@ -2471,14 +2487,14 @@ elseif. do.
   select. resultlevel
   NB. If the fillmask is boxed, the selresult is an expansion, or has a level, or is uncollectable.  In all
   NB. those cases, don't unbox the selresult, just box it into the shape/map of the fillmask.  But we still have
-  NB. to bring it to the correct shape, and we add fill (empty boxes) in case the execution was short.
+  NB. to bring it to the correct shape, and we add fill (box with one space, for ease in seeing the crosshatching) in case the execution was short.
   case. 0 do.
     NB. If this is L:, we must assemble the result using the result map (which has the same structure as the
     NB. fillmask)
     NB.?lintonly resultseqmap =: ''
-    resultseqmap (>@{) L:0 _ frame $!.a: y
+    resultseqmap (>@{) L:0 _ frame $!.(<' ') y
   case. 1;2 do.
-    tickettonatural ($x) $ y
+    tickettonatural ($x) $!.(<' ') y
   case. do.
   'cs fill fillreqd' =. checkframing y  NB. result cell size, fill atom (empty if unframable)
     NB. This is where we add fill as required
@@ -7864,6 +7880,8 @@ localeat_dissect_ =: 'dissectextendv' primlocale '@@:'
 NB. *** special arguments ***
 NB. cop starts with a space for hidden internal operations.  titlestring is always null, and we don't add an end-of-computation line
 NB. If cop is '[:', this is a capped fork and we display it that way
+NB. We may come here through & (which may be through &.), but only for monad, so in that case we leave the & unchanged, holding monad &[:];
+NB.  but we remove the . if any for exestring (no need to bother for defstring, since that is handled by dual)
 create =: 3 : 0
 if. 0 = bwand/ verb , > (<0 2;0) { y do.
   failmsg 'domain error: operands to ',((<1 1){::y),' must be verbs'
@@ -7915,7 +7933,7 @@ end.
 NB. return string form of operands, including instrumentation
 exestring =: 3 : 0
 initloggingtable ''
-auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') , ' ' , cop , ' (' , (exestring__vop '') , ')))'
+auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') , ' ' , (cop-.'.') , ' (' , (exestring__vop '') , ')))'
 )
 
 NB. Return the locales for propsel.  If we got here through capped fork, we have to format accordingly
@@ -8089,7 +8107,8 @@ if. 1 = #y do.
   changeobjtypeto localeat
   NB. kludge if this locale is dual, replace the dual in the path to preserve display hooks
   if. '.' e. cop do. insertoverride localedual end.
-  cop =: '@' 0} cop -. '.'
+  NB. leave the . in the conjunction for titlestring purposes - it will be removed before use
+NB. obsolete   cop =: cop -. '.'
 NB. Now that we have changed conjunctions, we need to go figure the valences based on the new conjunction
   setvalence y  NB. This will be in the new locale
 else.
@@ -8398,6 +8417,7 @@ NB.?lintonly uop =: <'dissectverb'
 NB. Now change this locale to &&: and create i&v
 NB. Replace the uop with the uop we just created
 NB. We leave the &. locale in the path, so that we can override
+NB. We leave the . in cop, as a flag to &&: that it will check and remove at setvalence
 create__localecompose f. (uop;cop) (<0 1;1)} y
 NB.?lintsaveglobals
 )
@@ -12523,6 +12543,6 @@ crash9 =: ([ [ 13!:8^:]@(9 e. ,))"0
 )
 
 0 : 0
-0!:1 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 )
