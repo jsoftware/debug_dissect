@@ -19,6 +19,7 @@ ALLOWNONQTTOOLTIP_dissect_ =: 1
 NB. We need to test everything with the different modes enabled.  These are the main defaults
 defaultuon2_dissect_ =: 0
 defaultcompmods_dissect_ =: 0
+defaultshowfillcalc_dissect_ =: 0
 
 NB. if any of the debugging switches is turned on, printf is required
 NOCLEANUP_dissect_ =: 0  NB. set to 1 for debugging to allow postmortem
@@ -53,6 +54,9 @@ defaultuon2_dissect_ =: 0
 defaultcompmods_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 defaultcompmods_dissect_ =: 0
+defaultshowfillcalc_dissect_ =: 1
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
+defaultshowfillcalc_dissect_ =: 0
 )
 0 : 0
 alltests''
@@ -60,11 +64,7 @@ alltests''
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '+ ((&.>)/)(>@:) 5' fails
 NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?
-NB. dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   no way to display the fill-cell error (when that is selected). Should promote codes to EEXEC etc when errorlevel is set?
-NB.   Also, set errorlevel at end, after the current node has fill marked
-NB.   Think about having multiple failurepoints, depending on {.errorlevel
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
 NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
 NB. support u . v y
@@ -1089,7 +1089,7 @@ maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 calccfms minimumfontsizex { FONTSIZECHOICES
 displaystealth =: 0
 displayautoexpand2 =: defaultuon2   NB. Automatically show u/ on 2 items as dyad
-displayshowfillcalc =: 0   NB. Make a rankstack mark when fill-cell is used
+displayshowfillcalc =: defaultshowfillcalc   NB. Make a rankstack mark when fill-cell is used
 displayprecisionx =: DISPLAYPRECCHOICESDEFAULT   NB. default display precision
 ('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue '1'
 
@@ -1142,7 +1142,8 @@ NB. y is 0 for normal traversal, or 1 for error traversal.  We initialize and tr
 NB. Called in instance locale
 traverse =: 3 : 0
 NB. Initialize for the traversal
-errorlevel =: 0$a:  NB. This will be the list of locales that raised a try indication (including for fillcell)
+NB. obsolete errorlevel =: 0$a:  NB. This will be the list of locales that raised a try indication (including for fillcell)
+errorlevelinit''
 snifferror =: y
 NB. We keep track of which monad/dyad execution is running, so that we can propagate all errors entirely
 NB. through the tree for that exec
@@ -1596,7 +1597,8 @@ NB. The following names are possibly modified after cloning.  Therefore, they mu
 NB. when the clone is created, so that a mod to the original doesn't affect the clone.
 (clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;($0);_;0;0;0;0
 
-NB.?lintonly valence =: errorlevel =: 0$a: [ snifferror =: 1
+NB.?lintonly valence =: 0$a: [ snifferror =: 1
+NB.?lintonly errorlevel =: 1 3$a:
 NB.?lintonly defstring =: ":
 NB.?lintonly resultissdt =: nounhasdetail =: nounshowdetail =: 0
 NB.?lintonly 'displayhandlesin displayhandleout displaylevrank fillmask' =: ($0);($0);(0 3$a:);($0)
@@ -1915,31 +1917,69 @@ dissect_dissectisi_paint 1
 )
 
 NB. ***************** traverse down ****************
-cocurrent 'dissectobj'
 
 NB. ****** error-level management ******
 
+cocurrent 'dissect'
 NB. errorlevel__COCREATOR is a list of locales that start an execution that may have a quiet error.
 NB. There are two cases: u :: v and fill-cells.  In each case we add the current locale to the
 NB. error list.
 NB.
 NB. The locale for u :: v is explicitly removed after u has executed, before v starts.  The locale
 NB. for a fill-cell is removed by endtraverse, that is, after every block completes.
-
-adderrorlevel =: 3 : 0
-errorlevel__COCREATOR =: (coname'') , errorlevel__COCREATOR
+errorlevelinit =: 3 : 0   NB. Called in locale of instance
+NB. The error-level record is (locale, single-level-boxed);type;(locale where the error is to be flagged, a: if no error found yet)
+errorlevel =: 0 3$a:
 )
 
+cocurrent 'dissectobj'
+ERRORLEVELNONE =: 0   NB. must be 0
+ERRORLEVELFILL =: 1
+ERRORLEVELADVERSE =: 2
+
+NB. stack a new errorlevel.  y is the type (must be ERRORLEVELFILL or ERRORLEVELADVERSE)
+adderrorlevel =: 3 : 0
+errorlevel__COCREATOR =: ((coname''),y;a:) , errorlevel__COCREATOR
+)
+
+NB. Remove the most recent errorlevel (used in adverse)
 remerrorlevel =: 3 : 0
 errorlevel__COCREATOR =: }. errorlevel__COCREATOR
 )
 
+NB. Remove the error level for the current locale if there is one (it had better be the top!)
 NB. Called after every traverse, so it must preserve its input
 endtraverse =: 3 : 0
-errorlevel__COCREATOR =:  errorlevel__COCREATOR -. (coname'')
+NB. If we are running a recoverable path (and not examining fill-cells), demote early errors back to non-fatal errors to avoid msg
+if. (-. displayshowfillcalc) *. ERRORLEVELFILL = {. > {. 1&{"1 errorlevel__COCREATOR do.
+  if. errorcode e. EEARLYERROR do. errorcode =: ENOEXECD end.
+end.
+if. (coname'') = {. 0{"1 errorlevel__COCREATOR do. errorlevel__COCREATOR =: }. errorlevel__COCREATOR end.
+assert. 0 = (coname'') e. {. 0{"1 errorlevel__COCREATOR
+NB. obsolete errorlevel__COCREATOR =:  errorlevel__COCREATOR -. (coname'')
 y
 )
 
+NB. Return the most recent error level
+geterrorlevel =: 3 : 0
+> {.!.(<ERRORLEVELNONE) 1 {"1 errorlevel__COCREATOR
+)
+
+NB. Indicate the locale of failure for recoverable errors.  If we have not previously seen an error
+NB. at this level, remember where we found the first one.  We will flag errors at that level
+setrecovflagpoint =: 3 : 0
+if. #errorlevel__COCREATOR do.
+  if. a: -: (<0 2) { errorlevel__COCREATOR do.
+    errorlevel__COCREATOR =: (coname'') (<0 2)} errorlevel__COCREATOR
+  end.
+end.
+''
+)
+
+NB. Nilad.  Return 1 if the current locale signals a recoverable error
+isrecovflagpoint =: 3 : 0
+(coname'') -: {. 2 {"1 errorlevel__COCREATOR
+)
 
 NB. utilities for traversal and selection
 NB. These are overridden as needed by individual modifiers.  The versions here work for simple verbs
@@ -1993,10 +2033,10 @@ NB.  ABORTED=no cells ran, and error was detected EXEC=cells ran, but one failed
 NB.  Values EOK and below are terminals; they should not be replaced.  Values above EOK indicate
 NB.  incomplete results; the lower a value, the more precise it is, so we will replace higher values
 NB.  with a lower during inheritu.
-(errorcodenames =: ;:'ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINADVERSE') =: _1 + i. 18
+(errorcodenames =: ;:'EFILLERROR ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINADVERSE') =: _2 + i. 19
 EEARLYERROR =: ENOAGREE,EINVALIDOP,EINVALIDVERB
 NB. If there were results to display, we will create a fillmask for them.  The cases follow:
-EHASVALIDFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK
+EHASVALIDFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EFILLERROR
 EHASFILLMASK =: EHASVALIDFILLMASK   NB. there are results, and a fillmask
 EFAILED =: EEARLYERROR,EABORTED,EEXEC,EFRAMING,ENOEXECD,EUNEXECD,EFRAMINGABORT,EFRAMINGEXEC,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK  NB. incomplete execution
 EALLFRAMING =: EFRAMING,EFRAMINGABORT,EFRAMINGEXEC   NB. framing error, with or without others
@@ -2061,11 +2101,12 @@ NB. Initialize the locales where detail is to come from.  We will inherit these 
 'sellevel rankhistory selopinfo' =: 3 {. y
 physreqandhighlights =: {.@> selopinfo
 inputselopshapes =: selopshapes =: , }.@> selopinfo
-if. errorlevel =: *#errorlevel__COCREATOR do.
-  e =. {. errorlevel__COCREATOR
-  NB.?lintonly frame_dissectobj_ =: 0 [ e =. <'dissectobj'
-  errorlevel =: (0 e. frame__e) { 2 1  NB. type 1 = fillcell; type 2 = adverse (the only other possibility)
-end.
+errorlevel =: geterrorlevel''
+NB. obsolete if. errorlevel =: *#errorlevel__COCREATOR do.
+NB. obsolete   e =. {. errorlevel__COCREATOR
+NB. obsolete   NB.?lintonly frame_dissectobj_ =: 0 [ e =. <'dissectobj'
+NB. obsolete   errorlevel =: (0 e. frame__e) { 2 1  NB. type 1 = fillcell; type 2 = adverse (the only other possibility)
+NB. obsolete end.
 opselin =: 0 2$a:  NB. initialize opselin to empty (=no selection)
 vranks =: getverbrank selopshapes
 NB. Non-atomic sellevel is a flag indicating that the nominal rank is to be ignored, because the verb runs at infinite rank
@@ -2166,7 +2207,7 @@ NB. Verb.  Get the frames of the verb and check for agreement error.
   NB. If the frame is invalid, we know that this verb is going to die before it executes; indicate agreement error
   NB. Clear the selector to short-circuit further processing
   -.@-:/ (<.&#&>/ {.&> ]) 2 {. execdframes,<$0 do.  NB. No agreement error on monad
-    NB. Here for verb with agreement error
+    NB. Here for verb with agreement error.
     'errorcode selector selopinfovalid selresult arglevel resultlevel frames selframe frame' =: ENOAGREE;(0$0);(0:"0 physreqandhighlights);(0$a:);($0);($0);execdframes;execdframe;execdframe
   elseif. a: -: 'selframe frame frames resultlevel arglevel' =: selopshapes calcdispframe execdframes do.
     NB. Partitioning verbs can detect agreement on infinite-rank operands eg.  (1 ]/. 2 3)
@@ -2223,12 +2264,21 @@ NB. Execution on a cell of fills.  We should have 0 or 1 result.  If 0, it means
 NB. execution on the cell of fills failed, and we will use a scalar numeric as the replacement
       assert. 0 1 e.~ #selx
 NB. create a result of the required type and shape
-      if. 0 = #selx do. selresult =: ,<0 else. selresult =: , ({.selx) { logvalues end.   NB. error in fill cell - use scalar numeric
+      if. 0 = #selx do.
+        selresult =: ,<0
+        NB. Since error-in-fill is automatically handled, it can't coexist with any other error, so
+        NB. we can signal the case with an errorcode, if we want to display that.
+        if. displayshowfillcalc do. errorcode =: EFILLERROR end.
+      else.
+        selresult =: , ({.selx) { logvalues
+      end.   NB. error in fill cell - use scalar numeric
 NB. we will extend fill-cell with frame
 NB. Keep selector unchanged, since there was just one cell in the operand and there still will be
       NB. fill-cells run, as it were, in a try block; if they fail, they do not show the error.
       NB. Start the try block here.  It will be removed by the endtraverse for this node
-      adderrorlevel''
+      adderrorlevel ERRORLEVELFILL
+      NB. Set the errorlevel for this cell.  We can never fail on the cell that creates the fill, so we use
+      NB. errorlevel as a flag to indicate whether the exec failed
       NB. If the user has asked for it, mark the rankhistory indicating the line at which the fillcell was substituted, by appending
       NB. '*' to any nonempty rank
       if. displayshowfillcalc do.
@@ -2250,33 +2300,41 @@ NB. Mark this cell as an execution error.  But if the selector is different, the
 NB. changed the selector to a later cell which didn't execute anything, or we have determined that this cell
 NB. was partially-executed because of an error elsewhere, and there's no error here.  In those case, we mark
 NB. the cell as partially-executed, with no error
-        if. (1 = snifferror__COCREATOR) *. 0 = errorlevel do.
-NB. See if incomplete operation represents failure.  It does for a verb, but not for something like u@v.  In general
-NB. we detect the failure at the same point J would: so 1.5 u/ y would fail on u/
-          if. operationfailed'' do. setfailurepoint selector end.
-NB. Continue narrowing the search for the error
-NB. If there is a frame, select the first non-executing cell.  For us to get here, any selectable higher levels
-NB. must have selected, so we will be adding to a selection chain.
+        if. operationfailed'' do. 
+          NB. See if incomplete operation represents failure.  It does for a verb, but not for something like u@v.  In general
+          NB. we detect the failure at the same point J would: so 1.5 u/ y would fail on u/
+
+          NB. Always signal failure in the current traversal.  We use this for flagging recoverable errors
+          setrecovflagpoint ''
+          NB. If we are in the search for a failure, and this might be it (i. e. it's not recoverable), remember where it is
+          if. (1 = snifferror__COCREATOR) *. ERRORLEVELNONE = errorlevel do. setfailurepoint selector end.
+        end.
+
+        if. (1 = snifferror__COCREATOR) *. ERRORLEVELNONE = errorlevel do.
+        NB. Continue narrowing the search for the error
+        NB. If there is a frame, select the first non-executing cell.  For us to get here, any selectable higher levels
+        NB. must have selected, so we will be adding to a selection chain.
           if. #failingisf =. selframe getfailingisf #selx do. 
-NB. we should have had errors at higher levels, which will have set the previous selectors
+            NB. we should have had errors at higher levels, which will have set the previous selectors
             assert. sellevel <: #selections  [ 'error in sniff'
-NB. During sniff, each error is propagated down separately.  We append the new error to the previous.
-NB. We know the previous exists, but there might be more, if we have sniffed error before; so we
-NB. append the calculated selector to the selectors valid for this node
-NB.
-NB. In normal debugging, selectors are added from the root outward.  If a selection is made above
-NB. the root, we don't propagate the selection back to the root, on the theory that if the user
-NB. wanted to select at the root, they could have.
-NB. The error selector must have the correct structure for the current node
+            NB. During sniff, each error is propagated down separately.  We append the new error to the previous.
+            NB. We know the previous exists, but there might be more, if we have sniffed error before; so we
+            NB. append the calculated selector to the selectors valid for this node
+            NB.
+            NB. In normal debugging, selectors are added from the root outward.  If a selection is made above
+            NB. the root, we don't propagate the selection back to the root, on the theory that if the user
+            NB. wanted to select at the root, they could have.
+            NB. The error selector must have the correct structure for the current node
             makeselection , failingisf
             QP^:DEBTRAVDOWN 'edisp'''' $selections selections '
           end.
         end.
-NB. Set the errorcode: if we are at the failure point, indicate the appropriate type of error; otherwise
-NB. just call it unexecuted
-        errorcode =: (#. (selector -: pointoffailure) , cellswereexecuted #selx) { ENOEXECD,EUNEXECD , EABORTED,EEXEC
+        NB. Set the errorcode: if we are at the failure point, indicate the appropriate type of error; otherwise
+        NB. just call it unexecuted
+        reporterror =. (selector -: pointoffailure) +. displayshowfillcalc *. isrecovflagpoint''
+        errorcode =: (#. reporterror , cellswereexecuted #selx) { ENOEXECD,EUNEXECD , EABORTED,EEXEC
       end.
-NB. We need to save the selected value.  We use this to calculate the predicted frame after collection.
+      NB. We need to save the selected value.  We use this to calculate the predicted frame after collection.
       selresult =: selx { logvalues NB. This is the (unopened, since it might not collect) result from this object's verb, in execution order
     end.
     
@@ -2392,7 +2450,8 @@ NB. The node can collect.  Calculate the per-atom part of fillmask, which indica
 NB. If the result contains dissimilar types, raise an error.  Treat empty as no type
       else.   NB. If framing error, so indicate
 NB. Framing error is always fatal; stop any ongoing sniff
-        if. (1 = snifferror__COCREATOR) *. 0 = errorlevel do. setfailurepoint selector end.
+        setrecovflagpoint''   NB. Indicate failure for recoverable errors
+        if. (1 = snifferror__COCREATOR) *. ERRORLEVELNONE = errorlevel do. setfailurepoint selector end.
         errorcode =: EFRAMING
         resultlevel =: 2   NB. Signify 'collection error'
       end.
@@ -2683,6 +2742,7 @@ NB. If u@v did not fail, but u did, ignore it - it must be a fill-cell
 if. errorcode <: EOK do.
   if. errorcode__loc e. EFAILED do.
     assert. 0 e. frame  [ 'u failed but u@v succeeded'
+  elseif. errorcode__loc = EFILLERROR do. errorcode =: errorcode__loc
   end.
   
 NB. If u has the error source then u@v should have failed short.   If u@v has no results,
@@ -3024,9 +3084,6 @@ sel =. sval # oval {:: selector;selector;<a:
 (bnsellevel , rh ;< opinfo) , sel
 )
 
-NB. Custom selection, used in picking.  If this returns 1, it means that the pick has been handled in the locale
-selectionoverride =: 0:
-postselectionoverride =: 0:
 
 NB. **************** code for display objects *********************
 
@@ -3571,6 +3628,12 @@ STATUSTEXTCOLOR =: 255 255 255
 STATUSFONT =: FONTIMSG
 STATUSFONTSIZE =: 2
 STATUSMARGIN =: 1
+NB. for recoverable status messages
+ISTATUSCOLOR =: 255 255 255
+ISTATUSTEXTCOLOR =: 255 0 0
+ISTATUSFONT =: FONTIMSG
+ISTATUSFONTSIZE =: 2
+ISTATUSMARGIN =: 1
 NB. for the user's sentence
 SATZCOLOR =: 190 190 190
 SATZTEXTCOLOR =: 0 0 0
@@ -3661,10 +3724,12 @@ calccfms =: 3 : 0
 nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;NOUNFONT;(y+NOUNFONTSIZE);NOUNMARGIN
 nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
+nouncfm =: nouncfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(y+ISTATUSFONTSIZE);ISTATUSMARGIN
 
 verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(y+VERBFONTSIZE);VERBMARGIN
 verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
 verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
+verbcfm =: verbcfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(y+ISTATUSFONTSIZE);ISTATUSMARGIN
 
 cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
 
@@ -3948,7 +4013,7 @@ NB. result is 0 if we created the object, 1 if it was omitted
 createDOvn =: 3 : 0
 NB.?lintonly DOcfm =: 4 # <1 4$a: [ valueformat =: 4$a: [ DOyx =: 0 0 [ DOrankcfm =: 2 0 $ a:
 if. #y do. DOcfm =: y end.
-'cfmlabel cfmshape cfmstatus' =. DOcfm
+'cfmlabel cfmshape cfmstatus cfmimsgs' =. DOcfm
 QP^:DEBDOvn 'createDOvn:?> coname''''%defstring 0%stealthoperand%'
 NB. If this node is a stealth operand, whether displayed or not, remember the fact so we can give the user the option of showing it
 assert. stealthoperand e. 0 1 2 3 5 6
@@ -4012,16 +4077,22 @@ NB. Account for error string, if any; 0 0 if none
 NB. If we are not in a try block, allow display of error only at the place where the error was detected
 NB. during sniff.  This handles the case where the user makes a selection after sniff, and then there is
 NB. no error detected at the point of error, and the enclosing conjunction shows its error.
-if. errorwasdisplayedhere +. *errorlevel do.
-  DOstatusstring =: ((6 2 3 2 1#'';'agreement';'framing';'invalid verb';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOUN,EOK,ENOEXECD,EUNEXECD,ENOOPS,ENOSEL,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EINADVERSE) i. errorcode
-else.
+if. errorwasdisplayedhere +. errorlevel ~: ERRORLEVELNONE do.
+  DOstatusstring =: ((6 2 3 2 1 1#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOUN,EOK,ENOEXECD,EUNEXECD,ENOOPS,ENOSEL,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,EINADVERSE) i. errorcode
+elseif. do.
   DOstatusstring =: ''
 end.
 if. #DOstatusstring do.
 NB. If this failure is in a try path, parenthesize the error
-  if. errorlevel do. DOstatusstring =: '(' , DOstatusstring , ')' end.
-  thw =. cfmstatus sizetext <DOstatusstring
+  if. (*errorlevel) +. errorcode e. EFILLERROR,EINADVERSE do.
+    DOstatusstring =: '(' , DOstatusstring , ')'
+    DOcfmstatus =: cfmimsgs
+  else.
+    DOcfmstatus =: cfmstatus
+  end.
+  thw =. DOcfmstatus sizetext <DOstatusstring
 else. thw =. 0 0
+  NB.?lintonly DOcfmstatus =: cfmimsgs
 end.
 statusdesc =. ALIGNSPREAD addalignmentrect thw
 
@@ -4753,7 +4824,7 @@ NB. These local variables cover the global names inside this routine (kludge).  
 'hwnd hwindex explorable DOyx DOsize DOlabelpos DOshapepos DOstatuspos DOdatapos displayscrollbars pickrects scrollpoint' =. y
 wd 'psel ' , hwnd
 glsel 'dissectisi'
-'cfmlabel cfmshape cfmstatus' =. DOcfm
+'cfmlabel cfmshape cfmstatus cfmimsgs' =. DOcfm
 SM^:DEBDOL 'drawDOvn: ' , > coname''
 NB. Save the position of the object, and as a 2x2
 actyx2 =. 0 ,:~ DOyx
@@ -4796,7 +4867,7 @@ end.
 
 NB. draw the status string, if any
 if. statuspresent do.
-  cfmstatus drawtext DOstatusstring;actyx2 + DOstatuspos
+  DOcfmstatus drawtext DOstatusstring;actyx2 + DOstatuspos
 end.
 
 
@@ -5812,6 +5883,10 @@ Execution took too long.
 Execution of this verb attempted to use a name that has not been assigned.
 ?recoverable error
 This verb failed, but execution continues with the verb given by the :: conjunction.
+?0 for fill result
+Execution on the cell of fills for this block failed.  Execution continues here as if the execution had produced 0.
+?error on fill-cell
+This block is part of an execution on a cell of fills started in another block.  This block failed.  Execution continues in the block that had the fill-cell, as if the execution on the fill-cell had produced 0.
 )
 
 hoverDOstatuspos =: 4 : 0
@@ -5916,14 +5991,20 @@ text
 
 FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
 
-'PICKTOOLTIPMSGOK PICKTOOLTIPMSGNOFRAME PICKTOOLTIPMSGNOSELYET PICKTOOLTIPMSGPREVERR PICKTOOLTIPMSGEMPTY PICKTOOLTIPMSGNOMORESEL' =: i. # PICKTOOLTIPMSGS =: <;._2 (0 : 0)
+'PICKTOOLTIPMSGOK PICKTOOLTIPMSGNOFRAME PICKTOOLTIPMSGNOSELYET PICKTOOLTIPMSGPREVERR PICKTOOLTIPMSGEMPTY PICKTOOLTIPMSGNOMORESEL PICKTOOLTIPMSGNOORIDE' =: i. # PICKTOOLTIPMSGS =: <;._2 (0 : 0)
 
 unselectable - no frame
 you must make a higher-level selection before you can select this result
 cell was not executed - previous error
 frame contains 0 - there are no items to select
 no further selection possible
+
 )
+
+NB. Custom selection, used in picking.  If this returns 1, it means that the pick has been handled in the locale
+selectionoverride =: PICKTOOLTIPMSGNOORIDE"_
+postselectionoverride =: 0:
+
 NB. For all these verbs, x is (button flags,view number), y is the yx position of the click relative to start of pickrect
 
 picklDOdatapos =: 4 : 0
@@ -5984,7 +6065,7 @@ NB. to show the selected cell at top-left
     end.
     dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
   else.
-NB. User tried to select, but we couldn't do it.  Give him a tooltip.  0=no frame, _1=no further selection, _2=empty operand, _3=unexecuted cell
+NB. User tried to select, but we couldn't do it.  Give him a tooltip.
     NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
@@ -6373,7 +6454,7 @@ recursiveselection =: 3 : 0
 0 _1 recursiveselection y
 :
 NB. First, try custom selection, and if it made a change, return fast since it finished the pick
-if. t =. selectionoverride'' do. t return. end.
+if. PICKTOOLTIPMSGOK = selectionoverride'' do. PICKTOOLTIPMSGOK return. end.
 'inslevel prevcellrank' =. x
 QP^:DEBPICK'selecting in ?defstring]0%coname''''%x%y%initialselection%sellevel%selections%selframe%frame%resultlevel%'
 selectionfound =. 0    NB. scalar = no selection
@@ -11305,7 +11386,7 @@ if. blockismarkable =: blockismarked do.
   xx =. (</ estheights__uop ,: estheights__vop) |."0 2 (,: createreference)"1 x
   dol =. joinlayoutsl (1 {"2 xx) traverse__vop (<'::')&((<_1 0)})`'' travops (TRAVOPSKEEPALL);TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
   NB. Indicate error level before running u
-  adderrorlevel''
+  adderrorlevel ERRORLEVELADVERSE
   ures =. (0 {"2 xx) traverse__uop travops (TRAVOPSKEEPALL);TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
   NB. However u failed, replace it with the 'failure in u :: v' code
   errorcode__uop =: EINADVERSE
@@ -11383,9 +11464,9 @@ NB. If this block is markable, toggle the mark; otherwise nothing
 selectionoverride =: 3 : 0
 if. blockismarkable do.
   blockismarked =: -. blockismarked
-  1
+  PICKTOOLTIPMSGOK
 else.
-  0
+  PICKTOOLTIPMSGNOORIDE
 end.
 )
 
@@ -12489,7 +12570,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(0&$);.1 ''abcadabcda'''
 2 dissect '(0 2 $ ,:);.1 ''abcadabcda'''
 2 dissect '(0 2 $ crash9_dissect_"0);.1 (0 1 0 2 3 0 4 9 0 5 6)'
-2 dissect '0 (1 2 3 , ])"0 $0'
+2 dissect '0 (1 2 3 , ])"0 $0'   NB. $FILL$
 2 dissect '0 ([: 1 2 3"0 $)"0 $0'
 2 dissect '0 (+ - ]) '''''
 2 dissect '0 (1 2 3 - *)"0 $0'
@@ -12501,7 +12582,6 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '([: crash9_dissect_"0 (2) # ,&9)"0 $0'
 2 dissect '(3 , ([: crash9_dissect_"0 (2) # ,&9)"0)"1 i. 2 0'
 2 dissect '(3 , ([: crash9_dissect_"0 (2) # ,&9)"0)"1 i. 2 0 1'
-2 dissect '2x&*&1&1 (2)'
 2 dissect 'crash9_dissect_ 9 , 1 (5 , +)"0 '''''
 2 dissect '(i. 2) ([: crash9_dissect_"0 (2) # 9 ,~ ])"0 i. 2 0 1'
 2 dissect '(i. 2) ([: crash9_dissect_"0 (2) # 9 ,~ ])"0 :: + i. 2 0 1'
@@ -12509,7 +12589,9 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect 'crash9_dissect_ ([: crash9_dissect_ 9 , (5 , +)"0) :: (9 $~ ])  '''''  NB. error in fill, then error in u ::, then later error
 2 dissect '5 (6 + '' '' + 4 , +)"0 i. 2 0'   NB. error during fill-cell calc
 2 dissect '5 (6 + 5 + 4 , +)"0 i. 2 0'   NB. No error, result has shape 2
-2 dissect '5 ('' '' + 5 + 4 , +)"0 i. 2 0'   NB. error at end of fillcell calc
+2 dissect '(,5) + 5 (5 + 6 5 4 3 2 1 + 4 , +)"0 i. 2 0'
+2 dissect '5 ('' '' + 5 + 4 , +)"0 i. 2 0'   NB. error at end of fillcell calc   $FILL$
+2 dissect '2x&*&1&1 (2)'
 2 dissect '(i. 2) +:@]"2 i. 2'  NB. inheritance of one-sided rank stack
 2 dissect '(i. 2  2 2) +:@]"2 i. 2'
 2 dissect '(i. 2  2 2) +:@["2 i. 2'
