@@ -64,22 +64,28 @@ alltests''
 testsandbox_base_ 1
 )
 NB. TODO:
+NB. dissect '(13!:8)^:(9=])"0@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   good sentence for multilevel fill
+NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   good sentence for multilevel fill
+NB. dissect 'i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   fill/result display is wrong.
+NB.   take maxcellresultshape for each loc; then, on partitions ending at a dropdown, use the tails of the
+NB.   first (=max) cellresultshape; this will be the fillinfo for the next cell.  Show fill if the
+NB.   DOshape doesn't match the lead values of the tail for the level
+NB. config file
+NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
 NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
 NB. support u . v y
-NB. dissect '+:`*:@.(2&|)"0 i. 5'  reselecting result does not remove expansion - because the selection is in " .  Should that remove selection?
-NB.  probably not, since that would penalize overclicking on verbs.  But then how to handle @.?  Should it have a selection toggle?  Then how would that be reset?
 NB. Use box trick to avoid special case in ;.3
 NB. Add rank-calculus for primitives with known behavior
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
-NB. errorwasdisplayedhere is always 1 if there was no error.  OK?
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name.  Assignments to noun operands?
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
 NB. can simplify combineyxsels
-NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
+
+NB. router:
 NB. Add single-jog to router options to avoid down-and-up turn
 NB. deep-freeze routing points that are far from dests?
 
@@ -1542,7 +1548,7 @@ NB. Set ishighlightnode for as many levels as there are selections (so clicking 
 prophighlightnode =: 'propselall'&((3 : 'if. y >: 0 do. ishighlightnode =: 1 end. <: y') traversedown 0:)
 
 NB. called after sniff to indicate which nodes can have an error display
-setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: {. ".''*#DOstatusstring''') traversedown 0:)
+setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: -. '' ('' e.~ {.!.'' '' ".''DOstatusstring''') traversedown 0:)
 
 NB. init SDT-display flag in all objects.  y is the value to set
 NB. Called in locale of the base of the tree
@@ -3630,7 +3636,7 @@ STATUSFONTSIZE =: 2
 STATUSMARGIN =: 1
 NB. for recoverable status messages
 ISTATUSCOLOR =: 255 255 255
-ISTATUSTEXTCOLOR =: 255 0 0
+ISTATUSTEXTCOLOR =: 255 128 128
 ISTATUSFONT =: FONTIMSG
 ISTATUSFONTSIZE =: 2
 ISTATUSMARGIN =: 1
@@ -3693,7 +3699,7 @@ HIGHLIGHTCOLORS =:  <. (*    1 <. 110 % RGBTOLUMINANCE) (0 0 0 (0}) SHAPECOLORS)
 NB. Colors to use for empty, including a checkerboard
 EMPTYCOLORS =: <. (120 120 120)  *"1/ 1 1 1 ,: 0 0 0
 
-FRINGECOLOR =: (128 128 128 , 200 200 0 , 255 0 0 ,: 255 255 255) ;"1 (0 0 0 1)   NB. color/border of fringes: in order label,shape,status,data
+FRINGECOLOR =: (128 128 128 , 200 200 0 , 255 128 128 ,: 255 255 255) ;"1 (0 0 0 1)   NB. color/border of fringes: in order label,shape,status,data
 
 DOBORDERCOLORS =: _3 ]\ 0 0 255 0 0 255  0 0 0  255 0 0   NB. Black border for box, but red if incomplete, blue if empty
 RANKCOLOR =: 0 0 255  NB. color of dashed line for high-rank ops
@@ -4084,7 +4090,7 @@ elseif. do.
 end.
 if. #DOstatusstring do.
 NB. If this failure is in a try path, parenthesize the error
-  if. (*errorlevel) +. errorcode e. EFILLERROR,EINADVERSE do.
+  if. (errorlevel ~: ERRORLEVELNONE) +. errorcode e. EFILLERROR,EINADVERSE do.
     DOstatusstring =: '(' , DOstatusstring , ')'
     DOcfmstatus =: cfmimsgs
   else.
@@ -4114,7 +4120,7 @@ NB. If the last verb does not allow a selection (ex: i.@>), remove it from the s
   NB. For each selection level, and for one more level representing the result of the last level, we create the shape display, which is
   NB.   shape [optional (filledsize) if this selection requires fill]
   NB. For each selecting level, get the fill info for the NEXT level, i. e. the result of the selecting level
-  fillinfo =. a: , 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(":maxcellresultshape__y),'')'''"0 DOshapelocales
+  fillinfo =. a: , 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(": maxcellresultshape__y),'')'''"0 DOshapelocales
   NB. Each box in DOshapes represents a frame.  If a frame contains 0, indicate that fact by putting * after the frame
   NB. We don't put * in for the last (result) box if there is one
   NB. Display of * is only performed when the user asks for it
@@ -6003,7 +6009,7 @@ no further selection possible
 
 NB. Custom selection, used in picking.  If this returns 1, it means that the pick has been handled in the locale
 selectionoverride =: PICKTOOLTIPMSGNOORIDE"_
-postselectionoverride =: 0:
+postselectionoverride =: PICKTOOLTIPMSGNOORIDE"_
 
 NB. For all these verbs, x is (button flags,view number), y is the yx position of the click relative to start of pickrect
 
@@ -6558,7 +6564,7 @@ if. #$selectionfound do.
 else.
   NB. Before we leave this block to look at the next, give the block a chance to perform an action
   NB. Returns nonzero if it handled the pick
-  if. t =. postselectionoverride'' do. t return. end.
+  if. PICKTOOLTIPMSGOK = postselectionoverride'' do. PICKTOOLTIPMSGOK return. end.
   SM^:DEBPICK'recursion'
   NB. get locale to use next; if empty, use our closer locale
   if. 0 = #recurloc =. getnextpickloc'' do. recurloc =. <'dissect' end.
@@ -7461,6 +7467,7 @@ NB. be displayed if it ever reaches a collector.
 NB. The result is  DOL ,&< locale  where DOL is the accumulated display (leading up to the current result),
 NB.   and locale is the current result, to be displayed eventually
 traverse =: endtraverse@:(4 : 0)
+hasrecursiveexpansion =: 0  NB. no expansion, unless we do it later
 nounhasdetail =: 0  NB. No detail, unless we suppress history later
 traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs here
 ylayo =. x traverse__yop TRAVNOUN
@@ -7468,13 +7475,13 @@ NB. If a noun operand failed, pull the plug and display only that result
 if. errorcode__yop > EOK do. ylayo return. end.  NB. If the noun failed, this node must have failed too
 NB. put this locale on the stack as the outermost monad/dyad execution
 executingmonaddyad__COCREATOR =: executingmonaddyad__COCREATOR ,~ coname''
-if. 1 = #ures =. (joinlayoutsl`<@.recursionhere ylayo) traverse__uop travops TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW;(uopval yop);<<selresultshape__yop do.
+if. hasrecursiveexpansion =: 1 = #ures =. (joinlayoutsl`<@.recursionhere ylayo) traverse__uop travops TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW;(uopval yop);<<selresultshape__yop do.
   NB. If we don't have a locale-name to inherit from, it means that uop was an expansion node
   NB. and it took over the display of u.  We must display the result here separately.
   'displayhandlesin displayhandleout displaylevrank' =: ((,0));1;<,: 'Result after all recursions';(coname''),<_
   ures =. ures ,< coname''
 else.
-  ures =. 1 0 inheritu ures  NB. Don't inherit stealh - we want to show a result
+  ures =. 1 0 inheritu ures  NB. Don't inherit stealth - we want to show a result
 end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
@@ -7504,6 +7511,16 @@ else.
   res =. 0 2$a:
 end.
 res
+)
+
+NB. Called when we have passed through this block without performing a selection.  If we have
+NB. a recursive expansion block, this is how we remove it
+postselectionoverride =: 3 : 0
+if. hasrecursiveexpansion do.
+  makeselection 0$a:
+  PICKTOOLTIPMSGOK
+else. PICKTOOLTIPMSGNOORIDE
+end.
 )
 
 cocurrent 'dissectdyad'
@@ -7570,6 +7587,7 @@ NB. We do not display u: we pass its display information back so that it can eve
 NB. be displayed if it ever reaches a collector.
 NB. The result is the DOL, up through the result of u
 traverse =: endtraverse@:(4 : 0)
+hasrecursiveexpansion =: 0  NB. no expansion, unless we do it later
 nounhasdetail =: 0  NB. No detail, unless we suppress history later
 traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs here
 ylayo =. x traverse__yop TRAVNOUN
@@ -7578,7 +7596,7 @@ xlayo =. x traverse__xop TRAVNOUN
 if. errorcode__xop > EOK do. xlayo return. end.
 NB. put this locale on the stack as the outermost monad/dyad execution
 executingmonaddyad__COCREATOR =: executingmonaddyad__COCREATOR ,~ coname''
-if. 1 = #ures =. (xlayo ,&(joinlayoutsl`<@.recursionhere) ylayo) traverse__uop travops TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW;(uopval xop,yop);<selresultshape__xop ,&< selresultshape__yop do.
+if. hasrecursiveexpansion =: 1 = #ures =. (xlayo ,&(joinlayoutsl`<@.recursionhere) ylayo) traverse__uop travops TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW;(uopval xop,yop);<selresultshape__xop ,&< selresultshape__yop do.
   NB. If we don't have a locale-name to inherit from, it means that uop was an expansion node
   NB. and it took over the display of u.  We must display the result here separately.
   'displayhandlesin displayhandleout displaylevrank' =: ((,0));1;<,: 'Result after all recursions';(coname''),2#<_
@@ -7615,6 +7633,8 @@ else.
 end.
 res
 )
+
+postselectionoverride =: postselectionoverride_dissectmonad_ f.
 
 cocurrent 'dissectrecursionpoint'
 coinsert 'dissectobj'
@@ -10587,6 +10607,18 @@ end.
 res
 )
 
+NB. When a single result of /. is selected, it creates an expansion.  There can be
+NB. no further selection in this block.  If the same result is reselected, we remove the expansion
+NB. Called when we have passed through this block without performing a selection.  If this block is already selected,
+NB. that means we have an expansion, and we should remove it
+postselectionoverride =: 3 : 0
+if. selectable *. sellevel < #selections do.
+  makeselection 0$a:
+  PICKTOOLTIPMSGOK
+else. PICKTOOLTIPMSGNOORIDE
+end.
+)
+
 NB. conjunction partitions ;.
 cocurrent 'dissectpartitionconjunction'
 coinsert 'dissectpartition'  NB. for lint
@@ -11301,8 +11333,8 @@ NB. that means we have an expansion, and we should remove it
 postselectionoverride =: 3 : 0
 if. selectable *. sellevel < #selections do.
   makeselection 0$a:
-  1
-else. 0
+  PICKTOOLTIPMSGOK
+else. PICKTOOLTIPMSGNOORIDE
 end.
 )
 
@@ -11528,7 +11560,7 @@ NB. Any selection in the recursion result is passed to the recursion point.
 NB. We have saved the locale of the recursion point, and 
 selectionoverride =: 3 : 0
 selectrecursion__uop__recursionpoint currentticket
-1  NB. Indicate that we have overridden, abort selection
+PICKTOOLTIPMSGOK  NB. Indicate that we have overridden, abort selection
 )
 
 NB. **** default ****
@@ -12622,6 +12654,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(3x (&*) &1) 0 1 2'
 2 dissect '((3x&*) (&1)) 0 1 2'
 2 dissect '(3x(&*) (&1)) 0 1 2'
+2 dissect 'i.@>@> z' [ z =. (<2 3);(,:2;3);<<"1]3 2 $2 5 2 3 2 4
 )
 
 testsandbox_base_ =: 3 : 0
