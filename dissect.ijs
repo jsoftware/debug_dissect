@@ -16,11 +16,6 @@ NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).
 NB. take over the timer interrupt
 ALLOWNONQTTOOLTIP_dissect_ =: 1
 
-NB. We need to test everything with the different modes enabled.  These are the main defaults
-defaultuon2_dissect_ =: 0
-defaultcompmods_dissect_ =: 0
-defaultshowfillcalc_dissect_ =: 0
-
 NB. if any of the debugging switches is turned on, printf is required
 NOCLEANUP_dissect_ =: 0  NB. set to 1 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
@@ -46,17 +41,17 @@ SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 
 alltests__ =: 3 : 0
-defaultuon2_dissect_ =: 0
+config_displayautoexpand2_dissect_ =: 0
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-defaultuon2_dissect_ =: 1
+config_displayautoexpand2_dissect_ =: 1
 0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-defaultuon2_dissect_ =: 0
-defaultcompmods_dissect_ =: 1
+config_displayautoexpand2_dissect_ =: 0
+displaycompmods_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-defaultcompmods_dissect_ =: 0
-defaultshowfillcalc_dissect_ =: 1
+displaycompmods_dissect_ =: 0
+config_displayshowfillcalc_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
-defaultshowfillcalc_dissect_ =: 0
+config_displayshowfillcalc_dissect_ =: 0
 )
 0 : 0
 alltests''
@@ -64,13 +59,6 @@ alltests''
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. dissect '(13!:8)^:(9=])"0@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   good sentence for multilevel fill
-NB. dissect 'crash9_dissect_@i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   good sentence for multilevel fill
-NB. dissect 'i.@>@> z' [ z =. 2 3;(2;3);<<"1]2 2 $2 5 2 3   fill/result display is wrong.
-NB.   take maxcellresultshape for each loc; then, on partitions ending at a dropdown, use the tails of the
-NB.   first (=max) cellresultshape; this will be the fillinfo for the next cell.  Show fill if the
-NB.   DOshape doesn't match the lead values of the tail for the level
-NB. config file
 NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
@@ -122,6 +110,76 @@ z458095869 =: (([ ,. <"0@] ,. (".@[`(rankinv_dissect_@[)`(rankinv_dissect_@[)`(r
 require 'strings gl2'
 cocurrent 'dissect'
 coinsert 'jgl2'
+
+NB. lines beginning config_ are names that are initialized in the instance from the globals here
+NB. the others are global, shared amond running dissections
+CONFIG =: 0 : 0
+minimumfontsizex =: 2   NB. font size to use in main window
+ttfontsizex =: 0   NB. tooltip font size
+tooltipdelayx =: 2  NB. tooltip delay
+tooltipdetailx =: 1   NB. tooltip detail level
+displaycompmods =: 0   NB. display full modified verb, not just modifier line
+displaystructmods =: 0   NB. display a line for @ @: & etc
+config_maxnoundisplaysizex =: 3 3
+config_displaystealth =: 0
+config_displayautoexpand2 =: 0   NB. Automatically show u/ on 2 items as dyad
+config_displayshowfillcalc =: 0  NB. Make a rankstack mark when fill-cell is used
+config_displayprecisionx =: 2   NB. default display precision
+)
+
+NB. Read & apply config file.  Run in dissect locale
+loadconfig =: 3 : 0
+try.
+  cfile =. 1!:1 <jpath '~config/dissect.ijs'
+catch.
+  cfile =. CONFIG
+end.
+NB. Remove CR, force LF termination
+cfile =. LF ,~^:(~: {:) cfile -. CR,TAB
+0!:0 cfile
+0 0$0
+)
+
+NB. Read the config file at startup
+loadconfig''
+
+NB. Write current settings to config file.  Called in the instance that we want to save
+saveconfig =: 3 : 0
+NB. Get the variable names we want to save under
+cnames =. {.@;:;._2 CONFIG
+NB. Get the name to save from - same with config removed, so we get the instance value
+inames =. ('config_' (#@[ }. ])^:([ -: #@[ {. ]) ])&.> cnames
+NB. create log string
+cdata =. ; cnames <@(LF ,~ >@[ , ' =: ' , 5!:5@])"0 inames
+try.
+  cdata 1!:2 <jpath '~config/dissect.ijs'
+catch.
+  wdinfo 'Error creating config file';'Unable to write config file'
+end.
+0 0$0
+)
+
+NB. Apply config variables to the current instance.  Called in the instance locale
+applyconfig =: 3 : 0
+inames =. a: -.~ (#~   'config_' -: 7&{.)&.>@{.@;:;._2 CONFIG
+NB. All names starting config_ become instance names losing the config_
+(7 }.&.> inames) =: ".&.> inames
+NB.?lintonly minimumfontsizex =: ttfontsizex =: tooltipdelayx =: tooltipdetailx =: displaycompmods =: displaystructmods =: 0
+NB.?lintonly maxnoundisplaysizex =: 0 0 [ displaystealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: 0
+NB. We have to set the form after loading the values
+('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '1'
+('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '1'
+('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '1'
+('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '1'
+('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0 ,~ tooltipdelayx) wdsetvalue '1'
+('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0 ,~ tooltipdetailx) wdsetvalue '1'
+maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
+('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue '1'
+calccfms minimumfontsizex { FONTSIZECHOICES
+NB. The rest of the form settings are performed each traversal
+0 0$0
+NB.?lintsaveglobals
+)
 
 dissectinstance =: 0$a:
 
@@ -671,7 +729,12 @@ NB. and 'verb' for modifier executions
           NB. adverb: handle the special code (currently only &.>)
           NB. If the value of the user name matches special code, expand it on the stack
           if. objval -: '&.>' do.
-            ntypeval =. (conj;'&.';(#queue)) ,: createverb (,'>');(0$0)
+            NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
+            NB. adverb on the stack, rather than conj verb, to avoid a parse error (if we had
+            NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
+            NB. eventually execute verb N0 erroneously
+            ntypeval =. adv ; ((conj;'&.';(#queue)) ,: createverb (,'>');(0$0)) ; $0
+NB. obsolete            ntypeval =. (conj;'&.';(#queue)) ,: createverb (,'>');(0$0)
           else.
             NB. If the value of the user name matches a supported primitive, replace the name by the supported value
             ntypeval =. adv;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
@@ -819,24 +882,15 @@ end.
 ntypeval
 )
 
-NB. These settings are persistent across dissections, since they describe the user, not the problem
-minimumfontsizex =: 2   NB. font size to use in main window
-ttfontsizex =: 0   NB. tooltip font size
-tooltipdelayx =: 2  NB. tooltip delay
-tooltipdetailx =: 1   NB. tooltip detail level
-displaycompmods =: defaultcompmods   NB. display full modified verb, not just modifier line
-displaystructmods =: 0   NB. display a line for @ @: & etc
-
-
 NB. Following lines must match the menus!
 FONTSIZECHOICES =: 8 10 12 14 16 20 24
 TOOLTIPFONTSIZECHOICES =: 8 10 12 14
 MAXNOUNPCTCHOICES =: 10 20 30 40 50 60 70 80 90
 DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 
-MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
-
-DISPLAYPRECCHOICESDEFAULT =: 2   NB. 3 places by default
+NB. obsolete MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
+NB. obsolete 
+NB. obsolete DISPLAYPRECCHOICESDEFAULT =: 2   NB. 3 places by default
 
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
@@ -891,6 +945,10 @@ menupop "Detail";
 rem ttdetlines;
 menupopz;
 menupopz;
+menupop "&Config";
+menu fmsaveconfig "Save current settings";
+menu fmapplyconfig "Revert to saved settings";
+menupopz;
 menupop "&Help";
 menu fmhelplearning "Learning Dissect";
 menu fmhelpusing "Using Dissect";
@@ -898,7 +956,10 @@ rem menusep;
 rem menupop "&Labs";
 rem menu fmlab1 "Introduction to Dissect";
 rem menu fmlab2 "Advanced Dissect";
+rem menusep;
 rem menupopz;
+rem menu fmwikidissect "View Wiki Page" "F1";
+rem menu fmwikinuvoc "View NuVoc Page" "Shift+F1";
 menupopz;
 xywh 3 4 20 12;cc fmshowerror button;cn "<<";
 xywh 26 4 20 12;cc fmbwd button;cn "<";
@@ -943,6 +1004,10 @@ menupop "Detail";
 rem ttdetlines;
 menupopz;
 menupopz;
+menupop "&Config";
+menu fmsaveconfig "Save current settings";
+menu fmapplyconfig "Revert to saved settings";
+menupopz;
 menupop "&Help";
 menu fmhelplearning "Learning Dissect";
 menu fmhelpusing "Using Dissect";
@@ -951,6 +1016,9 @@ menupop "&Labs";
 menu fmlab1 "Introduction to Dissect";
 menu fmlab2 "Advanced Dissect";
 menupopz;
+menusep;
+menu fmwikidissect "View Wiki Page" "F1";
+menu fmwikinuvoc "View NuVoc Page" "Shift+F1";
 menupopz;
 bin vhh0;
 minwh 6 28;cc fmshowerror button;cn "<<";
@@ -1083,21 +1151,15 @@ NB. The argument of $0 indicates that we want to set the crash variables
 NB. debug wd :: 0: 'psel dissect;pclose'
 wd DISSECT
 winhwnd =: wd 'qhwndp'
+NB. Init the instance variables from the defaults in the dissect locale
+NB. This also sets the values in the form
+applyconfig''
+NB. obsolete maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
 NB. Initialize the user selection
-('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '1'
-('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '1'
-maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
-('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '1'
-('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '1'
-('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0 ,~ tooltipdelayx) wdsetvalue '1'
-('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0 ,~ tooltipdetailx) wdsetvalue '1'
-maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
-calccfms minimumfontsizex { FONTSIZECHOICES
-displaystealth =: 0
-displayautoexpand2 =: defaultuon2   NB. Automatically show u/ on 2 items as dyad
-displayshowfillcalc =: defaultshowfillcalc   NB. Make a rankstack mark when fill-cell is used
-displayprecisionx =: DISPLAYPRECCHOICESDEFAULT   NB. default display precision
-('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue '1'
+NB. obsolete displaystealth =: 0
+NB. obsolete displayautoexpand2 =: defaultuon2   NB. Automatically show u/ on 2 items as dyad
+NB. obsolete displayshowfillcalc =: defaultshowfillcalc   NB. Make a rankstack mark when fill-cell is used
+NB. obsolete displayprecisionx =: DISPLAYPRECCHOICESDEFAULT   NB. default display precision
 
 NB. Convert the logged values from high-speed-collecting form to analysis form (one box per result)
 coalescealllogs__resultroot 0
@@ -1392,6 +1454,16 @@ dissect_dissectisi_paint 1
 ". 'dissect_fmprec' , (":x) , '_button =: dissect_fmprec_button@(', (":y) ,'"_)'
 )
 
+dissect_fmsaveconfig_button =: 3 : 0
+saveconfig''
+)
+
+dissect_fmapplyconfig_button =: 3 : 0
+loadconfig_dissect_''
+applyconfig''
+dissect_dissectisi_paint 1
+)
+
 
 dissect_fmhelplearning_button =: helpshow_dissecthelplearning_
 
@@ -1414,6 +1486,23 @@ dissect_fmlab_button '~addons/labs/labs/debug/dissect1.ijt'
 dissect_fmlab2_button =: 3 : 0
 dissect_fmlab_button '~addons/labs/labs/debug/dissect2.ijt'
 )
+
+dissect_fmwikidissect_button =: 3 : 0
+NB.?lintmsgsoff
+browse_j_ 'http://www.jsoftware.com/jwiki/Vocabulary/Dissect'
+NB.?lintmsgson
+0 0$0
+)
+dissect_f1_fkey =: dissect_fmwikidissect_button
+
+dissect_fmwikinuvoc_button =: 3 : 0
+NB.?lintmsgsoff
+browse_j_ 'http://www.jsoftware.com/jwiki/NuVoc'
+NB.?lintmsgson
+0 0$0
+)
+dissect_f1shift_fkey =: dissect_fmwikinuvoc_button
+4!:55^:(-.IFQT) 'dissect_f1_fkey';'dissect_f1shift_fkey'
 
 dissect_dissectisi_char =: 3 : 0
 NB. If user presses ctrl-J, treat it as 'labrun'
@@ -2614,7 +2703,7 @@ end.
 )
 
 NB. Create accumulated frame, from the current node through all its inheritance, to the end.  Nilad.
-NB. Result is a table, one per node, each row being sellevel;ISF for the node;locale for the node (no extra box)
+NB. Result is a table, one per node, each row being sellevel;ISF for the node;locale for the node (no extra box);maxcellresultshape;fillrequired
 NB. The ISF contains the frame and any SFOPENs called for by the resultlevel
 NB. Forced selections are replaced by empty frame
 NB. y is set if the previous node executed a fill-cell.  In that case, we will abort the search, returning the
@@ -2629,9 +2718,11 @@ NB. the following verb will be OK
 if. y *. errorcode e. EFAILED do. 0 3$a:
 elseif. (*#vranks) *. (0 = #selopshapes) +. (selector -: a:) do. 0 3$a:  NB. keep frames as long as there is valid shape
 elseif. do.
-  (sellevel ; ((<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) ; coname'') , accumframe__inheritedfrom 0 e. frame
+  (sellevel ; ((<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) ; (coname'') , maxcellresultshape ; fillrequired) , accumframe__inheritedfrom 0 e. frame
 end.
 )
+
+
 NB. Signal early error
 NB. Agreement error requires insertion of a node showing the location of the error.  For the nonce,
 NB. we will abort traversal at that point.
@@ -4107,36 +4198,67 @@ NB. The shape is the concatenation of the frames, so that in an expansion node i
 NB. We also append the shape of the max result cell in the last node, to get the total shape of the result
 if. #af =. accumframe__inheritedtailforselectinfo 0  do.
   DOshapes =: <@;/./ |: 0 1 {"1 af  NB. boxes, each containing a (level-1 or -2) isf
-  DOshapelocales =: {:/./ |: 0 2 {"1 af   NB. The locale that makes the selection, for each selection level
   NB. Remember the locale of the last verb executed
-  lastexecutednode =: {:DOshapelocales
+NB. obsolete   lastexecutednode =: {:DOshapelocales
+  lastexecutednode =: (<_1 2) { af
+  NB. The accumframe may include nodes that has a frame containing 1s but nonselectable.  We included them in
+  NB. the DPshapes above.  For the rest of the calculation we want only the info from the node that did the selecting
+  selectinglocaleinfo =. ({:/.~ 0&{"1) af
+NB. obsolete   DOshapelocales =: {:/./ |: 0 2 {"1 af   NB. The locale that makes the selection, for each selection level
   NB.?lintonly lastexecutednode =: <'dissectobj'
 NB. If the last verb does not allow a selection (ex: i.@>), remove it from the shapes so that it doesn't show a selection block,
   NB. and also the fill status from the last selection goes through to the result-cell
+  DOshapelocales =: 2 {"1 selectinglocaleinfo
+  NB. Split the locales into sections ending with a dropdown
+  endingfrets =. 1 (_1}) SFOPEN&e.@> DOshapes
+  NB. Calculate the filled-cellsizes.  For each level get the shape of the filled cellsize at that level.  Result is
+  NB. in boxes by dropdown sections
+  filledsizes =. endingfrets <@(({.~ -@#)&.>~ {.);.2 (3) {"1 selectinglocaleinfo  NB. maxcellresultshape
+  NB. Calculate filled status.  Fill starts after the first fill in a section and continues till the end.  Boxed by dropdown section
+  filledflags =. endingfrets <@(+./\);.2 (4) {::"1 selectinglocaleinfo  NB. fillrequired
+  NB. Calculate the filled frame: for each cell, the difference between the result of the previous level and the result of this level.
+  NB. Always empty (actually immaterial, since never flagged) for the first level
+  filledframes =. (2 (}.~ -@#)&.>/\ a:&,)&.> filledsizes
+
+  NB. Roll up the frames to match the shapes, then append the final result, which is the very last cellshape.
+  finalframes =. ;filledframes
+
+  NB. For fillflags, shift flags down so that the first in each section is 0 (fill at the highest level is attributed to the
+  NB. result, not the frame).  But keep the very last fillflag to be the flag for the final result
+  finalflags =. ; |.!.0&.> filledflags
+
+  NB. If the last node doesn't select, it contributed to the result but it shouldn't contribute to the frame, not even an empty
+  NB. rectangle.  So delete it everywhere it appears
   if. -. selectable__lastexecutednode do.
     DOshapes =: }: DOshapes
     DOshapelocales =: }: DOshapelocales
+    finalframes =. }: finalframes
+    finalflags =. }: finalflags
   end.
-  NB. For each selection level, and for one more level representing the result of the last level, we create the shape display, which is
-  NB.   shape [optional (filledsize) if this selection requires fill]
-  NB. For each selecting level, get the fill info for the NEXT level, i. e. the result of the selecting level
-  fillinfo =. a: , 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(": maxcellresultshape__y),'')'''"0 DOshapelocales
+
+  NB. append the result info: the last cellshape, and the last flag
+  finalframes =. finalframes , {: > {: filledsizes
+  finalflags =. finalflags , {: > {: filledflags
+  
+  NB. Format the fillinfo: (fillframe) if fill called for
+  fillinfo =. finalflags (#   '(' , ')' ,~ ":)&.> finalframes
   NB. Each box in DOshapes represents a frame.  If a frame contains 0, indicate that fact by putting * after the frame
   NB. We don't put * in for the last (result) box if there is one
   NB. Display of * is only performed when the user asks for it
   if. displayshowfillcalc do.
     fillinfo =. (0 ,~ (0 e. [: ; -.&SFOPEN)@> DOshapes) (, #&'*')&.>~ fillinfo
   end.
-  resultisfilled =. *#>{:fillinfo
-  NB. Append the result-shape of the last verb.  If a result is selected, use the shape of the selected result; otherwise use the max result
+
+  NB. Append the last shape, which is the result shape of the last node if it is not selected, and the selected
+  NB. shape if there is a selection.
   if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
-    NB. User selected a result.  Display its shape.  If the shape is filled, replace an empty selected-shape with
-    NB. 'atom' to call the user's attention to it
-    DOshapes =: DOshapes , <, 'atom'&[^:(resultisfilled *. 0 = #)@$&.> extractselectedcell__lastexecutednode''
+    NB. User selected a result.  Display its shape.
+    DOshapes =: DOshapes , <, $&.> extractselectedcell__lastexecutednode''
   else.
     NB. If the unselected result filled, don't repeat the shape - it will be in the fill
-    DOshapes =: DOshapes , <,<(-. resultisfilled) # maxcellresultshape__lastexecutednode
+    DOshapes =: DOshapes , <, < maxcellresultshape__lastexecutednode
   end.
+
   NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
   NB. The first box of each box of DOshapes is selection, the rest are dropdown(s)
   NB. The fill info is (optional * if verb is applied to a cell of fills);(parenthesized shape of cellsize if fill added)
@@ -4144,6 +4266,33 @@ NB. If the last verb does not allow a selection (ex: i.@>), remove it from the s
   NB. split DOshapes into (<frame) , dropdowns; convert to character
   DOshapes =: ((<@":@;@{. , }.)~ i.&SFOPEN)&.> isftorank2 DOshapes
   DOshapes =: ,: ;&.> fillinfo <@(({.@] , [ , }.@]) >)"0 DOshapes
+NB. obsolete   NB. For each selection level, and for one more level representing the result of the last level, we create the shape display, which is
+NB. obsolete   NB.   shape [optional (filledsize) if this selection requires fill]
+NB. obsolete   NB. For each selecting level, get the fill info for the NEXT level, i. e. the result of the selecting level
+NB. obsolete   fillinfo =. a: , 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(": maxcellresultshape__y),'')'''"0 DOshapelocales
+NB. obsolete   NB. Each box in DOshapes represents a frame.  If a frame contains 0, indicate that fact by putting * after the frame
+NB. obsolete   NB. We don't put * in for the last (result) box if there is one
+NB. obsolete   NB. Display of * is only performed when the user asks for it
+NB. obsolete   if. displayshowfillcalc do.
+NB. obsolete     fillinfo =. (0 ,~ (0 e. [: ; -.&SFOPEN)@> DOshapes) (, #&'*')&.>~ fillinfo
+NB. obsolete   end.
+NB. obsolete   resultisfilled =. *#>{:fillinfo
+NB. obsolete   NB. Append the result-shape of the last verb.  If a result is selected, use the shape of the selected result; otherwise use the max result
+NB. obsolete   if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
+NB. obsolete     NB. User selected a result.  Display its shape.  If the shape is filled, replace an empty selected-shape with
+NB. obsolete     NB. 'atom' to call the user's attention to it
+NB. obsolete     DOshapes =: DOshapes , <, 'atom'&[^:(resultisfilled *. 0 = #)@$&.> extractselectedcell__lastexecutednode''
+NB. obsolete   else.
+NB. obsolete     NB. If the unselected result filled, don't repeat the shape - it will be in the fill
+NB. obsolete     DOshapes =: DOshapes , <,<(-. resultisfilled) # maxcellresultshape__lastexecutednode
+NB. obsolete   end.
+NB. obsolete   NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
+NB. obsolete   NB. The first box of each box of DOshapes is selection, the rest are dropdown(s)
+NB. obsolete   NB. The fill info is (optional * if verb is applied to a cell of fills);(parenthesized shape of cellsize if fill added)
+NB. obsolete   NB. This is where we convert DOshapes to a table (selection row if any is added later)
+NB. obsolete   NB. split DOshapes into (<frame) , dropdowns; convert to character
+NB. obsolete   DOshapes =: ((<@":@;@{. , }.)~ i.&SFOPEN)&.> isftorank2 DOshapes
+NB. obsolete   DOshapes =: ,: ;&.> fillinfo <@(({.@] , [ , }.@]) >)"0 DOshapes
   if. #;DOshapes do.
     NB. There is a shape.  Format it and add selections
     cellshapedisp =: (<0 _1) {:: DOshapes
