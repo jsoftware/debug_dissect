@@ -40,6 +40,11 @@ QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
 
+0 : 0
+alltests''
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+testsandbox_base_ 1
+)
 alltests__ =: 3 : 0
 config_displayautoexpand2_dissect_ =: 0
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
@@ -53,24 +58,20 @@ config_displayshowfillcalc_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
 config_displayshowfillcalc_dissect_ =: 0
 )
-0 : 0
-alltests''
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-testsandbox_base_ 1
-)
-NB. TODO:
-NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?
-NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
-NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
-NB. support u . v y
-NB. Use box trick to avoid special case in ;.3
-NB. Add rank-calculus for primitives with known behavior
+NB. TODO
+NB. Implement comparison flags
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
+NB. Add rank-calculus for primitives with known behavior
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name.  Assignments to noun operands?
+NB. support u . v y
+
+NB. display:
+NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
+NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
-NB. can simplify combineyxsels
+
 
 NB. router:
 NB. Add single-jog to router options to avoid down-and-up turn
@@ -4201,7 +4202,8 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
 
   NB. Roll up the frames to match the shapes, then append the final result, which is the very last cellshape.
   finalframes =. ;filledframes
-
+  NB. Corresponding cellshapes
+  finalsizes =. ;filledsizes
   NB. For fillflags, shift flags down so that the first in each section is 0 (fill at the highest level is attributed to the
   NB. result, not the frame).  But keep the very last fillflag to be the flag for the final result
   finalflags =. ; |.!.0&.> filledflags
@@ -4213,10 +4215,16 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
     DOshapelocales =: }: DOshapelocales
     finalframes =. }: finalframes
     finalflags =. }: finalflags
+    NB. We also have to remove the undisplayed cell from the cell-size list, because the last cell-size
+    NB. becomes the result cellsize
+    finalsizes =. }: finalsizes
   end.
 
   NB. append the result info: the last cellshape, and the last flag
-  finalframes =. finalframes , {: > {: filledsizes
+  finalframes =. finalframes , {: finalsizes
+  NB. We just take the flag to be the very last flag of the last section.  It doesn't matter whether
+  NB. the last node doesn't select; if it doesn't, it won't fill, and the value in the last node will be
+  NB. the same as in the one before.
   finalflags =. finalflags , {: > {: filledflags
   
   NB. Format the fillinfo: (fillframe) if fill called for
@@ -4537,29 +4545,51 @@ end.
 NB. replace the first box of x (if there is any residual x after selection), and join it to the selected y.  If y has surplus rank this will copy the surplus rank to the result
 ysel ,"1 selx (,~ <)~"1^:(*@{:@$@[) }."1 x
 )
+NB. obsolete NB. y is a ysel, x is a selx.  Result is list of (new ysel);(new selx)
+NB. obsolete combineyxsels =: 4 : 0"1
+NB. obsolete NB. Since we are perforce down to a single list for ysel, run all the selections into a single level-2 list.
+NB. obsolete NB. Preserve single boxes, including SFOPENs, intact
+NB. obsolete ysell2 =. , ; <^:(1=L.)"0 y
+NB. obsolete NB. There may be multiple boxes of y containing boxes with multiple values, BUT: these boxes must
+NB. obsolete NB. be trailing boxes of y.  See how many there are.  This is the number of axes of x we can index.
+NB. obsolete NB. We take the LEADING x axes among the eligible ones, so that successive axes go in order
+NB. obsolete NB. count the trailing eligible axes
+NB. obsolete if. ranky =. 1 i.&1@:~: |. classsel ysell2 do.
+NB. obsolete   NB. Remove x axes used and replace the first box(es) of x with the remainder.
+NB. obsolete   usableselx =. (selrank =. ({: $ x) <. ranky) {."1 x
+NB. obsolete   if. selrank do.
+NB. obsolete     NB. There are selections to make.  They should not include SFOPEN
+NB. obsolete     NB. We apply to the leading axes among those that have alternatives.
+NB. obsolete     NB. The result of the selection should have the same boxing level as x: if x is a list of alternatives,
+NB. obsolete     NB. so should the result be; while if x is a simple selection, so should the result be.  So, we
+NB. obsolete     NB. open y all the way, then apply x at level 0
+NB. obsolete     ysell2 =. ((- ranky) }. ysell2) ,  selrank (}."1 ,"1~ usableselx ({L:0 >^:L.)"0"1 {."1) (-ranky) {. ysell2
+NB. obsolete     x =. selrank }."1 x
+NB. obsolete   end.
+NB. obsolete end.
+NB. obsolete (,< ysell2);<x
+NB. obsolete )
 NB. y is a ysel, x is a selx.  Result is list of (new ysel);(new selx)
 combineyxsels =: 4 : 0"1
+assert. 1 = #$x
+assert. 1 = #$y
 NB. Since we are perforce down to a single list for ysel, run all the selections into a single level-2 list.
 NB. Preserve single boxes, including SFOPENs, intact
-ysell2 =. , ; <^:(1=L.)"0 y
+yl2 =. , ; <^:(1=L.)"0 y
 NB. There may be multiple boxes of y containing boxes with multiple values, BUT: these boxes must
-NB. be trailing boxes of y.  See how many there are.  This is the number of axes of x we can index.
+NB. be trailing boxes of y.  See how many there are.  This is the number of axes of x we can index.  this is ranky
 NB. We take the LEADING x axes among the eligible ones, so that successive axes go in order
-NB. count the trailing eligible axes
-if. ranky =. 1 i.&1@:~: |. classsel ysell2 do.
-  NB. Remove x axes used and replace the first box(es) of x with the remainder.
-  usableselx =. (selrank =. ({: $ x) <. ranky) {."1 x
-  if. selrank do.
-    NB. There are selections to make.  They should not include SFOPEN
-    NB. We apply to the leading axes among those that have alternatives.
-    NB. The result of the selection should have the same boxing level as x: if x is a list of alternatives,
-    NB. so should the result be; while if x is a simple selection, so should the result be.  So, we
-    NB. open y all the way, then apply x at level 0
-    ysell2 =. ((- ranky) }. ysell2) ,  selrank (}."1 ,"1~ usableselx ({L:0 >^:L.)"0"1 {."1) (-ranky) {. ysell2
-    x =. selrank }."1 x
-  end.
+NB. selrank, the number of boxes of x we can process, is limited by the number of trakiling boxes of y
+if. selrank =. (#x) <. ranky =. 1 i.&1@:~: |. classsel yl2 do.
+  NB. There are selections to make.  They should not include SFOPEN
+  NB. We apply to the leading axes among those that have alternatives.
+  NB. The result of the selection should have the same boxing level as x: if x is a list of alternatives,
+  NB. so should the result be; while if x is a simple selection, so should the result be.  So, we
+  NB. open y all the way, then apply x at level 0
+  yl2 =. (- ranky) (}. ,  selrank (}. ,~ (selrank {. x) ({L:0 >^:L.)"0 {.) {.) yl2
 end.
-(,< ysell2);<x
+NB. Return the modified axes of y, and the unprocessed selections of x
+(,< yl2) ;< selrank }. x
 )
 
 NB. Convert highlight rectangle(s) to rectangles (tl,:br) unboxed (never empty)
@@ -6141,7 +6171,7 @@ text
 
 FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
 
-'PICKTOOLTIPMSGOK PICKTOOLTIPMSGNOFRAME PICKTOOLTIPMSGNOSELYET PICKTOOLTIPMSGPREVERR PICKTOOLTIPMSGEMPTY PICKTOOLTIPMSGNOMORESEL PICKTOOLTIPMSGNOORIDE' =: i. # PICKTOOLTIPMSGS =: <;._2 (0 : 0)
+'PICKTOOLTIPMSGOK PICKTOOLTIPMSGNOFRAME PICKTOOLTIPMSGNOSELYET PICKTOOLTIPMSGPREVERR PICKTOOLTIPMSGEMPTY PICKTOOLTIPMSGNOMORESEL PICKTOOLTIPMSGNOORIDE PICKTOOLTIPMSGFILLED' =: i. # PICKTOOLTIPMSGS =: <;._2 (0 : 0)
 
 unselectable - no frame
 you must make a higher-level selection before you can select this result
@@ -6149,6 +6179,7 @@ cell was not executed - previous error
 frame contains 0 - there are no items to select
 no further selection possible
 
+cell was not executed - added by fill
 )
 
 NB. Custom selection, used in picking.  If this returns 1, it means that the pick has been handled in the locale
@@ -6698,13 +6729,11 @@ if. #$selectionfound do.
   NB. be the case, because the new block might not even have been traversed at all lacking the selection.  So, we don't
   NB. audit initialselections, and assume they're valid since we generate them internally.
   if. #usinginitialselection do. selok =. _1 else. selok =. auditselection ,selectionfound end.  NB. _1=normal cell, 0=error cell, 1 = invalid
-  if. selok ~: 1 do.
+  if. selok <: 0 do.
     NB. Propagate the new selection
     makeselection , selectionfound
-    PICKTOOLTIPMSGOK  NB. We made a change
-  else.
-    PICKTOOLTIPMSGPREVERR  NB. Invalid selection
   end.
+  selok { PICKTOOLTIPMSGOK,PICKTOOLTIPMSGPREVERR,PICKTOOLTIPMSGFILLED,PICKTOOLTIPMSGOK
 else.
   NB. Before we leave this block to look at the next, give the block a chance to perform an action
   NB. Returns nonzero if it handled the pick
@@ -6907,9 +6936,11 @@ if. selectable do. < x #: y else. '' end.
 )
 
 NB. y is the new selection (boxed, and possibly with an initialselection following)
-NB. Result is signum of (sel - error spot): 1 if invalid, 0 if on the error, _1 if no error
+NB. Result is signum of (sel - error spot): 1 if invalid, 0 if on the error, _1 if no error, 2 if impossible (selection >: frame - must be fill)
 auditselection =: 3 : 0
-(selframe #. >@{.^:(0<L.) > selectiontoticket {. y) *@- nvalidresults
+if. +./ selframe <: actsel =. >@{.^:(0<L.) > selectiontoticket {. y do. 2
+else. * (selframe #. actsel) - nvalidresults
+end.
 )
 
 NB. y is #selx; result is 1 if it indicates that cells were executed.  The difference between no execs and some is significant
@@ -9048,7 +9079,7 @@ NB. Result is signum of (sel - error spot): 1 if invalid, 0 if on the error, _1 
 auditselection =: 3 : 0
 if. levelunused +. cop -: 'S:' do. auditselection_dissectobj_ f. y
 else.
-((SFOPEN -.~ ,>y) {:: resultseqmap) *@- #selresult  NB. kludge - , used because selection is a table - but should it be??
+* ((SFOPEN -.~ ,>y) {:: resultseqmap) - #selresult  NB. kludge - , used because selection is a table - but should it be??
 end.
 )
 
@@ -9938,7 +9969,7 @@ end.
 )
 
 NB. y is the new selection (boxed, and possibly with an initialselection following)
-NB. Result is 1 if selection is OK, 0 if not
+NB. Result is _1 if selection is OK, 0 if point of error, 1=invalid
 NB. There is no way for this selection to fail, since there is only one result, and if we have anything we have everything
 auditselection =: _1:
 
@@ -11170,6 +11201,9 @@ NB.?lintsaveglobals
 NB. y is raw selections, result is selections to use
 NB. There is a quirk in u;.3, probably in the special code, such that the computation may be restarted
 NB. depending on the result shape, and the changing shapes of the individual results
+NB.
+NB. We could keep this from happening by boxing the individual partition results and then unboxing at
+NB. the end; but this would be slow on large operands so we don't do that & hope we make proper adjustments here.
 findselection =: 3 : 0
 r =. findselection_dissectobj_ f. y
 if. partitionn e. 3 _3 do.
@@ -12798,7 +12832,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '(3x (&*) &1) 0 1 2'
 2 dissect '((3x&*) (&1)) 0 1 2'
 2 dissect '(3x(&*) (&1)) 0 1 2'
-2 dissect 'i.@>@> z' [ z =. (<2 3);(,:2;3);<<"1]3 2 $2 5 2 3 2 4
+2 dissect 'i.@>@> z' [ z =. (<2 3);(,:2;3);<<"1]3 2 $2 5 2 3 2 4  NB. good testcase for selections and display of fill shapes
 2 dissect 'i."0"1(2 2 $ 1 4 1 8)'
 2 dissect '+: each 1;2;1'
 )
@@ -12808,10 +12842,11 @@ vn =. 1 2 3
 vn_base_ =: 'abc'
 va =. &.>
 vc =. &
-vv =. 3 : ('y =. y + 1';'y =. y + 2')
+vv =. 3 : ('y =. y + 1';'y =. y + 2')&.>
 sentence =. 'vv y vc + va vn'
 arg =. ,: 1;(coname'');sentence
 arg =. arg , 'vn';0;vn
+arg =. arg , (,'y');0;y
 arg =. arg , 'va';1;5!:5 <'va'
 arg =. arg , 'vc';2;5!:5 <'vc'
 arg =. arg , 'vv';3;5!:5 <'vv'
