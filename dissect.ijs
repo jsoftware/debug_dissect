@@ -59,7 +59,7 @@ alltests''
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?  
+NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
 NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
 NB. support u . v y
