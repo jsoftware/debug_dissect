@@ -59,7 +59,6 @@ alltests''
 testsandbox_base_ 1
 )
 NB. TODO:
-NB. pseudoframes show up in frame explanation.  Look at rank?  Messes up L: too
 NB. Need option to allow parsing with ? - perhaps a prompt, or recognize ?
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
 NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
@@ -734,7 +733,6 @@ NB. and 'verb' for modifier executions
             NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
             NB. eventually execute verb N0 erroneously
             ntypeval =. adv ; ((conj;'&.';(#queue)) ,: createverb (,'>');(0$0)) ; $0
-NB. obsolete            ntypeval =. (conj;'&.';(#queue)) ,: createverb (,'>');(0$0)
           else.
             NB. If the value of the user name matches a supported primitive, replace the name by the supported value
             ntypeval =. adv;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
@@ -887,10 +885,6 @@ FONTSIZECHOICES =: 8 10 12 14 16 20 24
 TOOLTIPFONTSIZECHOICES =: 8 10 12 14
 MAXNOUNPCTCHOICES =: 10 20 30 40 50 60 70 80 90
 DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
-
-NB. obsolete MAXNOUNPCTCHOICESDEFAULT =: 3   NB. limit to 30% by default
-NB. obsolete 
-NB. obsolete DISPLAYPRECCHOICESDEFAULT =: 2   NB. 3 places by default
 
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
@@ -1154,12 +1148,6 @@ winhwnd =: wd 'qhwndp'
 NB. Init the instance variables from the defaults in the dissect locale
 NB. This also sets the values in the form
 applyconfig''
-NB. obsolete maxnoundisplaysizex =: 2#MAXNOUNPCTCHOICESDEFAULT
-NB. Initialize the user selection
-NB. obsolete displaystealth =: 0
-NB. obsolete displayautoexpand2 =: defaultuon2   NB. Automatically show u/ on 2 items as dyad
-NB. obsolete displayshowfillcalc =: defaultshowfillcalc   NB. Make a rankstack mark when fill-cell is used
-NB. obsolete displayprecisionx =: DISPLAYPRECCHOICESDEFAULT   NB. default display precision
 
 NB. Convert the logged values from high-speed-collecting form to analysis form (one box per result)
 coalescealllogs__resultroot 0
@@ -1210,7 +1198,6 @@ NB. y is 0 for normal traversal, or 1 for error traversal.  We initialize and tr
 NB. Called in instance locale
 traverse =: 3 : 0
 NB. Initialize for the traversal
-NB. obsolete errorlevel =: 0$a:  NB. This will be the list of locales that raised a try indication (including for fillcell)
 errorlevelinit''
 snifferror =: y
 NB. We keep track of which monad/dyad execution is running, so that we can propagate all errors entirely
@@ -2051,7 +2038,6 @@ if. (-. displayshowfillcalc) *. ERRORLEVELFILL = {. > {. 1&{"1 errorlevel__COCRE
 end.
 if. (coname'') = {. 0{"1 errorlevel__COCREATOR do. errorlevel__COCREATOR =: }. errorlevel__COCREATOR end.
 assert. 0 = (coname'') e. {. 0{"1 errorlevel__COCREATOR
-NB. obsolete errorlevel__COCREATOR =:  errorlevel__COCREATOR -. (coname'')
 y
 )
 
@@ -2197,11 +2183,6 @@ NB. Initialize the locales where detail is to come from.  We will inherit these 
 physreqandhighlights =: {.@> selopinfo
 inputselopshapes =: selopshapes =: , }.@> selopinfo
 errorlevel =: geterrorlevel''
-NB. obsolete if. errorlevel =: *#errorlevel__COCREATOR do.
-NB. obsolete   e =. {. errorlevel__COCREATOR
-NB. obsolete   NB.?lintonly frame_dissectobj_ =: 0 [ e =. <'dissectobj'
-NB. obsolete   errorlevel =: (0 e. frame__e) { 2 1  NB. type 1 = fillcell; type 2 = adverse (the only other possibility)
-NB. obsolete end.
 opselin =: 0 2$a:  NB. initialize opselin to empty (=no selection)
 vranks =: getverbrank selopshapes
 NB. Non-atomic sellevel is a flag indicating that the nominal rank is to be ignored, because the verb runs at infinite rank
@@ -4199,14 +4180,12 @@ NB. We also append the shape of the max result cell in the last node, to get the
 if. #af =. accumframe__inheritedtailforselectinfo 0  do.
   DOshapes =: <@;/./ |: 0 1 {"1 af  NB. boxes, each containing a (level-1 or -2) isf
   NB. Remember the locale of the last verb executed
-NB. obsolete   lastexecutednode =: {:DOshapelocales
   lastexecutednode =: (<_1 2) { af
   NB. The accumframe may include nodes that has a frame containing 1s but nonselectable.  We included them in
   NB. the DPshapes above.  For the rest of the calculation we want only the info from the node that did the selecting
   selectinglocaleinfo =. ({:/.~ 0&{"1) af
-NB. obsolete   DOshapelocales =: {:/./ |: 0 2 {"1 af   NB. The locale that makes the selection, for each selection level
   NB.?lintonly lastexecutednode =: <'dissectobj'
-NB. If the last verb does not allow a selection (ex: i.@>), remove it from the shapes so that it doesn't show a selection block,
+  NB. If the last verb does not allow a selection (ex: i.@>), remove it from the shapes so that it doesn't show a selection block,
   NB. and also the fill status from the last selection goes through to the result-cell
   DOshapelocales =: 2 {"1 selectinglocaleinfo
   NB. Split the locales into sections ending with a dropdown
@@ -4266,33 +4245,6 @@ NB. If the last verb does not allow a selection (ex: i.@>), remove it from the s
   NB. split DOshapes into (<frame) , dropdowns; convert to character
   DOshapes =: ((<@":@;@{. , }.)~ i.&SFOPEN)&.> isftorank2 DOshapes
   DOshapes =: ,: ;&.> fillinfo <@(({.@] , [ , }.@]) >)"0 DOshapes
-NB. obsolete   NB. For each selection level, and for one more level representing the result of the last level, we create the shape display, which is
-NB. obsolete   NB.   shape [optional (filledsize) if this selection requires fill]
-NB. obsolete   NB. For each selecting level, get the fill info for the NEXT level, i. e. the result of the selecting level
-NB. obsolete   fillinfo =. a: , 3 : '< (fillrequired__y *. 0 = #resultlevel__y) # ''('',(": maxcellresultshape__y),'')'''"0 DOshapelocales
-NB. obsolete   NB. Each box in DOshapes represents a frame.  If a frame contains 0, indicate that fact by putting * after the frame
-NB. obsolete   NB. We don't put * in for the last (result) box if there is one
-NB. obsolete   NB. Display of * is only performed when the user asks for it
-NB. obsolete   if. displayshowfillcalc do.
-NB. obsolete     fillinfo =. (0 ,~ (0 e. [: ; -.&SFOPEN)@> DOshapes) (, #&'*')&.>~ fillinfo
-NB. obsolete   end.
-NB. obsolete   resultisfilled =. *#>{:fillinfo
-NB. obsolete   NB. Append the result-shape of the last verb.  If a result is selected, use the shape of the selected result; otherwise use the max result
-NB. obsolete   if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
-NB. obsolete     NB. User selected a result.  Display its shape.  If the shape is filled, replace an empty selected-shape with
-NB. obsolete     NB. 'atom' to call the user's attention to it
-NB. obsolete     DOshapes =: DOshapes , <, 'atom'&[^:(resultisfilled *. 0 = #)@$&.> extractselectedcell__lastexecutednode''
-NB. obsolete   else.
-NB. obsolete     NB. If the unselected result filled, don't repeat the shape - it will be in the fill
-NB. obsolete     DOshapes =: DOshapes , <,<(-. resultisfilled) # maxcellresultshape__lastexecutednode
-NB. obsolete   end.
-NB. obsolete   NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
-NB. obsolete   NB. The first box of each box of DOshapes is selection, the rest are dropdown(s)
-NB. obsolete   NB. The fill info is (optional * if verb is applied to a cell of fills);(parenthesized shape of cellsize if fill added)
-NB. obsolete   NB. This is where we convert DOshapes to a table (selection row if any is added later)
-NB. obsolete   NB. split DOshapes into (<frame) , dropdowns; convert to character
-NB. obsolete   DOshapes =: ((<@":@;@{. , }.)~ i.&SFOPEN)&.> isftorank2 DOshapes
-NB. obsolete   DOshapes =: ,: ;&.> fillinfo <@(({.@] , [ , }.@]) >)"0 DOshapes
   if. #;DOshapes do.
     NB. There is a shape.  Format it and add selections
     cellshapedisp =: (<0 _1) {:: DOshapes
@@ -5612,16 +5564,21 @@ elseif. _ *./@:= vranks do.
   NB. If verb has infinite rank, just say so here.  We don't use the frame because u/ etc has pseudoframe and we want to 
   NB. report NOFRAME for them
   res =. res , EXEGESISFRAMENOFRAME;'This verb has infinite rank and always applies to its entire argument',((2=#inputselopshapes)#'s'),'.',LF    NB. If only 1 cell, can't analyze
-elseif. 0 = #frame do.
+elseif.
+shapes =. $^:(0<L.)&.> inputselopshapes
+0 = #frame do.
   NB. The verb applied to its entire operand
   if. 2=#inputselopshapes do.
-    res =. res , EXEGESISFRAMENOFRAME;'Each argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
-  else.
-    res =. res , EXEGESISFRAMENOFRAME;'The argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
+    ftext =. 'Each argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
+    ftext =. ftext , 'x is ',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),'.',LF
+    ftext =. ftext , 'y is ',(exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames),'.',LF
+   else.
+    ftext =. 'The argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
+    ftext =. ftext , 'The argument is ',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),'.',LF
   end.
+  res =. res , EXEGESISFRAMENOFRAME;ftext
 elseif. do.
   NB. There is a frame.  Describe it
-  shapes =. $^:(0<L.)&.> inputselopshapes
   NB. Set up some language about collection.  If the result is collected after this verb, say the result 'is assembled'.
   NB. But if the collection is remote, say 'will be assembled'
   if. (coname'') = cp =. findcollectionpoint__parent coname'' do.
@@ -6065,6 +6022,27 @@ NB. Remove <> from last box, and put ';' after all previous
 ; (,&'; '&.>@}: , -.&'<>'&.>@{:) boxindexes
 )
 
+jdatatypes =: <;._2 (0 : 0)
+numeric, Boolean
+character, byte
+numeric, integer
+numeric, float
+numeric, complex
+boxed
+numeric, extended integer
+numeric, rational
+
+
+sparse, numeric, Boolean
+sparse, character, byte
+sparse, numeric, integer
+sparse, numeric, float
+sparse, numeric, complex
+sparse, boxed
+symbol
+character, Unicode
+)
+
 hoverDOdatapos =: 4 : 0
 exp =. x
 hoveryx =. y
@@ -6097,8 +6075,23 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
     selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
     NB. Convert the isf to a path.
-    disp =. disp , EXEGESISDATAPATH ; 'You are hovering over the atom with path=' , (isftodisplayablepath selx),'.',LF,LF
-
+    t =. 'You are hovering over the atom with path=' , (isftodisplayablepath selx),'.'
+    NB. Calculate the type and value of the selected atom
+    if. endempty =. _1 = {: > {: path =. {."1 selx do.
+      NB. The path ends on an empty.  Discard the last selection, which will leave us pointing to the empty array
+      path =. }: path
+    end.
+    NB. We can't get an accurate type for an empty path.  If the result is coming from
+    NB. a monad/dyad execution, the empty value may have changed type (don't know why).
+    if. #path do.
+      selatom =. path {:: fillmask frameselresult selresult
+      t =. t , LF,'Type=(',((2 ^. 3!:0 selatom) {:: jdatatypes),')'
+      if. -. endempty do.
+        t =. t , ', Value=',(":!.10 selatom)
+      end.
+    end.
+    disp =. disp , EXEGESISDATAPATH ; t,LF,LF
+ 
     NB. If this has rank higher than 2, explain the display
     if. 2 < #rshape do.
       if. 2 | #rshape do.
@@ -6137,7 +6130,9 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   end.
   if. sellevel <: #selections do.
     selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
-    text =. text , '         path=' , isftodisplayablepath selx
+    text =. text , '    path=' , isftodisplayablepath selx
+    NB. Do not include the type/value because this requires instantiating the value and that
+    NB. might take a noticeable amount of time
   end.
 else. text =. ''
 end.
@@ -9439,7 +9434,7 @@ end.
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'Each intermediate result is shown in its own box.',LF
+'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each intermediate result in its own box.',LF
 )
 
 NB. *** traversal support ***
@@ -10226,7 +10221,7 @@ end.
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'Each successive power is shown in its own box.',LF
+'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each successive power in its own box.',LF
 )
 
 
@@ -12804,6 +12799,8 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '((3x&*) (&1)) 0 1 2'
 2 dissect '(3x(&*) (&1)) 0 1 2'
 2 dissect 'i.@>@> z' [ z =. (<2 3);(,:2;3);<<"1]3 2 $2 5 2 3 2 4
+2 dissect 'i."0"1(2 2 $ 1 4 1 8)'
+2 dissect '+: each 1;2;1'
 )
 
 testsandbox_base_ =: 3 : 0
