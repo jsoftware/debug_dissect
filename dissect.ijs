@@ -59,7 +59,7 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. Implement comparison flags
+NB. m} including gerund
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
 NB. Add rank-calculus for primitives with known behavior
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
@@ -91,6 +91,8 @@ NB.  bit 0 is 1 to use a sandbox for executing the sentence
 NB.  bit 1 is 1 to return the locale of the dissect window
 NB.  bit 2 is 1 to suppress assignment statements.  They will not be executed and an error will result if an assigned name is referred to later.
 NB.  bit 3 is 1 if this call was from the J debugger.  It changes the error messages if the assignments rule is violated.
+NB.  bits 4-5 are a coded field giving the level of comparison, in roughtly descending order:
+NB.   00=full comparison, 01=shape and type only; 10=success/failure only; 11=no comparison (and don't execute the original sentence)
 NB.
 NB. If y is boxed, it should be a table ready for use in parse, i. e. nx3 where the first line gives
 NB. parameters;locale;text of sentence
@@ -508,7 +510,8 @@ defnames =. }. y  NB. table of names
 if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
   failmsg 'The sentence to be dissected must be a string.' return. 
 end.
-'fromdebugger noassignment returnobject sandbox' =.  2 2 2 2 #: {.!.0 options
+'cl fromdebugger noassignment returnobject sandbox' =.  4 2 2 2 2 #: {.!.0 options
+comparisonlevel =: cl
 returnobject_dissect_ =: * returnobject
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
@@ -796,7 +799,7 @@ calcallestheights__resultroot $0
 NB. Create the string to execute.  If we have to create a sandbox, do so
 NB. The raw sentence has the user's tokens, but the the invisible ones removed (for noassign sentences).
 vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot '')&{&.;: sentence
-execsentences_dissect_ =: vissentence;exestring__resultroot''
+execsentences_dissect_ =: vissentence ;^:(comparisonlevel<3) ,<exestring__resultroot''
 if. sandbox do.
   NB. create the sandbox verb in the user's locale
   NB.?lintmsgsoff
@@ -1116,9 +1119,17 @@ NB. y is the results from running the user's original sentence and our instrumen
 displaymain =: 3 : 0  NB. called in dissectinstance locale
 NB. Make sure the results are the same
 NB. If the sentence ran correctly for the user, make sure we get the same result.
-NB. If there is only one result, we don't compare
+NB. If there is only one result, we don't compare (comparisonlevel must have suppressed uninstrumented execution)
 if. 1 < #y do.
-  if. -.@-:/ y do.
+  select. comparisonlevel
+  case. 0 do.  NB. compare for equality (should it be intolerant?  Naah - there may be shortcuts)
+    equal =. -:/ y
+  case. 1 do.  NB. compare for equality of shape and type
+    equal =. (-:&({.@(0&($,)) L:0) *. -:&($ L:0))/ y
+  case. 2 do.  NB. compare for equality of failure
+    equal =. =&(0 = #)&>/ y
+  end.
+  if. -. equal do.
 QP^:(NOCLEANUP)'y '
     failmsg 'dissect error: dissected sentence has incorrect result'
     return.
@@ -4545,30 +4556,7 @@ end.
 NB. replace the first box of x (if there is any residual x after selection), and join it to the selected y.  If y has surplus rank this will copy the surplus rank to the result
 ysel ,"1 selx (,~ <)~"1^:(*@{:@$@[) }."1 x
 )
-NB. obsolete NB. y is a ysel, x is a selx.  Result is list of (new ysel);(new selx)
-NB. obsolete combineyxsels =: 4 : 0"1
-NB. obsolete NB. Since we are perforce down to a single list for ysel, run all the selections into a single level-2 list.
-NB. obsolete NB. Preserve single boxes, including SFOPENs, intact
-NB. obsolete ysell2 =. , ; <^:(1=L.)"0 y
-NB. obsolete NB. There may be multiple boxes of y containing boxes with multiple values, BUT: these boxes must
-NB. obsolete NB. be trailing boxes of y.  See how many there are.  This is the number of axes of x we can index.
-NB. obsolete NB. We take the LEADING x axes among the eligible ones, so that successive axes go in order
-NB. obsolete NB. count the trailing eligible axes
-NB. obsolete if. ranky =. 1 i.&1@:~: |. classsel ysell2 do.
-NB. obsolete   NB. Remove x axes used and replace the first box(es) of x with the remainder.
-NB. obsolete   usableselx =. (selrank =. ({: $ x) <. ranky) {."1 x
-NB. obsolete   if. selrank do.
-NB. obsolete     NB. There are selections to make.  They should not include SFOPEN
-NB. obsolete     NB. We apply to the leading axes among those that have alternatives.
-NB. obsolete     NB. The result of the selection should have the same boxing level as x: if x is a list of alternatives,
-NB. obsolete     NB. so should the result be; while if x is a simple selection, so should the result be.  So, we
-NB. obsolete     NB. open y all the way, then apply x at level 0
-NB. obsolete     ysell2 =. ((- ranky) }. ysell2) ,  selrank (}."1 ,"1~ usableselx ({L:0 >^:L.)"0"1 {."1) (-ranky) {. ysell2
-NB. obsolete     x =. selrank }."1 x
-NB. obsolete   end.
-NB. obsolete end.
-NB. obsolete (,< ysell2);<x
-NB. obsolete )
+
 NB. y is a ysel, x is a selx.  Result is list of (new ysel);(new selx)
 combineyxsels =: 4 : 0"1
 assert. 1 = #$x
@@ -5180,61 +5168,63 @@ NB. To get rectangle extents, you need the onscreenmsk extended to include the e
 NB. rect, which gives the left end of the leftmost oncreen rect.   This is used to select from an endpoint
 NB. vector that has been extended by adding a leftmost 0, and has shape that matches the boundaries to be displayed
 onscreenmskext =. (+. 1&(|.!.0))@(0&,)&.> onscreenmsk
-NB. Create the rectangles for each atom.  This will be mxnx2x2.
-rects =. ,."1/&(}: ,. 2&(-~/\))&>/ onscreenbdys =. onscreenmskext #&.> yxpositions
-NB. Cut the data down to the displayable part
-usedd =. onscreenmsk scissortoscreen usedd
-NB. Extract and reshape the selection information, too.  sel should either be an atom or have
-NB. one atom per data cell.  The data may be truncated, though, so we bring sel up to the
-NB. rank of the shapeused, and then truncate it to shapeused size (using sel as a fill, in case sel
-NB. was an atom).  Then shape to 2D, and trim to the displayable part
-NB. But if this is a selection node, suppress rectangles, force lines, leave rectangles for next level
-if. sel -:&$ usel =. ''"_`>@.(2>L.) sel do.
-  sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |: shapeused {.!.({.,sel) ((-$shapeused) {.!.1 $sel) ($,) sel
-NB. Before filling the cells the first time, initialize the rectangles to the colors given by the fillmask.  This
-NB. is to give the right color to cells that are not drawn at all (empty contents) or whose contents do not fill
-NB. the cell, because of other larger values.
-  (cfmdata rectcolorfromfillmask (<:#cfmdata) colorlimitsellevel >sel) drawrect"0 2 rects
-else.
-  NB. Selector node
-  NB. usedd has been converted to a table - do the same for sel
-  sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |:  sel
-end.
+NB. Get the set of onscreen points.  If there aren't any, skip the drawing (to avoid errors)
+if. -. a: e. onscreenbdys =. onscreenmskext #&.> yxpositions do.
+  NB. Create the rectangles for each atom.  This will be mxnx2x2.
+  rects =. ,."1/&(}: ,. 2&(-~/\))&>/ onscreenbdys
+  NB. Cut the data down to the displayable part
+  usedd =. onscreenmsk scissortoscreen usedd
+  NB. Extract and reshape the selection information, too.  sel should either be an atom or have
+  NB. one atom per data cell.  The data may be truncated, though, so we bring sel up to the
+  NB. rank of the shapeused, and then truncate it to shapeused size (using sel as a fill, in case sel
+  NB. was an atom).  Then shape to 2D, and trim to the displayable part
+  NB. But if this is a selection node, suppress rectangles, force lines, leave rectangles for next level
+  if. sel -:&$ usel =. ''"_`>@.(2>L.) sel do.
+    sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |: shapeused {.!.({.,sel) ((-$shapeused) {.!.1 $sel) ($,) sel
+  NB. Before filling the cells the first time, initialize the rectangles to the colors given by the fillmask.  This
+  NB. is to give the right color to cells that are not drawn at all (empty contents) or whose contents do not fill
+  NB. the cell, because of other larger values.
+    (cfmdata rectcolorfromfillmask (<:#cfmdata) colorlimitsellevel >sel) drawrect"0 2 rects
+  else.
+    NB. Selector node
+    NB. usedd has been converted to a table - do the same for sel
+    sel =. onscreenmsk scissortoscreen sizes ($,) (;axes) |:  sel
+  end.
 
-NB. If there are subDOLs, process each of them.  The operand was boxed.
-if. 3 < #vf do.
-  sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
-  NB.  Adjust each inner box position
-  (sdol ,"0 1 usedd ,"0 (_1-FILLMASKNOCOLLECT)&bwand^:(0=L.)&.> sel)   drawDOL   cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
-  NB. Draw mesh for the rectangles - dotted if the boxing is because of collection error
-  collecterr =. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel
-  (BOXBORDERCOLOR,1,collecterr # PS_DOT) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
-else.
-  NB. Not boxed data; draw each cell.  If the cell is error/unexecd, delete the text, since the cell
-  NB. doesn't really have a value.  We leave its space as a reminder of how big it might have been
-  NB. Install checkboard, so it shows up at all levels
-   sel =. (FILLMASKEXTRAAXES * 1 = {. $ data) + (<:#cfmdata) checkerboardfillmask sel
-   if. emptydata do.
-     (emptycfm rectcolorfromfillmask (<:#emptycfm) colorlimitsellevel sel) drawrect"0 2 rects
-   else.
-     (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
-   end.
-end.
+  NB. If there are subDOLs, process each of them.  The operand was boxed.
+  if. 3 < #vf do.
+    sdol =. onscreenmsk scissortoscreen flatshape ($,) (;axes) |: shapeused {. 3 {:: vf
+    NB.  Adjust each inner box position
+    (sdol ,"0 1 usedd ,"0 (_1-FILLMASKNOCOLLECT)&bwand^:(0=L.)&.> sel)   drawDOL   cliptlbr ;"2 1 (BOXLINEWIDTH + BOXMARGIN) +"1 {."2 rects
+    NB. Draw mesh for the rectangles - dotted if the boxing is because of collection error
+    collecterr =. +./@:, 0:`(0~:FILLMASKNOCOLLECT&bwand)@.(0=L.)@> sel
+    (BOXBORDERCOLOR,1,collecterr # PS_DOT) drawmesh (,:   [: |. 0 _1&{&.>) onscreenbdys
+  else.
+    NB. Not boxed data; draw each cell.  If the cell is error/unexecd, delete the text, since the cell
+    NB. doesn't really have a value.  We leave its space as a reminder of how big it might have been
+    NB. Install checkboard, so it shows up at all levels
+     sel =. (FILLMASKEXTRAAXES * 1 = {. $ data) + (<:#cfmdata) checkerboardfillmask sel
+     if. emptydata do.
+       (emptycfm rectcolorfromfillmask (<:#emptycfm) colorlimitsellevel sel) drawrect"0 2 rects
+     else.
+       (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
+     end.
+  end.
   
-NB. Draw borders at any boundary (except the first) where a rank rolls over.  The width of the line
-NB. is the number of ranks that rolled over simultaneously.  We see which rectangles start
-NB. on a new boundary, and use the start position to get the line
-NB. Get number of boundaries for each row/col: 0=not a bdy, 1=rank-2 bdy, etc
-NB. Add 1 pixel of width to nonzero boundaries
- bdynos =. axisshapes (+ *)@}.@:(0&(i.&1@:~:)@|."1)@(#: i.)&.> flatshape
-NB. Create table of startpoint,width for each line.  Discard first point of bdynos (always a big
-NB. value for the first cell) and the last point of sizes (gives position of the last cell).  We
-NB. are left with internal boundaries.  Back up the position by the width of the boundary, and discard
-NB. zero boundaries
-if. +/ #@> startwidth =. bdynos (*@[ # ,.~)&.> (<<<0 _1)&{&.> yxpositions do.
-  (RANKCOLOR ,"1 PS_SOLID ,.~ {:"1 ; startwidth) drawmesh ({."1&.> startwidth) ,: |.   0 _1&{&.> yxpositions
+  NB. Draw borders at any boundary (except the first) where a rank rolls over.  The width of the line
+  NB. is the number of ranks that rolled over simultaneously.  We see which rectangles start
+  NB. on a new boundary, and use the start position to get the line
+  NB. Get number of boundaries for each row/col: 0=not a bdy, 1=rank-2 bdy, etc
+  NB. Add 1 pixel of width to nonzero boundaries
+   bdynos =. axisshapes (+ *)@}.@:(0&(i.&1@:~:)@|."1)@(#: i.)&.> flatshape
+  NB. Create table of startpoint,width for each line.  Discard first point of bdynos (always a big
+  NB. value for the first cell) and the last point of sizes (gives position of the last cell).  We
+  NB. are left with internal boundaries.  Back up the position by the width of the boundary, and discard
+  NB. zero boundaries
+  if. +/ #@> startwidth =. bdynos (*@[ # ,.~)&.> (<<<0 _1)&{&.> yxpositions do.
+    (RANKCOLOR ,"1 PS_SOLID ,.~ {:"1 ; startwidth) drawmesh ({."1&.> startwidth) ,: |.   0 _1&{&.> yxpositions
+  end.
 end.
-  
 0
 )
 
@@ -12835,6 +12825,12 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect 'i.@>@> z' [ z =. (<2 3);(,:2;3);<<"1]3 2 $2 5 2 3 2 4  NB. good testcase for selections and display of fill shapes
 2 dissect 'i."0"1(2 2 $ 1 4 1 8)'
 2 dissect '+: each 1;2;1'
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '?~ 100'
+18 dissect '?~ 100'
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 18 dissect '(100 ?@$ 3) { 5;''a'';<a:'
+34 dissect '(100 ?@$ 3) { 5;''a'';<a:'
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 34 dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
+50 dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
 )
 
 testsandbox_base_ =: 3 : 0
@@ -12859,6 +12855,7 @@ crash9 =: ([ [ 13!:8^:]@(9 e. ,))"0
 )
 
 0 : 0
+alltests''
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 )
