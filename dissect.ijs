@@ -38,33 +38,37 @@ DEBMOUSE_dissect_ =: 0   NB. display mouse events
 DEBTIME_dissect_ =: 0  NB. Show elapsed times
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
-edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~1+errorcode) , '')'''
+edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~2+errorcode) , '')'''
 
 0 : 0
 alltests''
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 )
 alltests__ =: 3 : 0
 config_displayautoexpand2_dissect_ =: 0
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 config_displayautoexpand2_dissect_ =: 1
-0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 config_displayautoexpand2_dissect_ =: 0
 displaycompmods_dissect_ =: 1
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 displaycompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 1
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. m} including gerund
+NB. examine power gerund for height of u+xy, and refiguring dummytrav when setting y
+NB. don't remove hover if mmove with button down?
+NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
 NB. Add rank-calculus for primitives with known behavior
+NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
-NB. clicking on vbname (if tacit) should launch sandbox for that name.  Assignments to noun operands?
+NB. clicking on vbname (if tacit) should launch sandbox for that name.
 NB. support u . v y
+NB. have a locale for verb primitives like m} and eventually {:: and {, to hold operationfailed etc.
 
 NB. display:
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
@@ -187,10 +191,10 @@ dissectinstance =: 0$a:
 
 defstring =: 'start of traversal'"_   NB. for debugging only
 
+NB. Handle apwcial inputa: 0=last errpr. 1=clipboard, others pass through unchanged
 getsentence =: (' ' takeafter LF (i:~ }. ]) [: }:^:(LF={:) (13!:12)@(''"_))`(LF (>:@i:~ }. ]) LF , [: }:^:(LF={:) CR -.~ [: wd 'clippaste'"_)`]@.((0;1) i. <)
 
 NB. Maximum line length that we will try to display in a grid cell
-
 MAXSENTENCEWIDTH =: 0.5  NB. max frac of screenwidth that we allow for sentence display
 
 ifdefined =: 0 <: [: 4!:0 <
@@ -256,7 +260,8 @@ isname =: ({: e. '.:'"_) < {. e. (a.{~,(i.26)+/65 97)"_
 NB. 1 iff a string y from the result of ;: is is a name
 
 NB. y is a value, result is 1 if it looks like a gerund
-isgerund =: 0:`(2 32 e.~ 3!:0@>)@.(32=3!:0)"0
+isar =: 0:`((1:`((2 = #) *. (2 = 3!:0@>@{.))`0:)@.(2 32 i. 3!:0)@>)@.(32=3!:0)"0
+isgerund =: [: +./ isar
 
 class =: 3 : 0         NB. the class of the word represented by string y
 if. y-:mark do. mark return. end.
@@ -1126,11 +1131,11 @@ if. 1 < #y do.
     equal =. -:/ y
   case. 1 do.  NB. compare for equality of shape and type
     equal =. (-:&({.@(0&($,)) L:0) *. -:&($ L:0))/ y
-  case. 2 do.  NB. compare for equality of failure
+  case. do.  NB. must be 2 - compare for equality of failure
     equal =. =&(0 = #)&>/ y
   end.
   if. -. equal do.
-QP^:(NOCLEANUP)'y '
+QP^:NOCLEANUP'y '
     failmsg 'dissect error: dissected sentence has incorrect result'
     return.
   end.
@@ -1702,9 +1707,9 @@ NB.?lintsaveglobals
 ''
 )
 
-NB. Object destruction
+NB. Object destruction.  This is inherited by all the object locales, if they have no local work to do (which they don't)
 destroy =: 3 : 0
-NB. if there is a grid attached to this control, destroy it.
+NB. if there is a grid attached to this locale, destroy it.
 destroyexplorer''
 codestroy''
 )
@@ -2097,7 +2102,7 @@ NB. indicating whether the result of that selection is a singleton (which means 
 NB.
 NB. If snifferror__COCREATOR is 1, it means we are doing the initial selection to find where the crash was.  We
 NB. set this value to 2 after we have encountered the error, so that we catch only the first error.  We catch framing errors
-NB. before execution errors; ortherwise we follow the J order
+NB. before execution errors; otherwise we follow the J order
 NB. When there is a selection, we always select the last thing that happened.
 NB. y is a single list with 0-4 items depending on selection status.  When operands are given, it is implied that
 NB. the selector is selecting a single application of the verb.
@@ -2184,6 +2189,7 @@ end.
 physreqandhighlights =: {.@> selopinfo
 inputselopshapes =: selopshapes =: , }.@> selopinfo
 bnsellevel =: <sellevel
+rankhistory =: rankhistory , '' ; coname''
 ''
 )
 
@@ -2715,6 +2721,19 @@ elseif. do.
 end.
 )
 
+NB. Change the error message displayed on the error block
+NB. We call this when we understand an error and want to explain it
+NB. We honor the request only during sniff, and only when we are not in a try block
+changeerrormessagefrominterp =: 3 : 0
+if. (errorlevel = ERRORLEVELNONE) *. (snifferror__COCREATOR = 1) do.
+  errormessagefrominterp__COCREATOR =: y
+end.
+''
+:
+NB. For the dyad, make the change only if the errorcode (in x) indicates failure (which it should, if we diagnosed the error correctly)
+if. x e. EFAILED do. changeerrormessagefrominterp y end.
+''
+)
 
 NB. Signal early error
 NB. Agreement error requires insertion of a node showing the location of the error.  For the nonce,
@@ -2732,12 +2751,8 @@ else.
 end.
 :
 NB. The dyad is used for errors detected during traversal, eg u@.v where v creates a non-atom,
-NB. or datatype errors.  We might be able to give a better description of the error.
-NB. x is errorcode[;description string].  We set the errorcode and, if the string is given,
-NB. we replace the J string with it
-'ecode estg' =. 2 {. x
-errorcode =: ecode
-if. 2 = 3!:0 estg do. errormessagefrominterp__COCREATOR =: estg end.
+NB. or datatype errors. We set the errorcode
+errorcode =: x
 earlyerror y
 )
 
@@ -2924,7 +2939,7 @@ NB. it will perforce have no selection, so just pick up the fillmask from the u
   elseif. selectable *. (sellevel < #selections) do.
     NB. sel1 is the path to the selection.  It may go down multiple levels, but it will
     NB. always end with a dropdown if there is a dropdown.  If the fillmask is boxed, there will
-    NB. be a dropdown as long as this node is selectable (it isn't in the case of L: wiehn the arguments
+    NB. be a dropdown as long as this node is selectable (it isn't in the case of L: when the arguments
     NB. are initially at level).
     NB. So, we convert the selection to path form, which merely requires removing the dropdowns.
     sel1 =. SFOPEN -.~ > isfensureselection isftorank2 sellevel { selections
@@ -4370,6 +4385,7 @@ end.
 NB. Similarly, if there is a shape/selection line, create an index for it
 if. (#picknames) > shapex =. picknames i. <'DOshapepos' do.
   NB. Convert the overall brect to yx,:00, then subtract it from the brect for each row
+  NB. This converts the shape/selection to a single row of pickrects
   DOshapepospickrects =: (brect"0@{.@> shapex {"1 arects) -"2"_1 (1 0) *"1 2 shapex {"3 pickrects
   assert. (#DOshapelocales) = <: 1 { $DOshapepospickrects
 end.
@@ -5887,6 +5903,68 @@ end.
 text
 )
 
+getselectedcell =: 3 : 0
+NB. sel1 is the path to the selection.  It may go down multiple levels, but it will
+NB. always end with a dropdown if there is a dropdown.  If the fillmask is boxed, there will
+NB. be a dropdown as long as this node is selectable (it isn't in the case of L: when the arguments
+NB. are initially at level).
+NB. So, we convert the selection to path form, which merely requires removing the dropdowns.
+sel1 =. SFOPEN -.~ > isfensureselection isftorank2 sellevel { selections
+NB. If the current fillmask is boxed, it has internal structure, and we
+NB. should replace the selected portion with the fillmask and data that was calculated in u
+select. resultlevel
+  NB. tmodx gives the index into selresult of the selection.  For L: we get it from
+  NB. the result map; for others we calculate from the index
+  NB. fillmask, which describes what ought to be, is in natural order.
+  NB. selresult, which describes what is, is in ticket order.
+case. 0 do.
+  NB.?lintonly resultseqmap =: ''
+  NB. L: requires that we box the lower fillmask, whatever it is, and insert it into the tree.
+  NB. We also install the lower selresult
+  tmodx =. sel1 {:: resultseqmap
+case. 1;2 do.
+  NB. expansion/each, and collection error both require that we install the boxed fillmask.
+  NB. We install into the fillmask array
+  tmodx =. ($fillmask)&#.&.> selectiontoticket sel1
+case. do.
+  NB. Normal fillmasks, which may or may not be boxed (they will be boxed if they contained some boxed detail such as
+  tmodx =. frame #. > {. sel1   NB. only 1 atom allowed; make it an atom
+end.
+tmodx {:: selresult
+)
+
+pickrDOshapepos =: 4 : 0
+'flags exp' =. x
+if. 0 = #DOshapes do.
+elseif. #r =. (exp{DOshapepospickrects) findpickhits y do.
+  'ix pyx' =. {. r   NB. index of pickrect found
+  NB. Get the picked row: 0 for shape, 1 for selection.  The selection is possible only if there is
+  NB. a selection line, i. e. #DOshapes=2
+  row =. ({.pyx) > ((<exp,_1 1 0) { DOshapepospickrects) % #DOshapes
+  if. (row = 0) +. (ix >: #DOshapelocales) do.
+    t =. fillmask frameselresult selresult
+    msg =. 'result copied to clipboard'
+  else.
+    l =. ix { DOshapelocales   NB. the locale of the selection
+    NB.?lintonly l =. <'dissectverb'
+    NB. Put the selected data on the clipboard
+    t =. getselectedcell__l ''
+    msg =. 'selected cell copied to clipboard'
+  end.
+  try.
+    wd 'clipcopy *' , 5!:5 <'t' [ t
+  catch.
+    msg =. 'error writing to clipboard'
+  end.
+  NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
+  formloc =. exp { COCREATOR,coname''
+  NB.?lintonly formloc =. <'dissect'
+  drawtooltip__formloc (y + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
+  hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
+end.
+0 0$0
+)
+
 hoverDOshapepostutorial =: 0 : 0
 This is the shape/selection line(s).  The first line gives the shape of the result; the second line, which is present only when a selection has been made inside the result, gives the path of the selection.
 
@@ -5965,14 +6043,42 @@ This error is reported as 'domain error' in the J session.
 The result-cells that could not be assembled are shown below, with each result inside its own dashed box, so that you can see where the incompatibility arises.
 ?invalid verb
 This combination was rejected before it was even executed on its arguments.
+
+This is reported as a 'domain error' in the J session.
 ?error
 This execution resulted in an error, but overall execution continued.
 
 If this verb is being executed on a cell of fills, the error result is treated as if it were 0.
 
 If this verb is executed in the combination u :: v, execution continues with the v side.
+?incompatible selectors
+In x m} y, the selectors select regions of y that have different shapes.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+
+This is reported as a 'domain error' in the J session.
 ?non-atomic v
 In m@.v, the execution of v must result in a numeric atom.
+
+This is reported as a 'domain error' in the J session.
+?selector invalid
+In x { y or x m} y, a complementary selector is not atomic.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+
+This is reported as an 'index error' in the J session.
+?selector rank
+In x { y or x m} y, a selector contains contents with rank > 1.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+
+This is reported as a 'rank error' in the J session
+?selector level
+In x { y or x m} y, a selector has boxing level higher than 3.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+
+This is reported as a 'domain error' in the J session.
+?selector too long
+In x { y or x m} y, a selector specifies more axes than the rank of y.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+
+This is reported as a 'length error' in the J session.
+?xm agreement
+In x m} y, $x must be a suffix of $m{y.
+
+This is reported as a 'domain error' in the J session.
 ?attention interrupt
 You interrupted execution with JBreak.
 ?break
@@ -6010,7 +6116,7 @@ This verb either executes an illegal sentence or attempts to return a result tha
 
 The usual cause is an undefined name in the definition of the verb.
 ?time limit
-Execution took too long.
+Execution took too long.  An execution time-limit has been set by (9!:33).
 ?value
 Execution of this verb attempted to use a name that has not been assigned.
 ?recoverable error
@@ -6533,6 +6639,10 @@ NB. Use the last-drawn position as the new position.  If it hasn't changed from 
 elseif. 0 = 4!:0 <'scrollinglocale' do.
   4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 end.
+)
+
+dissect_dissectisi_mbrup =: 3 : 0
+hoverend''
 )
 
 dissect_dissectisi_focuslost =: 3 : 0
@@ -7215,10 +7325,6 @@ noun;(coname'');tokensource
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 NB. Apply parentheses if left verb operand or conjunction operand operand - but only if more than 1 word
@@ -7270,10 +7376,6 @@ NB. If this verb has a one-line description, save it
 onelinedesc =: 2 {:: y , <''
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Save the number of operands for this invocation
@@ -7595,10 +7697,6 @@ noun;(coname'');''
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 enparen^:(y>0) (defstring__uop 0) jd ' ' , (defstring__yop 0)
@@ -7716,10 +7814,6 @@ noun;(coname'');''
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 enparen^:(y>0) (defstring__xop 1) jd ' ' , (defstring__uop 0) jd ' ' , (defstring__yop 0)
@@ -7816,10 +7910,6 @@ NB. Since this is called after setvalence, we insert valence-related stuff here
 valence =: <: #y
 resultissdt =: resultissdt__uop
 coname''
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 calcestheights =: 3 : 0
@@ -8048,10 +8138,6 @@ NB. Return the part of speech of the assigned value
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 if. uopisname do.
@@ -8180,10 +8266,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -8377,10 +8459,6 @@ verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 NB. The monad is just like @@:, so we just point to that locale.  This also applies if u
@@ -8535,10 +8613,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -8773,10 +8847,6 @@ verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
@@ -8915,10 +8985,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -9163,10 +9229,6 @@ verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. Set the valence used for executing this verb, and propagate to descendants
 NB. The descendant is always executed as a dyad
 setvalence =: 3 : 0
@@ -9322,10 +9384,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
 NB.?lintsaveglobals
 coname''
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -9559,10 +9617,6 @@ verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
@@ -9573,6 +9627,12 @@ if. visnoun do.
 else.
   vvop =: setvalence__vvop y
   NB.?lintonly vvop =: <'dissectverb'
+  NB. In case the operand changed, refigure the gerunds
+  if. #gops =: querygerund__vvop '' do.
+  NB. If there are gerund locales, the next-to-last will be the one that survives for use as v
+    vop =: _2 { gops  NB.?lintonly =: 3$a:
+  end.
+  NB.?lintonly vop =: <'dissectverb'
   resultissdt =: resultissdt__uop *. resultissdt__vvop
 end.
 NB. Return the dispoperands from v
@@ -9688,8 +9748,6 @@ else.
     if. #inputselopshapes do. y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
   end.
 end.
-NB. Create references as needed
-NB. Traverse & realize x and y operands for gerund cases
 
 NB. Now ux has the traverse x inputs for u (the [x]y inputs to u), vx has the ones for v if any
 NB. traverse v, either as a noun or as a verb using the current selector
@@ -9988,10 +10046,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
 coname''
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -10367,10 +10421,6 @@ noun;(coname'');tokensource
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
-
 setvalence =: 3 : 0
 valence =: #y
 vop =: setvalence__vop y
@@ -10446,10 +10496,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -10596,10 +10642,6 @@ NB. ********** the partitioning modifiers themselves *****************
 NB. These routines are shared by all partition processing
 cocurrent 'dissectpartition'
 coinsert 'dissectobj'  NB. for lint
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
-)
 
 NB. Set the valence used for executing this verb, and propagate to descendants
 NB. The descendant is always executed as a monad
@@ -11334,7 +11376,7 @@ create =: 3 : 0
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: <'dissectobj'
 NB. Switch to general verb if v is a noun, or if u is not a noun, or if u is not understood as a gerund
-if. (noun bwand (<2 0) {:: y) +. 0 = #ulocales =: querygerund__uop '' do.
+if. (* noun bwand (<2 0) {:: y) +. 0 = #ulocales =: querygerund__uop '' do.
   if. 0 = noun bwand (<0 0) {:: y do.
     failmsg 'domain error: verb@.v'
   end.
@@ -11352,10 +11394,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -11420,11 +11458,13 @@ elseif. do.
   try.
     selectedop =. ulocales {~ fillmask__vop frameselresult__vop selresult__vop
   catch.
-    (EINVALIDOP;'invalid v value') earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return.
+    changeerrormessagefrominterp 'invalid v value'
+    EINVALIDOP earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return.
   end.
   NB. The selection must be a scalar.
   if. ($0) -.@-: $selectedop do.
-    (EINVALIDOP;'non-atomic v') earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return.
+    changeerrormessagefrominterp 'non-atomic v'
+    EINVALIDOP earlyerror x ;< ,: vlayo ,&< < (2 1 $ <0 0$0) , <0 return.
   end.
   NB.?lintonly selectedop =. <'dissectverb'
   NB. Insert an end-of-computation marker for the expansion
@@ -11518,7 +11558,6 @@ create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the display form of the conjunction and the locale of v.
-NB. If the display form of the conjunction is not '^:', we are acting as a surrogate for another function like dyad u&m
 'uop cop vop' =: 1 {"1 y
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
 blockismarked =: 0
@@ -11526,10 +11565,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -11688,10 +11723,6 @@ r
 NB.?lintsaveglobals
 )
 
-destroy =: 3 : 0
-destroy_dissectverb_ f. ''
-)
-
 setvalence =: 3 : 0
 if. executingvalence__COCREATOR ~: #y do.
   failmsg 'dissect restriction: recursion must have the same valence as the original execution'
@@ -11729,6 +11760,518 @@ NB. We have saved the locale of the recursion point, and
 selectionoverride =: 3 : 0
 selectrecursion__uop__recursionpoint currentticket
 PICKTOOLTIPMSGOK  NB. Indicate that we have overridden, abort selection
+)
+
+NB. *********** } ***********
+primlocale '}'
+
+create =: 3 : 0
+NB. Switch to general verb if u is a verb
+if. 0 = noun bwand (<0 0) {:: y do.
+  changeobjtypeto localedefault
+  create y
+  return.
+end.
+
+create_dissectobj_ f. (<1 2) { y
+NB. Register this object so we can clean up at end
+newobj__COCREATOR coname''
+NB. Save the display form of c, the locale of u, and the gerund locales if any
+'uop cop' =: 1 {"1 y
+NB. Save the original v, whether gerund, noun, or verb
+uuop =: uop
+NB.?lintonly uuop =: <'dissectverb'
+NB.?lintonly uop =: <'dissectverb' [ cop =: ''
+NB. Save gerund locales if any
+if. #gops =: querygerund__uuop '' do.
+  NB. If there are gerund locales, the next-to-last will be the one that survives for use as u
+  uop =: _2 { gops  NB.?lintonly =: 3$a:
+end.
+NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
+NB. Ignore ]@ etc.
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop
+verb;(coname'');tokensource
+NB.?lintsaveglobals
+)
+
+NB. Set the valence used for executing this verb, and propagate to descendants
+setvalence =: 3 : 0
+valence =: #y
+if. #gops do.
+  uuop =: setvalence__uuop y
+  NB.?lintonly uuop =: <'dissectverb'
+  gops =: querygerund__uuop ''
+  uop =: _2 { gops  NB.?lintonly =: 3$a:
+  NB.?lintonly uop =: <'dissectverb'
+end.
+resultissdt =: resultissdt__uop
+separatevalences''
+coname''
+NB.?lintsaveglobals
+)
+
+calcestheights =: 3 : 0
+NB. Add 1 unit to height of u to account for this node; 1/2 unit to v since it starts lower.
+NB. Overall height is the larger of the two.  If v is a noun, it will have just 1 height regardless
+NB. of valence; we turn that into an atom so it will replicate
+estheights =: (valence # 1) >. {.^:(0=#gops) estheights__uuop combineheights ,0.5
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+enparen^:(y=3) (defstring__uuop 2) jd cop
+)
+
+NB. return string form of operands, including instrumentation
+exestring =: 3 : 0
+initloggingtable ''
+auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uuop '') , cop , '))'
+)
+
+NB. Return the locales for propsel.
+proplocales =: 3 : 0
+NB. We mustn't propagate a selection to a gerund, bacuase the gerund has the same sellevel as m}
+NB. and the selection may be invalid for it.  We keep the sellevel of the gerunds the same as
+NB. m} for display purposes, so we pass any selection that is at a lower level.
+<^:(0=L.)@".@>^:(0 <: y) (((y~:0)+.(sellevel >: #selections)) , (y=3)) # ;: 'uuop tokensource'
+)
+
+NB. Nilad.  Result is the selection for this node:  type;selection where type=
+NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only
+NB. Here we never return the actual selection, if any, because it's valid only for highlighting - there aren't really items
+NB. of logvalues to back it up.  If the selection has been made, we return a forced selection (a:) which will cause the selector
+NB. to be unchanged but mark it valid; if not, we return no selection
+getselection =: 3 : 0
+NB. If we need a selection and we have one, forced, otherwise pick-only
+a: ,&<~ (selectable *. (sellevel < #selections)) { 0 3
+)
+
+NB. m} is treated as a verb for reporting purposes
+operationfailed =: 1:   NB. An error found during verb execution is a stopper
+
+NB. x is the frame of the full expected result
+NB. y is the number of results we actually got
+NB. result is index list of the failing location, in natural order
+NB. This turns ticket order to selection order
+getfailingisf =: 4 : 0
+''
+)
+
+NB. y is the new selection (boxed, and possibly with an initialselection following)
+NB. Result is _1 if selection is OK, 0 if point of error, 1=invalid
+NB. There is no way for this selection to fail, since there is only one result, and if we have anything we have everything
+auditselection =: _1:
+
+startmonad''
+
+NB. Traversal up and down the tree.
+NB. The result is the DOL, up through the result of u
+traverse =: endtraverse@:(4 : 0)
+dummytraversedowncalcselect y  NB. Set the main global names only
+
+NB. Handle gerund operands if any, and figure the drawing connections to use for u & v
+select. #gops
+case. 0 do.
+  NB. Noun m: no references required, operands come from x
+  udol =. NOLAYOUTS traverse__uop TRAVNOUN
+  NB. If noun operand failed, pull the plug and display only that result
+  if. errorcode__uop > EOK do. udol return. end.  NB. If the noun failed, this node must have failed too
+case. 2;3 do.
+  NB. gerund m.  We must create replicate xy, for each gerund.  Do so, and
+  NB. arrange them in descending order of estheight for each argument so as to put the source at the highest point where
+  NB. it won't be deleted
+  sourceref =. (,: createreference)"1 x  NB. source,:ref for each argument x/y x s/r x 4  (x/y, source/ref)
+  NB. Get the estheights for each operand.  For vop, use as is.  For x and y, add in the appropriate height from u
+  eh =. (3 : 'estheights__y'"0) _2 {. gops  NB. estheight for each locale, m/y x valence(2)
+  srx =. *@:(/:@\:)"1&.|: eh   NB. source (0) or ref (1) for each argument, x/y x valence(2), taking the largest height for each
+  sr =. srx {"0 2"1 3 sourceref   NB. The actual inputs to use, m/y x valence x 4
+  NB. sr now has the operands that will be applied to the original m & y to produce:
+  NB.   the y inputs to m}, which will go by the name x
+  NB.   the m value for m}, which is traversed below and then accessed via uop.
+
+  NB. Create a y argument for the pre-u verbs: gerund xy.  Replace the rankstack in y with a rankstack containing only the light lines
+NB. obsolete   NB. This is a conundrum: the sellevel for the gerunds depends on whether m} is selectable.  But we don't know that until we run m}, which
+NB. obsolete   NB. depends on the gerunds.  Maybe the right thing is to modify the sellevel in the gerunds after we traverse m}; for the time being, we
+NB. obsolete   NB. will just assume that m} is selectable, and increment the sellevel in the gerunds.  kludge
+  xyy =. (< (#~ (<DLRCOMPEND) ~: 0&{"1) rankhistory) 1} y
+NB. obsolete   xyy =. (<>:sellevel) 0} xyy
+  NB. Traverse the u verb to create the m value
+  udol =. (_2 { sr) traverse__uop xyy
+
+  NB. Realize the other gerunds; their results become the input to u.  We treat the xy verbs as occurring
+  NB. BEFORE the u^:v.  Any selection performed here applies to the results of the xy verbs, not the original xy.  So,
+  NB. we run the xy verbs BEFORE calcselect here.  That means that travops cannot be used.  But we have to do the same kind of
+  NB. work as in fork: the light rank-lines and phys selections must be passed from the input y to the xy verbs, and
+  NB. the heavy rank-lines must be kept for u.  Moreover, if an xy verb is stealth, we need to pass rank lines that it
+  NB. did not show on to u.
+  NB. We end up by replacing y with a new y that shows the result of the xy verbs and the selection operations, and x with the results of the xy verbs
+
+  NB. Execute the [x]y verbs and realize their display
+
+  NB. traverse the xy ops and save their results as x (replacing the input x), to be passed into m} below
+  xylocs =. (,_1) { gops  NB. The locales x y
+  NB. For v0`v1`v2 and v1`v2 monad, }:sr matches the number of locales.  For v1`v2 dyad, we selected an extra operand above, to stand
+  NB. for the implied v0=[ .  This is the first item of sr; it must be omitted when traversing gops
+  travargs =. ((,_1) { sr) ,&<"2 1 xyy  NB. Traverse args for each locale x ; y
+  ld =. travargs (4 : '((<selresultshape__y);dispstealthoperand__y);~(joinlayoutsl traverse__y&>/ x)')"1 0 xylocs  NB. use ;~ to run traverse before inspecting results
+  'x srs stealth' =. <@;"1 |: ld
+  NB. Create the y to use for m}, with the heavy lines unless stealth caused an xy verb to be omitted.
+  if. 0 = +/ stealthcode =. 3 bwand |. stealth do.  NB. Convert to y x order to match rankhistory
+    NB. Not stealth: keep heavies
+    rankstackcode =. TRAVOPSSTARTHEAVY
+  elseif. valence = 1 do.
+    NB. monad with stealth; just keep all the original lines
+    rankstackcode =. TRAVOPSKEEPALL
+  elseif. do.
+    rankstackcode =. TRAVOPSKEEPALL
+    NB. dyad with one or both stealth.  Create new rankhistory, where each column is chosen to be the
+    NB. value selected by that stealthop, or empty if not stealth.  Delete lines that end up with no rank
+    NB. This is copied from fork, except that we never generate highlights
+    rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 |."1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
+  end.
+  NB. If the input y had no operands, we leave it that way.  Everything else doesn't matter.
+  NB. Otherwise, we recalculate y, and recalculate the inputselopshapes etc that we use below
+  if. #inputselopshapes do. dummytraversedowncalcselect y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
+case. do.
+  traversedowncalcselect y
+  EINVALIDVERB earlyerror x return.
+end.
+
+NB. We have traversed u to get the m value.  x and y contain the inputs to m}
+
+NB. Create the layout for m
+ulayo =. joinlayoutsl udol
+titlestring =: 0 fulltitlestring 'm',cop
+
+if. errorcode__uop e. EHASVALIDFILLMASK do. mval =: fillmask__uop frameselresult__uop selresult__uop
+else. mval =: 0   NB. Make sure it's defined
+end.
+NB. If m produced a gerund at execution time, in other words if it constructed an AR, we're beat, because we don't have
+NB. the moxie to analyze that at display time.
+if. isgerund mval do. failmsg 'm} produced a gerund m without using ` - dissect doesn''t support that' end.
+
+mselect =. <EMPTYPRH   NB. start out with no highlight on m
+errorloc =: ''  NB. This will hold the index of the detected error if any
+yindex =: 0  NB. Indicate no index list for the x operand
+
+NB. If m didn't run, there is really nothing we can do about m}; just display the final result.
+if. (errorcode__uop > EOK) do.
+  NB. If m did not run, remove validity from m}.  Traverse it for display.
+  y =. 3 {. y  
+elseif. #inputselopshapes do.
+  sy =. $^:(0<L.) 0 {:: inputselopshapes  NB. shape of y
+  if. ($mval) -.@-: }. sy do.
+    changeerrormessagefrominterp 'ym agreement'
+    errorloc =: 0
+  elseif. +./@, emsk =. -. mval e. ((] , -~) i.) {. sy do.
+    NB. selector out of bounds.  leave as index error
+    errorloc =: ($mval) #: 1 i.~ emsk
+  end. 
+  NB. We have run the gsuntlet, and have set errorloc if there is an error
+
+  NB. If there was a selection, calculate the highlight for the selection part
+  if. selectable *. sellevel < #selections do.
+    NB. There is a selection.  Find the atom of m that contained it; highlight that atom
+    if. -. 0 e. $mval do.  NB. If mval empty, fill-cell processing is active, and there is nothing to select anyway
+      if. errorloc -: 0$a: do.
+        NB. The operands were valid.  Highlight the selected m
+        mselect =. < (2 1 $ < ,sellevel { selections) , <0
+        yindex =: , ({.sy) | (sellevel { selections) { mval
+      end.
+    end.
+  elseif. {. $ errorloc do.
+    NB. No selection, but there was an error detected on the inputs.  Highlight the error
+    mselect =. < (2 1 $ <errorloc) , <0
+  end.
+end.
+
+NB. Perform selections for m} - needed for display whether m ran or not
+traversedowncalcselect y
+if. errorcode e. EEARLYERROR do. earlyerror x ;< ,: ulayo ,&< < (2 1 $ <0 0$0) , <0 return. end.
+
+NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
+'displayhandlesin displayhandleout displaylevrank' =: (,0);1;< rankhistory
+NB. Bring v in as a third input to the result, wherever it came from.
+NB. The v result (coming in from the right) is placed in a third box of
+NB. the result (present only when there is a right-hand operand).  This box contains
+NB. a table of dol;highlights
+x ; (coname '') ; < ,: ulayo ,&< mselect
+NB.?lintsaveglobals
+)
+
+exegesisrankstack =: 3 : 0
+'appearstwice lastinblock datapresent' =. y
+if. datapresent do.
+  t =. 'The result of the verb:',LF,(defstring 0),CR
+
+  if. *./ selopinfovalid do.
+    t =. t , 'the result is a composite item of y, with each atom of m telling which item of y the corresponding atom of the result should come from',LF
+    type =. EXEGESISRANKOVERALLCOMPEND
+  else.
+    t =. t , 'Select a result-cell to see where it came from.'
+    type =. EXEGESISRANKOVERALLNOOPS
+  end.
+else.
+  'type t' =. exegisisrankoverallnodisp 1;titlestring
+end.
+,: type;t
+)
+
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb (always empties here, since rank is _)
+NB. result is (selframe);(frame);(frame of value to display);(selopshapes for next level - cells of this verb);resultlevel;arglevel
+NB. Called even when selector is empty, if rank-calculus probe
+calcdispframe =: 4 : 0
+NB. If this is a rank-calculus probe, vval is invalid and we can't look at it.  Its value doesn't matter anyway
+if. a: -: selector do. sf =. '' else. sf =. }. $^:(0<L.) 0 {:: selopshapes end.  NB. calc selframe: shape of an item of y
+sf;($0);y;a:,a:
+)
+
+
+NB. y is the current selection (a: if forced)
+NB. Calculate a highlight x or y, as appropriate
+calcphysandhighlights =: 3 : 0
+NB. If the current selection was found when we did the search for mselect, use the
+NB. index to x that we calculated there, and highlight that value in x.  Otherwise, highlight
+NB. the same position in y.  Only one of these positions will be highlighted.
+if. #$yindex do.
+  NB. Highlight into y
+  ,< 2 1 $ < , yindex&,&.> sellevel { selections
+else.
+  ,< 2 {. EMPTYPRH
+end.
+
+)
+
+startdyad''
+
+NB. Traversal up and down the tree.
+NB. The result is the DOL, up through the result of u
+traverse =: endtraverse@:(4 : 0)
+NB. Create a y argument for the pre-u verbs: gerund xy.  Replace the rankstack in y with a rankstack containing only the light lines
+dummytraversedowncalcselect y  NB. Set the main global names only
+xyy =. (< (#~ (<DLRCOMPEND) ~: 0&{"1) rankhistory) 1} y
+
+NB. Handle gerund operands if any, and figure the drawing connections to use for u & v
+select. #gops
+case. 0 do.
+  NB. Noun m: no references required, operands come from x
+  udol =. NOLAYOUTS traverse__uop TRAVNOUN
+  NB. If noun operand failed, pull the plug and display only that result
+  if. errorcode__uop > EOK do. udol return. end.  NB. If the noun failed, this node must have failed too
+case. 3 do.
+  NB. gerund m.  We must create replicate xy, for each gerund.  Do so, and
+  NB. arrange them in descending order of estheight for each argument so as to put the source at the highest point where
+  NB. it won't be deleted
+  sourceref =. (,: createreference)"1 x  NB. source,:ref for each argument x/y x s/r x 4  (x/y, source/ref)
+  NB. Get the estheights for each operand.  For vop, use as is.  For x and y, add in the appropriate height from u
+  eh =. (3 : 'estheights__y'"0) gops  NB. estheight for each locale, x/m/y x valence(2)
+  srx =. *@:(/:@\:)"1&.|: eh   NB. source (0) or ref (1) for each argument, x/m/y x valence(2), taking the largest height for each
+  sr =. srx {"0 2"1 3 sourceref   NB. The actual inputs to use, x/m/y x valence x 4
+  NB. sr now has the operands that will be applied to the original x & y to produce:
+  NB.   the xy inputs to m}, which will go by the name x
+  NB.   the m value for m}, which is traversed below and then accessed via uop.
+
+  NB. Traverse the u verb to create the m value
+  udol =. (1 { sr) traverse__uop xyy
+
+  NB. Realize the other gerunds; their results become the input to m.  We treat the xy verbs as occurring
+  NB. BEFORE the u^:v.  Any selection performed here applies to the results of the xy verbs, not the original xy.  So,
+  NB. we run the xy verbs BEFORE calcselect here.  That means that travops cannot be used.  But we have to do the same kind of
+  NB. work as in fork: the light rank-lines and phys selections must be passed from the input y to the xy verbs, and
+  NB. the heavy rank-lines must be kept for u.  Moreover, if an xy verb is stealth, we need to pass rank lines that it
+  NB. did not show on to u.
+  NB. We end up by replacing y with a new y that shows the result of the xy verbs and the selection operations, and x with the results of the xy verbs
+
+  NB. Execute the xy verbs and realize their display
+
+  NB. traverse the xy ops and save their results as x (replacing the input x), to be passed into m} below
+  xylocs =. 0 2 { gops  NB. The locales x y
+  NB. For v0`v1`v2 and v1`v2 monad, }:sr matches the number of locales.  For v1`v2 dyad, we selected an extra operand above, to stand
+  NB. for the implied v0=[ .  This is the first item of sr; it must be omitted when traversing gops
+  travargs =. (0 2 { sr) ,&<"2 1 xyy  NB. Traverse args for each locale x ; y
+  ld =. travargs (4 : '((<selresultshape__y);dispstealthoperand__y);~(joinlayoutsl traverse__y&>/ x)')"1 0 xylocs  NB. use ;~ to run traverse before inspecting results
+  'x srs stealth' =. <@;"1 |: ld
+  NB. Create the y to use for m}, with the heavy lines unless stealth caused an xy verb to be omitted.
+  if. 0 = +/ stealthcode =. 3 bwand |. stealth do.  NB. Convert to y x order to match rankhistory
+    NB. Not stealth: keep heavies
+    rankstackcode =. TRAVOPSSTARTHEAVY
+  elseif. valence = 1 do.
+    NB. monad with stealth; just keep all the original lines
+    rankstackcode =. TRAVOPSKEEPALL
+  elseif. do.
+    rankstackcode =. TRAVOPSKEEPALL
+    NB. dyad with one or both stealth.  Create new rankhistory, where each column is chosen to be the
+    NB. value selected by that stealthop, or empty if not stealth.  Delete lines that end up with no rank
+    NB. This is copied from fork, except that we never generate highlights
+    rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 |."1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
+  end.
+  NB. If the input y had no operands, we leave it that way.  Everything else doesn't matter.
+  NB. Otherwise, we recalculate y, and recalculate the inputselopshapes etc that we use below
+  if. #inputselopshapes do. dummytraversedowncalcselect y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
+case. do.
+  traversedowncalcselect y
+  EINVALIDVERB earlyerror x return.
+end.
+
+NB. We have traversed u to get the m value.  x and y contain the inputs to m}
+
+NB. Create the layout for m
+ulayo =. joinlayoutsl udol
+titlestring =: 0 fulltitlestring 'm',cop
+
+if. errorcode__uop e. EHASVALIDFILLMASK do. mval =: fillmask__uop frameselresult__uop selresult__uop
+else. mval =: 0   NB. Make sure it's defined
+end.
+NB. If m produced a gerund at execution time, in other words if it constructed an AR, we're beat, because we don't have
+NB. the moxie to analyze that at display time.
+if. isgerund mval do. failmsg 'm} produced a gerund m without using ` - dissect doesn''t support that' end.
+
+mselect =. <EMPTYPRH   NB. start out with no highlight on m
+errorloc =: ''  NB. This will hold the index of the detected error if any
+xindex =: 0  NB. Indicate no index list for the x operand
+
+NB. If m didn't run, there is really nothing we can do about m}; just display the final result.
+if. (errorcode__uop > EOK) do.
+  NB. If m did not run, remove validity from m}.  Traverse it for display.
+  y =. 3 {. y
+elseif. #inputselopshapes do.
+  'sx sy' =. $^:(0<L.)&.> inputselopshapes  NB. shapes of x and y
+  NB. Create canonical form of mval, which is a table of index lists for each atom of
+  NB. mval.  The shape of the table gives the shape of the selection from y; there must be no fill
+  NB. across the atoms.  And, the shape of the x must be a suffix of the selected shape
+  if. 0 e. $ mval do. cmval =. 0 $ i. #sy   NB. processed as cell of fills
+  else.
+    cmval =. mval
+    if. 0 = L. cmval do. cmval =. <"0 cmval end.  NB. bring up to boxing level 1
+    if. +./@, emsk =. 1 < #@$@> cmval do.
+      NB. The first boxing level should contain rank < 2.  If not, change the error message
+      changeerrormessagefrominterp 'selector rank'
+      errorloc =: ($cmval) #: 1 i.~ emsk
+    elseif. +./@, emsk =. 2 < L.@> cmval do.
+      NB. Selectors should not have level > 3
+      changeerrormessagefrominterp 'selector level'
+      errorloc =: ($cmval) #: 1 i.~ emsk
+    elseif. +./@, emsk =. +./@;@> ((1=L.) *. '' -.@-: $)&.>&.> cmval do.
+      NB. Complementary selectors must be atomic
+      changeerrormessagefrominterp 'selector invalid'
+      errorloc =: ($cmval) #: 1 i.~ emsk
+    elseif. +./@, emsk =. (#sy) < #@> cmval do. 
+      NB. Selectors should have no more axes than the rank of y
+      changeerrormessagefrominterp 'selector too long'
+      errorloc =: ($cmval) #: 1 i.~ emsk
+    elseif.
+    cmval =. <"0^:(0=L.)&.> cmval  NB. Bring up to boxing level 2
+    cmval =. (#sy) {.!.(<<'')&.> cmval  NB. Bring up to full length with complementary 
+    +./@, emsk =. ([: +./ (((] , -~) i.)&.> sy)&((*@#@-.~ ,@:>)&>))@> cmval do.
+      NB. Index not in the valid range.  Leave as index error
+      errorloc =: ($cmval) #: 1 i.~ emsk
+    elseif.
+    NB. Valid selector, except for fill.  Make all indexes positive
+    cmval =. sy&((|L:0)"0)&.> cmval
+    NB. Convert the complementary selectors to the list of selected indexes, in order
+    cmval =. sy&((i.@[ -. >@])^:(1=L.@])&.>)&.> cmval
+    NB. Now we have a level-2 set of selectors.  Roll them up into a level-1 set of arrays of complete index lists
+    NB. append a: to guarantee that there will be at least 2 boxes, so we will not have a neutral which might have any shape.
+    NB. This way we know we are going to have complete index lists
+    cmval =. > ,"0 1/&.>/@(,&a:)&.> cmval  NB. >>cmval can't be empty
+    NB. Get the shape of each fully-filled-out selector; extend the shape with high-order 1s (trickily); verify all shapes
+    NB. equal (otherwise there is fill
+    +./@, emsk =. (~: ''&($,)) cmvalshapes =. (<"1) |."1  >: <:@|.@> }:@$&.> cmval do.
+      NB. Selectors should have no more axes than the rank of y
+      changeerrormessagefrominterp 'incompatible selectors'
+      NB. We can't finger any one selector, but we find the first one that mismatches the head shape
+      errorloc =: ($cmval) #: 1 i.~ emsk
+    elseif. (($cmvalshapes) , > '' ($,) cmvalshapes) (] -.@-: ({.!._1~   -@#)) sx do.
+      NB. $x must be a suffix of $m{y
+      changeerrormessagefrominterp 'xm agreement'
+      NB. We can't finger any one selector, so we use a scalar value of errorloc to indicate the error
+      errorloc =: 0  NB. scalar 0 - xm agreement
+    end.
+    NB. We have run the gsuntlet, and have set errorloc if there is an error
+  end. 
+
+  NB. If there was a selection, calculate the highlight for the selection part
+  if. selectable *. sellevel < #selections do.
+    NB. There is a selection.  Find the atom of m that contained it; highlight that atom
+    if. -. 0 e. $mval do.  NB. If mval empty, fill-cell processing is active, and there is nothing to select anyway
+      if. errorloc -: 0$a: do.
+        NB. The operands were valid, so we know we have converted cmval to level-1 table of full index lists
+        NB. Find the last box of cmval that contains the selection
+        if. 1 e. cmmask =. , ((sellevel { selections) (e. ,) <"1)@> cmval do.
+          NB. The selection appeared in m.  Find the last box of m and create a highlight for it.
+          NB. Turn it into a highlight record
+          mselect =. < (2 1 $ < ,<($cmval) #: cmmask i: 1) , <0
+          NB. Get the index in x that corresponds (we will use this for highlighting the cell)
+          NB. count all the rows before the one that matched, and use that to generate the index list into x
+          tailx =. (, <"1 (cmmask i: 1) {:: , cmval) i: sellevel { selections
+          xindex =: sx #: tailx + +/ (cmmask i: 1) {. , */@}:@$@> cmval
+        end.
+      end.
+    end.
+  elseif. {. $ errorloc do.
+    NB. No selection, but there was an error detected on the inputs.  Highlight the error
+    mselect =. < (2 1 $ <errorloc) , <0
+  end.
+end.
+
+NB. Perform selections for m} - needed for display whether m ran or not
+traversedowncalcselect y
+if. errorcode e. EEARLYERROR do. earlyerror x ;< ,: ulayo ,&< < (2 1 $ <0 0$0) , <0 return. end.
+
+NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
+'displayhandlesin displayhandleout displaylevrank' =: _0.3 0.3;1;< rankhistory
+NB. Bring v in as a third input to the result, wherever it came from.
+NB. The v result (coming in from the right) is placed in a third box of
+NB. the result (present only when there is a right-hand operand).  This box contains
+NB. a table of dol;highlights
+x ; (coname '') ; < ,: ulayo ,&< mselect
+NB.?lintsaveglobals
+)
+
+exegesisrankstack =: 3 : 0
+'appearstwice lastinblock datapresent' =. y
+if. datapresent do.
+  t =. 'The result of the verb:',LF,(defstring 0),CR
+
+  if. *./ selopinfovalid do.
+    t =. t , 'the result is y with selected atoms replaced by atoms of x',LF
+    type =. EXEGESISRANKOVERALLCOMPEND
+  else.
+    t =. t , 'Select a result-cell to see where it came from.'
+    type =. EXEGESISRANKOVERALLNOOPS
+  end.
+else.
+  'type t' =. exegisisrankoverallnodisp 1;titlestring
+end.
+,: type;t
+)
+
+NB. x is selopshapes: box for each operand, containing $L:0 of the operand
+NB. y is natural frame(s) of the executed verb (always empties here, since rank is _)
+NB. result is (selframe);(frame);(frame of value to display);(selopshapes for next level - cells of this verb);resultlevel;arglevel
+NB. Called even when selector is empty, if rank-calculus probe
+calcdispframe =: 4 : 0
+NB. If this is a rank-calculus probe, vval is invalid and we can't look at it.  Its value doesn't matter anyway
+if. a: -: selector do. sf =. '' else. sf =. $^:(0<L.) 1 {:: selopshapes end.  NB. calc selframe
+sf;($0);y;a:,a:
+)
+
+
+NB. y is the current selection (a: if forced)
+NB. Calculate a highlight x or y, as appropriate
+calcphysandhighlights =: 3 : 0
+NB. If the current selection was found when we did the search for mselect, use the
+NB. index to x that we calculated there, and highlight that value in x.  Otherwise, highlight
+NB. the same position in y.  Only one of these positions will be highlighted.
+if. #$xindex do.
+  NB. Highlight into x
+  (2 1 $ < ,<xindex);< 2 {. EMPTYPRH
+else.
+  NB. Highlight into y
+  (2 {. EMPTYPRH) ;< 2 1 $ < sellevel { selections
+end.
 )
 
 NB. **** default ****
@@ -11794,10 +12337,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop *. resultissdt__cop
 verb;(coname'');''
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -11916,10 +12455,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
 verb;(coname'');''
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -12048,10 +12583,6 @@ NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-destroy =: 3 : 0
-destroy_dissectobj_ f. ''
 )
 
 NB. Set the valence used for executing this verb, and propagate to descendants
@@ -12830,7 +13361,75 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 18 dissect '(100 ?@$ 3) { 5;''a'';<a:'
 34 dissect '(100 ?@$ 3) { 5;''a'';<a:'
 'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 34 dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
+ctup = 9
 50 dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
+ctup = 8
+2 dissect '4 (1)} i. 5'   NB. no error
+2 dissect '4 (1)} i. 5 6'  NB. no error
+2 dissect '4 (<,:0 1)} i. 5 6'
+2 dissect '5 (<<<<1)} i. 5 6'
+2 dissect '5 (<<,<1 2)} i. 5 6'
+2 dissect '5 (<0 1 2)} i. 5 6'
+2 dissect '5 (6)} i. 5 6'
+2 dissect '5 (<6)} i. 5 6'
+2 dissect '5 (<<6)} i. 5 6'
+2 dissect '5 (<,<6)} i. 5 6'
+2 dissect '5 (,<,<6)} i. 5 6'
+2 dissect '5 (<4 6)} i. 5 6'
+2 dissect '5 (<5 4)} i. 5 6'
+2 dissect '5 (<4)} i. 5 6'
+2 dissect '5 (<4;5)} i. 5 6'  NB. no error
+2 dissect '5 (<4;6)} i. 5 6'
+2 dissect '5 (<5;5)} i. 5 6'
+2 dissect '5 (<2 5;5)} i. 5 6'
+2 dissect '5 (<(<2 5);5)} i. 5 6'
+2 dissect '5 (<(<2 4);5)} i. 5 6'  NB. no error
+2 dissect '5 (<(<2 4);<<5)} i. 5 6'  NB. no error
+2 dissect '(i. 4) (<(<2 4);<<5)} i. 5 6'
+2 dissect '(i. 5) (<(<2 4);<<5)} i. 5 6'  NB. no error
+2 dissect '(i. 3 5) (<(<2 4);<<5)} i. 5 6'  NB. no error
+2 dissect '(i. 2 5) (<(<2 4);<<5)} i. 5 6'
+2 dissect '5 (<(<2 4);<<6)} i. 5 6'
+2 dissect '5 (<(<2 4);<<_6)} i. 5 6'  NB. no error
+2 dissect '5 (<(<2 4);<<_7)} i. 5 6'
+2 dissect '5 (<(<2 4);<<2 _7)} i. 5 6'
+2 dissect '5 (1;1 2)} i. 5 6'
+2 dissect '100 200 (2 3;1 2)} i. 5 6'  NB. no error
+2 dissect '5 ((<2 3);<<<1 2 4)} i. 5 6'   NB. no error
+2 dissect '5 ((<2 3);<<<0 1 3 4)} i. 5 6'
+2 dissect '5 (<<2 3,:1 2)} i. 5 6'  NB. no error
+2 dissect '5 (<(2 3,:1 2);3)} i. 5 6'  NB. no error
+2 dissect '(100*i.4) (<(2 3,:1 2);3)} i. 5 6'
+2 dissect '(100*i.2 2) (<(2 3,:1 2);3)} i. 5 6'  NB. no error
+2 dissect '5 (<a:;(2 3,:1 2))} i. 5 6'  NB. no error
+2 dissect '(100 * i. 2 2) (<a:;(2 3,:1 2))} i. 5 6'  NB. no error
+2 dissect '(100 * i. 5 2 2) (<a:;(2 3,:1 2))} i. 5 6'  NB. no error
+2 dissect '5 6 (1)} i. 5 6'
+2 dissect '5 6 (1 2)} i. 5 6'
+2 dissect '5 6 (<a:;1 2)} i. 5 6'  NB. no error
+2 dissect '5 6 (<1;1 2)} i. 5 6'  NB. no error
+2 dissect '5 6 (<(,1);1 2)} i. 5 6'  NB. no error
+2 dissect '5 6 (<3 1;1 2)} i. 5 6'  NB. no error
+2 dissect '5 (0 1)} i. 5 6'  NB. no error
+2 dissect '5 6 (0 1)} i. 5 6'
+2 dissect '5 6 (0 1)} i. 5'   NB. no error
+2 dissect '(2 2;4 4) (1:`[`])} i. 3 4 5'
+2 dissect '(2 2;1 1) (1:`[`])} i. 3 4 5'  NB. no error
+2 dissect '1 (2 2;1 1)} i. 3 4 5'  NB. no error
+2 dissect '(2 2;1 1) ((i.@{:@$@])`[`(}:@]))} i. 5 4 5'  NB. no error
+2 dissect '(2 2;1 1) ((i.@{:@$@])`[`(*:@]))} i. 5 4 5'  NB. no error
+2 dissect '5 +`0:} i. 6'
+2 dissect '0} i. 4'  NB. no error
+2 dissect '0 2 4 _3} i. 5 4'   NB. no error
+2 dissect '0} i. 5 4'
+2 dissect '1 0.5} i. 5 2'
+2 dissect '0 2} i. 5'
+2 dissect '0 2 3 2} i. 3 4'
+2 dissect '0 2 _4 2} i. 3 4'
+2 dissect '0 2 _3 2} i. 3 4'   NB. no error
+2 dissect '{.`]} i. 3 3'
+2 dissect '{.`*:} i. 3 3'
+2 dissect '(2 2;1 1) ((i.@$@])`[`*:)} i. 5 4 5'
 )
 
 testsandbox_base_ =: 3 : 0
