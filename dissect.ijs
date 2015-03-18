@@ -59,8 +59,8 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. examine power gerund for height of u+xy, and refiguring dummytrav when setting y
-NB. don't remove hover if mmove with button down?
+NB. Support 0: etc and noun"_ to have no inputs; rethink m"_ as sdt in that case; think about (expr)"n; option to show inputs? naaah
+NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
 NB. Add rank-calculus for primitives with known behavior
@@ -68,7 +68,7 @@ NB. Give more-detailed error info during hover?, like what in the frame didn't a
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name.
 NB. support u . v y
-NB. have a locale for verb primitives like m} and eventually {:: and {, to hold operationfailed etc.
+NB. copy verb to clipboard on right-click?
 
 NB. display:
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?
@@ -860,7 +860,7 @@ if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
 else.
 NB. If the modifier and all the operands are self-defining terms, execute the modifier, figure out the resulting
 NB. part of speech, and create an appropriate type/value for it.  This will handle things like
-NB. 3 b.   and 1!:1   and  1 : '...' .
+NB. 3 b.   and 1!:1   and  1 : '...' and m"n .
   if. bwand/ sdt , 0 {::"1 exeblock do.
     ". 'exeobj =. ' , defstg =. ; 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. enparen y end.'&.> (1) {"1 exeblock
     tokennums =. ; 2 {"1 exeblock
@@ -1147,7 +1147,7 @@ NB. at which the display can be withdrawn.
 hoversessmin =: 0
 
 NB. save the crash indicator
-if. crashed =: 0 = #0 {:: y do.
+if. crashed =. 0 = #0 {:: y do.
 NB. Save the error message for the crash
   errormessagefrominterp =: _6 }.^:(' error' -: {.) (<:13!:11''){::9!:8''
 else.
@@ -1185,6 +1185,11 @@ wdsetfocus 'dissectisi'
 NB. Initialize selection history.  This sets enables for the buttons too.
 initselections''
 
+NB. If the user codes a verb whose result is never used (owing to stealth), and that verb crashes,
+NB. we will never see the error (unless we have the wit to show ][).  We look out for that here.
+NB. We create a flag that will be cleared if we display an error block.  If that is still set after the
+NB. first display, we will turn on displaystealth and retry
+needtocheckerrordisplayed =: crashed *. -. displaystealth
 if. crashed do.
   joinlayoutsl traverse 1   NB. Don't forget the final display!
   setdisplayerror__resultroot''
@@ -1297,6 +1302,15 @@ NB. if we need to refigure the placement because of a change like selection or a
 NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
   QP^:DEBTIME'startdraw=?6!:1'''' '
   drawplacement }. sizedrawingandform 0
+  NB. If we didn't put out the error message, show stealth and try again
+  if. needtocheckerrordisplayed do.
+    NB. set stealth visible and retry
+    displaystealth =: 1
+    calcallestheights__resultroot 1 2
+    placeddrawing =: calcplacement''
+    drawplacement }. sizedrawingandform 0
+    needtocheckerrordisplayed =: 0   NB. do this only once
+  end.
   glpaint''
   
 NB. Set the user-option buttons based on the display results
@@ -1310,13 +1324,13 @@ NB. give the user the option of changing the display size
 NB. If there are stealth operands on the display, enable the button and caption it
 NB. according to whether we are displaying them
   if. stealthopencountered do.
-    'fmshowstealth' wdsetvalue ": displaystealth
-  end.
   'fmshowstealth' wdsetenable ": stealthopencountered
+  end.
   'fmshowcompmods' wdsetvalue ": displaycompmods
   'fmshowstructmods' wdsetvalue ": displaystructmods
   'fmautoexpand2' wdsetvalue ": displayautoexpand2
   'fmshowfillcalc' wdsetvalue ": displayshowfillcalc
+  'fmshowstealth' wdsetvalue ": displaystealth
   
 NB. stealthopencountered =: 0   NB. Set if there is a stealth op on the display
   
@@ -1648,6 +1662,7 @@ NB. Called in locale of the base of the tree
 initnounshowdetail =: 'propselall'&((3 : 'y [ nounshowdetail =: y +. -. resultissdt') traversedown 0:)
 
 NB. calculate estheights for display.  We call estheights during the upwards traversal
+NB. While we're at it, we also set dispstealthoperand: y is 1 2 to remove those codes from stealth, making ][ displayable
 NB. Called in locale of the base of the tree
 calcallestheights =: 'propselall'&((3 : 'y [ dispstealthoperand =: {. stealthoperand -. y') traversedown (calcestheights@]))
 
@@ -1675,7 +1690,7 @@ NB. Object creation.  create the signaling variables used for communicating with
 NB. y is <the tokens that these values came from
 NB. Each verb-type object is responsible for creating:
 NB. titlestring: the name that will appear in the display at the top of a box
-NB. stealthoperand: at create time, this is set to 0 for normal verb, 1=], 2=[, 3=[:, 5=] never displayed, 6=[ never displayed
+NB. stealthoperand: at create time, this is set to 0 for normal verb, 1=], 2=[, 4=[:, 5=] never displayed, 6=[ never displayed
 NB. valence: when the verb gets a valence (i. e. when its monad/dyad exec happens), that valence is saved.
 NB. estheights: number of blocks from the bottom of the noun node to the input(s) to this node.  This list has one atom per
 NB.  valid operand. Set during setvalence, when we know the valence etc.  Height of <:0 is special, and indicates a stealthoperand like ] [,
@@ -2381,7 +2396,7 @@ NB. Keep selector unchanged, since there was just one cell in the operand and th
     else.
 NB. Not fill cell.  If there is no error, we should have just the right number of results
 NB. TEMP kludge!!  Error is not fatal, if we are in adverse or chasing a fill-cell.  Only too many results is always bad
-      assert. ((*/ frame) > #selx) +. (*/ frame) = #selx [ 'travdowncalcselect'  NB. used to include crashed__COCREATOR
+      assert. ((*/ frame) > #selx) +. (*/ frame) = #selx [ 'travdowncalcselect'
 NB. If the frame is valid, but we didn't get enough results, it means something died in this verb;
 NB. mark this verb as requiring detail and set the selector (if any) to select the failing item, which
 NB. will be the first item we did NOT create.  OR, it could mean that we are executing on a cells of fills, which
@@ -4121,7 +4136,7 @@ if. #y do. DOcfm =: y end.
 'cfmlabel cfmshape cfmstatus cfmimsgs' =. DOcfm
 QP^:DEBDOvn 'createDOvn:?> coname''''%defstring 0%stealthoperand%'
 NB. If this node is a stealth operand, whether displayed or not, remember the fact so we can give the user the option of showing it
-assert. stealthoperand e. 0 1 2 3 5 6
+assert. stealthoperand e. 0 1 2 4 5 6
 if. stealthoperand e. 1 2 do. stealthopencountered__COCREATOR =: 1 end.
 NB. If stealth verb, there is no display; but because of inheritance and suppressed detail, we might have the stealthoperand flag
 NB. set in a locale that is creating a noun; we'd better create that.  We detect nouns, as usual, by absence of handles in
@@ -5009,6 +5024,8 @@ end.
 NB. draw the status string, if any
 if. statuspresent do.
   DOcfmstatus drawtext DOstatusstring;actyx2 + DOstatuspos
+  NB. If we put out an error message, remember that fact so we keep stealth disabled
+  if. '(' ~: {.!.'(' DOstatusstring do. needtocheckerrordisplayed__COCREATOR =: 0 end. 
 end.
 
 
@@ -5285,7 +5302,7 @@ NB. If the input is a noun result that has had detail removed, it may contain no
 NB. if we pass it to a stealth operand it must make a layout for it  Example: z + ] 3.  If there are
 NB. layouts, only one of them will survive to take the place of the stealth operand; we make sure here
 NB. that it is the non-stealth operand
-  if. 0 = #x do. createlayout 0 0 else. (, dispstealthoperand { 0 _1 0 0 _1 _1 0) { x end.
+  if. 0 = #x do. createlayout 0 0 else. (, dispstealthoperand { 0 _1 0 0 0 _1 0) { x end.
 else.
 NB. If there are no earlier layouts, this had better be a noun - just create its layout
   if. 0 = #x do.
@@ -5361,6 +5378,7 @@ glclear''
 if. DEBOBJ do.
   qprintf'DOL?y '
 end.
+NB. draw the objects
 for_d. dos do.  NB.?lintonly d =. <'dissectobj'
   drawDO__d d_index{yx
 end.
@@ -5465,7 +5483,7 @@ exegesisfmtframe =: 3 : 0
 )
 
 NB. These are the morphemes we use, in the order they should appear in the final result.
-NB. Some may be entended with selection levels when they are created.
+NB. Some may be extended with selection levels when they are created.
 NB. The number is the detail level at which the value is displayed
 exegesismorphemes =. 3&{.@;:;._2 (0 : 0)
 EXEGESISTUTORIAL 2 Tutorial
@@ -5491,9 +5509,10 @@ EXEGESISSHAPEFRAME 0
 EXEGESISSHAPERESULT 0
 EXEGESISDATASOURCE 1
 EXEGESISDATASHAPE 1
-EXEGESISDATAPATH 1
+EXEGESISDATAPATH 0
 EXEGESISDATAARRANGEMENT 1
-EXEGESISDATAEXPLORABLE 0
+EXEGESISDATAEXPLORABLE 1
+EXEGESISDATACLIPINFO 1 Clipboard
 )
 ({."1 exegesismorphemes) =: i. # exegesismorphemes
 exegesislevels =: (1) 0&".@{::"1 exegesismorphemes
@@ -5959,7 +5978,7 @@ elseif. #r =. (exp{DOshapepospickrects) findpickhits y do.
   NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
   formloc =. exp { COCREATOR,coname''
   NB.?lintonly formloc =. <'dissect'
-  drawtooltip__formloc (y + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
+  drawtooltip__formloc (y + (((exp,0 0);0 0;0) {:: DOshapepos) + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
   hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
 end.
 0 0$0
@@ -6173,7 +6192,6 @@ hoverDOdatapos =: 4 : 0
 exp =. x
 hoveryx =. y
 NB. Ignore hover in the scrollbar
-NB. If the click is in the scrollbar, handle scrolling
 NB. See which scrollbar, if any, the click is in
 dhw =. (<exp,1) { DOdatapos
 if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
@@ -6238,6 +6256,14 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     elseif. do.
       disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to destroy the explorer window.',LF
     end.
+  end.
+  NB. Describe the options for putting the data onto the clipboard.
+  select. #DOshapes
+  case. 1 do.
+    disp =. disp , EXEGESISDATACLIPINFO ; 'Click in the shape line to copy this result to the clipboard.',LF
+  case. 2 do.
+    disp =. disp , EXEGESISDATACLIPINFO ; 'Click in the shape line to copy this result to the clipboard; click on a number in the selection line to put the unfilled cell it selects onto the clipboard.',LF
+  case. do.
   end.
   text =. exegesisgrammar disp
 else.
@@ -6408,18 +6434,18 @@ NB. hoverend is called whenever anything happens to abort the hover (click, focu
 NB. is called when the timer expires: we then see where the cursor is and call the owner to get a tooltip.
 
 NB. y is the mouse position yx.  Start/continue a hover timer, clearing an old one if the mouse has moved
-MAXHOVERMOVEMENT =: 1   NB. Allow this much movement from start-of-hover position
+MAXHOVERMOVEMENT =: 1 4   NB. Allow this much movement from start-of-hover position, depending on button status
 'HOVEROFFSETY HOVEROFFSETX' =: _8 5  NB. amount to offset tooltip from the hover
 
 NB. This is called in whichever locale and psel of whatever form is active - the main or an explorer.
 NB. The timer will run in the main form
-NB. x is (window type 0=main 1=exp);(1 to write to the statline (which doesn't exist on explorers))
+NB. x is (window type 0=main 1=exp);(1 to write to the statline (which doesn't exist on explorers));(radius for continuation);(1 to allow new timer-start)
 hoverstart =: 4 : 0
-'isexp writestat' =. x
+'isexp writestat radius startok' =. x
 if. #hoverinitloc do.  NB. We are hovering.  Does this continue the same hover?
-  if. MAXHOVERMOVEMENT < >./ | y - hoverinitloc do. hoverend'' end.
+  if. (radius { MAXHOVERMOVEMENT) < >./ | y - hoverinitloc do. hoverend'' end.
 end.
-if. 0 = #hoverinitloc do.   NB. If no hover running (and perhaps we just cleared it), start one
+if. startok *. 0 = #hoverinitloc do.   NB. If no hover running (and perhaps we just cleared it), start one
 NB.?lintonly wdtimer =: wd
 QP^:DEBMOUSE'hoverstart:hwnd=?winhwnd wd''qhwndp'' '
   wdtimer (tooltipdelayx,2) {:: TOOLTIPDELAYCHOICES  NB. start the hover timer
@@ -6518,6 +6544,8 @@ NB. Draw a tooltip there after saving the pixels
 drawtooltip =: 3 : 0
 'cpos string' =. y
 NB. There is a tooltip.  Display it.
+NB. Remember where the tooltip is to be drawn.  From now on we check for movement from this spot
+hoverinitloc =: cpos
 NB. Copy the pixels we are about to overwrite
 'ctly ctlx' =. 3 2 { 0 ". wdqchildxywh 'dissectisi'
 'hovery hoverx' =. cpos
@@ -6615,13 +6643,9 @@ elseif. 0 = 4!:0 <'scrollinglocale' do.
 NB. Perform the scroll, on the main window, but in the locale of the data
   0 scrollmmove__scrollinglocale 1 0 { sd
 elseif. do.
-NB. mmove not for scrolling.  If a mouse button is down, stop the hover; otherwise
-NB. start or continue the hover
-  if. 1 e. 4 5 8 9 10 { sd do.   NB. If any button down...
-    hoverend''
-  else.
-    0 1 hoverstart 1 0 { sd
-  end.
+  NB. mmove not for scrolling.  Set radius to use depending on whether a button is down
+  NB. If button down, use larger radius but don't allow a new tooltip to start
+  (0 1 , (1 e. 4 5 { sd) { 0 1,:1 0) hoverstart 1 0 { sd
 end.
 )
 
@@ -6945,13 +6969,9 @@ NB. abort it.
     explorer_dissectisi_mblup''
   end.
 elseif. do.
-NB. mmove not for scrolling.  If a mouse button is down, stop the hover; otherwise
-NB. start or continue the hover
-  if. 1 e. 4 5 8 9 10 { sd do.   NB. If any button down...
-    hoverend''
-  else.
-    1 0 hoverstart 1 0 { sd
-  end.
+  NB. mmove not for scrolling.  Set radius to use depending on whether a button is down
+  NB. If button down, use larger radius but don't allow a new tooltip to start
+  (1 0 , (1 e. 4 5 { sd) { 0 1,:1 0) hoverstart 1 0 { sd
 end.
 )
 
@@ -7368,8 +7388,9 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand, as the display and executable form (we may modify the display form later)
 'execform titlestring' =: ,&.> boxopen 0 {:: y
-stealthoperand =: 1 2 3 4 5 6 0 {~ ((;:'][[:'),']';']]';'[[') i. <titlestring  NB. ']' scalar is always-display. '[[' and ']]' are always-invisible forms
-titlestring =: stealthoperand {:: titlestring; ;: '][[:]]['
+assert. -. titlestring -: ']'
+stealthoperand =: 1 2 4 5 6 0 {~ ((;:'][[:'),']]';'[[') i. <titlestring  NB. '[[' and ']]' are always-invisible forms
+titlestring =: stealthoperand {:: titlestring; ;: '][?[:]['
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
 NB. If this verb has a one-line description, save it
@@ -7389,7 +7410,7 @@ NB.?lintsaveglobals
 )
 
 calcestheights =: 3 : 0
-estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;0;1;0;0) ,: (1 1;_1 0;0 _1;0 0;0 0;_1 0;0 _1)
+estheights =: , (<valence,dispstealthoperand) {:: a: , (1;0;0;1;1;0;0) ,: (1 1;_1 0;0 _1;1 1;1 1;_1 0;0 _1)
 )
 
 NB. return string form of operands, not including instrumentation
@@ -7420,7 +7441,7 @@ assert. 1 2 e.~ #x
 traversedowncalcselect y  NB. Just to set error globals
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. If no vranks, this verb must have failed to execute owing to upstream error.  Leave no levrank then
-'displayhandlesin displayhandleout displaylevrank' =: ((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1 1 1 1);1;<rankhistory
+'displayhandlesin displayhandleout displaylevrank' =: ((($0);(,0);_0.3 0.3) {::~ dispstealthoperand { valence , 1 1 1 , valence ,1 1);1;<rankhistory
 NB. Pass the DOLs through, but mark a stealthoperand for removal by deleting the output handles
 if. (valence = 2) *. dispstealthoperand e. 1 2 5 6 do.
   x =. a: (<3 ,~ <:3 bwand dispstealthoperand)} x
@@ -9681,7 +9702,12 @@ dummytraversedowncalcselect y  NB. Set the main global names only
 xyy =. (< (#~ (<DLRCOMPEND) ~: 0&{"1) rankhistory) 1} y
 
 NB. Handle gerund operands if any, and figure the drawing connections to use for u & v
+NB. For gerunds, to get the error-detection right we have to use the same order used by the interpreter:
+NB. v, y, [x]
 if. visnoun do.
+  vdol =. NOLAYOUTS traverse__vop TRAVNOUN
+NB. If noun operand failed, pull the plug and display only that result
+  if. errorcode__vop > EOK do. vdol return. end.  NB. If the noun failed, this node must have failed too
   NB. Noun v: no references required, just traverse u on x and y
   ux =. x   NB.?lintonly [ vx =. x
 else.
@@ -9691,6 +9717,7 @@ else.
   if. 0 = #refs =. |. _2 |. gops do. refs =. uop,vop end.  NB. refs =. [xop] yop vop or uop vop
   sourceref =. (,: createreference)"1 x  NB. source,:ref for each argument (1 or 2) x 2 x 4
   NB. Get the estheights for each operand.  For vop, use as is.  For x and y, add in the appropriate height from u
+  NB. Should perhaps add 1/2 unit to non-v since v starts lower
   eh =. (3 : 'estheights__y'"0) refs  NB. estheight for each locale, n x (1 or 2)
   if. #gops do.
     NB. If this is v1`v2 dyad, we have to treat is as [`v1`v2, so add an xop of [ (=height 0 _1)
@@ -9700,8 +9727,8 @@ else.
   end.
   srx =. *@:(/:@\:)"1&.|: eh   NB. source (0) or ref (1) for each argument, (1 or 2) x n, taking the largest height for each
   sr =. srx {"0 2"1 3 sourceref   NB. The actual inputs to use, n x (1 or 2) x 4
-  NB. The v op is always last
-  vx =. {: sr
+  NB. The v op is always last in our list, but executed first.
+  vdol =. ({: sr) traverse__vop xyy
   if. 0 = #gops do.
     NB. If this is u^:v, we just use the source/refs for processing u and v below
     ux =. {. sr
@@ -9721,7 +9748,8 @@ else.
     NB. For v0`v1`v2 and v1`v2 monad, }:sr matches the number of locales.  For v1`v2 dyad, we selected an extra operand above, to stand
     NB. for the implied v0=[ .  This is the first item of sr; it must be omitted when traversing gops
     travargs =. ((-#xylocs) {. }: sr) ,&<"2 1 xyy  NB. Traverse args for each locale x ; y
-    ld =. travargs (4 : '((<selresultshape__y);dispstealthoperand__y);~(joinlayoutsl traverse__y&>/ x)')"1 0 xylocs  NB. use ;~ to run traverse before inspecting results
+    NB. Traverse y before x just like Roger
+    ld =. travargs (4 : '((<selresultshape__y);dispstealthoperand__y);~(joinlayoutsl traverse__y&>/ x)')"1 0&.|. xylocs  NB. use ;~ to run traverse before inspecting results
     NB. If xop omitted for dyad, default it to [ by taking the x from the calculated input/ref, the shape from the first
     NB. shape input, and stealth of 2 (=[)
     if. valence > #xylocs do.
@@ -9744,24 +9772,12 @@ else.
       rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 |."1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
     end.
     NB. If the input y had no operands, we leave it that way.  Everything else doesn't matter.  We might have added
-    NB. a default operand here and we shouldn't try to traverse
-    if. #inputselopshapes do. y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
+    NB. a default operand here and we shouldn't try to traverse.  If we change y, recalculate the initial assignments
+    if. #inputselopshapes do. dummytraversedowncalcselect y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
   end.
 end.
+NB. Now ux has the traverse x inputs for u (the [x]y inputs to u)
 
-NB. Now ux has the traverse x inputs for u (the [x]y inputs to u), vx has the ones for v if any
-NB. traverse v, either as a noun or as a verb using the current selector
-if. visnoun do.
-  vdol =. NOLAYOUTS traverse__vop TRAVNOUN
-NB. If noun operand failed, pull the plug and display only that result
-  if. errorcode__vop > EOK do. vdol return. end.  NB. If the noun failed, this node must have failed too
-else.
-NB. u^:v: Create references for the input(s) and assign the correct one to u and v.
-NB. x is a list of layouts (each layout a list); create a table of layouts, each (rank-2) row having orig,reference
-NB. Start with original to u, ref to v; reverse if u height < v height.  The reference will go to the lower
-NB. Add 1/2 unit to u since v starts lower
-  vdol =. vx traverse__vop xyy
-end.
 NB. Create the layout for v
 vlayo =. joinlayoutsl vdol
 
@@ -11891,11 +11907,7 @@ case. 2;3 do.
   NB.   the m value for m}, which is traversed below and then accessed via uop.
 
   NB. Create a y argument for the pre-u verbs: gerund xy.  Replace the rankstack in y with a rankstack containing only the light lines
-NB. obsolete   NB. This is a conundrum: the sellevel for the gerunds depends on whether m} is selectable.  But we don't know that until we run m}, which
-NB. obsolete   NB. depends on the gerunds.  Maybe the right thing is to modify the sellevel in the gerunds after we traverse m}; for the time being, we
-NB. obsolete   NB. will just assume that m} is selectable, and increment the sellevel in the gerunds.  kludge
   xyy =. (< (#~ (<DLRCOMPEND) ~: 0&{"1) rankhistory) 1} y
-NB. obsolete   xyy =. (<>:sellevel) 0} xyy
   NB. Traverse the u verb to create the m value
   udol =. (_2 { sr) traverse__uop xyy
 
@@ -11910,7 +11922,7 @@ NB. obsolete   xyy =. (<>:sellevel) 0} xyy
   NB. Execute the [x]y verbs and realize their display
 
   NB. traverse the xy ops and save their results as x (replacing the input x), to be passed into m} below
-  xylocs =. (,_1) { gops  NB. The locales x y
+  xylocs =. (,_1) { gops  NB. The locale y
   NB. For v0`v1`v2 and v1`v2 monad, }:sr matches the number of locales.  For v1`v2 dyad, we selected an extra operand above, to stand
   NB. for the implied v0=[ .  This is the first item of sr; it must be omitted when traversing gops
   travargs =. ((,_1) { sr) ,&<"2 1 xyy  NB. Traverse args for each locale x ; y
@@ -12091,7 +12103,7 @@ case. 3 do.
   NB. For v0`v1`v2 and v1`v2 monad, }:sr matches the number of locales.  For v1`v2 dyad, we selected an extra operand above, to stand
   NB. for the implied v0=[ .  This is the first item of sr; it must be omitted when traversing gops
   travargs =. (0 2 { sr) ,&<"2 1 xyy  NB. Traverse args for each locale x ; y
-  ld =. travargs (4 : '((<selresultshape__y);dispstealthoperand__y);~(joinlayoutsl traverse__y&>/ x)')"1 0 xylocs  NB. use ;~ to run traverse before inspecting results
+  ld =. travargs (4 : '((<selresultshape__y);dispstealthoperand__y);~(joinlayoutsl traverse__y&>/ x)')"1 0&.|. xylocs  NB. use ;~ to run traverse before inspecting results
   'x srs stealth' =. <@;"1 |: ld
   NB. Create the y to use for m}, with the heavy lines unless stealth caused an xy verb to be omitted.
   if. 0 = +/ stealthcode =. 3 bwand |. stealth do.  NB. Convert to y x order to match rankhistory
@@ -12323,7 +12335,7 @@ NB.?lintonly uop =: vop =: cop =: <'dissectverb'
 NB. Remember whether this is an nvv-type fork
 if. vvv =: * verb bwand (<0 0) {:: y do.
 NB. If it's vvv, see if starts with [: .  If so, go process it as u@:v
-  if. 3 = stealthoperand__uop do.  NB. [:
+  if. 4 = stealthoperand__uop do.  NB. [:
     changeobjtypeto localeat
 NB. Move the token values too
 NB. Use the conjunction-name as a way of flagging this as [: for display
@@ -13430,6 +13442,11 @@ ctup = 8
 2 dissect '{.`]} i. 3 3'
 2 dissect '{.`*:} i. 3 3'
 2 dissect '(2 2;1 1) ((i.@$@])`[`*:)} i. 5 4 5'
+2 dissect '(2 2;1 1) ((i.@$@])`[`(*:~@]))} i. 5 4 5'
+2 dissect '5 [: 6'
+2 dissect '5 +:@]^:(+:@+`(2:@])`([:)) i. 5 6' 
+2 dissect '5 +:@]^:(+:@+`(2:@])`(*:)) i. 5 6'
+2 dissect '5 (*: ] +) 6'
 )
 
 testsandbox_base_ =: 3 : 0
