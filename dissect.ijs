@@ -59,7 +59,8 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. Support 0: etc and noun"_ to have no inputs; rethink m"_ as sdt in that case; think about (expr)"n; option to show inputs? naaah
+NB. when vb =. "_, use vb not (m"_) in stack
+NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
 NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
@@ -76,6 +77,15 @@ NB.    Launch Jwiki from hotlinks in tooltips.  How about F1 to call up NuVoc?
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
 
+NB. layout:
+NB. do layout after entire traversal.  Keep structure as is, but after trav, create all objects (once), then
+NB.  process from bottom up, choosing the lowest blocks to place each time and placing a referrered-to block
+NB.  at the highest reference 
+NB.   solves the problem of u@.v, where it is impossible to estimate a height before traversal
+NB.   removes need for estheights
+NB.   get accurate rather than estimated height
+NB.   avoids instantiation of undisplayed nodes
+NB.   allows the layout size to be calculated after all highlighting etc
 
 NB. router:
 NB. Add single-jog to router options to avoid down-and-up turn
@@ -172,6 +182,12 @@ NB. All names starting config_ become instance names losing the config_
 (7 }.&.> inames) =: ".&.> inames
 NB.?lintonly minimumfontsizex =: ttfontsizex =: tooltipdelayx =: tooltipdetailx =: displaycompmods =: displaystructmods =: 0
 NB.?lintonly maxnoundisplaysizex =: 0 0 [ displaystealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: 0
+0 0$0
+NB.?lintsaveglobals
+)
+
+NB. Applyconfig setting to form - must wait until form exists
+setformconfig =: 3 : 0
 NB. We have to set the form after loading the values
 ('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '1'
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '1'
@@ -183,9 +199,9 @@ maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 ('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue '1'
 calccfms minimumfontsizex { FONTSIZECHOICES
 NB. The rest of the form settings are performed each traversal
-0 0$0
 NB.?lintsaveglobals
 )
+
 
 dissectinstance =: 0$a:
 
@@ -736,13 +752,20 @@ NB. and 'verb' for modifier executions
         case. 1 do.
           NB. adverb: handle the special code (currently only &.>)
           NB. If the value of the user name matches special code, expand it on the stack
-          if. objval -: '&.>' do.
+          select. objval
+          case. '&.>' do.
+            NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
+            NB. adverb on the stack, rather than conj+verb, to avoid a parse error (if we had
+            NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
+            NB. eventually execute verb N0 erroneously)
+            ntypeval =. adv ; ((conj;'&.';(#queue)) ,: createverb (,'>');(0$0)) ; $0
+          case. '"_' do.
             NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
             NB. adverb on the stack, rather than conj verb, to avoid a parse error (if we had
             NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
             NB. eventually execute verb N0 erroneously
-            ntypeval =. adv ; ((conj;'&.';(#queue)) ,: createverb (,'>');(0$0)) ; $0
-          else.
+            ntypeval =. adv ; ((conj;(,'"');(#queue)) ,: createnoun (,'_');'';0$0) ; $0
+          case. do.
             NB. If the value of the user name matches a supported primitive, replace the name by the supported value
             ntypeval =. adv;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
           end.
@@ -799,8 +822,14 @@ NB. This call will fill in all the verb-to-noun locale references
 resultroot =: (<1 1) {:: stack
 NB.?lintonly resultroot =: <'dissectmonad' [ scrollinglocale =: <'dissectobj'
 QP^:DEBTIME'endparse=?6!:1'''' '
-NB. Init the estheights in every object
-calcallestheights__resultroot $0
+NB. Decide where nilads should have inputs displayed: 2:"0 etc
+calcdispniladinputs__resultroot 0
+NB. Init the instance variables from the defaults in the dissect locale
+NB. This also sets the values in the form
+applyconfig''
+NB. Init the estheights in every object.  Must be refigured if we change dispstealth
+calcallestheights__resultroot displaystealth # 1 2
+
 NB. Create the string to execute.  If we have to create a sandbox, do so
 NB. The raw sentence has the user's tokens, but the the invisible ones removed (for noassign sentences).
 vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot '')&{&.;: sentence
@@ -926,7 +955,7 @@ menupopz;
 menupop "Display precision for floats";
 rem prec;
 menupopz;
-menu fmshowstealth "Show ][";
+menu fmshowstealth "Show ][ and 0-9:";
 menu fmshowcompmods "Show full compound-names";
 menu fmshowstructmods "Show @ @: etc";
 menu fmautoexpand2 "Show u/ on 2 items as dyad";
@@ -985,7 +1014,7 @@ menupopz;
 menupop "Display precision for floats";
 rem prec;
 menupopz;
-menu fmshowstealth "Show ][";
+menu fmshowstealth "Show ][ and 0-9:";
 menu fmshowcompmods "Show full compound-names";
 menu fmshowstructmods "Show @ @: etc";
 menu fmautoexpand2 "Show u/ on 2 items as dyad";
@@ -1162,9 +1191,13 @@ NB. The argument of $0 indicates that we want to set the crash variables
 NB. debug wd :: 0: 'psel dissect;pclose'
 wd DISSECT
 winhwnd =: wd 'qhwndp'
-NB. Init the instance variables from the defaults in the dissect locale
-NB. This also sets the values in the form
-applyconfig''
+wd 'pn *Dissecting ' , usersentence
+'fmstatline' wdsettext ''
+
+wd 'pshow'  NB. On QT, you can't calculate the size of graphics unless you are showing the form
+wdsetfocus 'dissectisi'
+setformconfig''
+
 
 NB. Convert the logged values from high-speed-collecting form to analysis form (one box per result)
 coalescealllogs__resultroot 0
@@ -1176,13 +1209,7 @@ initnounshowdetail__resultroot resultissdt__resultroot
 NB. If we crashed, do an initial traversal to set selection flags to find the error
 maxnoundisplaysizes =: 2 2$0  NB. Init to small display for sniff, for speed
 
-wd 'pn *Dissecting ' , usersentence
-'fmstatline' wdsettext ''
-
-wd 'pshow'  NB. On QT, you can't calculate the size of graphics unless you are showing the form
-wdsetfocus 'dissectisi'
-
-NB. Initialize selection history.  This sets enables for the buttons too.
+NB. Initialize selection history.  This sets enables for the buttons too.  Sniff modifies the selections, so do this early.
 initselections''
 
 NB. If the user codes a verb whose result is never used (owing to stealth), and that verb crashes,
@@ -1479,6 +1506,7 @@ saveconfig''
 dissect_fmapplyconfig_button =: 3 : 0
 loadconfig_dissect_''
 applyconfig''
+setformconfig''
 dissect_dissectisi_paint 1
 )
 
@@ -1530,65 +1558,6 @@ if. (,10) -: a. i. sysdata do.
   9!:29 (1)
 end.
 0 0$0
-)
-
-NB. Draw the user's sentence at the top, showing highlighting
-NB. x is the sentence, in the user's spacing
-NB. y is a table of (token range);display level;tokenvisibility)
-NB. The characters are drawn, with appropriate colors
-sizesentence =: 4 : 0
-usentence =. x
-NB. Reselect in case explorers were drawn
-wd 'psel ' , winhwnd
-glsel 'dissectisi'
-NB. Create table of token#,level.  Decrement token # to account for queue-end added at front.
-NB. This also deletes any boxes of y that contain 0 token numbers - these will have been added for
-NB. emulation purposes, for example vi@:u to handle &.
-toklev =. /:~ ; (<:@,@[ ,"0 1 ])&.>/"1 > y
-
-NB. Any missing #s should be parentheses.  Assign them the level of the lowest inside token.
-NB. Assign level of _1 for (, _2 for ), and start with a stack of high-value for selection level.
-NB. Process as a state machine.  Then use the stacks to fill in gaps in
-NB. the selection levels
-tokens =. ;: usentence
-assert. (-: i.@#) {."1 toklev
-'toksellvl tokvisible' =. |: 1 2 {"1 toklev
-
-NB. Get the length of each token (except the last) in the user's spacing
-tokulen =. 2 -~/\ (' ' +/\@:~: usentence) I. (>: |.!.0 +/\ ' '&(+/@:~:)@> tokens)
-
-NB. Looking at pairs of tokens, insert after each the number of blanks needed to match the
-NB. user's spacing.  Give this string the proper color: the selection level if both are the same, or
-NB. _1 if they differ.  Result is a table, with a pair of rows for each token, the first token;level for token and the next for the following space.
-NB. Handle the last token, which is never followed by anything.
-addedblanks =. tokulen (' ' #~ (- #))&.> }: tokens
-addedlevel =. 2 _1:^:~:/\ toksellvl
-utokspacelevel =. (addedblanks ,. <"0 addedlevel) ({:@] ,~ (,/)@(,:"1~  }:)) tokens ,. <"0 toksellvl
-NB. Remove invisible tokens.  Remove empty strings.
-utokspacelevel =. (#~ *@#@>@:({."1)) (}: 2 # tokvisible) # utokspacelevel
-NB. Get the size of the rectangles.
-rectsize =. (cfms =. satzcfm {~ (_2 + #satzcfm) <. > 1 {"1 utokspacelevel) sizetext ,. txts =. 0 {"1 utokspacelevel
-NB. Box them into sections that fit within the allowed part of the screen, one box per line
-scrwid =. <. MAXSENTENCEWIDTH * {: screensize
-boxhw =. , (((}.~) (, $:)~^:(*@#@[) <@{.~)   1 >. scrwid I.~ (+/\@:({:"1))) rectsize
-NB. Get the height of each line
-lh =. >./@:({."1)@> boxhw
-NB. Get the start of each line, which is zero here for left justification
-lw =. 0
-NB. Install starting yx, and move rects into horizontal position
-rects =. ; (lw ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
-
-NB. Get the max size for the string, and return the data for drawing
-NB. Draw the strings
-(>./ +/"2 rects);cfms;txts;rects
-)
-
-NB. Draw the sentence.  y is the result of sizesentence, except for the brect
-NB. x is the yx of the start of the region
-drawsentence =: 4 : 0
-tlc =. x ,:0 0
-'cfms txts rects' =. y
-cfms drawtext txts ,. <"2 tlc +"2 rects
 )
 
 
@@ -1662,9 +1631,14 @@ NB. Called in locale of the base of the tree
 initnounshowdetail =: 'propselall'&((3 : 'y [ nounshowdetail =: y +. -. resultissdt') traversedown 0:)
 
 NB. calculate estheights for display.  We call estheights during the upwards traversal
-NB. While we're at it, we also set dispstealthoperand: y is 1 2 to remove those codes from stealth, making ][ displayable
+NB.On the way down, we also set dispstealthoperand (needed for calcestheights): y is 1 2 to remove those codes from stealth, making ][ displayable
 NB. Called in locale of the base of the tree
 calcallestheights =: 'propselall'&((3 : 'y [ dispstealthoperand =: {. stealthoperand -. y') traversedown (calcestheights@]))
+
+NB. Decide whether inputs to niladic verbs should be displayed.
+NB. Normally not, but after " (ex: 2:"0) we may want to see them.  Result of each node is passed to its descendants; the input is saved as the status for this node to use
+NB. Called in locale of the base of the tree
+calcdispniladinputs =: 'propselall'&((3 : 'shownilad dispniladinputs =: y') traversedown 0:)
 
 NB. Return selection level for each token in the input string
 NB. Result is table of (token number(s));selection level
@@ -1677,6 +1651,9 @@ NB. common routines used by the object locales.  Objects are subclasses of disse
 cocurrent 'dissectobj'
 coinsert 'dissect'
 
+NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+shownilad =: 0:    NB. normally not
+
 EMPTYPRH =: 3 0$a:
 NOPHYSREQ =: 0$a:  NB. this matches NOLAYOUTS
 
@@ -1684,7 +1661,7 @@ NB. Defaults for switches set only in certain paths
 rankcalculussupported =: 1
 
 NB. The following names must be redefined when an object is cloned
-clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel winhwnd errorwasdisplayedhere pointoffailure sellevel selectable stealthoperand ishighlightnode endhighlightnode'
+clonenames_dissect_ =: ;: 'selections scrollpoints scrolltravelers displaysellevel winhwnd errorwasdisplayedhere pointoffailure sellevel selectable stealthoperand ishighlightnode endhighlightnode dispniladinputs'
 
 NB. Object creation.  create the signaling variables used for communicating with the grid.
 NB. y is <the tokens that these values came from
@@ -1709,7 +1686,7 @@ NB. The following names are guaranteed modified in the clone after this object i
 
 NB. The following names are possibly modified after cloning.  Therefore, they must be copied into the clone
 NB. when the clone is created, so that a mod to the original doesn't affect the clone.
-(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;($0);_;0;0;0;0
+(clonenames) =: (0$a:);(0 2$0);(2 2 2$0);0;'';1;($0);_;0;0;0;0;0
 
 NB.?lintonly valence =: 0$a: [ snifferror =: 1
 NB.?lintonly errorlevel =: 1 3$a:
@@ -1718,6 +1695,7 @@ NB.?lintonly resultissdt =: nounhasdetail =: nounshowdetail =: 0
 NB.?lintonly 'displayhandlesin displayhandleout displaylevrank fillmask' =: ($0);($0);(0 3$a:);($0)
 NB.?lintonly dispstealthoperand =: 0
 NB.?lintonly estheights =: ,1
+NB.?lintonly dispniladinputs =: 0
 NB.?lintsaveglobals
 ''
 )
@@ -2791,7 +2769,7 @@ NB. When we get to the end, we are in 'dissect' locale, and the result is the pr
 inheritedto findinheritedtail__inheritedto x
 )
 
-NB. Append locale x (default=current locale) to the chain ending in locale y
+NB. Append locale x (default=current locale) to the end of the chain ending in locale y
 NB. It is possible that y points to the middle of a chain, so we have to be careful
 NB. to add to the end
 NB. The chain starts at u and ends at u"v"w....  Info in the root of the chain is most detailed.
@@ -2840,11 +2818,20 @@ QP^:DEBDOL2'physreqandhighlights physreqandhighlights__loc '
 NB. The display information is always inherited from the last u, which creates it.
 NB. The only time we wouldn't inherit is if the error is detected before the last u, example 1.5 u/ y which
 NB. would detect it on u/.  We detect that by the error-point codes
-assert. 32 = 3!:0 displaylevrank__loc
 if. errorcode -.@e. EABORTED,EEXEC do.
   cnames =. (<:copystealth) }. DISPINFO
   NB.?lintonly cnames =. DISPINFO
   (cnames) =: ".@(,&'__loc')&.> cnames
+  if. 32 ~: 3!:0 displaylevrank do.
+    NB. We are inheriting a noun, presumably a nilad.  At this point it becomes a verb.
+    NB. Replace levrank with the rankhistory for the verb (preserving the levrank as the name),
+    NB. and make the verb the base of the inheritance chain
+    NB.?lintonly niladtitle =: ''
+    displaylevrank =: (< niladtitle&[^:(0=#) displaylevrank) (<_1 0)} rankhistory
+    extendinheritchain loc
+    NB. The chain pointers are already set up to start the chain at this locale
+    (<coname'') 1} y return.
+  end.
   if. addcompmark do. displaylevrank =: displaylevrank , DLRCOMPEND;coname'' end.
 end.
 NB. If any node contributing to this display is highlightable, enable the highlight.  The flag
@@ -3758,7 +3745,7 @@ NB. for the user's sentence
 SATZCOLOR =: 190 190 190
 SATZTEXTCOLOR =: 0 0 0
 SATZFONT =: FONTNUM
-SATZFONTSIZE =: 10
+SATZFONTSIZE =: 0
 SATZMARGIN =: 1
 NB. for the shape, top level
 SHAPEFONT =: FONTNUM
@@ -3854,6 +3841,10 @@ verbcfm =: verbcfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(y+ISTATUSFONTS
 cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
 
 RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;RESULTSHAPEFONT;(y+RESULTSHAPEFONTSIZE);RESULTSHAPEMARGIN
+
+NB. For the displayed sentence
+satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 SATZFONT;(y+SATZFONTSIZE);SATZMARGIN
+satzcfm =: satzcfm , SATZCOLOR;SATZTEXTCOLOR;SATZFONT;(y+SATZFONTSIZE);SATZMARGIN
 NB.?lintsaveglobals
 ''
 )
@@ -3862,9 +3853,6 @@ NB. For empty nouns, use a dark rectangle.  There is no text
 emptycfm =: (FILLMASKSELLEVEL_dissectobj_%FILLMASKCHECKER_dissectobj_) $ EMPTYCOLORS ;"1 a: , a: , a: , <DATAMARGIN
 
 
-NB. For the displayed sentence
-satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 SATZFONT;SATZFONTSIZE;SATZMARGIN
-satzcfm =: satzcfm , SATZCOLOR;SATZTEXTCOLOR;SATZFONT;SATZFONTSIZE;SATZMARGIN
 
 NB. font pen margin tcolor bcolor
 FONTSFORCLASSRANKVERB =: 2 $ ,: VERBFONT;'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR
@@ -3911,6 +3899,68 @@ NB. y is sellevel if positive, or negative for special types (_1 = result-cell)
 cfmforclassshape =: 3 : 0
 (SHAPEFONT;'';SHAPEMARGIN),((y <. <:#STATUSCOLOR) { COLORSFORCLASSSHAPE) , < minimumfontsizex { FONTSIZECHOICES
 )
+
+NB. ************** drawing the sentence *****************
+
+NB. Draw the user's sentence at the top, showing highlighting
+NB. x is the sentence, in the user's spacing
+NB. y is a table of (token range);display level;tokenvisibility)
+NB. The characters are drawn, with appropriate colors
+sizesentence =: 4 : 0
+usentence =. x
+NB. Reselect in case explorers were drawn
+wd 'psel ' , winhwnd
+glsel 'dissectisi'
+NB. Create table of token#,level.  Decrement token # to account for queue-end added at front.
+NB. This also deletes any boxes of y that contain 0 token numbers - these will have been added for
+NB. emulation purposes, for example vi@:u to handle &.
+toklev =. /:~ ; (<:@,@[ ,"0 1 ])&.>/"1 > y
+
+NB. Any missing #s should be parentheses.  Assign them the level of the lowest inside token.
+NB. Assign level of _1 for (, _2 for ), and start with a stack of high-value for selection level.
+NB. Process as a state machine.  Then use the stacks to fill in gaps in
+NB. the selection levels
+tokens =. ;: usentence
+assert. (-: i.@#) {."1 toklev
+'toksellvl tokvisible' =. |: 1 2 {"1 toklev
+
+NB. Get the length of each token (except the last) in the user's spacing
+tokulen =. 2 -~/\ (' ' +/\@:~: usentence) I. (>: |.!.0 +/\ ' '&(+/@:~:)@> tokens)
+
+NB. Looking at pairs of tokens, insert after each the number of blanks needed to match the
+NB. user's spacing.  Give this string the proper color: the selection level if both are the same, or
+NB. _1 if they differ.  Result is a table, with a pair of rows for each token, the first token;level for token and the next for the following space.
+NB. Handle the last token, which is never followed by anything.
+addedblanks =. tokulen (' ' #~ (- #))&.> }: tokens
+addedlevel =. 2 _1:^:~:/\ toksellvl
+utokspacelevel =. (addedblanks ,. <"0 addedlevel) ({:@] ,~ (,/)@(,:"1~  }:)) tokens ,. <"0 toksellvl
+NB. Remove invisible tokens.  Remove empty strings.
+utokspacelevel =. (#~ *@#@>@:({."1)) (}: 2 # tokvisible) # utokspacelevel
+NB. Get the size of the rectangles.
+rectsize =. (cfms =. satzcfm {~ (_2 + #satzcfm) <. > 1 {"1 utokspacelevel) sizetext ,. txts =. 0 {"1 utokspacelevel
+NB. Box them into sections that fit within the allowed part of the screen, one box per line
+scrwid =. <. MAXSENTENCEWIDTH * {: screensize
+boxhw =. , (((}.~) (, $:)~^:(*@#@[) <@{.~)   1 >. scrwid I.~ (+/\@:({:"1))) rectsize
+NB. Get the height of each line
+lh =. >./@:({."1)@> boxhw
+NB. Get the start of each line, which is zero here for left justification
+lw =. 0
+NB. Install starting yx, and move rects into horizontal position
+rects =. ; (lw ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
+
+NB. Get the max size for the string, and return the data for drawing
+NB. Draw the strings
+(>./ +/"2 rects);cfms;txts;rects
+)
+
+NB. Draw the sentence.  y is the result of sizesentence, except for the brect
+NB. x is the yx of the start of the region
+drawsentence =: 4 : 0
+tlc =. x ,:0 0
+'cfms txts rects' =. y
+cfms drawtext txts ,. <"2 tlc +"2 rects
+)
+
 
 NB. *********** create DOs
 cocurrent 'dissectobj'
@@ -4801,7 +4851,7 @@ joinlayoutsl_dissect_ =: 3 : 0
 'dol loc right' =. 3 {. y , <0 2$a:
 NB.?lintonly loc =. <'dissectobj'
 NB. If there are operand selections, apply them to the input locales
-QP^:DEBSELECT'dol joinlayouts:physreq=?physreqandhighlights__inheritroot__loc coname$0 defstring]0 >loc defstring__loc]0 '
+QP^:DEBSELECT'dol joinlayouts:physreq=?physreqandhighlights__inheritroot__loc coname$0 defstring]0 >loc defstring__loc]0 defstring__inheritroot__loc]0 '
 if. *#physreqandhighlights__inheritroot__loc do.
 NB. The highlight requests have been consolidated by inheritu so that they now are a list for
 NB. each operand, with one highlight request per sellevel.  Also, physreqandhighlights has been
@@ -5304,13 +5354,13 @@ NB. layouts, only one of them will survive to take the place of the stealth oper
 NB. that it is the non-stealth operand
   if. 0 = #x do. createlayout 0 0 else. (, dispstealthoperand { 0 _1 0 0 0 _1 0) { x end.
 else.
-NB. If there are no earlier layouts, this had better be a noun - just create its layout
-  if. 0 = #x do.
+NB. If there are no earlier layouts, this is either a noun or a nilad that is not displaying - just create its layout
+  if. 0 = #x =. (#~    a: ~: 3&{"1) x do.
     createlayout 0 0
   else.
 NB. Remove any layout (there can be only one) that has been marked as elided by stealth, by having its
 NB. output handles cleared.  Join the survivors
-    'upperdol upperyxhw upperwires upperresult' =. joinlayoutslr@,:/ (#~    a: ~: 3&{"1) x
+    'upperdol upperyxhw upperwires upperresult' =. joinlayoutslr@,:/ x
     if. DEBLAYOUT do.
       qprintf'Joined upper objects:dol=?upperdol%yxhw=?upperyxhw%wires=?upperwires%$upperresult%res=?upperresult%'
     end.
@@ -7435,6 +7485,7 @@ NB.?lintsaveglobals
 proplocales =: 3 : 0
 (y = 3) # < tokensource
 )
+
 NB. Set globals, then initialize display for the verb
 traverse =: endtraverse@:(4 : 0)
 assert. 1 2 e.~ #x
@@ -7958,6 +8009,7 @@ proplocales =: 3 : 0
 
 NB. Traversal up and down the tree.
 traverse =: endtraverse@:(4 : 0)
+NB. sellevel may not be 0 here, if the recursion is in a nilad or NVV that runs at a level
 traversedowncalcselect y
 NB. Inside travdowncalcselect, we implied a selection of 0 even if there was no selection.  This was necessary
 NB. to get the selector calculated even when there is no selection.
@@ -7967,8 +8019,8 @@ NB. back to 0, and simply return the result from u.  If there is a selection, we
 NB. into it and creating a layout for it, and we return the layout for the expansion with no locale, signifying that
 NB. the monad/dyad should display its result without inheriting.
 oprshape =. 0$a:
-if. 0 = #selections do.
-  bnsellevel =: <0  NB. reset selection level if the expansion is dormant
+if. sellevel = #selections do.
+  bnsellevel =: 0{y  NB. reset selection level if the expansion is dormant
   for_l. yxop do.
     NB.?lintonly l =. <'dissectverb'
     oprshape =. oprshape ,~ < selresultshape__l
@@ -7985,7 +8037,7 @@ end.
 NB. We suppressed the joinlayouts in the monad/dyad; do it now, now that we have the correct labels and values for the display
 ures =. (; joinlayoutsl&.> x) traverse__uop travops TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW;(uopval |.yxop);< oprshape
 NB. return value may have been set at this point
-if. #selections do.
+if. sellevel < #selections do.
   udol =. 0 1 1 inheritu ures  NB. This is an expansion
   displaylevrank =: displaylevrank , 'Recursions';coname''
   < joinlayoutsl udol
@@ -8302,6 +8354,12 @@ coname''
 NB.?lintsaveglobals
 )
 
+NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+shownilad =: 3 : 0
+NB. For @, treat it like @>, which is like "0, always displaying NB. for @:, pass y on through
+y +. -. ':' e. cop
+)
+
 calcestheights =: 3 : 0
 estheights =: estheights__vop combineheights estheights__uop
 )
@@ -8508,6 +8566,11 @@ NB.?lintonly vop0 =: vop1 =: <'dissectverb'
 coname''
 NB. We always get both operands for v, since we have cloned vop0/vop1 (it's not worth saving the operand).
 NB.?lintsaveglobals
+)
+
+shownilad =: 3 : 0
+NB. For @, treat it like @>, which is like "0, always displaying NB. for @:, pass y on through
+y +. -. ':' e. cop
 )
 
 calcestheights =: 3 : 0
@@ -8848,17 +8911,30 @@ NB. We also come through here for u&n m&v, with the primitive changed to '&'
 localerank_dissect_ =: primlocale '"'
 
 create =: 3 : 0
-NB. Handle m"nv as a general verb
-if. noun bwand (<0 0) {:: y do.
-  changeobjtypeto localedefault
-  create y
-  return.
-end.
-create_dissectobj_ f. (<1 2) {  y
-NB. Register this object so we can clean up at end
-newobj__COCREATOR coname''
 NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
+NB. Handle m"nv as a general verb, except when it's m"_ which we handle as a nilad
+if. noun bwand (<0 0) {:: y do.
+  if. _ -: ". ". 'op__vop' do.
+    nilad =: 1
+  else.
+    changeobjtypeto localedefault
+    create y
+    return.
+  end.
+else. nilad =: 0
+end.
+create_dissectobj_ f. (<1 2) {  y
+
+NB. In case this is a nilad, create the title to use.  If the title of v is empty, we must be on a named "_
+if. a: -: (<2 2) { y do.
+  niladtitle =: ; (<:tokensource) ({ /: [) ;: usersentence__COCREATOR   NB. decr tokensource to account for MARK added
+else.
+  niladtitle =: '(m"_)'
+end.
+
+NB. Register this object so we can clean up at end
+newobj__COCREATOR coname''
 NB. Save the type of v
 vtype =: (<2 0) {:: y
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
@@ -8871,15 +8947,20 @@ NB.?lintsaveglobals
 NB. Set the valence used for executing this verb, and propagate to descendants
 setvalence =: 3 : 0
 valence =: #y
-uop =: setvalence__uop y
-NB.?lintonly uop =: <'dissectverb'
+if. -. nilad do.
+  uop =: setvalence__uop y
+  NB.?lintonly uop =: <'dissectverb'
+end.
 resultissdt =: resultissdt__uop
 coname''
 NB.?lintsaveglobals
 )
 
+NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+shownilad =: 1:    NB. always display (the nilad case was taken as special)
+
 calcestheights =: 3 : 0
-estheights =: estheights__uop
+estheights =: _1"0^:nilad estheights__uop
 )
 
 NB. return string form of operands, not including instrumentation
@@ -8892,12 +8973,16 @@ NB. return string form of operands, including instrumentation
 NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
 exestring =: 3 : 0
 initloggingtable ''
-auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , '"' , '(' , (exestring__vop '') , '))'
+if. nilad do.
+  auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , '"',(exestring__vop ''),'))'
+else.
+  auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , '"' , '(' , (exestring__vop '') , '))'
+end.
 )
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3) , y>0) # ;: 'uop tokensource vop'
+<^:(0=L.)@".@>^:(0 <: y) (((y ~: 0) +. (-. nilad)) , (y=3) , y>0) # ;: 'uop tokensource vop'
 )
 
 NB. Nilad.  We know that the current node has no selection but has valid selopshapes.
@@ -8914,8 +8999,17 @@ NB. for u"n, resolve n internally.  It will not display, but we need a result fo
 if. vtype bwand noun do. NOLAYOUTS traverse__vop TRAVNOUN end.
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
-NB. Insert end-of-computation unless this node is hidden (as part of u&n or u&.v)
-(cop -: ,'"') inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
+NB. If this is m"_, all we can do is display m, regradless of whether shownilad is set: there are in
+NB. general no input handles on m.
+if. nilad do.
+  NB. Traverse the noun, but keep sellevel in order so highlights are calculated correctly
+  0 inheritu NOLAYOUTS traverse__uop bnsellevel 0} TRAVNOUN
+  NB. This returned a noun result, which may have a character value for the name in displaylevrank.  So we inherit it
+  NB. into m"_, which in inheritu converts it to a verb for subsequent inheritance.  This turns the noun into a niladic verb.
+else.
+  NB. Insert end-of-computation unless this node is hidden (as part of u&n or u&.v)
+  (cop -: ,'"') inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
+end.
 )
 
 NB. overrides for calcselect
@@ -10523,6 +10617,8 @@ resultissdt =: resultissdt__uop
 coname''
 NB.?lintsaveglobals
 )
+NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+shownilad =: ]
 
 calcestheights =: 3 : 0
 estheights =: , >./^:(valence=1) |. estheights__uop
@@ -11456,7 +11552,7 @@ NB. Create references for the input(s) and assign the correct one to u and v.
 NB. x is a list of layouts (each layout a list); create a table of layouts, each (rank-2) row having orig,reference
 NB. Start with original to u, ref to v; reverse if u height < v height.  The reference will go to the lower
 NB. Add 1/2 unit to u since v starts lower
-xx =. (</ ((estheights__uop combineheights ,0.5) ,: estheights__vop)) |."0 2 (,: createreference)"1 x
+xx =. (</ (0 ,: estheights__vop)) |."0 2 (,: createreference)"1 x  NB. kludge since we don't know uop heights till we pick one
 vlayo =. joinlayoutsl (1 {"2 xx) traverse__vop seloperands =. travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
 x =. 0 {"2 xx   NB. Pass the other operands into u^: or this node
 NB. Create the layout for v
@@ -11724,58 +11820,6 @@ end.
 clearselect =: 3 : 0
 blockismarked =: 0
 clearselect_dissect_ f. y
-)
-
-NB. *********** $: *************
-
-'dissectverb' primlocale '$:'
-
-NB. y is (string form of the verb);tokens it came from
-create =: 3 : 0
-r =. create_dissectverb_ f. y
-NB. Changes for $:
-resultissdt =: 0   NB. $: is NOT an sdt
-r
-NB.?lintsaveglobals
-)
-
-setvalence =: 3 : 0
-if. executingvalence__COCREATOR ~: #y do.
-  failmsg 'dissect restriction: recursion must have the same valence as the original execution'
-end.
-NB. Indicate that this verb-phrase contains a recursion
-recursionencountered__COCREATOR =: 1
-setvalence_dissectverb_ f. y
-)
-
-NB. We save a couple of things and then traverse as a normal verb
-traverse =: endtraverse@:(4 : 0)
-recursionpoint =: {. executingmonaddyad__COCREATOR
-NB.?lintonly recursionpoint =: <'dissectmonad'
-x traverse_dissectverb_ f. y
-NB.?lintsaveglobals
-)
-
-exegesisrankstack =: 3 : 0
-,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the result of a recursion. Select the result to see results of all recursion levels and examine any of them.',LF
-)
-
-getselection =: 3 : 0
-NB. Save the ticket for this result.  If we get a selection at this node, we will send this value back to the
-NB. recursion point to make the selection
-NB. y is the list of valid results.  If it's empty, there is no ticket to save (but there will be no display
-NB. either, and the ticket is used only by selection, so there's no harm)
-if. #y do. currentticket =: ({. y) { logticket end.
-NB.?lintonly currentticket =: 0
-getselection_dissectverb_ f. y
-NB.?lintsaveglobals
-)
-
-NB. Any selection in the recursion result is passed to the recursion point.
-NB. We have saved the locale of the recursion point, and 
-selectionoverride =: 3 : 0
-selectrecursion__uop__recursionpoint currentticket
-PICKTOOLTIPMSGOK  NB. Indicate that we have overridden, abort selection
 )
 
 NB. *********** } ***********
@@ -12286,6 +12330,84 @@ else.
 end.
 )
 
+NB. ******* verbs with explicit support ***********
+
+NB. *********** $: *************
+
+'dissectverb' primlocale '$:'
+
+NB. y is (string form of the verb);tokens it came from
+create =: 3 : 0
+r =. create_dissectverb_ f. y
+NB. Changes for $:
+resultissdt =: 0   NB. $: is NOT an sdt
+r
+NB.?lintsaveglobals
+)
+
+setvalence =: 3 : 0
+if. executingvalence__COCREATOR ~: #y do.
+  failmsg 'dissect restriction: recursion must have the same valence as the original execution'
+end.
+NB. Indicate that this verb-phrase contains a recursion
+recursionencountered__COCREATOR =: 1
+setvalence_dissectverb_ f. y
+)
+
+NB. We save a couple of things and then traverse as a normal verb
+traverse =: endtraverse@:(4 : 0)
+recursionpoint =: {. executingmonaddyad__COCREATOR
+NB.?lintonly recursionpoint =: <'dissectmonad'
+x traverse_dissectverb_ f. y
+NB.?lintsaveglobals
+)
+
+exegesisrankstack =: 3 : 0
+,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the result of a recursion. Select the result to see results of all recursion levels and examine any of them.',LF
+)
+
+getselection =: 3 : 0
+NB. Save the ticket for this result.  If we get a selection at this node, we will send this value back to the
+NB. recursion point to make the selection
+NB. y is the list of valid results.  If it's empty, there is no ticket to save (but there will be no display
+NB. either, and the ticket is used only by selection, so there's no harm)
+if. #y do. currentticket =: ({. y) { logticket end.
+NB.?lintonly currentticket =: 0
+getselection_dissectverb_ f. y
+NB.?lintsaveglobals
+)
+
+NB. Any selection in the recursion result is passed to the recursion point.
+NB. We have saved the locale of the recursion point, and 
+selectionoverride =: 3 : 0
+selectrecursion__uop__recursionpoint currentticket
+PICKTOOLTIPMSGOK  NB. Indicate that we have overridden, abort selection
+)
+
+NB. *********** 0-9: *************
+
+'dissectverb' primlocale '0:1:2:3:4:5:6:7:8:9:_1:_2:_3:_4:_5:_6:_7:_8:_9:_:__:'
+
+calcestheights =: 3 : 0
+estheights =: valence # (dispniladinputs +. displaystealth) { _1 1 
+)
+
+NB. Set globals, then initialize display for the verb
+traverse =: endtraverse@:(4 : 0)
+assert. 1 2 e.~ #x
+traversedowncalcselect y  NB. Just to set error globals
+if. errorcode e. EEARLYERROR do. earlyerror x return. end.
+if. _1 e. estheights do.
+  NB. we are not displaying the inputs.  Give no input handles, and remove output handles from x
+  'displayhandlesin displayhandleout displaylevrank' =: ($0);1;<rankhistory
+  x =. a: (<a:;3)} x
+else.
+  NB. Display the inputs as usual
+  'displayhandlesin displayhandleout displaylevrank' =: (valence {:: ($0);(,0);_0.3 0.3);1;<rankhistory
+end.
+x ,&< coname'' NB. no v, so no change to the DOLs
+)
+
 NB. **** default ****
 localedefault_dissect_ =: primlocale ''
 NB. Remove the last element in the search, to make this the 'search failed' locale
@@ -12321,6 +12443,8 @@ proplocales =: 3 : 0
 (y=3) # (<tokensource) 1} >&.> ucvlocs
 )
 
+
+NB. ********* invisible modifiers ************
 
 NB. **** fork ****
 cocurrent 'dissectfork'
@@ -12606,6 +12730,8 @@ resultissdt =: resultissdt__uop
 coname''
 NB.?lintsaveglobals
 )
+NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+shownilad =: 0:    NB. like "0
 
 calcestheights =: 3 : 0
 estheights =: estheights__uop
@@ -12634,7 +12760,7 @@ NB. We do not create a cell; we just traverse u.  There is no visible indication
 NB. frames
 traverse =: endtraverse@:(4 : 0)
 NB. Set the title string to the actual characters the user used, sorted into order
-titlestring =: 0 fulltitlestring ; (<:tokensource) ({ /: [) ;: usersentence__COCREATOR   NB. decr tokensource to accoutn for MARK added
+titlestring =: 0 fulltitlestring ; (<:tokensource) ({ /: [) ;: usersentence__COCREATOR   NB. decr tokensource to account for MARK added
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
@@ -13447,6 +13573,20 @@ ctup = 8
 2 dissect '5 +:@]^:(+:@+`(2:@])`([:)) i. 5 6' 
 2 dissect '5 +:@]^:(+:@+`(2:@])`(*:)) i. 5 6'
 2 dissect '5 (*: ] +) 6'
+2 dissect '2: i. 5'
+2 dissect '2:"0 i. 5'
+2 dissect '(2:"0 * +:) i. 5'
+2 dissect '(2: * +:)"0 i. 5'
+2 dissect '2"_ i. 5'
+2 dissect '2"_"0 i. 5'
+2 dissect '(2"_"0 * +:) i. 5'
+2 dissect '(2"_ * +:)"0 i. 5'
+2 dissect '(5 * 7)"_ i. 5'
+2 dissect '(5 * 7)"_"0 i. 5'
+2 dissect '((5 * 7)"_"0 * +:) i. 5'
+2 dissect '((5 * 7)"_ * +:)"0 i. 5'
+2 dissect '2 vb i. 5' [ *(vb =. "_) 4
+2 dissect 'z"_"0 i. 5' [ z =. 6
 )
 
 testsandbox_base_ =: 3 : 0
