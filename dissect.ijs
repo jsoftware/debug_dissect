@@ -59,7 +59,6 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. when vb =. "_, use vb not (m"_) in stack
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -1063,7 +1062,7 @@ minwh 5 28;cc fmspacer static;cn "";
 bin zh1;
 minwh 50 16;cc fmstatline static;
 bin zz;
-minwh 400 80;cc dissectisi isidraw flush;
+minwh 400 80;cc dissectisi isidraw;
 bin z;
 pas 0 0;
 rem form end;
@@ -1193,10 +1192,9 @@ wd DISSECT
 winhwnd =: wd 'qhwndp'
 wd 'pn *Dissecting ' , usersentence
 'fmstatline' wdsettext ''
-
-wd 'pshow'  NB. On QT, you can't calculate the size of graphics unless you are showing the form
-wdsetfocus 'dissectisi'
 setformconfig''
+
+wdsetfocus 'dissectisi'
 
 
 NB. Convert the logged values from high-speed-collecting form to analysis form (one box per result)
@@ -1237,7 +1235,10 @@ scrolltlc =: 0 ,~ 2 + {. sentencesize
 NB. Do the initial traversal, calculate the initial placement.
 placeddrawing =: calcplacement''
 sizedrawingandform 1
-dissect_dissectisi_paint^:IFQT ''  NB. QT doesn't kick off with a paint - do one
+wd 'pshow'
+NB. On J6, we will get an immediate paint event.
+NB. On QT, the pshow will instantly call resize (before returning to immediate mode), which will
+NB.  do the first paint
 0 0$0
 NB.The initial paint event will draw the screen
 NB.?lintsaveglobals
@@ -1273,7 +1274,8 @@ yxneeded =. sentencesize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement plac
 NB. Get the current size of the isi; if insufficient, make it bigger, with expansion added
 if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
   minisi =. MINIMUMISISIZE >. <. (%/ TOOLTIPFONTSIZECHOICES {~ ttfontsizex,0) * tooltipdetailx { TOOLTIPMINISISIZE
-  'dissectisi' wdsetxywh 1 0 3 2 { cyxhw =. (minisi >. EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
+  NB. For QT, always size the canvas to the full screen
+  'dissectisi' wdsetxywh _1"0^:IFQT 1 0 3 2 { cyxhw =. (minisi >. EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
   NB. If the main form has grown now that the isi has grown, resize it too.
   if. initfromsess do. xywh =. 1 0 3 2 { (getsessionyx'') , +/ 2 2 $ cyxhw
   else. xywh =. (0 ". wdqform'') >. 0 0 , |. +/ 2 2 $ cyxhw
@@ -1559,7 +1561,6 @@ if. (,10) -: a. i. sysdata do.
 end.
 0 0$0
 )
-
 
 NORANKHIST =: 0 2$a:
 NORANKHISTNOUN =: ''   NB. string means noun
@@ -6484,7 +6485,7 @@ NB. hoverend is called whenever anything happens to abort the hover (click, focu
 NB. is called when the timer expires: we then see where the cursor is and call the owner to get a tooltip.
 
 NB. y is the mouse position yx.  Start/continue a hover timer, clearing an old one if the mouse has moved
-MAXHOVERMOVEMENT =: 1 4   NB. Allow this much movement from start-of-hover position, depending on button status
+MAXHOVERMOVEMENT =: 6 8   NB. Allow this much movement from start-of-hover position, depending on button status
 'HOVEROFFSETY HOVEROFFSETX' =: _8 5  NB. amount to offset tooltip from the hover
 
 NB. This is called in whichever locale and psel of whatever form is active - the main or an explorer.
@@ -6721,6 +6722,11 @@ hoverend''
 
 dissect_dissectisi_focuslost =: 3 : 0
 hoverend''
+)
+
+NB. Resize happens at the beginning for QT to kick off display
+dissect_dissectisi_resize =: 3 : 0
+dissect_dissectisi_paint 1
 )
 
 cocurrent 'dissectobj'
