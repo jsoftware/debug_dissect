@@ -71,7 +71,7 @@ NB. Add rank-calculus for primitives with known behavior
 NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name.
-NB. support u . v y
+NB. support u . v y?
 
 NB. display:
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
