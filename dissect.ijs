@@ -59,11 +59,9 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. Look at '] 5'
-NB. Inspect displays carefully
-
-
-NB. Add option to title display
+NB. can we be more specific about 'before fill if any'?
+NB. can we distinguish left time of fork from right?
+NB. Add code to debug to associate options with function lines & apply them if autodissect on
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -74,12 +72,12 @@ NB. Give more-detailed error info during hover?, like what in the frame didn't a
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. clicking on vbname (if tacit) should launch sandbox for that name.
 NB. support u . v y
-NB. copy verb to clipboard on right-click?
 
 NB. display:
-NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Perhaps center display?
+NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
+NB. Revise sentence creation to point each symbol to the locale of its current selection level (and parens for hook/fork to the hook/fork)?
 
 NB. router:
 NB. Add single-jog to router options to avoid down-and-up turn
@@ -94,13 +92,17 @@ NB. where sentence is a string to be executed.  The sentence is parsed and modif
 NB. looging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
 NB. dissect verb), and then the results are displayed in 2d form.  If sentence is omitted, the sentence from the last error is used.
 NB.
-NB. Options are (bitmask) where
+NB. Options are (bitmask)[;(label options)] where
 NB.  bit 0 is 1 to use a sandbox for executing the sentence
 NB.  bit 1 is 1 to return the locale of the dissect window
 NB.  bit 2 is 1 to suppress assignment statements.  They will not be executed and an error will result if an assigned name is referred to later.
 NB.  bit 3 is 1 if this call was from the J debugger.  It changes the error messages if the assignments rule is violated.
 NB.  bits 4-5 are a coded field giving the level of comparison, in roughtly descending order:
 NB.   00=full comparison, 01=shape and type only; 10=success/failure only; 11=no comparison (and don't execute the original sentence)
+NB.
+NB. Label options are a table of (type);(string) where types are
+NB.  'title'  string is (fontchange)TABtitle  fontchange is +-amount to increase over sentence size, title is text
+NB.  'link'  string is (fontchange)TABdisplay textTABlink text
 NB.
 NB. If y is boxed, it should be a table ready for use in parse, i. e. nx3 where the first line gives
 NB. parameters;locale;text of sentence
@@ -526,9 +528,11 @@ defnames =. }. y  NB. table of names
 if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
   failmsg 'The sentence to be dissected must be a string.' return. 
 end.
+'options do' =. 2 {. options
 'cl fromdebugger noassignment returnobject sandbox' =.  4 2 2 2 2 #: {.!.0 options
 comparisonlevel =: cl
 returnobject_dissect_ =: * returnobject
+dispoptions =: ,:^:(2 > #@$) (0 2$a:)"_^:(2 > #@,) do  NB. If no second operand (empty or scalar created above), use an empty table
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 NB. Discard anything past the first LF, and remove CR
@@ -1145,6 +1149,44 @@ else.   NB. user tried recursive execution
   'Vivisection is illegal.'
 end.
 )
+
+
+NB. lay out the grid.  Should be called in the locale of the major instance
+NB. Sets globals   topinfo (top drawing info) and  sentencesizes  (wh of sentence & links)
+NB. This must be called whenever a display parameter changes, to resize the sentence and drawing.
+NB. y is the screensize yx
+calcplacement =: 3 : 0
+NB. Get the size of the sentence and links.  Remember the layout of the sentence
+sentencesizes =: > 0 {"1 topinfo =: usersentence sizesentence gettokenlevels__resultroot ''
+
+NB. Check the current screensize, and calculate the box sizes in pixels
+maxnoundisplaysizes =: <. (maxnoundisplayfrac ,: MAXEXPLORERDISPLAYFRAC) *"1 y
+
+NB. Select our drawing control, so we have something to check sizes with
+wd 'psel ',winhwnd
+glsel 'dissectisi'
+NB. Traverse, producing the final DOL
+NB. Add on the display for the final collector
+endingloc =. (<0 0) { joinlayoutsl traverse 0
+NB.?lintonly endingloc =. <'dissectobj'
+NB. calculate grouping hierarchy
+NB. place the blocks
+'dl dyxhw dwires' =. establishgrouping__endingloc ''
+NB. create wiring and revise placement
+NB. create the parameters for the router: the brick of start/end+1, and the
+NB. list of nets, in the form <source,dest,dest...
+NB. where each point is  obj#,face#,fraction
+dyxbr =. +/\"2 dyxhw  NB. Convert to start/end+1; adjust to leave top & bottom margin
+wirenets =. (<@((<0 0)&{ , {:"2)/.~ {."2) dwires  NB. Convert nets (same source) to net form
+NB.  size is ymax,xmax
+NB.  gridsize is spacing between lines
+NB.  standoff is min distance between a block and a line
+NB.  penalties is penalty for a turn (in units of movement)
+QP^:DEBTIME'startrouter=?6!:1'''' '
+dl ; (ROUTINGGRIDSIZE;WIRESTANDOFF;ROUTINGTURNPENALTY) routegrid dyxbr;<wirenets
+NB.?lintsaveglobals
+)
+
 NB. y is the results from running the user's original sentence and our instrumented version.
 displaymain =: 3 : 0  NB. called in dissectinstance locale
 NB. Make sure the results are the same
@@ -1225,12 +1267,10 @@ screensize =: 3 2 { 0 ". wd 'qscreen'
 NB. Set the initial selection of cells:
 NB. If the result is an sdt, the user is probably noodling around with a new sentence, so select everything
 NB. resultissdt__resultroot
-NB. Get the size of the sentence; use its height to set scroll position for the display
-sentencesize =: 0 {:: usersentence sizesentence gettokenlevels__resultroot ''
-NB. Set the starting position, just below the sentence
-scrolltlc =: 0 ,~ 2 + {. sentencesize
 NB. Do the initial traversal, calculate the initial placement.
-placeddrawing =: calcplacement''
+placeddrawing =: calcplacement screensize
+NB. Set the starting scroll position, just below the sentence/link
+scrolltlc =: 0 ,~ 2 + >./ (<a:;0) { sentencesizes  NB. y sizes of brects
 sizedrawingandform 1
 wd 'pshow'
 NB. On J6, we will get an immediate paint event.
@@ -1260,14 +1300,17 @@ NB.?lintsaveglobals
 EXPANSIONROOMAROUNDISI =: 200 100  NB. Number of pixels to leave at margin
 NB. Size the isigraph and the parent, and size the drawing for display
 NB. If y is 1, set the initial position based on the session history
-NB. Globals sentencesize, scrolltlc, placeddrawing have been set
+NB. Globals sentencesizes, scrolltlc, placeddrawing have been set
 NB. Result is the drawing (the result of sizeplacement)
 NB. Side effect: the isigraph and parent are resized (up only) as required
 NB. When we resize the isigraph, we include expansion room
 sizedrawingandform =: 3 : 0
 initfromsess =. y
-NB. Get the required size - mostly the isi, but must be wide enough for the sentence too
-yxneeded =. sentencesize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
+NB. Get the required size - mostly the isi, but must be wide enough for the sentence/links too
+NB. Minimum top size is total width, and maximum height, of brects, plus some spacing if there is more than
+NB. 1 brect
+topminsize =. ((0 2 * 1 < #) + >./@:({."1) , +/@:({:"1)) sentencesizes
+yxneeded =. topminsize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
 NB. Get the current size of the isi; if insufficient, make it bigger, with expansion added
 if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
   minisi =. MINIMUMISISIZE >. <. (%/ TOOLTIPFONTSIZECHOICES {~ ttfontsizex,0) * tooltipdetailx { TOOLTIPMINISISIZE
@@ -1281,42 +1324,14 @@ if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh '
   if. -. IFQT do. wd 'pas 6 6' end.  NB. JQt ignores pas
 end.
 NB. Now that we have the size of the isigraph, center the sentence in the screen area; remember brect
-sentencebrect =: sentencesize (] ,: +) 0 , cyxhw (<.@-:@-)&{: sentencesize
+NB. Center the sentence, but make sure it doesn't overlap the links if any
+szszx =. (0 >. 2 + >./ (<(<0);1) { sentencesizes) >. cyxhw (<.@-:@-)&{: {. sentencesizes  NB. widths except first
+NB. First rect is sentence, moved to proper place; next (if any) is links
+topbrect =: brect sentencebrects =: (({. sentencesizes) (] ,: +) 0 , szszx) , 0 0 ,:"1 }. sentencesizes
 shifteddrawing
 NB.?lintsaveglobals
 )
 
-
-
-NB. lay out the grid.  Should be called in the locale of the major instance
-calcplacement =: 3 : 0
-NB. Check the current screensize, and calculate the box sizes in characters
-maxnoundisplaysizes =: <. (maxnoundisplayfrac ,: MAXEXPLORERDISPLAYFRAC) *"1 screensize
-
-NB. Select our drawing control, so we have something to check sizes with
-wd 'psel ',winhwnd
-glsel 'dissectisi'
-NB. Traverse, producing the final DOL
-NB. Add on the display for the final collector
-endingloc =. (<0 0) { joinlayoutsl traverse 0
-NB.?lintonly endingloc =. <'dissectobj'
-NB. calculate grouping hierarchy
-NB. place the blocks
-'dl dyxhw dwires' =. establishgrouping__endingloc ''
-NB. create wiring and revise placement
-NB. create the parameters for the router: the brick of start/end+1, and the
-NB. list of nets, in the form <source,dest,dest...
-NB. where each point is  obj#,face#,fraction
-dyxbr =. +/\"2 dyxhw  NB. Convert to start/end+1; adjust to leave top & bottom margin
-wirenets =. (<@((<0 0)&{ , {:"2)/.~ {."2) dwires  NB. Convert nets (same source) to net form
-NB.  size is ymax,xmax
-NB.  gridsize is spacing between lines
-NB.  standoff is min distance between a block and a line
-NB.  penalties is penalty for a turn (in units of movement)
-QP^:DEBTIME'startrouter=?6!:1'''' '
-dl ; (ROUTINGGRIDSIZE;WIRESTANDOFF;ROUTINGTURNPENALTY) routegrid dyxbr;<wirenets
-NB.?lintsaveglobals
-)
 
 NB. y is 1 for an internal call that needs to refigure the placement
 dissect_dissectisi_paint =: 3 : 0
@@ -1324,7 +1339,7 @@ NB. To avoid an error loop, terminate quietly if there is an error
 try.
   NB. Establish local J environment.  The user's environment was saved when we started
 NB. if we need to refigure the placement because of a change like selection or a display parameter, do so.
-  if. 1 = {. y do. placeddrawing =: calcplacement'' end.
+  if. 1 = {. y do. placeddrawing =: calcplacement screensize end.
 NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
   QP^:DEBTIME'startdraw=?6!:1'''' '
   drawplacement }. sizedrawingandform 0
@@ -1332,7 +1347,7 @@ NB. Draw the revised placement and wiring.  Save the placement to speed scrollin
   if. needtocheckerrordisplayed do.
     NB. set stealth visible and retry
     calcdispstealth__resultroot (displaystealth =: 1) # 1 2
-    placeddrawing =: calcplacement''
+    placeddrawing =: calcplacement screensize
     drawplacement }. sizedrawingandform 0
     needtocheckerrordisplayed =: 0   NB. do this only once
   end.
@@ -1536,17 +1551,15 @@ dissect_fmlab_button '~addons/labs/labs/debug/dissect2.ijt'
 )
 
 dissect_fmwikidissect_button =: 3 : 0
-NB.?lintmsgsoff
+NB.?lintonly browse_j_ =. 3 : 'y'
 browse_j_ 'http://www.jsoftware.com/jwiki/Vocabulary/Dissect'
-NB.?lintmsgson
 0 0$0
 )
 dissect_f1_fkey =: dissect_fmwikidissect_button
 
 dissect_fmwikinuvoc_button =: 3 : 0
-NB.?lintmsgsoff
+NB.?lintonly browse_j_ =. 3 : 'y'
 browse_j_ 'http://www.jsoftware.com/jwiki/NuVoc'
-NB.?lintmsgson
 0 0$0
 )
 dissect_f1shift_fkey =: dissect_fmwikinuvoc_button
@@ -1580,9 +1593,9 @@ NB. Conjunction for tree traversal down (i. e. root to leaves)
 NB. y is the argument to pass to the first node
 NB. x is the traversal type: 0 to stop before nouns, 1 to go through conjunction noun operands, 2 to go through everything, 3 to get tokens for the sentence
 NB. u is the verb for applying to y at each level going down; its result will be the y for the next level
-NB. v produces the result, and joins multiple results.  It is applied dyadically at leaf nodes or if a non-locale is returned from proplocales,
-NB.  and monadically at interior nodes.  At the leaf, x is empty; for a non-locale interior node, x is a box.  At other interior
-NB.  nodes, y is the result of applying u.
+NB. v produces the result, and joins multiple results.  It is applied dyadically (with x='') at leaf nodes or
+NB. (with x=the contents of the non-locale result) if a non-locale is returned from proplocales,
+NB.  and monadically at interior nodes. y to the dyad is the result of applying u to y; to the monad it is the array of results from executing on lower locales
 NB.
 NB.
 NB. NOTE that users of this conjunction must interpolate a named verb to call it, so that the current locale will not be modified
@@ -3787,7 +3800,7 @@ ISTATUSFONT =: FONTIMSG
 ISTATUSFONTSIZE =: 2
 ISTATUSMARGIN =: 1
 NB. for the user's sentence
-SATZCOLOR =: 190 190 190
+SATZCOLOR =: 240 240 240
 SATZTEXTCOLOR =: 0 0 0
 SATZFONT =: FONTNUM
 SATZFONTSIZE =: 0
@@ -3805,6 +3818,19 @@ TOOLTIPCOLOR =: 255 255 0
 TOOLTIPTEXTCOLOR =: 0 0 0
 TOOLTIPFONT =: FONTIMSG
 TOOLTIPMARGIN =: 1
+NB. for title
+NB. for the user's sentence
+TITLCOLOR =: 240 240 240
+TITLTEXTCOLOR =: 0 0 0
+TITLFONT =: FONTIMSG
+TITLFONTSIZE =: 4
+TITLMARGIN =: 0
+NB. for links
+LINKCOLOR =: 240 240 240
+LINKTEXTCOLOR =: 0 0 192
+LINKFONT =: FONTIMSG
+LINKFONTSIZE =: _2
+LINKMARGIN =: 0
 
 
 NB. The shape colors/textcolors give the main data colors for the selection level
@@ -3867,29 +3893,38 @@ EMPTYEXTENT =: 15 10   NB. Size to use for displaying empty
 
 MAXDATASIZEYX =: 200 200
 
+MINFONTSIZE =: 7   NB. As small as we can readably display
+
 NB. Create cfms for later use.  y is the font size selected.
 NB. called in locale of main instance, leaves names defined there
 NB. Operands to drawtext/sizetext
 NB. These take colors from the selectors, except for the first one, which tells part of speech, and the last
 NB. few, which are status/unexecd/fill
 calccfms =: 3 : 0
-nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;NOUNFONT;(y+NOUNFONTSIZE);NOUNMARGIN
-nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
-nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
-nouncfm =: nouncfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(y+ISTATUSFONTSIZE);ISTATUSMARGIN
+modfontsize =. MINFONTSIZE >. y&+
+nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;NOUNFONT;(modfontsize NOUNFONTSIZE);NOUNMARGIN
+nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(modfontsize SHAPEFONTSIZE);SHAPEMARGIN
+nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(modfontsize STATUSFONTSIZE);STATUSMARGIN
+nouncfm =: nouncfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(modfontsize ISTATUSFONTSIZE);ISTATUSMARGIN
 
-verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(y+VERBFONTSIZE);VERBMARGIN
-verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(y+SHAPEFONTSIZE);SHAPEMARGIN
-verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(y+STATUSFONTSIZE);STATUSMARGIN
-verbcfm =: verbcfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(y+ISTATUSFONTSIZE);ISTATUSMARGIN
+verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(modfontsize VERBFONTSIZE);VERBMARGIN
+verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(modfontsize SHAPEFONTSIZE);SHAPEMARGIN
+verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(modfontsize STATUSFONTSIZE);STATUSMARGIN
+verbcfm =: verbcfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(modfontsize ISTATUSFONTSIZE);ISTATUSMARGIN
 
-cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": y+DATAFONTSIZE) ,. <DATAMARGIN
+cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": modfontsize DATAFONTSIZE) ,. <DATAMARGIN
 
-RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;RESULTSHAPEFONT;(y+RESULTSHAPEFONTSIZE);RESULTSHAPEMARGIN
+RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;RESULTSHAPEFONT;(modfontsize RESULTSHAPEFONTSIZE);RESULTSHAPEMARGIN
 
 NB. For the displayed sentence
-satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 SATZFONT;(y+SATZFONTSIZE);SATZMARGIN
-satzcfm =: satzcfm , SATZCOLOR;SATZTEXTCOLOR;SATZFONT;(y+SATZFONTSIZE);SATZMARGIN
+satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 SATZFONT;(modfontsize SATZFONTSIZE);SATZMARGIN
+
+NB. For titles
+titlcfm =: TITLCOLOR;TITLTEXTCOLOR;TITLFONT;(modfontsize TITLFONTSIZE);TITLMARGIN
+
+NB. For links
+linkcfm =: LINKCOLOR;LINKTEXTCOLOR;LINKFONT;(modfontsize LINKFONTSIZE);LINKMARGIN
+
 NB.?lintsaveglobals
 ''
 )
@@ -3904,6 +3939,8 @@ FONTSFORCLASSRANKVERB =: 2 $ ,: VERBFONT;'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR
 SIZESFORCLASSRANKVERB =: 1 1.6
 
 COLORSFORCLASSSHAPE =: (SHAPETEXTCOLORS ;"1 SHAPECOLORS) , RESULTSHAPETEXTCOLOR;RESULTSHAPECOLOR
+
+FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
 
 NB. Calculate a font from a class and selection
 NB. x is the class of the characters:
@@ -3947,15 +3984,56 @@ cfmforclassshape =: 3 : 0
 
 NB. ************** drawing the sentence *****************
 
-NB. Draw the user's sentence at the top, showing highlighting
+NB. Draw the user's top info: the sentence including highlighting,
+NB. and any title and links
 NB. x is the sentence, in the user's spacing
 NB. y is a table of (token range);display level;tokenvisibility)
-NB. The characters are drawn, with appropriate colors
+NB. Result is table of (brect for header data);< other stuff needed to draw the sentence.  Ending brects are hw
+NB. If there is more than one row, the second row is similar information for the links
 sizesentence =: 4 : 0
 usentence =. x
 NB. Reselect in case explorers were drawn
 wd 'psel ' , winhwnd
 glsel 'dissectisi'
+
+NB. If there is a title, size it
+if. #titlelines =. (1 {"1 dispoptions) #~ (0 {"1 dispoptions) = <'title' do.
+  titlsizetext =. TAB (0&".@taketo ; takeafter)&> titlelines
+  titlcfms =. (#titlsizetext) $ ,: titlcfm
+  NB. Add in fontsize adjustment
+  titlcfms =. ((0 {"1 titlsizetext) (MINFONTSIZE >. +)&.> 3 {"1 titlcfms) (<a:;3)} titlcfms
+  NB. Get the size of the rectangles.
+  titlrectsizes =. titlcfms sizetext ,. titltxts =. 1 {"1 titlsizetext
+  NB. Get the starting y position for each title line
+  titly =. |.!.0 +/\ {."1 titlrectsizes
+  NB. Get max title width
+  maxtitlewid =. >./ {:"1 titlrectsizes
+  NB. Get the starting x position - so as to center the titles
+  titlx =. <. -: maxtitlewid - {:"1 titlrectsizes
+  titlrects =. (titly,.titlx) ,:"1 titlrectsizes
+else.
+  titlcfms =. 0 $ ,: titlcfm [ titltxts =. 0$<'' [ titlrects =. 0 2 2$0 NB.?lintonly [ maxtitlewid =. 0
+end.
+
+NB. If there are links, size them too.  Create a table, empty if no links
+if. #linklines =. (1 {"1 dispoptions) #~ (0 {"1 dispoptions) = <'link' do.
+  linksizetextlink =.<;._2@:(,&TAB)@> linklines
+  linkcfms =. (#linksizetextlink) $ ,: linkcfm
+  NB. Add in fontsize adjustment
+  linkcfms =. ((0&".@> 0 {"1 linksizetextlink) (MINFONTSIZE >. +)&.> 3 {"1 linkcfms) (<a:;3)} linkcfms
+  NB. Get the size of the rectangles.
+  linkrectsizes =. linkcfms sizetext ,. linktxts =. 1 {"1 linksizetextlink
+  NB. Get the starting y position for each link line
+  linky =. |.!.0 +/\ {."1 linkrectsizes
+  NB. Links are left-justified, start at 0
+  linkrects =. (linky,.0) ,:"1 linkrectsizes
+  linkinfo =.  ,: (>./ +/"2 linkrects);< linkcfms;linktxts;linkrects;< 2 {"1 linksizetextlink
+else.
+  linkinfo =. 0 2$a:
+end.
+
+
+
 NB. Create table of token#,level.  Decrement token # to account for queue-end added at front.
 NB. This also deletes any boxes of y that contain 0 token numbers - these will have been added for
 NB. emulation purposes, for example vi@:u to handle &.
@@ -3988,33 +4066,75 @@ scrwid =. <. MAXSENTENCEWIDTH * {: screensize
 boxhw =. , (((}.~) (, $:)~^:(*@#@[) <@{.~)   1 >. scrwid I.~ (+/\@:({:"1))) rectsize
 NB. Get the height of each line
 lh =. >./@:({."1)@> boxhw
-NB. Get the start of each line, which is zero here for left justification
-lw =. 0
+NB. Get the start of each line, which are all the same.  The lines should be centered under the headers
+NB. if any.  Add to whichever center-point is to the left
+szyx =. 0   NB. left-justify if no titles, or titles shorter than sentence; top offset 0 if no titles
+if. #titlrects do.
+  maxtextwid =. >./ +/@:({:"1)@> boxhw
+  szyx =. (+/ (<_1;a:;0) { titlrects)   NB. Get starting y - at end of last title rect
+  if. maxtitlewid > maxtextwid do.
+    NB. title is longer: just start the text over to the right
+    szyx =. szyx , <. -: maxtitlewid - maxtextwid
+  else.
+    NB. text is longer: start it on the left, and add offset to each starting title rect
+    szyx =. szyx , 0
+    titlrects =. titlrects +"2 (2 _2) {. <. -: maxtextwid - maxtitlewid
+  end. 
+end.
 NB. Install starting yx, and move rects into horizontal position
-rects =. ; (lw ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
+rects =. ; (szyx +"1 (0) ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
 
 NB. Get the max size for the string, and return the data for drawing
-NB. Draw the strings
-(>./ +/"2 rects);cfms;txts;rects
+linkinfo ,~ (>./ +/"2 titlrects,rects);<(titlcfms,cfms);(titltxts,txts);(titlrects,rects)
 )
 
-NB. Draw the sentence.  y is the result of sizesentence, except for the brect
+NB. Draw the sentence.  y is the first line of the result of sizesentence (the sentence info)
 NB. x is the yx of the start of the region
 drawsentence =: 4 : 0
 tlc =. x ,:0 0
-'cfms txts rects' =. y
+'cfms txts rects' =. 1 {:: y
 cfms drawtext txts ,. <"2 tlc +"2 rects
 )
 
+NB. Draw the links.  y is the second line of the result of sizesentence (the link info)
+NB. x is the yx of the start of the region
+drawlinks =: 4 : 0"1 1
+tlc =. x ,:0 0
+'cfms txts rects links' =. 1 {:: y
+cfms drawtext txts ,. <"2 tlc +"2 rects
+)
 
-NB. *********** create DOs
-cocurrent 'dissectobj'
-
+NB. Pick for display object, vectoring to the indicated type
+NB. x is ('l' or 'r') flag
+NB. y is main/explorer;(y,x relative to pickrect);pickflags (numeric atom of left,right,ctrl,shift)
+NB. no result.  selections are performed
+pickDO =: 4 : 0  NB. Called in locale of the node that drew the DO
+QP^:DEBPICK 'coname'''' y '
+'exp yx flags' =. y
+if. 'l' = x do.
+  'cfms txts rects links' =. 1 1 {:: topinfo
+  for_r. rects findpickhits yx do.
+    'ix pyx' =. r
+    QP^:DEBPICK 'x ix pyx exp yx flags ix{::picknames '
+    if. IFQT do.   NB.?lintonly browse_j_ =. 3 : 'y'
+      browse_j_ ix {:: links
+    else.
+      drawtooltip yx ; 'Links not supported in J6'
+      hoversessmin =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
+    end.
+  end.
+end.
+0 0$0
+)
 
 NB. y is a brick of rectangles yx,:hw, or an array of boxes containing rects at some level,
 NB. or a single rect (which becomes the bbox)
 NB. Result is bounding rect, a single yx,:hw
 brect =: (<./@:({."2) ,: >./@:({:"2))&.:(+/\"2)^:(2<#@$)@(>@:(<S:0)^:(0<L.))
+
+
+NB. *********** create DOs
+cocurrent 'dissectobj'
 
 
 NB. x is alignment(s) for a single rectangle
@@ -4895,10 +5015,6 @@ NB. Get the amount to move each side up, corresponding to the winning value
 moves =. ROUTINGGRIDSIZE * |. bestx { allmoves
 NB. Get the spacing represented by the best move
 lookbest =. bestx { alllooks
-NB. obsolete NB. Try smaller vertical offsets first.  Pair each position of each side with the base position of the other side
-NB. obsolete NB. (unshifted position appears twice)
-NB. obsolete lookbest =. <./ lookres =. , rlookups ((>. {.) ,. (>. {.)~) llookups  NB. R +0, L +0, R +1, L +1, etc...
-NB. obsolete moves =. ROUTINGGRIDSIZE * |.!.0^:{: 0 2 #: lookres i. lookbest  NB. Interpret as L -0. R -0, L -1 etc
 NB. Move each side down (i. e. up the diagram) to the extent there is slack; move other side up the rest
 vertadj =. moves ([ (|.@:- - ]) <.) slacks
 NB. Move blocks to establish spacing
@@ -5523,16 +5639,26 @@ NB. Size the placed layout, and convert wires to lines;arcs
 NB. y is locales;table of yx;wires as table of y x y x type, type = 0 for wire, 1 for arc
 NB. x, if given, is the scroll amount (starting position of top-left corner)
 NB. result is size reqd yx;locales;yx;(lines as n 2 2 yx start,:end);(arcs as n 2 2 yx center,:corner)
+NB. side effects: pick info created
+NB. globals used: topinfo (used to find the link pickrects)
 sizeplacement =: 4 : 0
 tlc =. x
 'dos yx wires' =. 3 {. y
 NB. Apply scroll offset
 yx =. yx +"1 tlc
 wires =. wires +"1 tlc,tlc,0
-locpickrects =: 0 2 2 $ 0
-for_d. picklocs =: dos do.  NB.?lintonly d =. <'dissectobj'
-  locpickrects =: locpickrects , (d_index{yx),:{.DOsize__d
+NB. Initialize pick information.  For speed, there are two arrays: locpickrects, which is a brick of
+NB. yxhw for each object, and picklocs, which is a list of locales, one per pickrect.
+NB. Each displayed block is associated with a unique locale.  Links are associated with the form locale.
+if. 1 < #topinfo do.
+  NB. There are links.  Create a brect for them, associated with the form locale
+  picklocs =: (coname''),dos
+  locpickrects =: ,: brect (1 1;2) {:: topinfo
+else.
+  locpickrects =: 0 2 2 $ 0
+  picklocs =: dos
 end.
+locpickrects =: locpickrects , yx ,:"1 ({."2) 3 : 'DOsize__y'"0 dos
 lines =. (2 2&$)"1 (0 = 4 {"1 wires) # wires
 arcs =. (2 2&$)"1 (1 = 4 {"1 wires) # wires
 NB. Get the max size drawn, and set the control to just big enough to hold it
@@ -5575,7 +5701,9 @@ NB.  aazz =. (2&{."1 (] ,"1 ([ + 2&*@:*@:-)) 2&}."1) aazz
 end.
 
 NB. Show the sentence, with the user's spacing, highlighting according to selection level
-({.sentencebrect) drawsentence }. usersentence sizesentence gettokenlevels__resultroot ''
+((<0 0) { sentencebrects) drawsentence {. topinfo
+NB. Show the links if any
+(0 {"2 sentencebrects) drawlinks^:(*@#@])&}. topinfo
 NB.?lintsaveglobals
 )
 
@@ -5966,7 +6094,7 @@ drawDO =: 3 : 'drawDOvnall y'
 NB. ********************************** pick DOs
 NB. Pick for display object, vectoring to the indicated type
 NB. x is ('l' or 'r') flag
-NB. y is main/explorer(y,x relative to pickrect);pickflags (numeric atom of left,right,ctrl,shift)
+NB. y is main/explorer;(y,x relative to pickrect);pickflags (numeric atom of left,right,ctrl,shift)
 NB. no result.  selections are performed
 pickDO =: 4 : 0  NB. Called in locale of the node that drew the DO
 QP^:DEBPICK 'coname'''' y '
@@ -6104,9 +6232,8 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     labelloc =. ix { DOranklocales
     NB.?lintonly labelloc =. <'dissectobj'
     if. #nuvocpage__labelloc do.
-      NB.?lintmsgsoff
+      NB.?lintonly browse_j_ =. 3 : 'y'
       browse_j_ 'http://www.jsoftware.com/jwiki/Vocabulary/' , nuvocpage__labelloc
-      NB.?lintmsgson
     else.
       msgtext =. 'No NuVoc available'
     end.
@@ -6463,9 +6590,9 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   NB. Describe the options for putting the data onto the clipboard.
   select. #DOshapes
   case. 1 do.
-    disp =. disp , EXEGESISDATACLIPINFO ; 'Click in the shape line to copy this result to the clipboard.',LF
+    disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard.',LF
   case. 2 do.
-    disp =. disp , EXEGESISDATACLIPINFO ; 'Click in the shape line to copy this result to the clipboard; click on a number in the selection line to put the unfilled cell it selects onto the clipboard.',LF
+    disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard; right-click on a number in the selection line to put the cell it selects (before fill if any) onto the clipboard.',LF
   case. do.
   end.
   text =. exegesisgrammar disp
@@ -6494,8 +6621,7 @@ end.
 text
 )
 
-FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
-
+NB. tooltip messages
 'PICKTOOLTIPMSGOK PICKTOOLTIPMSGNOFRAME PICKTOOLTIPMSGNOSELYET PICKTOOLTIPMSGPREVERR PICKTOOLTIPMSGEMPTY PICKTOOLTIPMSGNOMORESEL PICKTOOLTIPMSGNOORIDE PICKTOOLTIPMSGFILLED' =: i. # PICKTOOLTIPMSGS =: <;._2 (0 : 0)
 
 unselectable - no frame
@@ -6683,8 +6809,10 @@ NB.?lintonly pickloc =. <'dissectobj'
   glsel 'dissectisi'  NB. reselect graphics window
   if. #pickloc do.
 QP^:DEBMOUSE'hoverdo:hwnd=?winhwnd wd''qhwndp'' hoverisexp pickloc '
-    hstring =. hoverDO__pickloc hoverisexp;yx
-    if. #hstring do. drawtooltip hoverinitloc;hstring end.
+    if. 3 = 4!:0 <'hoverDO__pickloc' do.
+      hstring =. hoverDO__pickloc hoverisexp;yx
+      if. #hstring do. drawtooltip hoverinitloc;hstring end.
+    end.
   end.
 end.
 )
@@ -6697,7 +6825,9 @@ for_r. pr =. locpickrects findpickhits y do.
   'l yx' =. r
   pickloc =. l { picklocs
 NB.?lintonly pickloc =. <'dissectobj'
-  stattext =. statlineDO__pickloc hoverisexp;yx
+  if. 3 = 4!:0 <'statlineDO__pickloc' do.
+    stattext =. statlineDO__pickloc hoverisexp;yx
+  end.
 end.
 'fmstatline' wdsettext stattext
 0 0$0
@@ -6801,7 +6931,9 @@ for_r. pr =. locpickrects findpickhits 1 0 { y do.
   'l yx' =. r
   pickloc =. l { picklocs
 NB.?lintonly pickloc =. <'dissectobj'
-  x pickDO__pickloc 0;yx;#. 4 5 6 7 { y
+  if. 3 = 4!:0 <'pickDO__pickloc' do.
+    x pickDO__pickloc 0;yx;#. 4 5 6 7 { y
+  end.
 end.
 #pr
 NB.?lintsaveglobals
@@ -6813,9 +6945,9 @@ NB. the screen buffer as an indicator of scroll-in-progress, and delete it when 
 NB. since it's big)
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
-NB. Read the pixels from the end of the sentence area to the bottom of the screen
-  picksentencepixels =: glqpixels 1 0 3 2 { , -~/\ sentencebrect
-  scrollblock =. -~/\ (0 (1}) {: sentencebrect) ,: 3 2 { sd
+NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
+  picksentencepixels =: glqpixels 1 0 3 2 { , -~/\ topbrect
+  scrollblock =. -~/\ (0 (1}) {: topbrect) ,: 3 2 { sd
   pickpixels =: ({: $ glqpixels@:,@:(|."1)) scrollblock
   pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
 NB.?lintsaveglobals
@@ -6838,9 +6970,9 @@ sd =. 0 ". sysdata
 if. 0 = 4!:0 <'pickpixels' do.
   pickscrollcurryx =: 1 0 { sd
   glclear''
-  scrollblock =. -~/\ (0 (1}) {: sentencebrect) ,: 3 2 { sd
+  scrollblock =. -~/\ (0 (1}) {: topbrect) ,: 3 2 { sd
   glpixels (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) , (|. $ pickpixels) , , pickpixels
-  glpixels (1 0 3 2 { , -~/\ sentencebrect) , picksentencepixels
+  glpixels (1 0 3 2 { , -~/\ topbrect) , picksentencepixels
   glpaint''
 elseif. 0 = 4!:0 <'scrollinglocale' do.
 NB. Perform the scroll, on the main window, but in the locale of the data
@@ -12684,6 +12816,7 @@ NB. Traversal up and down the tree.
 NB.
 NB. The result is the DOL, up through the result of u
 traverse =: endtraverse@:(4 : 0)
+titlestring =: 1 fulltitlestring 'fork'
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 if. vvv do.
@@ -12716,17 +12849,41 @@ NB. to start the physreqs with the values that they would have had to start uv.
 1 inheritu (dolu,dolv) traverse__cop travops rankstackcode;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
 )
 
+exegesisrankstack =: 3 : 0
+'appearstwice lastinblock datapresent' =. y
+if. lastinblock do.   NB. If we are the last block, save description for the end (should not occur, unless stealth)
+  res =. 0 2$a:
+else.
+  t =. 'This is the part of the fork:',LF,(defstring 0),CR
+  select. appearstwice, datapresent
+  case. 0 0 do.
+    t =. t , 'This block will contain a single intermediate result for the verb after sufficient selections have been made.  The overall result will be shown in the final block of the verb.',LF
+  case. 0 1 do.
+    t =. t , 'This block contains an intermediate result for the fork.  The overall result is shown in the final block of the fork.',LF
+  case. 1 0 do.
+    t =. t , 'When a single result-cell is selected, this block will contain the result.',LF
+  case. do.
+    t =. t , 'This block contains the result.',LF
+  end.
+   res =. ,: EXEGESISRANKSTACKEXPLAIN;t
+end.
+res
+)
+
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
 'datapresent endflag linetext' =. y
-if. endflag do.
+if. DLRCOMPEND -: linetext do.
+  NB. This is the 'end-of-computation' node.  Put out the description
+  tit =. (*#titlestring) # ', which started in the block(s) marked in the rank stack as a ',titlestring
   if. datapresent do.
-  NB. No data.  Must not be the expansion
-    ,: exegisisrankoverallcompend appearstwice;'';'fork'
+    res =. exegisisrankoverallcompend appearstwice;tit;'fork'
   else.
-    ,: exegisisrankoverallnodisp appearstwice;'';'fork'
+    res =. exegisisrankoverallnodisp appearstwice;tit;'fork'
   end.
-else. 0 2$a:
+  res
+else.
+  0 2$a:
 end.
 )
 
@@ -12780,6 +12937,7 @@ NB. Traversal up and down the tree.
 NB.
 NB. The result is the DOL, up through the result of u
 traverse =: endtraverse@:(4 : 0)
+titlestring =: 1 fulltitlestring 'hook'
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 dol =. joinlayoutsl (_1 {. x) traverse__vop travops (TRAVOPSKEEPINLIGHT 0 1 2);TRAVOPSPHYSKEEP;(vopval _1 { selopinfovalid);selopshapes;_1
@@ -12808,17 +12966,19 @@ NB. Tell inheritu to add an end-of-computation mark to the display stack
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
 'datapresent endflag linetext' =. y
-if. endflag do.
+if. DLRCOMPEND -: linetext do.
+  NB. This is the 'end-of-computation' node.  Put out the description
+  tit =. (*#titlestring) # ', which started in the block(s) marked in the rak stack as a ',titlestring
   if. datapresent do.
-  NB. No data.  Must not be the expansion
-    ,: exegisisrankoverallcompend appearstwice;'';'hook'
+    res =. exegisisrankoverallcompend appearstwice;tit;'hook'
   else.
-    ,: exegisisrankoverallnodisp appearstwice;'';'hook'
+    res =. exegisisrankoverallnodisp appearstwice;tit;'hook'
   end.
-else. 0 2$a:
+  res
+else.
+  0 2$a:
 end.
 )
-
 
 
 NB. ***** modifier sequences *****
@@ -13749,6 +13909,12 @@ ctup = 8
 2 dissect '*`crash9_dissect_/ i. 10'
 2 dissect 'crash9_dissect_`*/ i. 10'
 2 dissect '*`+/ i. 10'
+(2 ;< 'title';'0',TAB,'Demo') dissect '3 + 5 + 7 + 9'
+(2 ;< 'title';'0',TAB,'Demonstration Title') dissect '3 + 5'
+(2 ;< ('title';'0',TAB,'Demonstration Title'),:('title';'-4',TAB,'subtitle')) dissect '3 + 5'
+(2 ;< 'link';'0',TAB,'Demo',TAB,'http://www.jsoftware.com/jwiki/NuVoc') dissect '3 + 5 + 7 + 9'
+(2 ;< 'link';'2',TAB,'Demo link with extremely long name',TAB,'http://www.jsoftware.com/jwiki/NuVoc') dissect '3 + 5 + 7 + 9'
+(2 ;< ('link';'0',TAB,'Demo',TAB,'http://www.jsoftware.com/jwiki/NuVoc'),:('link';'0',TAB,'Demo link with extremely long name',TAB,'http://www.jsoftware.com/jwiki/NuVoc')) dissect '3 + 5 + 7 + 9'
 )
 
 testsandbox_base_ =: 3 : 0
