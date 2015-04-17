@@ -61,7 +61,6 @@ config_displayshowfillcalc_dissect_ =: 0
 NB. TODO
 NB. can we be more specific about 'before fill if any'?
 NB. can we distinguish left time of fork from right?
-NB. Add code to debug to associate options with function lines & apply them if autodissect on
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -70,10 +69,11 @@ NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to suppo
 NB. Add rank-calculus for primitives with known behavior
 NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
-NB. clicking on vbname (if tacit) should launch sandbox for that name.
-NB. support u . v y?
+NB. right-clicking on vbname (if tacit) should launch sandbox for that name.
+NB. support u . v y
 
 NB. display:
+NB. Give some indication of assignment?
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
@@ -1144,8 +1144,7 @@ if. #dissectinstance do.
     destroy__dissectinstance''
     errormessage
   end.
-else.   NB. user tried recursive execution
-  destroy__dissectinstance''
+else.   NB. user tried recursive execution; dissectinstance is now empty
   'Vivisection is illegal.'
 end.
 )
