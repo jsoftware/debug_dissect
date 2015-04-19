@@ -73,6 +73,7 @@ NB. right-clicking on vbname (if tacit) should launch sandbox for that name.
 NB. support u . v y
 
 NB. display:
+NB. Unicode?
 NB. Give some indication of assignment?
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
@@ -3761,6 +3762,7 @@ RGBTOLUMINANCE =: +/@:*"1&0.2989 0.5870 0.1140
 
 
 SCROLLBARWIDTH =: 14  NB. width of scrollbar in pixels
+SCROLLBARMINWIDTH =: 12  NB. Minimum thickness of traveler
 SCROLLBARCOLOR =: <192 192 192   NB. color for scrollbar - no pen
 SCROLLBARENDCOLOR =: <240 240 240
 SCROLLBARENDTHICKNESS =: 10
@@ -4306,7 +4308,21 @@ elseif. do.
   NB. We also come here for the top level, which is boxed because it might not collect
   subDOLs =. 0$a:  NB. no subnouns unless boxed
   glfontextent ; (<(1 = {. $ value);0 1) { fontdesc
-  hw =. (+/ 2 2 ($,) (<0 2) {:: fontdesc) +"1 |."1 glqextent@(":!.displayprecision)"0 value
+  NB. For very large nouns, sizing the text may take a long time.  Taking advantage of the
+  NB. fact that we use fixed-pitch font for data, calculate the size once for each
+  NB. displayed atom, and reuse that
+  if. do.
+    NB. fixed-pitch optimization.  Calculate # chars for each cell, then one example of each
+    charcts =. #@(":!.displayprecision)"0 value
+    charctsnub =. ~.@:, charcts
+    lookuptbl =. (>:>./charctsnub) $ ,: 10 10
+    lookuptbl =. (|."1 glqextent@(#&' ')"0 charctsnub) charctsnub} lookuptbl
+    extentsyx =. charcts { lookuptbl
+  else.
+    NB. for variable-pitch font, use this
+    extentsyx =. |."1 glqextent@(":!.displayprecision)"0 value
+  end.
+  hw =. (+/ 2 2 ($,) (<0 2) {:: fontdesc) +"1 extentsyx
 end.
   
 NB. combine the height/widths for the row & columns to get the size of each row/column
@@ -5464,16 +5480,26 @@ NB. If there are scrollbars, draw them
     scrolltravv =. scrolltravh =. 0 0
 NB. draw horizontal scroll
     if. 1 { displayscrollbars do.
+      NB. Draw the scrollbar itself
       SCROLLBARCOLOR drawrect (vpos =. -/\. b , SCROLLBARWIDTH) ,. (l , w)
+      NB. Draw the endcaps
       SCROLLBARENDCOLOR drawrect vpos ,."1 (l , SCROLLBARENDTHICKNESS) ,: (-/\. (l+w) , SCROLLBARENDTHICKNESS)
-      scrolltravh =. SCROLLBARENDTHICKNESS + <. sw * 0 >. 1 <. (+/\ (1 { scrollpoint) , w) % (1 { datahw)
+      NB. Calculate left & right scroll positions of the travelers, as pixel positions in the scrollbar
+      scrolltravh =. <. sw * 0 >. 1 <. (+/\ (1 { scrollpoint) , w) % (1 { datahw)
+      NB. Make sure the traveler has a minimum width so user can find it.
+      NB. Distribute the added width toward the center of the region: negative for left, positive for right
+      leeway =. (% -~/) (0,sw) - scrolltravh
+      NB. Add needed thickness, and adjust right to account for the leading endcap
+      scrolltravh =. scrolltravh + SCROLLBARENDTHICKNESS + <. leeway * 0 >. SCROLLBARMINWIDTH - (-~/ scrolltravh)
       SCROLLBARTRAVELERCOLOR drawrect vpos ,. -~/\ l + scrolltravh
     end.
 NB. vertical
     if. 0 { displayscrollbars do.
       SCROLLBARCOLOR drawrect (hpos =. -/\. r , SCROLLBARWIDTH) ,.~ (t , h)
       SCROLLBARENDCOLOR drawrect hpos ,.~"1 (t , SCROLLBARENDTHICKNESS) ,: (-/\. (t+h) , SCROLLBARENDTHICKNESS)
-      scrolltravv =. SCROLLBARENDTHICKNESS + <. sh * 0 >. 1 <. (+/\ (0 { scrollpoint) , h) % (0 { datahw)
+      scrolltravv =. <. sh * 0 >. 1 <. (+/\ (0 { scrollpoint) , h) % (0 { datahw)
+      leeway =. (% -~/) (0,sh) - scrolltravv
+      scrolltravv =. scrolltravv + SCROLLBARENDTHICKNESS + <. leeway * 0 >. SCROLLBARMINWIDTH - (-~/ scrolltravv)
       SCROLLBARTRAVELERCOLOR drawrect hpos ,.~ -~/\ t + scrolltravv
     end.
     scrolltravelers =: (scrolltravv ,: scrolltravh) hwindex} scrolltravelers
