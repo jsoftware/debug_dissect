@@ -2244,6 +2244,10 @@ rankhistory =: rankhistory , '' ; coname''
 ''
 )
 
+NB. If an operand to a modifier is invalid, so that the verb will not run, we
+NB. abort it early by producing an invalid frame.  This will localize the error to the failing modifier
+FRAMETOCREATEABORT =: ,0.5
+
 traversedowncalcselect =: 3 : 0
 assert. 1 = #$y
 assert. (#y) e. 3 4
@@ -11702,8 +11706,13 @@ case. 1;_1;2;_2 do.
   NB. canonize x: convert to list of boxes; then within each box, convert atom to full list, or empty to list of one partition
   canonx =: shapeofy ((<.&# {. [) ((#^:(''-:$@])) [^:(0=#@])~ ({. 1:))&.> (<.&# {. ])) <^:(0=L.) partitionx__xop
   usedyshape =: ({:@$ canonx) {. shapeofy
-  NB. Get shape of result partitions
-  ny =. +/@> canonx
+  if. (;canonx) *./@:e. 0 1 do.
+    NB. Get shape of result partitions.
+    ny =. +/@(0&~:)@> canonx
+  else.
+    NB. If there is an invalid value in the operand, create an invalid frame to abort the operation
+    ny =. FRAMETOCREATEABORT
+  end.
 case. 3;_3 do.
   NB. convert list to table; replace values bigger than axis by signed length of axis
   canonx =: 1 ,:^:(2>#@$@]) partitionx__xop
@@ -13940,6 +13949,7 @@ ctup = 8
 (2 ;< 'link';'0',TAB,'Demo',TAB,'http://www.jsoftware.com/jwiki/NuVoc') dissect '3 + 5 + 7 + 9'
 (2 ;< 'link';'2',TAB,'Demo link with extremely long name',TAB,'http://www.jsoftware.com/jwiki/NuVoc') dissect '3 + 5 + 7 + 9'
 (2 ;< ('link';'0',TAB,'Demo',TAB,'http://www.jsoftware.com/jwiki/NuVoc'),:('link';'0',TAB,'Demo link with extremely long name',TAB,'http://www.jsoftware.com/jwiki/NuVoc')) dissect '3 + 5 + 7 + 9'
+2 dissect '1 0 0 0 _4 0 0 1 <;._2 ''abcdefgh'''
 )
 
 testsandbox_base_ =: 3 : 0
