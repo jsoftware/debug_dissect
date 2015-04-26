@@ -59,6 +59,8 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
+NB. Look at invalid x in partitions
+NB. debug must turn itself off before dissecting to avoid hitting lower stop
 NB. can we be more specific about 'before fill if any'?
 NB. can we distinguish left time of fork from right?
 NB. reconsider how to display nilad fully based on switch
@@ -542,15 +544,13 @@ try. queue =. ;: sentence catch. queue =. 0$a: end.
 if. #queue do.  NB. following fails on no words
 NB. Get mask of words to discard: discard leading control words, or anything starting with a control word after a non-control
   dischdtl =. (*./\ ,: [: +./\ 0 , (2) </\ ]) iscw queue
-NB. Get the sentence in the form the user gave it, by deleting the nonblank characters corresponding
-NB. to the discarded words.
+  NB. Get the sentence in the form the user gave it, by deleting the nonblank characters corresponding
+  NB. to the discarded words.
   ndiscardshdtl =. dischdtl (#@(-.&' ')@;@#)"1 queue
-  usersentence =: ' ' (-@(i.&0@:= |.) }. i.&0@:= }. ]) sentence ((}.~ {.) }.~ -@{:@]) ndiscardshdtl i.~"0 1 (0) ,. (+/\ ,: +/\@|.) ' ' ~: sentence
-NB. keep the nondiscards in the tokenized version
-  queue =. (+:/ dischdtl) # queue
+  NB. Make sure the queue matches the tokens that have been selected for processing
+  queue =. ;: usersentence =: ' ' (-@(i.&0@:= |.) }. i.&0@:= }. ]) sentence ((}.~ {.) }.~ -@{:@]) ndiscardshdtl i.~"0 1 (0) ,. (+/\ ,: +/\@|.) ' ' ~: sentence
 end.
 NB.?lintonly usersentence =: ''
-
 NB. If the sentence is empty, abort
 if. 0 = #queue do.
   failmsg 'Usage: dissect ''sentence''',LF,LF,'Try   dissect ''0'' to see example screen' return.
@@ -832,7 +832,7 @@ calcdispstealth__resultroot displaystealth # 1 2
 
 NB. Create the string to execute.  If we have to create a sandbox, do so
 NB. The raw sentence has the user's tokens, but the the invisible ones removed (for noassign sentences).
-vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot '')&{&.;: sentence
+vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot '')&{&.;: usersentence
 execsentences_dissect_ =: vissentence ;^:(comparisonlevel<3) ,<exestring__resultroot''
 if. sandbox do.
   NB. create the sandbox verb in the user's locale
@@ -13950,6 +13950,11 @@ ctup = 8
 (2 ;< 'link';'2',TAB,'Demo link with extremely long name',TAB,'http://www.jsoftware.com/jwiki/NuVoc') dissect '3 + 5 + 7 + 9'
 (2 ;< ('link';'0',TAB,'Demo',TAB,'http://www.jsoftware.com/jwiki/NuVoc'),:('link';'0',TAB,'Demo link with extremely long name',TAB,'http://www.jsoftware.com/jwiki/NuVoc')) dissect '3 + 5 + 7 + 9'
 2 dissect '1 0 0 0 _4 0 0 1 <;._2 ''abcdefgh'''
+2 dissect 'if. 3 + 5'
+2 dissect '3 + 5 end. 0'
+2 dissect '3 + 5 end. 0 end.'
+6 dissect 'if. r =. +/ 1 2 3 do. a =. 5 end.'
+6 dissect 'if. 0 = #r =. +/ 1 2 3 do. a =. 5 end.'
 )
 
 testsandbox_base_ =: 3 : 0
