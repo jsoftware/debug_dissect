@@ -59,8 +59,10 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. Look at invalid x in partitions
-NB. debug must turn itself off before dissecting to avoid hitting lower stop
+NB. dissect '+&.> 1 2 3 ; 4 5 6 7'  weird shape line?
+NB. dissect '__&".@>&.> z' [ z =. ('1';'23';'5') ; ('')  ;< ('345';'67')    weird shape line?
+NB. 1!:1 needs to point to NuVoc page
+NB. Need a little more boxmargin, especially at lasy level
 NB. can we be more specific about 'before fill if any'?
 NB. can we distinguish left time of fork from right?
 NB. reconsider how to display nilad fully based on switch
@@ -11166,6 +11168,8 @@ cocurrent 'dissectpartitionadverb'
 coinsert 'dissectpartition'  NB. for lint
 
 create =: 3 : 0
+NB. We come through here for both adverb and conjunction partitions, keeping both operands
+NB. in case we need to switch to default verb
 if. noun bwand (<0 0) {:: y do.
   NB. Noun u: should be a gerund.  See if we understand it
   uop =: 0 1 {:: y
@@ -11183,7 +11187,7 @@ create_dissectobj_ f. (<1 2) {  y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locale of the verb, and string form of the adv
-'uop cop' =: 1 {"1 y
+'uop cop' =: (<0 1;1) { y
 NB.?lintonly uop =: <'dissectverb' [ cop =: ''
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
@@ -11339,7 +11343,7 @@ if. 0 = noun bwand (<2 0) {:: y do.
   failmsg 'domain error: right operand to ',((<1 1){::y),' must be a noun'
 end.
 vop =: 2 1 {:: y
-r =. create_dissectpartitionadverb_ f. 2 {. y
+r =. create_dissectpartitionadverb_ f. y
 NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: '' [ gops =: 0$a:
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
@@ -11440,8 +11444,10 @@ NB. The pseudoframe (# of partitions) is already in the stored data, since we lo
 NB. call to u.  So make that the frame.  The number of partitions is:
 NB. if x is nonnegative, (the number of items of y + 1) - x, but never negative
 NB. if x is negative, (the number of items of y) % |x, rounded up
-if. partitionx__xop >: 0 do. ny =. , 0 >. (>: itemctiny) - partitionx__xop
-else. ny =. , >. itemctiny % -partitionx__xop
+if. (3!:0 partitionx__xop) -.@e. 1 4 8 16 do. ny =. FRAMETOCREATEABORT
+elseif. (-.@-: <.) partitionx__xop do. ny =. FRAMETOCREATEABORT
+elseif. partitionx__xop >: 0 do. ny =. , 0 >. (>: itemctiny) - partitionx__xop
+elseif. do. ny =. , >. itemctiny % -partitionx__xop
 end.
 ny ; ny ; (($0);ny) ; a: , a:
 NB.?lintsaveglobals
@@ -11697,38 +11703,61 @@ calcdispframe =: 4 : 0
 NB.?lintonly xop =: <'dissectpartitionselector'
 NB.?lintonly partitionn =: 0
 shapeofy =: ($^:(0<L.))@> {: x
+NB.?lintonly canonx =: usedyshape =: $0
 select. partitionn
 case. 0 do.
-  canonx =: 0&,:^:(2>#@$) partitionx__xop
-  usedyshape =: ({:@$ canonx) {. shapeofy
-  ny =. $0
+  if. (3!:0 partitionx__xop) -.@e. 1 4 8 16 do. ny =. FRAMETOCREATEABORT
+  elseif. (-.@-: <.) partitionx__xop do. ny =. FRAMETOCREATEABORT
+  elseif. do.
+    canonx =: 0&,:^:(2>#@$) partitionx__xop
+    usedyshape =: ({:@$ canonx) {. shapeofy
+    ny =. $0
+  end.
 case. 1;_1;2;_2 do.
+  NB. default in case of error
   NB. canonize x: convert to list of boxes; then within each box, convert atom to full list, or empty to list of one partition
-  canonx =: shapeofy ((<.&# {. [) ((#^:(''-:$@])) [^:(0=#@])~ ({. 1:))&.> (<.&# {. ])) <^:(0=L.) partitionx__xop
+  boxp =. <^:(0=L.) partitionx__xop
+  canonx =: shapeofy ((<.&# {. [) ((#^:(''-:$@])) [^:(0=#@])~ ({. 1:))&.> (<.&# {. ])) boxp
   usedyshape =: ({:@$ canonx) {. shapeofy
-  if. (;canonx) *./@:e. 0 1 do.
-    NB. Get shape of result partitions.
-    ny =. +/@(0&~:)@> canonx
-  else.
+  if. 1 < #$canonx do.
+    NB. x has invalid rank
+    ny =. FRAMETOCREATEABORT  NB. Error if too many partitions
+  elseif. shapeofy <&# boxp do.
+    NB. More partitions than rank of y
+    ny =. FRAMETOCREATEABORT  NB. Error if too many partitions
+  elseif. 1 +./@:~: #@$@> canonx do.
+    NB. Invalid rank in x
+    ny =. FRAMETOCREATEABORT
+  elseif. -. (;canonx) *./@:e. 0 1 do.
     NB. If there is an invalid value in the operand, create an invalid frame to abort the operation
     ny =. FRAMETOCREATEABORT
+  elseif. (#@> canonx) -.@-: usedyshape do.
+    NB. partition shape doesn't match y
+    ny =. FRAMETOCREATEABORT
+  elseif. do.
+    NB. Get shape of result partitions.
+    ny =. +/@(0&~:)@> canonx
   end.
 case. 3;_3 do.
-  NB. convert list to table; replace values bigger than axis by signed length of axis
-  canonx =: 1 ,:^:(2>#@$@]) partitionx__xop
-  NB. Trailing axes of ;.3 are included in the partitioning, so extend them by assuming a 'take everything'.
-  NB. We can't just omit them from canonx and leave them in the frame, because then the selection would be
-  NB. longer than canonx
-  canonx =: canonx ,. (0 >. (#shapeofy) - ({:$canonx)) #"0 (0 _)
-  usedyshape =: ({:@$ canonx) {. shapeofy   NB. Now always same as shapeofy
-  canonx =: ({. canonx) ,: (usedyshape<|)`(,:  usedyshape * *)} {: canonx
-  NB. Calculate the number of start positions: ceiling of (length of axis/movement vector) for 3,
-  NB. or ceiling of (length-size/movement vector) for _3; but 1 if movement vector is 0
-  ny =. (0 ~: 0{canonx)} 1 ,: >. (|0{canonx) %~ (| 1 { canonx) -~^:(partitionn=_3) usedyshape
-  ny =. (#shapeofy) {.!.1 ny
+  if. (3!:0 partitionx__xop) -.@e. 1 4 8 16 do. ny =. FRAMETOCREATEABORT
+  elseif. (-.@-: <.) partitionx__xop do. ny =. FRAMETOCREATEABORT
+  elseif. do.
+    NB. convert list to table; replace values bigger than axis by signed length of axis
+    canonx =: 1 ,:^:(2>#@$@]) partitionx__xop
+    NB. Trailing axes of ;.3 are included in the partitioning, so extend them by assuming a 'take everything'.
+    NB. We can't just omit them from canonx and leave them in the frame, because then the selection would be
+    NB. longer than canonx
+    canonx =: canonx ,. (0 >. (#shapeofy) - ({:$canonx)) #"0 (0 _)
+    usedyshape =: ({:@$ canonx) {. shapeofy   NB. Now always same as shapeofy
+    canonx =: ({. canonx) ,: (usedyshape<|)`(,:  usedyshape * *)} {: canonx
+    NB. Calculate the number of start positions: ceiling of (length of axis/movement vector) for 3,
+    NB. or ceiling of (length-size/movement vector) for _3; but 1 if movement vector is 0
+    ny =. (0 ~: 0{canonx)} 1 ,: >. (|0{canonx) %~ (| 1 { canonx) -~^:(partitionn=_3) usedyshape
+    ny =. (#shapeofy) {.!.1 ny
+  end.
 case. do.
-  NB.?lintonly canonx =: usedyshape =: $0
   NB.?lintonly ny =. 0
+  NB.?lintonly canonx =: usedyshape =: $0
 end.
 NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
 NB. call to u.  So make that the frame.
@@ -13955,6 +13984,16 @@ ctup = 8
 2 dissect '3 + 5 end. 0 end.'
 6 dissect 'if. r =. +/ 1 2 3 do. a =. 5 end.'
 6 dissect 'if. 0 = #r =. +/ 1 2 3 do. a =. 5 end.'
+2 dissect '+&.> 1 2 3 ; 4 5 6 7'
+2 dissect '__&".@>&.> z' [ z =. ('1';'23';'5') ; ('')  ;< ('345';'67')
+2 dissect '''abc'' ;._2 ] 1 2 3'
+2 dissect '''abc'' <;._2 ] 1 2 3'
+2 dissect '''a'' ]\ i. 5'
+2 dissect '''a'' ]\. i. 5'
+2 dissect '1 0 0 0 <;._2 ] 1 2 3'
+2 dissect '(1 0 0;0) <;._2 ] 1 2 3'
+2 dissect '''ab'' <;.0 i. 3 4'
+2 dissect '''ab'' <;.3 i. 3 4'
 )
 
 testsandbox_base_ =: 3 : 0
