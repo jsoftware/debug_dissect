@@ -59,10 +59,12 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
+NB. pfkey detector needs to find user's delimiter
+NB. size menu doesn't have the right values for width when there is a wide noun
+NB. allow width/height to be passed in as a command option
 NB. dissect '+&.> 1 2 3 ; 4 5 6 7'  weird shape line?
 NB. dissect '__&".@>&.> z' [ z =. ('1';'23';'5') ; ('')  ;< ('345';'67')    weird shape line?
 NB. 1!:1 needs to point to NuVoc page
-NB. Need a little more boxmargin, especially at lasy level
 NB. can we be more specific about 'before fill if any'?
 NB. can we distinguish left time of fork from right?
 NB. reconsider how to display nilad fully based on switch
@@ -108,6 +110,7 @@ NB.
 NB. Label options are a table of (type);(string) where types are
 NB.  'title'  string is (fontchange)TABtitle  fontchange is +-amount to increase over sentence size, title is text
 NB.  'link'  string is (fontchange)TABdisplay textTABlink text
+NB.  'datasize'  string is vpct hpct   max size of noun, in % of screen (must be converted to numeric)
 NB.
 NB. If y is boxed, it should be a table ready for use in parse, i. e. nx3 where the first line gives
 NB. parameters;locale;text of sentence
@@ -144,7 +147,7 @@ config_displayshowfillcalc =: 0  NB. Make a rankstack mark when fill-cell is use
 config_displayprecisionx =: 2   NB. default display precision
 )
 
-NB. Read & apply config file.  Run in dissect locale
+NB. Read & apply config file.  Run in dissect locale.
 loadconfig =: 3 : 0
 try.
   cfile =. 1!:1 <jpath '~config/dissect.ijs'
@@ -176,11 +179,18 @@ end.
 0 0$0
 )
 
-NB. Apply config variables to the current instance.  Called in the instance locale
+NB. Apply config variables to the current instance.  Called in the instance locale.
+NB. If y is not empty, it is the table of input options.  We override the config file with them
 applyconfig =: 3 : 0
 inames =. a: -.~ (#~   'config_' -: 7&{.)&.>@{.@;:;._2 CONFIG
 NB. All names starting config_ become instance names losing the config_
 (7 }.&.> inames) =: ".&.> inames
+if. #y do.
+  if. (#y) > dsx =. ({."1 y) i. <'datasize' do.
+    NB. Input options specify the max display sizes, use it
+    maxnoundisplaysizex =: (}:MAXNOUNPCTCHOICES) I. 2 ($,) 0 ". (dsx,1) {:: y
+  end.
+end.
 NB.?lintonly minimumfontsizex =: ttfontsizex =: tooltipdelayx =: tooltipdetailx =: displaycompmods =: displaystructmods =: 0
 NB.?lintonly maxnoundisplaysizex =: 0 0 [ displaystealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: 0
 0 0$0
@@ -827,8 +837,8 @@ QP^:DEBTIME'endparse=?6!:1'''' '
 NB. Decide where nilads should have inputs displayed: 2:"0 etc
 calcdispniladinputs__resultroot 0
 NB. Init the instance variables from the defaults in the dissect locale
-NB. This also sets the values in the form
-applyconfig''
+NB. This also sets the values in the form.  We pass in the display options so they can be used
+applyconfig dispoptions
 NB. Init the displaystealth in every object.  Must be refigured if we change dispstealth
 calcdispstealth__resultroot displaystealth # 1 2
 
@@ -1361,8 +1371,8 @@ NB. give the user the option of changing the display size
   actualpctused =. >. 100 * maxactualnounsize % screensize
   NB. Disable all choices that are two notches above the actual max size
   enablesz =. '01' {~ actualpctused >:"0 1 |.!.0 MAXNOUNPCTCHOICES  NB. Prepend 0 so that 9 eg will enable 10
-  (0 { enablesz) (wdsetenable~   'fmmaxnounsizex' , ":)"0 MAXNOUNPCTCHOICES
-  (1 { enablesz) (wdsetenable~   'fmmaxnounsizey' , ":)"0 MAXNOUNPCTCHOICES
+  (0 { enablesz) (wdsetenable~   'fmmaxnounsizey' , ":)"0 MAXNOUNPCTCHOICES
+  (1 { enablesz) (wdsetenable~   'fmmaxnounsizex' , ":)"0 MAXNOUNPCTCHOICES
 NB. If there are stealth operands on the display, enable the button and caption it
 NB. according to whether we are displaying them
   if. stealthopencountered do.
@@ -1483,7 +1493,7 @@ dissect_fmmaxnounsize_button =: 4 : 0
 maxnoundisplaysizex =: y x} maxnoundisplaysizex
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '1'
 ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '1'
-maxnoundisplayfrac =: 0.01 * MAXNOUNPCTCHOICES {~  maxnoundisplaysizex
+maxnoundisplayfrac =: 0.01 * MAXNOUNPCTCHOICES {~ maxnoundisplaysizex
 dissect_dissectisi_paint 1
 )
 (4 : 0"0 i.@#) MAXNOUNPCTCHOICES
@@ -1523,9 +1533,9 @@ saveconfig''
 )
 
 dissect_fmapplyconfig_button =: 3 : 0
-loadconfig_dissect_''
-applyconfig''
-setformconfig''
+loadconfig_dissect_''  NB. get values from config file
+applyconfig 0   NB. apply them to this instance, ignoring input options
+setformconfig''   NB. put the values into the form
 dissect_dissectisi_paint 1
 )
 
@@ -3893,7 +3903,7 @@ SELECTIONBORDERSTYLE =: 0 0 0,HIGHLIGHTLINEWIDTH,PS_SOLID  NB. color,width of li
 
 WIRECOLOR =: 0 0 0   NB. Color of wires
 
-BOXMARGIN =: 2 ($,) 2   NB. Space to leave around boxed results
+BOXMARGIN =: 2 ($,) 3   NB. Space to leave around boxed results
 BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
 
 EMPTYEXTENT =: 15 10   NB. Size to use for displaying empty
@@ -13994,6 +14004,8 @@ ctup = 8
 2 dissect '(1 0 0;0) <;._2 ] 1 2 3'
 2 dissect '''ab'' <;.0 i. 3 4'
 2 dissect '''ab'' <;.3 i. 3 4'
+(2 ;< 'datasize';'10 20') dissect 'i. 5 100'
+(2 ;< 'datasize';'10') dissect 'i. 100 100'
 )
 
 testsandbox_base_ =: 3 : 0
