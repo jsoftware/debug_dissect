@@ -10,7 +10,7 @@ NB. 10 10 here is the starting position of the first window
 
 NB. DISSECTLEVEL is updated from time to time whenever there is a change to an external interface, indicating the dissect release level
 NB. at the time of the change
-DISSECTLEVEL_dissect_ =: 3 7
+DISSECTLEVEL_dissect_ =: 4 9
 
 NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).  In J6 tooltips
 NB. take over the timer interrupt
@@ -59,14 +59,9 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. pfkey detector needs to find user's delimiter
-NB. size menu doesn't have the right values for width when there is a wide noun
-NB. allow width/height to be passed in as a command option
-NB. dissect '+&.> 1 2 3 ; 4 5 6 7'  weird shape line?
-NB. dissect '__&".@>&.> z' [ z =. ('1';'23';'5') ; ('')  ;< ('345';'67')    weird shape line?
 NB. 1!:1 needs to point to NuVoc page
 NB. can we be more specific about 'before fill if any'?
-NB. can we distinguish left time of fork from right?
+NB. can we distinguish left tine of fork from right?
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -2777,6 +2772,7 @@ NB. scalar error result, if the current node had an error.  On the first call, y
 accumframe_dissect_ =: (0 3$a:)"_
 accumframe =: 3 : 0
 QP^:DEBDOvn'accumframe for ?defstring]0%>coname''''%selframe%unforcedselection''''%sellevel%selections%'
+QP^:DEBDOvn'#selopshapes selector errorcode '
 NB. Keep taking frames as long as they are valid, i. e. as long as we have selected from them using a
 NB. selector that is not a rank-calculus probe.
 NB. We have to patch over the first node of monad/dyad, which looks like a noun and has no selops out;
@@ -2784,7 +2780,8 @@ NB. the following verb will be OK
 if. y *. errorcode e. EFAILED do. 0 3$a:
 elseif. (*#vranks) *. (0 = #selopshapes) +. (selector -: a:) do. 0 3$a:  NB. keep frames as long as there is valid shape
 elseif. do.
-  (sellevel ; ((<(unforcedselection'') # selframe) , (1 -: resultlevel) # SFOPEN) ; (coname'') , maxcellresultshape ; fillrequired) , accumframe__inheritedfrom 0 e. frame
+  resultinsidebox =. (<resultlevel) e. 0;1   NB. If this is L: or each, which always boxes results separately
+  (sellevel ; ((<(unforcedselection'') # selframe) , resultinsidebox # SFOPEN) ; (coname'') , maxcellresultshape ; fillrequired *. -. resultinsidebox) , accumframe__inheritedfrom 0 e. frame
 end.
 )
 
@@ -4463,7 +4460,7 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
   NB. Remember the locale of the last verb executed
   lastexecutednode =: (<_1 2) { af
   NB. The accumframe may include nodes that has a frame containing 1s but nonselectable.  We included them in
-  NB. the DPshapes above.  For the rest of the calculation we want only the info from the node that did the selecting
+  NB. the DOshapes above.  For the rest of the calculation we want only the info from the node that did the selecting
   selectinglocaleinfo =. ({:/.~ 0&{"1) af
   NB.?lintonly lastexecutednode =: <'dissectobj'
   NB. If the last verb does not allow a selection (ex: i.@>), remove it from the shapes so that it doesn't show a selection block,
@@ -4487,7 +4484,6 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
   NB. For fillflags, shift flags down so that the first in each section is 0 (fill at the highest level is attributed to the
   NB. result, not the frame).  But keep the very last fillflag to be the flag for the final result
   finalflags =. ; |.!.0&.> filledflags
-
   NB. If the last node doesn't select, it contributed to the result but it shouldn't contribute to the frame, not even an empty
   NB. rectangle.  So delete it everywhere it appears
   if. -. selectable__lastexecutednode do.
@@ -4500,13 +4496,15 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
     finalsizes =. }: finalsizes
   end.
 
-  NB. append the result info: the last cellshape, and the last flag
+  NB. append the result info: the last cellshape, and the last flag.  We always have this, so that
+  NB. there is one moe shape than shapelocales.
+
+  NB.First we calculate the extra fillinfo value
   finalframes =. finalframes , {: finalsizes
   NB. We just take the flag to be the very last flag of the last section.  It doesn't matter whether
   NB. the last node doesn't select; if it doesn't, it won't fill, and the value in the last node will be
   NB. the same as in the one before.
   finalflags =. finalflags , {: > {: filledflags
-  
   NB. Format the fillinfo: (fillframe) if fill called for
   fillinfo =. finalflags (#   '(' , ')' ,~ ":)&.> finalframes
   NB. Each box in DOshapes represents a frame.  If a frame contains 0, indicate that fact by putting * after the frame
@@ -4516,14 +4514,18 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
     fillinfo =. (0 ,~ (0 e. [: ; -.&SFOPEN)@> DOshapes) (, #&'*')&.>~ fillinfo
   end.
 
-  NB. Append the last shape, which is the result shape of the last node if it is not selected, and the selected
+  NB. Now append the last shape, which is the result shape of the last node if it is not selected, and the selected
   NB. shape if there is a selection.
   if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
     NB. User selected a result.  Display its shape.
     DOshapes =: DOshapes , <, $&.> extractselectedcell__lastexecutednode''
-  else.
+  elseif. (<resultlevel__lastexecutednode) -.@e. 0;1 do.
     NB. If the unselected result filled, don't repeat the shape - it will be in the fill
     DOshapes =: DOshapes , <, < maxcellresultshape__lastexecutednode
+  elseif. do.
+    NB. But if the last node is a nonselecting dropdown (L: or each), we really have no idea of any shape
+    NB. beyond the last node - they are incommensurate - so don't confuse things by showing one
+    DOshapes =: DOshapes , <, <''
   end.
 
   NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
@@ -6381,7 +6383,18 @@ elseif. #r =. (exp{DOshapepospickrects) findpickhits y do.
     if. ix < #DOshapelocales do.
       l =. ix { DOshapelocales   NB. the locale of the selection
       NB.?lintonly l =. <'dissectverb'
-      ttt =. 'This portion of the frame selects a cell for the verb:',LF,(defstring__l 0),CR
+      ttt =. 'This is the frame of the verb:',LF,(defstring__l 0),CR
+      if. (<resultlevel__l) e. 0;1 do.
+        if. 1 < #DOshapes do.
+           ttt =. ttt , 'This verb operates inside the boxed structure.  The top line shows the number of times the verb was executed inside the boxed structure.  The second line gives the path to the selected result.',LF
+        else.
+           ttt =. ttt , 'This verb operates inside the boxed structure.  The number is how many times the verb was executed inside the boxed structure.',LF
+        end.
+      else.
+        if. 1 < #DOshapes do.
+          ttt =. ttt , 'The top line is the frame of the verb; the bottom line is the index of the selected result',LF
+        end.
+      end.
       if. '*' e. (0,ix) {:: DOshapes do.
         ttt =. ttt , 'The frame contains 0, so the verb is executed on a cell of fills.  The place where computation of the fill-cell starts is marked with * after the rank.',LF
       end.
@@ -9476,7 +9489,7 @@ end.
 
 NB. **** uL:n uS:n ****
 
-primlocale 'L: S:'
+primlocale 'L:S:'
 
 create =: 3 : 0
 if. 0 = verb bwand (<0 0) {:: y do.
@@ -14006,6 +14019,7 @@ ctup = 8
 2 dissect '''ab'' <;.3 i. 3 4'
 (2 ;< 'datasize';'10 20') dissect 'i. 5 100'
 (2 ;< 'datasize';'10') dissect 'i. 100 100'
+2 dissect '+:L:0 z' [ z =.  <<<4 5
 )
 
 testsandbox_base_ =: 3 : 0
