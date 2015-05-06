@@ -60,8 +60,6 @@ config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
 NB. 1!:1 needs to point to NuVoc page
-NB. can we be more specific about 'before fill if any'?
-NB. can we distinguish left tine of fork from right?
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -99,13 +97,12 @@ NB.  bit 0 is 1 to use a sandbox for executing the sentence
 NB.  bit 1 is 1 to return the locale of the dissect window
 NB.  bit 2 is 1 to suppress assignment statements.  They will not be executed and an error will result if an assigned name is referred to later.
 NB.  bit 3 is 1 if this call was from the J debugger.  It changes the error messages if the assignments rule is violated.
-NB.  bits 4-5 are a coded field giving the level of comparison, in roughtly descending order:
-NB.   00=full comparison, 01=shape and type only; 10=success/failure only; 11=no comparison (and don't execute the original sentence)
 NB.
 NB. Label options are a table of (type);(string) where types are
 NB.  'title'  string is (fontchange)TABtitle  fontchange is +-amount to increase over sentence size, title is text
 NB.  'link'  string is (fontchange)TABdisplay textTABlink text
 NB.  'datasize'  string is vpct hpct   max size of noun, in % of screen (must be converted to numeric)
+NB.  'check'  string is 'all'=full comparison, shape'=shape and type only; 'error'=success/failure only; 'no'=no comparison (and don't execute the original sentence)
 NB.
 NB. If y is boxed, it should be a table ready for use in parse, i. e. nx3 where the first line gives
 NB. parameters;locale;text of sentence
@@ -539,10 +536,13 @@ if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
   failmsg 'The sentence to be dissected must be a string.' return. 
 end.
 'options do' =. 2 {. options
-'cl fromdebugger noassignment returnobject sandbox' =.  4 2 2 2 2 #: {.!.0 options
-comparisonlevel =: cl
+'fromdebugger noassignment returnobject sandbox' =.  2 2 2 2 #: {.!.0 options
 returnobject_dissect_ =: * returnobject
 dispoptions =: ,:^:(2 > #@$) (0 2$a:)"_^:(2 > #@,) do  NB. If no second operand (empty or scalar created above), use an empty table
+if. 4 = comparisonlevel =: (;:'all shape error no') i. ((<'all') ,~ {:"1 dispoptions) {~ (<'check') i.~ {."1 dispoptions do.
+  failmsg 'Invalid value for ''check'' option.' return. 
+end.
+
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 NB. Discard anything past the first LF, and remove CR
@@ -3229,7 +3229,7 @@ NB. Calculate the rankhistory to use
 NB. If we start heavy or keep light, cull the list down to those elements
 select. rhcull
 case. 0 do.  NB. start (always keeping heavy)
-  rh =. 2 {."1 (#~ (<DLRCOMPEND) = 0&{"1) rankhistory
+  rh =. x`:6 (2) {."1 (#~ (<DLRCOMPEND) = 0&{"1) rankhistory
 case. 1 do.  NB. keep all
   rh =.  x`:6 rankhistory
 case. do.  NB. keep light
@@ -4514,6 +4514,8 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
     fillinfo =. (0 ,~ (0 e. [: ; -.&SFOPEN)@> DOshapes) (, #&'*')&.>~ fillinfo
   end.
 
+  DOshapehasfill =: +./ finalflags
+
   NB. Now append the last shape, which is the result shape of the last node if it is not selected, and the selected
   NB. shape if there is a selection.
   if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
@@ -4677,7 +4679,7 @@ NB. a scrolled display and the user enlarges the max datasize; then the scrollba
 NB. on the screen
 scrollpoints =: displayscrollbars * scrollpoints
 NB.?lintonly 'DOlabelpos DOshapepos DOstatuspos DOdatapos' =: <2 2 $ 0
-NB.?lintonly 'DOranks DOranklevels DOshapes' =: ($0);($0);<0$a:
+NB.?lintonly 'DOranks DOranklevels DOshapes DOshapehasfill' =: ($0);($0);(0$a:);0
 NB.?lintonly 'DOlabelpospickrects DOranklocales' =: (1 0 2 2$0);(0$a:)
 NB.?lintonly 'DOshapepospickrects DOshapelocales' =: (1 0 2 2$0);(0$a:)
 NB.?lintonly lastexecutednode =: <'dissectobj'
@@ -6646,7 +6648,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   case. 1 do.
     disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard.',LF
   case. 2 do.
-    disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard; right-click on a number in the selection line to put the cell it selects (before fill if any) onto the clipboard.',LF
+    disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard; right-click in the selection line to put the cell it selects ',(DOshapehasfill # '(before fill) '),'onto the clipboard.',LF
   case. do.
   end.
   text =. exegesisgrammar disp
@@ -12906,33 +12908,36 @@ titlestring =: 1 fulltitlestring 'fork'
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 if. vvv do.
-  dolv =. joinlayoutsl x traverse__vop travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
-  dolu =. joinlayoutsl x traverse__uop travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
+  dolv =. joinlayoutsl x traverse__vop ((<displaystructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
+  dolu =. joinlayoutsl x traverse__uop ((<displaystructmods#'\fork')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
 else.
 NB. nvv.  Traverse n as a noun; but keep sellevel so that highlighting is calculated correctly
-  dolv =. joinlayoutsl x traverse__vop travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
+  dolv =. joinlayoutsl x traverse__vop ((<displaystructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
   dolu =. joinlayoutsl NOLAYOUTS traverse__uop bnsellevel 0} TRAVNOUN
 end.
 NB. If u or v are stealth, we need to preserve the original rank-stack info associated with the inputs, and route that info to
 NB. the correct side.  We always need to preserve the heavy inputs
 NB. We will create a new rankstack to pass in if either operand is stealth.  This will have x and y arguments, each of which is
 NB. chosen from (x,y,empty) as called for by the stealthness of u or v.  If neither operand is stealth, we will just do
-NB. STARTHEAVY on the original rankhistory.
+NB. STARTHEAVY on the original rankhistory - but we do it by hand here, so we can add the '\fork/' label if called for
 if. 0 0 -: stealthcode =. 3 bwand dispstealthoperand__vop , dispstealthoperand__uop do.
-  rankstackcode =. TRAVOPSSTARTHEAVY
+  NB. This is STARTHEAVY, calculated by hand
+  rankhistory =: (2) {."1 (#~ (<DLRCOMPEND) = 0&{"1) rankhistory
 else.
-  rankstackcode =. TRAVOPSKEEPALL
   NB. Create a: y y or a: y x, then select using 0 ] [ to give the following selections:
   NB. nonstealth=a:  monad stealth=y   dyad ]=y   dyad [=x  (for dyads, each argument is selected separately)
   NB. Then discard rows that have nonatom in the title (so not heavy) and empty in both columns
-  rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 |."1 (2) }."1 rankhistory
+  rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) }: (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 |."1 (2) }."1 rankhistory
 end.
+NB. If we are showing structural tags, add one for this middle tine of fork
+if. displaystructmods do. rankhistory =: ('\fork/';coname'') , rankhistory end.
+
 NB. We keep the highlights from the input, to both the left and right ops.  This will not be needed EXCEPT when u or v is ][.  Other times,
 NB. the highlights go from u to v, and they are at the same sellevel (since u has infinite rank), so nothing that happened below u's sellevel matters.
 NB. But if uv is ][, then highlights from c (or below) might reach through this node and highlight a higher node - and those nodes may have
 NB. lower sellevels, so we need to make sure the lower selections are as they would have been for the omitted ][.  The way to do this is
 NB. to start the physreqs with the values that they would have had to start uv.
-1 inheritu (dolu,dolv) traverse__cop travops rankstackcode;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
+1 inheritu (dolu,dolv) traverse__cop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
 )
 
 exegesisrankstack =: 3 : 0
@@ -13023,7 +13028,7 @@ NB. Traversal up and down the tree.
 NB.
 NB. The result is the DOL, up through the result of u
 traverse =: endtraverse@:(4 : 0)
-titlestring =: 1 fulltitlestring 'hook'
+titlestring =: 1 fulltitlestring 'hook/'
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 dol =. joinlayoutsl (_1 {. x) traverse__vop travops (TRAVOPSKEEPINLIGHT 0 1 2);TRAVOPSPHYSKEEP;(vopval _1 { selopinfovalid);selopshapes;_1
@@ -13037,7 +13042,8 @@ else. rankhistory =: (0 1 2 2&{^:(a:-:{:))"1 rankhistory
 end.
 NB. Then, unless v is a stealthop, wipe out the y column
 if. dispstealthoperand__vop -.@e. 1 2 5 6 do. rankhistory =: a: 2}"1 rankhistory end.
-NB.
+NB. If we are displaying the label, put the left-hand label on u
+if. displaystructmods do. rankhistory =: (< 'hook/' ,~ valence { ' /\') (<_1 0)} rankhistory end.
 NB. Use selop0 for x, and selresult for y - but only if selop0 exists, and no travdownuops error
 NB. replace the rank with the left rank of the hook, alone.  Preserve previous highlighting from u to the left operand
 NB. We keep the highlights from the input, to both the left and right ops.  This will not be needed EXCEPT when v is ][.  Other times,
@@ -13878,13 +13884,14 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect 'i."0"1(2 2 $ 1 4 1 8)'
 2 dissect '+: each 1;2;1'
 'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '?~ 100'
-18 dissect '?~ 100'
-'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 18 dissect '(100 ?@$ 3) { 5;''a'';<a:'
-34 dissect '(100 ?@$ 3) { 5;''a'';<a:'
-'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 34 dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
+(2 ;< 'check';'shape') dissect '?~ 100'
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'shape') dissect '(100 ?@$ 3) { 5;''a'';<a:'
+(2 ;< 'check';'error') dissect '(100 ?@$ 3) { 5;''a'';<a:'
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'error') dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
 ctup = 9
-50 dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
+(2 ;< 'check';'no') dissect 'crash9_dissect_ ctup =: ctup + 1' [ ctup =: 7
 ctup = 8
+'Invalid value for ''check'' option.' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'xxx') dissect '?~ 100'
 2 dissect '4 (1)} i. 5'   NB. no error
 2 dissect '4 (1)} i. 5 6'  NB. no error
 2 dissect '4 (<,:0 1)} i. 5 6'
