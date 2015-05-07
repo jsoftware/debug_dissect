@@ -60,6 +60,8 @@ config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
 NB. 1!:1 needs to point to NuVoc page
+NB.  need locales for !: b. :
+NB.  remove other SDT processing (after verifying it's dead code)
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -579,241 +581,241 @@ NB. If the stack contains an executable combination, execute it
 NB. If part of the execution has unknown value, produce an unknown result, of type 'noun' for verb executions,
 NB. and 'verb' for modifier executions
   select.
-  NB.?lintonly stack =. (verb,verb,verb,noun);"0 1 '';''
-      if. (#PTpatterns) > pline =. 1 1 1 1 i.~ * PTpatterns bwand"1 ,>4 1{.stack do.
-        exeblock =. (subj =. pline{PTsubj) # 4 {. stack  NB. the executable part
-        exetypes =. > subj # , 4 1 {. stack   NB. the corresponding types
-      end.
-  NB.?lintonly exeblock =. 3 3$<'' [ exetypes =. 0 0 0 [ subj =. 0 1 1 1
-      QP^:DEBPARSE'pline exetypes exeblock stack '
-      pline
-      
-    case. 0;1 do.  NB. monad
-  NB. Create a monad execution block for the operands, and put that on the stack
-      stack =. ((subj i. 1){.stack),('dissectmonad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
-      
-    case. 2 do.  NB. dyad
-  NB. Create a dyad execution block for the operands, and put that on the stack
-      stack =. ((subj i. 1){.stack),('dissectdyad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
-      
-    case. 3;4 do.  NB. adverb/conjunction execution
-      stack =. ((subj i. 1){.stack),(execmod exeblock),((>:subj i: 1)}. stack)
-      
-    case. 5 do.  NB. Trident N V V or V V V
-  NB. Create a trident execution block for the operands, and put that on the stack
-      stack =. ((subj i. 1){.stack),('dissectfork' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
-      
-    case. 6 do.   NB. bident  A A, C VN, VN C, V V
-  NB.?lintonly exetypes =. 0 0 [ exeblock =. '';'';''
-      if. bwand/ verb , exetypes do.  NB. V V
-        stack =. ((subj i. 1){.stack),('dissecthook' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
-      elseif. (bwand/ adv , exetypes) +. (conj = +/ conj bwand exetypes) do. NB. A A, C VN, NV C
-  NB. This becomes an adverb type.  The value is the exeblock, which will be executed later
-        stack =. ((subj i. 1){.stack),(adv;exeblock;$0),((>:subj i: 1)}. stack)
-      elseif. do.
-        failmsg 'Invalid sequence: ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj)
-        return.
-      end.
-    case. 7 do.  NB. assignment
-  NB. See if we can analyze the assignment.  If so, add to the name table.
-  NB. If the assignment is not a noun value, ignore it with a warning
-      if. 0 = noun bwand 2 { exetypes do.
-        failmsg 'non-noun assignment not supported'
-        rname =. 0$a:
-        return.
-  NB. See if it's a simple assignment to a name
-      elseif. name = 0 { exetypes do.
-        rname =. (<0 1) { exeblock  NB. boxed name
-  NB. If the assignment is an AR assignment, ignore it with a warning
-      elseif. (sdt+noun) ([ -: bwand) 0 { exetypes do.
-        rname =. (<0 1) {:: exeblock  NB. locale of sdt
-  NB.?lintonly op_dissectnoun_ =: '' [ rname =. <'dissectnoun'
-        if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
-          if. '`' = {. lvalue do.
-            failmsg 'AR assignment to ' , lvalue , ' not supported'
-            rname =. 0$a:
-            return.
-          else.
-            rname =. ;: :: (a:$~0:) lvalue
-          end.
-        else.
-          failmsg 'Invalid assignment'
-          return.
-        end.
-  NB. If the assignment is to a variable name, we can do nothing with it
-      elseif. do.
-        rname =. 0$a:
-      end.
-      NB. If the assignment is one we can handle, we will have one or more names.  In that case, create an
-      NB. assignment block on the stack
-      stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock;noassignment),((>:subj i: 1)}. stack)
-        NB. We would like to preserve the value of the unhandleable assignment, but we can't, because
-        NB. We need an assignment node to account for the assignment tokens, and we can't get a value for the
-        NB. modifier because it might be complex (a train).  If we try to push the assignment tokens into
-        NB. the rvalue, it would have to be able to handle them, which we're not ready to do since they would be
-        NB. out of order. So, we lose the value of the assignment (kludge)
-        NB. Otherwise, we have to ignore it.  We can't produce an assignment block, because we don't know what
-        NB. value to put into the executed sentence.  So we just ignore the assignment, leaving
-        NB. the rvalue on the stack.  We will leave the assignment tokkens out of the display too, since we
-        NB. don't process them
-      
-  NB. rname has the list of names that we should define.  If this is a global assignment,
-  NB. append the locale name to each name that doesn't contain a locative
-      if. (<'=:') -: (<1 1) { exeblock do. rname =. (('_',(>loc),'_') ,~ ])^:('__'&(+./@:E.) +: '_' = {:)&.> rname end.
-      
-  NB. We can't deal with assignments to object locatives since we track only the part of speech, not the value, at parse time
-      if. +./ elocs =. '__'&(+./@:E.)@> rname do.
-        smoutput 'Assignment to object locatives not supported: ' , ;:^:_1 elocs # rname
-        rname =. (-. elocs) # rname
-      end.
-      
-  NB. Define the names, as nouns (J nameclass 0).
-      defnames =. (rname ,"0 1 ((0+256*noassignment);'')) , defnames
-      
-    case. 8 do.  NB. ( x ) - but remember the token numbers of the parens
-      if. (noun+verb) bwand 1 { exetypes do.
-        NB. If the stackop is a verb or noun, it has a locale & we should install the tokens there
-        insideop =. (<1 1) {:: stack
-        NB.?lintmsgsoff
-        tokensource__insideop =: tokensource__insideop , ; (<0 2;2) { stack
-        NB.?lintmsgson
-      else.
-        NB. If the stackop is a modifier, we add the tokens into those for the modifier.  They will
-        NB. eventually be added into a locale
-        stack =. (< ; (<0 1 2;2) { stack) (<1 2)} stack
-      end.
+    NB.?lintonly stack =. (verb,verb,verb,noun);"0 1 '';''
+    if. (#PTpatterns) > pline =. 1 1 1 1 i.~ * PTpatterns bwand"1 ,>4 1{.stack do.
+      exeblock =. (subj =. pline{PTsubj) # 4 {. stack  NB. the executable part
+      exetypes =. > subj # , 4 1 {. stack   NB. the corresponding types
+    end.
+    NB.?lintonly exeblock =. 3 3$<'' [ exetypes =. 0 0 0 [ subj =. 0 1 1 1
+    QP^:DEBPARSE'pline exetypes exeblock stack '
+    pline
+   
+  case. 0;1 do.  NB. monad
+    NB. Create a monad execution block for the operands, and put that on the stack
+    stack =. ((subj i. 1){.stack),('dissectmonad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
 
-      stack =. (<<<0 2) { stack
-      
-  NB. If the stack did not have an executable combination, bring the next word onto the stack.
-    case. do. NB. no executable fragment
-      if. 0 = #queue do. pline =. _1 break. end.  NB. This is how we end the sentence, with pline set as a flag
-      qend =. > qendb =. {: queue
-      queue =. }: queue
-      
-  NB. If this is the last word in the queue, it's the mark, keep it
-      if. mark = qend do.
-        stack =. (mark;'';(#queue)) , stack
-  NB. If this is an assignment statement, and the new word is a name, this is where we detect that.
-  NB. We stack the bare name as the value
-      elseif. (asgn = (<0 0) {:: stack) *. isname qend do.
-        stack =. (name;qend;(#queue)) , stack
-  NB. If punctuation, keep it
-      elseif. qendb e. ;:'() =. =:' do.
-        stack =. ((qend;(#queue)) ;~ (lpar,rpar,2#asgn) {~  (;:'() =. =:') i. qendb) , stack
-  NB. If self-defining term, create a noun block for it, mark as sdt
-      elseif. (qend e. ;:'a. a: _.') +. (-. '.:' e.~ {: qend) *. ({. qend) e. '''_0123456789' do.
-        stack =. stack ,~ (<sdt+noun) 0} createnoun qend;'';(#queue)
-      elseif. isname qend do.
-  NB. Name.  Resolve the name to find part of speech.
-  NB. split the name into (global part),(object locative).  If the name is absolute (ending in _),
-  NB. Make that the entire object locative, so that we look it up in case it has been directly assigned earlier
-  NB. in the sentence
-        if. '__' +./@:E. qend do.
-          'glopart objloc' =. (({. ; 2 }. }.)~   '__'&(i:&1@:E.)) qend
+  case. 2 do.  NB. dyad
+    NB. Create a dyad execution block for the operands, and put that on the stack
+    stack =. ((subj i. 1){.stack),('dissectdyad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
+
+  case. 3;4 do.  NB. adverb/conjunction execution
+    stack =. ((subj i. 1){.stack),(execmod exeblock),((>:subj i: 1)}. stack)
+
+  case. 5 do.  NB. Trident N V V or V V V
+    NB. Create a trident execution block for the operands, and put that on the stack
+    stack =. ((subj i. 1){.stack),('dissectfork' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
+
+  case. 6 do.   NB. bident  A A, C VN, VN C, V V
+    NB.?lintonly exetypes =. 0 0 [ exeblock =. '';'';''
+    if. bwand/ verb , exetypes do.  NB. V V
+      stack =. ((subj i. 1){.stack),('dissecthook' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
+    elseif. (bwand/ adv , exetypes) +. (conj = +/ conj bwand exetypes) do. NB. A A, C VN, NV C
+      NB. This becomes an adverb type.  The value is the exeblock, which will be executed later
+      stack =. ((subj i. 1){.stack),(adv;exeblock;$0),((>:subj i: 1)}. stack)
+    elseif. do.
+      failmsg 'Invalid sequence: ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj)
+      return.
+    end.
+
+  case. 7 do.  NB. assignment
+    NB. See if we can analyze the assignment.  If so, add to the name table.
+    NB. If the assignment is not a noun value, ignore it with a warning
+    if. 0 = noun bwand 2 { exetypes do.
+      failmsg 'non-noun assignment not supported'
+      rname =. 0$a:
+      return.
+    NB. See if it's a simple assignment to a name
+    elseif. name = 0 { exetypes do.
+      rname =. (<0 1) { exeblock  NB. boxed name
+    NB. If the assignment is an AR assignment, ignore it with a warning
+    elseif. (sdt+noun) ([ -: bwand) 0 { exetypes do.
+      rname =. (<0 1) {:: exeblock  NB. locale of sdt
+      NB.?lintonly op_dissectnoun_ =: '' [ rname =. <'dissectnoun'
+      if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
+        if. '`' = {. lvalue do.
+          failmsg 'AR assignment to ' , lvalue , ' not supported'
+          rname =. 0$a:
+          return.
         else.
-          'glopart objloc' =. '';qend
+          rname =. ;: :: (a:$~0:) lvalue
         end.
-  NB. Look up the object locative in the local name table, resolving to type;value/rank if found
-        if. (<objloc) e. {."1 defnames do.
-          'objtype objval' =. 1 2 { (({."1 defnames) i. <objloc) { defnames
-          gloc =. objval
-        elseif. (<objloc =. objloc , '_' , (>loc) , '_') e. {."1 defnames do.
-  NB. not found as a local, but it may have been assigned in this sentence as a global.  If so,
-  NB. use that value
-          'objtype objval' =. 1 2 { (({."1 defnames) i. <objloc) { defnames
-          gloc =. objval
-        elseif. do.
-  NB. Nothing found in local table - set to resolve the whole thing globally
-          gloc =. loc
-          glopart =. qend
-        end.
-  NB. Now we have resolved any local that we are going to use.  If there was one, it is in
-  NB. objtype/objval.  But a global search may be needed: if there was
-  NB. an object locative, or if the local search failed.  This search will start in locale gloc.
-  NB. This search, if performed, must succeed, and we will convert the result to a type/(rank if verb)
-        if. #glopart do.
-  NB. First, see if this global name was assigned in this sentence.  If so, use that value
-          if. (<objloc =. glopart , '_' , (>gloc) , '_') e. {."1 defnames do.
-  NB. Name is in our local table.  Use that
-            'objtype objval' =. 1 2 { (({."1 defnames) i. objloc) { defnames
+      else.
+        failmsg 'Invalid assignment'
+        return.
+      end.
+    NB. If the assignment is to a variable name, we can do nothing with it
+    elseif. do.
+      rname =. 0$a:
+    end.
+    NB. If the assignment is one we can handle, we will have one or more names.  In that case, create an
+    NB. assignment block on the stack
+    stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock;noassignment),((>:subj i: 1)}. stack)
+    NB. We would like to preserve the value of the unhandleable assignment, but we can't, because
+    NB. We need an assignment node to account for the assignment tokens, and we can't get a value for the
+    NB. modifier because it might be complex (a train).  If we try to push the assignment tokens into
+    NB. the rvalue, it would have to be able to handle them, which we're not ready to do since they would be
+    NB. out of order. So, we lose the value of the assignment (kludge)
+    NB. Otherwise, we have to ignore it.  We can't produce an assignment block, because we don't know what
+    NB. value to put into the executed sentence.  So we just ignore the assignment, leaving
+    NB. the rvalue on the stack.  We will leave the assignment tokkens out of the display too, since we
+    NB. don't process them
+      
+    NB. rname has the list of names that we should define.  If this is a global assignment,
+    NB. append the locale name to each name that doesn't contain a locative
+    if. (<'=:') -: (<1 1) { exeblock do. rname =. (('_',(>loc),'_') ,~ ])^:('__'&(+./@:E.) +: '_' = {:)&.> rname end.
+
+    NB. We can't deal with assignments to object locatives since we track only the part of speech, not the value, at parse time
+    if. +./ elocs =. '__'&(+./@:E.)@> rname do.
+      smoutput 'Assignment to object locatives not supported: ' , ;:^:_1 elocs # rname
+      rname =. (-. elocs) # rname
+    end.
+
+    NB. Define the names, as nouns (J nameclass 0).
+    defnames =. (rname ,"0 1 ((0+256*noassignment);'')) , defnames
+
+  case. 8 do.  NB. ( x ) - but remember the token numbers of the parens
+    if. (noun+verb) bwand 1 { exetypes do.
+      NB. If the stackop is a verb or noun, it has a locale & we should install the tokens there
+      insideop =. (<1 1) {:: stack
+      NB.?lintmsgsoff
+      tokensource__insideop =: tokensource__insideop , ; (<0 2;2) { stack
+      NB.?lintmsgson
+    else.
+      NB. If the stackop is a modifier, we add the tokens into those for the modifier.  They will
+      NB. eventually be added into a locale
+      stack =. (< ; (<0 1 2;2) { stack) (<1 2)} stack
+    end.
+
+    stack =. (<<<0 2) { stack
+
+    NB. If the stack did not have an executable combination, bring the next word onto the stack.
+  case. do. NB. no executable fragment
+    if. 0 = #queue do. pline =. _1 break. end.  NB. This is how we end the sentence, with pline set as a flag
+    qend =. > qendb =. {: queue
+    queue =. }: queue
+
+    NB. If this is the last word in the queue, it's the mark, keep it
+    if. mark = qend do.
+      stack =. (mark;'';(#queue)) , stack
+      NB. If this is an assignment statement, and the new word is a name, this is where we detect that.
+      NB. We stack the bare name as the value
+    elseif. (asgn = (<0 0) {:: stack) *. isname qend do.
+      stack =. (name;qend;(#queue)) , stack
+    NB. If punctuation, keep it
+    elseif. qendb e. ;:'() =. =:' do.
+      stack =. ((qend;(#queue)) ;~ (lpar,rpar,2#asgn) {~  (;:'() =. =:') i. qendb) , stack
+    NB. If self-defining term, create a noun block for it, mark as sdt.  String, number, a. a: _.
+    elseif. (qend e. ;:'a. a: _.') +. (-. '.:' e.~ {: qend) *. ({. qend) e. '''_0123456789' do.
+      stack =. stack ,~ (<sdt+noun) 0} createnoun qend;'';(#queue)
+    elseif. isname qend do.
+      NB. Name.  Resolve the name to find part of speech.
+      NB. split the name into (global part),(object locative).  If the name is absolute (ending in _),
+      NB. Make that the entire object locative, so that we look it up in case it has been directly assigned earlier
+      NB. in the sentence
+      if. '__' +./@:E. qend do.
+        'glopart objloc' =. (({. ; 2 }. }.)~   '__'&(i:&1@:E.)) qend
+      else.
+        'glopart objloc' =. '';qend
+      end.
+      NB. Look up the object locative in the local name table, resolving to type;value/rank if found
+      if. (<objloc) e. {."1 defnames do.
+        'objtype objval' =. 1 2 { (({."1 defnames) i. <objloc) { defnames
+        gloc =. objval
+      elseif. (<objloc =. objloc , '_' , (>loc) , '_') e. {."1 defnames do.
+        NB. not found as a local, but it may have been assigned in this sentence as a global.  If so,
+        NB. use that value
+        'objtype objval' =. 1 2 { (({."1 defnames) i. <objloc) { defnames
+        gloc =. objval
+      elseif. do.
+        NB. Nothing found in local table - set to resolve the whole thing globally
+        gloc =. loc
+        glopart =. qend
+      end.
+      NB. Now we have resolved any local that we are going to use.  If there was one, it is in
+      NB. objtype/objval.  But a global search may be needed: if there was
+      NB. an object locative, or if the local search failed.  This search will start in locale gloc.
+      NB. This search, if performed, must succeed, and we will convert the result to a type/(rank if verb)
+      if. #glopart do.
+        NB. First, see if this global name was assigned in this sentence.  If so, use that value
+        if. (<objloc =. glopart , '_' , (>gloc) , '_') e. {."1 defnames do.
+          NB. Name is in our local table.  Use that
+          'objtype objval' =. 1 2 { (({."1 defnames) i. objloc) { defnames
+        else.
+          savloc =. coname''
+          NB.?lintonly savloc =. <'dissect'
+          NB.?lintmsgsoff
+          cocurrent gloc
+          NB.?lintmsgson
+          if. 0 <: objtype =. 4!:0 :: _2: <glopart do.
+            objval =. rankinv_dissect_ f. glopart
           else.
-            savloc =. coname''
-  NB.?lintonly savloc =. <'dissect'
-  NB.?lintmsgsoff
-            cocurrent gloc
-  NB.?lintmsgson
-            if. 0 <: objtype =. 4!:0 :: _2: <glopart do.
-              objval =. rankinv_dissect_ f. glopart
-            else.
-              objtype =. _1
-            end.
-            cocurrent savloc
+            objtype =. _1
           end.
+          cocurrent savloc
         end.
-  NB. Now objtype/objval are set.  If the name is a noun or verb, create a locale for it
-  NB.?lintonly 'objtype objval' =. 0;0 0 0 0
+      end.
+      NB. Now objtype/objval are set.  If the name is a noun or verb, create a locale for it
+      NB.?lintonly 'objtype objval' =. 0;0 0 0 0
       select. objtype
-        case. 0 do.
-          ntypeval =. createnoun qend;qend;(#queue)  NB. Keep name, and save name for display
-        case. 1 do.
-          NB. adverb: handle the special code (currently only &.>)
-          NB. If the value of the user name matches special code, expand it on the stack
-          select. objval
-          case. '&.>' do.
-            NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
-            NB. adverb on the stack, rather than conj+verb, to avoid a parse error (if we had
-            NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
-            NB. eventually execute verb N0 erroneously)
-            ntypeval =. adv ; ((conj;'&.';(#queue)) ,: createverb (,'>');(0$0)) ; $0
-          case. '"_' do.
-            NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
-            NB. adverb on the stack, rather than conj verb, to avoid a parse error (if we had
-            NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
-            NB. eventually execute verb N0 erroneously
-            ntypeval =. adv ; ((conj;(,'"');(#queue)) ,: createnoun (,'_');'';0$0) ; $0
-          case. do.
-            NB. If the value of the user name matches a supported primitive, replace the name by the supported value
-            ntypeval =. adv;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
-          end.
-        case. 2 do.
-          ntypeval =. conj;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
-        case. 3 do.
-           NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
-          ntypeval =. createverb (qend;(#queue)) , (-. LF e. objval)#<objval
-        case. 0+256 do.  NB. Special type: name previously assigned which in ignore assignment mode
-          failmsg 'The name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',(fromdebugger # ' when dissect is called from the debugger'),'.'
-          return.
+      case. 0 do.
+        ntypeval =. createnoun qend;qend;(#queue)  NB. Keep name, and save name for display
+      case. 1 do.
+        NB. adverb: handle the special code (currently only &.>)
+        NB. If the value of the user name matches special code, expand it on the stack
+        select. objval
+        case. '&.>' do.
+          NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
+          NB. adverb on the stack, rather than conj+verb, to avoid a parse error (if we had
+          NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
+          NB. eventually execute verb N0 erroneously)
+          ntypeval =. adv ; ((conj;'&.';(#queue)) ,: createverb (,'>');(0$0)) ; $0
+        case. '"_' do.
+          NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
+          NB. adverb on the stack, rather than conj verb, to avoid a parse error (if we had
+          NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
+          NB. eventually execute verb N0 erroneously
+          ntypeval =. adv ; ((conj;(,'"');(#queue)) ,: createnoun (,'_');'';0$0) ; $0
         case. do.
-          failmsg 'undefined name: ' , qend
-          return.
+          NB. If the value of the user name matches a supported primitive, replace the name by the supported value
+          ntypeval =. adv;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
+        end.
+      case. 2 do.
+        ntypeval =. conj;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
+      case. 3 do.
+         NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
+        ntypeval =. createverb (qend;(#queue)) , (-. LF e. objval)#<objval
+      case. 0+256 do.  NB. Special type: name previously assigned which in ignore assignment mode
+        failmsg 'The name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',(fromdebugger # ' when dissect is called from the debugger'),'.'
+        return.
+      case. do.
+        failmsg 'undefined name: ' , qend
+        return.
       end.
       
-NB. Make the stack entry for the new name
+      NB. Make the stack entry for the new name
       stack =. ntypeval,stack
-      
+
     elseif. do.
-NB. Must be a primitive.  Get its type and stack it
+      NB. Must be a primitive.  Get its type and stack it
       try. 
         ". 'exeobj =. ' , qend
         select. 4!:0 <'exeobj'
-          case. 0 do.
-            ntypeval =. createnoun qend;'';(#queue)
-          case. 1 do.
-            ntypeval =. adv;qend;(#queue)
-          case. 2 do.
-            ntypeval =. conj;qend;(#queue)
-          case. 3 do.
-            ntypeval =. createverb qend;(#queue)
-          case. do.
-            failmsg 'invalid type for primitive'
-            return.
+        case. 0 do.
+          ntypeval =. (<sdt+noun) 0} createnoun qend;'';(#queue)
+        case. 1 do.
+          ntypeval =. (sdt+adv);qend;(#queue)
+        case. 2 do.
+          ntypeval =. (sdt+conj);qend;(#queue)
+        case. 3 do.
+          ntypeval =. (<sdt+verb) 0} createverb qend;(#queue)
+        case. do.
+          failmsg 'invalid type for primitive'
+          return.
         end.
       catch.
         failmsg 'Invalid word in sentence: ' , qend return.
       end.
       stack =. ntypeval,stack
-      
     end.
   end.
   if. pline < 9 do. errstartpoint =. _2 {. }. queue end.
@@ -878,7 +880,7 @@ exeblock =. y
 NB. If the modifier's value is boxed, it is a compound modifier, necessarily bident.  We will classify it as
 NB. C VN, VN C, or A A, and execute it as is appropriate.
 if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
-  select. (0 {::"1 modblock) i. conj
+  select. (conj bwand 0 {::"1 modblock) i. conj
   case. 0 do. NB. C VN
     ntypeval =. execmod ({.exeblock),modblock
   case. 1 do. NB. VN C
@@ -894,33 +896,34 @@ if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
   tokensource__topmod =: tokensource__topmod , (<1 2) {:: exeblock
   NB.?lintmsgson
 else.
-NB. If the modifier and all the operands are self-defining terms, execute the modifier, figure out the resulting
-NB. part of speech, and create an appropriate type/value for it.  This will handle things like
-NB. 3 b.   and 1!:1   and  1 : '...' and m"n .
-  if. bwand/ sdt , 0 {::"1 exeblock do.
-    ". 'exeobj =. ' , defstg =. ; 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. enparen y end.'&.> (1) {"1 exeblock
-    tokennums =. ; 2 {"1 exeblock
-    select. 4!:0 <'exeobj'
-    case. 0 do.
-      ntypeval =. createnoun (5!:5 <'exeobj');'';tokennums
-    case. 1 do.
-      ntypeval =. adv;(enparen defstg);tokennums
-    case. 2 do.
-      ntypeval =. conj;(enparen defstg);tokennums
-    case. 3 do.
-      ntypeval =. createverb (5!:5 <'exeobj');tokennums
-    case. do.
-      failmsg 'Invalid type while applying modifier'
-      return.
-    end.
-  else.
-    NB. Not sdt.  Look up the locale of the modifier, and execute it.  The executed modifier must correctly guess the
-    NB. part of speech that is going to be produced.
-    ntypeval =. exeblock (0 createmodifier)~ 'dissectprim' , ": ifound =. ((<1 1) { exeblock) i.&1@:((e.>)"0) dissectprimindex
-    NB. If the modifier was not one that we recognize, remember that, in case of parse failure
-    usermodifierencountered =: usermodifierencountered >. ifound = #dissectprimindex
+NB. obsolete NB. If the modifier and all the operands are self-defining terms, execute the modifier, figure out the resulting
+NB. obsoleteNB. part of speech, and create an appropriate type/value for it.  This will handle things like
+NB. obsoleteNB. 3 b.   and 1!:1   and  1 : '...' and m"n .
+NB. obsolete  if. bwand/ sdt , 0 {::"1 exeblock do.
+NB. obsolete13!:8 (3)
+NB. obsolete    ". 'exeobj =. ' , defstg =. ; 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. enparen y end.'&.> (1) {"1 exeblock
+NB. obsolete    tokennums =. ; 2 {"1 exeblock
+NB. obsolete    select. 4!:0 <'exeobj'
+NB. obsolete    case. 0 do.
+NB. obsolete      ntypeval =. createnoun (5!:5 <'exeobj');'';tokennums
+NB. obsolete    case. 1 do.
+NB. obsolete      ntypeval =. adv;(enparen defstg);tokennums
+NB. obsolete    case. 2 do.
+NB. obsolete      ntypeval =. conj;(enparen defstg);tokennums
+NB. obsolete    case. 3 do.
+NB. obsolete      ntypeval =. createverb (5!:5 <'exeobj');tokennums
+NB. obsolete    case. do.
+NB. obsolete      failmsg 'Invalid type while applying modifier'
+NB. obsolete      return.
+NB. obsolete    end.
+NB. obsolete  else.
+  NB. Not sdt.  Look up the locale of the modifier, and execute it.  The executed modifier must correctly guess the
+  NB. part of speech that is going to be produced.
+  ntypeval =. exeblock (0 createmodifier)~ 'dissectprim' , ": ifound =. ((<1 1) { exeblock) i.&1@:((e.>)"0) dissectprimindex
+  NB. If the modifier was not one that we recognize, remember that, in case of parse failure
+  usermodifierencountered =: usermodifierencountered >. ifound = #dissectprimindex
 NB.?lintonly nobj =. localedefault
-  end.
+NB. obsolete  end.
 end.
 ntypeval
 )
@@ -1334,7 +1337,8 @@ NB. Now that we have the size of the isigraph, center the sentence in the screen
 NB. Center the sentence, but make sure it doesn't overlap the links if any
 szszx =. (0 >. 2 + >./ (<(<0);1) { sentencesizes) >. cyxhw (<.@-:@-)&{: {. sentencesizes  NB. widths except first
 NB. First rect is sentence, moved to proper place; next (if any) is links
-topbrect =: brect sentencebrects =: (({. sentencesizes) (] ,: +) 0 , szszx) , 0 0 ,:"1 }. sentencesizes
+NB. These rects are yx,:hw
+topbrect =: brect sentencebrects =: ((0 , szszx) ,: ({. sentencesizes)) , 0 0 ,:"1 }. sentencesizes
 shifteddrawing
 NB.?lintsaveglobals
 )
@@ -6946,7 +6950,7 @@ NB. Get desired left position, but if that goes offscreen right, move left; then
 ttipx =. 0 >. (+   0 <. ctlx - ttipw + ]) hoverx + HOVEROFFSETX
 NB. That's the topleft of the tooltip.  Now calculate the rectangle that we will use to save the pixels
 NB. We have to save an extra pixel all the way around (seeming glrect error), and we have to make sure
-NB. that the rectangle is all onscreen, else QT will return all 0 pixels
+NB. that the rectangle is all onscreen, else QT will crash
 ttpyx =. 0 >. _1 + ttipy,ttipx
 ttphw =. (2 + ttiph,ttipw) <. (ctly,ctlx) - ttpyx
 tooltippixels =: glqpixels 1 0 3 2 { , tooltippixpos =: ttpyx,:ttphw
@@ -7001,9 +7005,10 @@ NB. the screen buffer as an indicator of scroll-in-progress, and delete it when 
 NB. since it's big)
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
+  winsize =. 3 2 { sd   NB. y,x of control.  Mustn't read outside!
 NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
-  picksentencepixels =: glqpixels 1 0 3 2 { , -~/\ topbrect
-  scrollblock =. -~/\ (0 (1}) {: topbrect) ,: 3 2 { sd
+  picksentencepixels =: glqpixels 1 0 3 2 { , picksentencerect =: ({. ,: winsize <. {:)&.(+/\) topbrect
+  scrollblock =. -~/\ (0 (1}) {: picksentencerect) ,: winsize
   pickpixels =: ({: $ glqpixels@:,@:(|."1)) scrollblock
   pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
 NB.?lintsaveglobals
@@ -7028,7 +7033,7 @@ if. 0 = 4!:0 <'pickpixels' do.
   glclear''
   scrollblock =. -~/\ (0 (1}) {: topbrect) ,: 3 2 { sd
   glpixels (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) , (|. $ pickpixels) , , pickpixels
-  glpixels (1 0 3 2 { , -~/\ topbrect) , picksentencepixels
+  glpixels (1 0 3 2 { , picksentencerect) , picksentencepixels
   glpaint''
 elseif. 0 = 4!:0 <'scrollinglocale' do.
 NB. Perform the scroll, on the main window, but in the locale of the data
