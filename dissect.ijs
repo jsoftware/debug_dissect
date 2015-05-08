@@ -59,9 +59,7 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. 1!:1 needs to point to NuVoc page
-NB.  need locales for !: b. :
-NB.  remove other SDT processing (after verifying it's dead code)
+NB. 1!:1 needs to point to NuVoc page - check it
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -383,12 +381,12 @@ NB. If a timer was NOT created because of earlier sys_timer, stub out wdtimer in
 NB. otherwise allow it to go through to the definition in dissect locale
 if. ALLOWNONQTTOOLTIP *. -. IFQT do.
   if. 0 = #a: -.~ {."1 dissectionlist_dissect_ do.
-    if.  0 > 4!:0 <'sys_timer_base_' do.
+    if. 0 > 4!:0 <'sys_timer_base_' do.
       sys_timer_z_ =: sys_timer_dissect_
     end.
   end.
   NB. If somebody else's timer is present, disable our use of it
-  if. (<'sys_timer_dissect_') -.@-: 5!:1 <'sys_timer_z_'  do. wdtimer =: ] end.
+  if. 3 = 4!:0 <'sys_timer_z_' do. if. (<'sys_timer_dissect_') -.@-: 5!:1 <'sys_timer_z_'  do. wdtimer =: ] end. end.
 end.
 Jenvirons =: (9!:38 '')
 NB.?lintsaveglobals
@@ -896,34 +894,12 @@ if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
   tokensource__topmod =: tokensource__topmod , (<1 2) {:: exeblock
   NB.?lintmsgson
 else.
-NB. obsolete NB. If the modifier and all the operands are self-defining terms, execute the modifier, figure out the resulting
-NB. obsoleteNB. part of speech, and create an appropriate type/value for it.  This will handle things like
-NB. obsoleteNB. 3 b.   and 1!:1   and  1 : '...' and m"n .
-NB. obsolete  if. bwand/ sdt , 0 {::"1 exeblock do.
-NB. obsolete13!:8 (3)
-NB. obsolete    ". 'exeobj =. ' , defstg =. ; 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. enparen y end.'&.> (1) {"1 exeblock
-NB. obsolete    tokennums =. ; 2 {"1 exeblock
-NB. obsolete    select. 4!:0 <'exeobj'
-NB. obsolete    case. 0 do.
-NB. obsolete      ntypeval =. createnoun (5!:5 <'exeobj');'';tokennums
-NB. obsolete    case. 1 do.
-NB. obsolete      ntypeval =. adv;(enparen defstg);tokennums
-NB. obsolete    case. 2 do.
-NB. obsolete      ntypeval =. conj;(enparen defstg);tokennums
-NB. obsolete    case. 3 do.
-NB. obsolete      ntypeval =. createverb (5!:5 <'exeobj');tokennums
-NB. obsolete    case. do.
-NB. obsolete      failmsg 'Invalid type while applying modifier'
-NB. obsolete      return.
-NB. obsolete    end.
-NB. obsolete  else.
   NB. Not sdt.  Look up the locale of the modifier, and execute it.  The executed modifier must correctly guess the
   NB. part of speech that is going to be produced.
   ntypeval =. exeblock (0 createmodifier)~ 'dissectprim' , ": ifound =. ((<1 1) { exeblock) i.&1@:((e.>)"0) dissectprimindex
   NB. If the modifier was not one that we recognize, remember that, in case of parse failure
   usermodifierencountered =: usermodifierencountered >. ifound = #dissectprimindex
 NB.?lintonly nobj =. localedefault
-NB. obsolete  end.
 end.
 ntypeval
 )
@@ -7853,6 +7829,14 @@ end.
 x ,&< coname'' NB. no v, so no change to the DOLs
 )
 
+NB. Find explanation for verb - overriden in other locales
+lookupexplanation =: 3 : 0
+if. (#primexplains) > tx =. (0{"1 primexplains) i. <titlestring do.
+  ((<tx,valence) {:: primexplains),LF
+else. ''
+end.
+)
+
 exegesisrankstack =: 3 : 0
 if. execform -.@:-: titlestring do.
   NB. If this is a final node (execform not the same as titlestring), explain the expansion
@@ -7870,8 +7854,7 @@ end.
 if. #onelinedesc do.
   r =. r , EXEGESISONELINEDESC ; 'The definition of this verb is:',LF,onelinedesc,CR
 end.
-if. (#primexplains) > tx =. (0{"1 primexplains) i. <titlestring do.
-  t =. ((<tx,valence) {:: primexplains),LF
+if. #t =. lookupexplanation'' do.
   if. 0: #nuvocpage do. t =. t , 'Left-click to see the NuVoc page for this primitive.',LF end.
   r =. r , EXEGESISVERBDESC ; t
 end.
@@ -12735,6 +12718,214 @@ else.
 end.
 )
 
+NB. **** !: ****
+
+localeforeign_dissect_ =: primlocale '!:'
+
+create =: 3 : 0
+NB. m and n must be nouns
+if. 0 = bwand/ noun , > (<0 2;0) { y do.
+  failmsg 'domain error: operands of m!:n must be nouns'
+end.
+
+'uop cop vop' =: 1 {"1 y
+NB.?lintonly uop =. vop =. <'dissectverb' [ cop =. ''
+defstg =. (defstring__uop 2) jd  cop jd (defstring__vop 3)
+if. knownmn =: bwand/ sdt , > (<0 2;0) { y do.
+  NB. If m and n are sdts, execute the conjunction to determine the part of speech it produces
+  try.
+    ". 'exeobj =. ' , defstg =. ; uvval =: 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. y end.'&.> (1) {"1 y
+  catch.
+    failmsg 'Invalid operand to !:'
+    return.
+  end.
+  tokennums =. ; 2 {"1 y
+  restype =: 4!:0 <'exeobj'
+else. restype =: 3   NB. assume verb if unknown
+  NB.?lintonly tokennums =. 0 [ uvval =: 1;2;3
+end.
+select. restype
+case. 0 do.
+  createnoun (5!:5 <'exeobj');'';tokennums
+case. 1 do.
+  adv;(enparen defstg);tokennums
+case. 2 do.
+  conj;(enparen defstg);tokennums
+case. 3 do.
+  NB. We will treat this as a generic verb, except for the overrides we have in this locale
+  changeobjtypeto 'dissectverb'
+  insertoverride localeforeign
+  NB. Pass the token number of the modifier in as the verb token number.  That will go into tokensource
+  create_dissectverb_ f. defstg;(<1 2){y
+case. do.
+  failmsg 'Invalid type while applying modifier'
+  return.
+end.
+)
+
+NB. All we do with the valence is override the nuvocpage
+setvalence =: 3 : 0
+setvalence_dissectverb_ f. y
+if. IFQT do.
+  if. knownmn do. nuvocpage =: 'Foreigns#m',": 0 ". 0 {:: uvval
+  else. nuvocpage =: 'bangco'
+  end.
+end.
+coname''
+)
+
+NB. Get text of explanation, if any
+lookupexplanation =: 3 : 0
+if. knownmn do.
+'m!:n creates a verb to perform a special function.  The verb created here is documented under m=',(": 0{::uvval),', n=',(": 2{::uvval),'.',LF
+else.
+'The m!:n conjunction produces a great variety of features based on the (m) and (n) operands.',LF
+end.
+)
+
+proplocales =: 3 : 0
+(y=3) # uop,tokensource;vop
+)
+
+NB. **** b. ****
+
+localebasic_dissect_ =: primlocale 'b.'
+
+create =: 3 : 0
+'uop cop' =: 1 {"1 y
+NB.?lintonly uop =: <'dissectverb' [ cop =: ''
+defstg =. (defstring__uop 2) jd  cop
+if. knownm =: (sdt+noun) = (<0 0) {:: y do.
+elseif. bwand/ verb , (<0 0) {:: y do.
+  knownm =: 2
+end.
+
+NB. We will treat this as a generic verb, except for the overrides we have in this locale
+changeobjtypeto 'dissectverb'
+insertoverride localebasic
+NB. Pass the token number of the modifier in as the verb token number.  That will go into tokensource
+create_dissectverb_ f. defstg;(<1 2){y
+)
+
+NB. All we do with the valence is override the nuvocpage
+setvalence =: 3 : 0
+setvalence_dissectverb_ f. y
+if. IFQT do. nuvocpage =: knownm {:: 'bdot';'bdot';'bdotu' end.
+coname''
+)
+
+NB. Get text of explanation, if any
+lookupexplanation =: 3 : 0
+select. knownm
+case. 0 do.
+  '(m b.) produces a verb to perform Boolean operations, either on Boolean nouns or on each bit of integers.  The function depends on (m).',LF
+case. 1 do.
+  uval =. 0 ". defstring__uop 0
+  b =. (":uval),' b.'
+  if. valence = 1 do.
+    b =. enparen b , ' y'
+    op =. enparen (16 | uval) {:: '0';'0';'0';'0';'y';'y';'y';'y';'NOT y';'NOT y';'NOT y';'NOT y';'1';'1';'1';'1'
+  else.
+    b =. enparen 'x ', b , ' y'
+    op =. enparen (16 | uval) {:: '0';'x AND y';'x > y';'x [ignoring y]';'x < y';'y [ignoring x]';'x ~: y [XOR]';'x OR y';'x NOR y';'x = y [XNOR]';'NOT y';'x >: y';'NOT x';'x <: y';'x NAND y';'1'
+  end.
+  i =. ": >: 2 ^. _1&(33 b.)&.<: 0   NB. wordsize in bits
+  select. uval
+  case. <"0 (_16) , i: 15 do.
+    b , ' calculates the function ' , op , ' on Boolean arguments.',LF
+  case. <"0 (16) + i. 16 do.
+    b , ' calculates the function ' , op , ' bit by bit on integer arguments.  The result depends on the size of an integer [yours are ',i,' bits].',LF
+  case. 32 do.
+    if. valence=1 do.
+      b , ' produces (y).',LF
+    else.
+      b , ' bitwise-rotates (y) leftwards by (x) positions.  The result depends on the size of an integer [yours are ',i,' bits].',LF
+    end.
+  case. 33 do.
+    if. valence=1 do.
+      b , ' produces (y).',LF
+    else.
+      b , ' performs unsigned shift of (y) leftwards by (x) positions.  Vacated positions are filled with 0 bits.  The result depends on the size of an integer [yours are ',i,' bits].',LF
+    end.
+  case. 34 do.
+    if. valence=1 do.
+      b , ' produces (y).',LF
+    else.
+      b , ' performs signed shift of (y) leftwards by (x) positions.  Vacated positions are filled with 0 bits for left shift, sign bits for right shift.  The result depends on the size of an integer [yours are ',i,' bits].',LF
+    end.
+  end.
+case. do.
+  'This is a verb that gives information about the underlying verb:',CR,(defstring__uop 0),LF,'depending on (y).  (y)-value _1 gives the inverse, 0 gives the rank, 1 the neutral function.',LF
+end.
+)
+
+proplocales =: 3 : 0
+(y=3) # uop,<tokensource
+)
+
+NB. **** : ****
+
+primlocale ':'
+
+create =: 3 : 0
+if. bwxor/ verb bwand > (<0 2;0) { y do.
+  failmsg 'domain error: operands of u :v must be verb-verb or noun-noun'
+end.
+if. noun bwand (<0 0) {:: y do.
+  NB. noun : noun - treat as generic verb
+  changeobjtypeto localedefault
+  create y
+  return.
+else.
+  NB. verb : verb.  We will wait till we know the valence and then
+  NB. treat as if only that valence were given
+  NB. Register this object so we can clean up at end
+  newobj__COCREATOR coname''
+  create_dissectobj_ f. (<1 2) { y
+  'uop vop' =: (<0 2;1) { y
+  NB.?lintonly uop =: vop =: <'dissectverb'
+  NB. Set resultissdt for modifier processing
+  resultissdt =: resultissdt__uop *. resultissdt__vop
+  verb;(coname'');tokensource
+end.
+NB.?lintsaveglobals
+)
+
+NB. Set the valence used for executing this verb, and propagate to descendants
+setvalence =: 3 : 0
+valence =: #y
+uop =: setvalence__uop y
+NB.?lintonly uop =: <'dissectverb'
+vop =: setvalence__vop y
+NB.?lintonly vop =: <'dissectverb'
+actop =: valence { '';uop,vop
+NB.?lintonly actop =: <'dissectverb'
+resultissdt =: resultissdt__actop
+coname''
+NB.?lintsaveglobals
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0
+enparen^:(y=3) (defstring__uop 2) jd ':' jd (defstring__vop 3)
+)
+
+NB. return string form of operands, including instrumentation
+exestring =: 3 : 0
+exestring__actop y
+)
+
+NB. Return the locales for propsel.  If we got here through capped fork, we have to format accordingly
+proplocales =: 3 : 0
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3), 1) # ;: 'uop tokensource vop'
+)
+
+
+NB. Traversal up and down the tree.
+NB. The result is the DOL, up through the result of u
+traverse =: 4 : 'x traverse__actop y'
+
+
 NB. ******* verbs with explicit support ***********
 
 NB. *********** $: *************
@@ -12811,7 +13002,7 @@ localedefault_dissect_ =: primlocale ''
 NB. Remove the last element in the search, to make this the 'search failed' locale
 dissectprimindex_dissect_ =: }: dissectprimindex_dissect_
 
-NB. This is the default object to handle unknown entities
+NB. This is the default object to handle unknown modifiers
 
 NB. Unknown modifiers create verbs (we hope).  We will create something that looks like a verb -
 NB. it will be the display form of the modified input operands.  We will then pretend to be a verb.
@@ -14032,6 +14223,13 @@ ctup = 8
 (2 ;< 'datasize';'10 20') dissect 'i. 5 100'
 (2 ;< 'datasize';'10') dissect 'i. 100 100'
 2 dissect '+:L:0 z' [ z =.  <<<4 5
+2 dissect '1!:1 <''xxx'''
+2 dissect '0 1 2 -: _2 (3!:4) 2 (3!:4) i. 3'
+2 dissect '6 (34 b.) 34 b. _5 (33 b.) 33 b. 4 (32 b.) 32 b. 512 (27 b.) 26 b. #. 1 0 0 0 (6 b.) _4 b. 1 0 1 1'
+2 dissect '3 : ''+: y'' i. 2 3'
+2 dissect '+: : [: 5'
+2 dissect '4 [: : * 5'
+2 dissect '1 2 + : * i. 3 3'
 )
 
 testsandbox_base_ =: 3 : 0
