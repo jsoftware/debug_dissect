@@ -59,7 +59,6 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. 1!:1 needs to point to NuVoc page - check it
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -1552,15 +1551,20 @@ browse_j_ 'http://www.jsoftware.com/jwiki/NuVoc'
 dissect_f1shift_fkey =: dissect_fmwikinuvoc_button
 4!:55^:(-.IFQT) 'dissect_f1_fkey';'dissect_f1shift_fkey'
 
+dissect_jctrl_fkey =: 3 : 0
+if. 0 < 4!:0 <'labrun_jlab_' do.
+  9!:27 'labrun_jlab_$0'   NB. create immex sentence
+  9!:29 (1)
+end.
+0 0 $0
+)
+
 dissect_dissectisi_char =: 3 : 0
 NB. If user presses ctrl-J, treat it as 'labrun'
 NB.?lintonly sysdata =. 20 0 146 { a.
 select. a. i. ,sysdata
-case. ,10 do.
-  if. 0 < 4!:0 <'labrun_jlab_' do.
-    9!:27 'labrun_jlab_$0'   NB. create immex sentence
-    9!:29 (1)
-  end.
+case. ,10 do.  NB. ctrl-J
+  dissect_jctrl_fkey''
 case. 239 160&,&.> 146 + i. 4 do.  NB. arrow: l u r d
   NB. Arrow key: move the selection
   'axis incr' =. (146 -~ a. i. 2 { sysdata) { _2 ]\ 0 _1  1 _1  0 1  1 1   
