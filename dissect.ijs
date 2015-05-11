@@ -1,6 +1,6 @@
 NB. Copyright (c) Henry H. Rich, 2012-2015.  All rights reserved.
 
-locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector nadverb conjunction'
+locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops fitok powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector nadverb conjunction'
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
 NB. The 2 1 gives the name-table sizes: 2 1 0 0 0 ...
 NB. The dissectionlist thing is to preserve the list over reloads, for debugging.  This is also its initialization
@@ -10,7 +10,7 @@ NB. 10 10 here is the starting position of the first window
 
 NB. DISSECTLEVEL is updated from time to time whenever there is a change to an external interface, indicating the dissect release level
 NB. at the time of the change
-DISSECTLEVEL_dissect_ =: 4 9
+DISSECTLEVEL_dissect_ =: 4 0
 
 NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).  In J6 tooltips
 NB. take over the timer interrupt
@@ -59,8 +59,6 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. Support !. in /. etc
-NB. Tooltips for fit forms
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -1730,9 +1728,6 @@ if. ~:/ '()' +/@:="0 _ y do.
 end.
 y
 )
-
-NB. obsolete names =: 4!:1
-NB.
 
 NB. y is a short string, usually the name of the modifier that creates a verb.
 NB. result is the value to use for titlestring.
@@ -7618,6 +7613,17 @@ NB. Nilad.  The locale called must be a noun locale.  The result is the list of 
 NB. the gerund in the locale.  If the locale is not a gerund, the result is empty.
 querygerund =: (0$a:)"_
 
+cocurrent 'dissectfitok'
+
+NB. x is fit tokens, y is string to use
+applyfit =: 4 : 0
+NB.?lintonly titlestring =: tokensource =: ''
+titlestring =: titlestring , y
+fitstring =: y
+tokensource =: tokensource , x
+0
+)
+
 
 cocurrent 'dissectrighttoleft'
 NB. y is anything - intervals, results, fillmasks - that has been expanded into an array using the shape of the frame.
@@ -7766,7 +7772,7 @@ x ,&< coname''  NB. Return the empty DOLs
 )
 
 cocurrent 'dissectverb'
-coinsert 'dissectobj'
+coinsert 'dissectfitok dissectobj'
 NB. y is (string form of the verb);tokens it came from
 NB. If the string form is boxed, it contains (string form);(title for display purposes)
 create =: 3 : 0
@@ -7786,14 +7792,6 @@ NB. If this verb has a one-line description, save it
 onelinedesc =: 2 {:: y , <''
 verb;(coname'');tokensource
 NB.?lintsaveglobals
-)
-
-NB. x is fit tokens, y is string to use
-applyfit =: 4 : 0
-titlestring =: titlestring , y
-fitstring =: y
-tokensource =: tokensource , x
-0
 )
 
 NB. Save the number of operands for this invocation
@@ -11091,6 +11089,9 @@ coname''
 NB.?lintsaveglobals
 )
 
+NB. Pass fit request down the line
+applyfit =: 4 : 'x applyfit__uop y'
+
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 defstring__uop y
@@ -11219,6 +11220,7 @@ NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operands - locale of the verb, and string form of the adv
 'uop cop' =: (<0 1;1) { y
+fitstring =: ''   NB. Init to no fit specified
 NB.?lintonly uop =: <'dissectverb' [ cop =: ''
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop
@@ -11229,7 +11231,7 @@ NB.?lintsaveglobals
 
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
-enparen^:(y=3) (defstring__uop 2) jd cop
+enparen^:(y=3) (defstring__uop 2) jd cop,fitstring
 )
 
 NB. Return the locales for propsel
@@ -11243,10 +11245,10 @@ initloggingtable ''
 if. #gops do.
   NB. ( vlog (log u0)`(log u1)`... /. )
   gopx =. }. ; (3 : '< ''`('' , (logstring$0) , ''@:('' , (exestring__y$0) , ''))'' '"0) gops
-  auditstg '(' , (verblogstring '') , gopx , cop , ')'
+  auditstg '(' , (verblogstring '') , gopx , cop , fitstring , ')'
 else.
   NB. ( vlog log@:(u) /. )
-  auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , cop , ')'
+  auditstg '(' , (verblogstring '') , (logstring '') , '@:(' , (exestring__uop '') , ')' , cop , fitstring , ')'
 end.
 )
 
@@ -11625,7 +11627,7 @@ end.
 
 NB. *** /. ***
 
-'dissectirregularops dissectpartitionadverb dissectpartition' primlocale '/.'
+'dissectfitok dissectirregularops dissectpartitionadverb dissectpartition' primlocale '/.'
 
 NB. The monadic valence u/. y:
 startmonad ''
@@ -11649,7 +11651,7 @@ NB.?lintsaveglobals
 NB. y is the current selection (a: if forced)
 NB. For the normal verb, the selector and the highlight are identical.
 calcphysandhighlights =: 3 : 0
-NB. the selections are the (ysize) disgonal elements starting at (0,sel) and going down and to the left.
+NB. the selections are the (ysize) diagonal elements starting at (0,sel) and going down and to the left.
 NB. But we must discard leading items that are not in the object: that is ((sel+1)-xsize), if positive;
 NB. and we must discard trailing items not in the object: (ysize-(sel+1)) if positive
 'ysize xsize' =. _2 {.!.1 yitemshape
@@ -11687,8 +11689,12 @@ NB. The pseudoframe (# of partitions) is already in the stored data, since we lo
 NB. call to u.  So make that the frame.  The number of partitions is
 NB. the number of unique elements of x
 NB. Detect agreement error if the number of items of x doesn't match that of y
-if. ~:&({.!.1@($^:(0<L.)))&>/ x do. a: return. end. 
-ny =. , # ~. partitionx__xop
+if. ~:&({.!.1@($^:(0<L.)))&>/ x do. a: return. end.
+if. #fitstring do.
+  ny =. , # ~.!.(". 2 }. fitstring) partitionx__xop
+else.
+  ny =. , # ~. partitionx__xop
+end.
 ny ; ny ; (($0);ny) ; a: , a:
 NB.?lintsaveglobals
 )
@@ -14279,6 +14285,8 @@ ctup = 8
 'domain error: right operand of !. must be a noun' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '>.!.>. 5'
 'domain error: !. not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+:@+:!.0 (5)'
 2 dissect '3 {.!.4 '''''
+2 dissect '1 2 1 1 3 </.!.0 i. 5'
+2 dissect '1.00000000000001 2 1 1 3 </.!.0 i. 5'
 )
 
 testsandbox_base_ =: 3 : 0
