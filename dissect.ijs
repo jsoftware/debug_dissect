@@ -59,6 +59,8 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
+NB. Support !. in /. etc
+NB. Tooltips for fit forms
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -1563,8 +1565,7 @@ dissect_dissectisi_char =: 3 : 0
 NB. If user presses ctrl-J, treat it as 'labrun'
 NB.?lintonly sysdata =. 20 0 146 { a.
 select. a. i. ,sysdata
-case. ,10 do.  NB. ctrl-J
-  dissect_jctrl_fkey''
+case. ,10 do.  NB. ctrl-J, now handled in main form
 case. 239 160&,&.> 146 + i. 4 do.  NB. arrow: l u r d
   NB. Arrow key: move the selection
   'axis incr' =. (146 -~ a. i. 2 { sysdata) { _2 ]\ 0 _1  1 _1  0 1  1 1   
@@ -1730,7 +1731,8 @@ end.
 y
 )
 
-names =: 4!:1
+NB. obsolete names =: 4!:1
+NB.
 
 NB. y is a short string, usually the name of the modifier that creates a verb.
 NB. result is the value to use for titlestring.
@@ -1745,6 +1747,9 @@ elseif. displaycompmods do. defstring 0
 elseif. do. y
 end.
 )
+
+NB. fit conjunction is normally not supported, gives error
+applyfit =: 1:
 
 NB. Clone.  Nilad.  Create a new locale.  Chain path through the path of the current object.
 NB. That way, a cloned noun points to the originating noun, which will be the one that gets
@@ -7774,12 +7779,21 @@ stealthoperand =: 1 2 4 5 6 0 {~ ((;:'][[:'),']]';'[[') i. <titlestring  NB. '[[
 NB. A stealth operand counts as invertibly monadic
 invertiblymonadic =: 3 bwand stealthoperand
 titlestring =: stealthoperand {:: titlestring; ;: '][?[:]['
+fitstring =: ''
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
 NB. If this verb has a one-line description, save it
 onelinedesc =: 2 {:: y , <''
 verb;(coname'');tokensource
 NB.?lintsaveglobals
+)
+
+NB. x is fit tokens, y is string to use
+applyfit =: 4 : 0
+titlestring =: titlestring , y
+fitstring =: y
+tokensource =: tokensource , x
+0
 )
 
 NB. Save the number of operands for this invocation
@@ -7790,7 +7804,7 @@ valence =: #y
 resultissdt =: *./y
 NB. If this is a primitive verb, get its NuVoc designation
 if. IFQT *. (#primexplains) > tx =. (0{"1 primexplains) i. <execform do.
-  nuvocpage =: ((<tx,3) {:: primexplains) , (valence = 2) # '#dyadic'
+  nuvocpage =: (#. (*#fitstring),(valence = 2)) {:: 4 $ <;._1 '`' , ((<tx,3) {:: primexplains)
 end.
 coname''
 NB.?lintsaveglobals
@@ -7799,7 +7813,7 @@ NB.?lintsaveglobals
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 NB. Apply parentheses if right conjunction operand - but only if more than 1 word
-enparen^:((y>2) *. 1 < #@;: execform ) execform
+enparen^:((y>2) *. 1 < #@;: ) execform,fitstring
 )
 
 NB. return string form of operands, including instrumentation
@@ -7810,7 +7824,7 @@ exestring =: 3 : 0
 NB. init for logging
 initloggingtable ''
 NB. Instrument the forward verb - bivalent
-auditstg '(' , (logstring '') , '@(' , (verblogstring '') , execform , '))'
+auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (execform,fitstring) , '))'
 NB.?lintonly 'logvalues logticket' =: (1$a:);$0
 NB.?lintsaveglobals
 )
@@ -7835,8 +7849,8 @@ x ,&< coname'' NB. no v, so no change to the DOLs
 
 NB. Find explanation for verb - overriden in other locales
 lookupexplanation =: 3 : 0
-if. (#primexplains) > tx =. (0{"1 primexplains) i. <titlestring do.
-  ((<tx,valence) {:: primexplains),LF
+if. (#primexplains) > tx =. (0{"1 primexplains) i. <execform do.
+  LF ,~ (*#fitstring) {:: 2 $ <;._1 '`' , ((<tx,valence) {:: primexplains)
 else. ''
 end.
 )
@@ -7869,288 +7883,288 @@ NB. Quick descriptions of all primitives
 primexplains =: _4 ]\ <;._2 (0 : 0)
 =
 =y indicates, for each item in the nub of y, whether it matches each item of y
-x=y is 1 if the atoms x and y are tolerantly equal
-eq
+x=y is 1 if the atoms x and y are tolerantly equal`x=!.f y is 1 if the atoms x and y are equal to with tolerance f
+eq`#dyadic
 <
 <y boxes y
-x<y is 1 if the atom x is tolerantly less than the atom y
-lt
+x<y is 1 if the atom x is tolerantly less than the atom y`x<!.f y is 1 if the atom x is less than y with tolerance f
+lt`lt#dyadic
 <.
-<.y is the largest integer not exceeding y
+<.y is the largest integer not tolerantly exceeding y`<.!.f y is the largest integer not exceeding y by the tolerance f
 x<.y is the smaller of the atoms x and y
-ltdot
+ltdot`ltdot#dyadic
 <:
 <:y is y-1
-x<:y is 1 if the atom x is tolerantly less than or equal to the atom y
-ltco
+x<:y is 1 if the atom x is tolerantly less than or equal to the atom y`x<:!.f y is 1 if the atom x is less than or equal to the atom y with tolerance f
+ltco`ltco#dyadic
 >
 >y unboxes each atom of y
-x>y is 1 if the atom x is tolerantly greater than the atom y
-gt
+x>y is 1 if the atom x is tolerantly greater than the atom y`x>y is 1 if the atom x is greater than the atom y with tolerance f
+gt`gt#dyadic
 >.
->.y is the smallest integer not less than y
+>.y is the smallest integer not tolerantly less than y`>.!.f y is the smallest integer not less than y by the tolerance f
 x>.y is the larger of the atoms x and y
-gtdot
+gtdot`gtdot#dyadic
 >:
 >:y is y+1
-x>:y is 1 if the atom x is tolerantly greater than or equal to the atom y
-gtco
+x>:y is 1 if the atom x is tolerantly greater than or equal to the atom y`x>:!.f y is 1 if the atom x is greater than or equal to the atom y with tolerance f
+gtco`gtco#dyadic
 _:
 _:y is infinity, regardless of y
 x_:y is infinity, regardless of x and y
-underco
+underco`underco#dyadic
 +
 +y is the complex conjugate of y
 x+y is x plus y
-plus
+plus`plus#dyadic
 +.
 +.y is a 2-atom list of the real and imaginary parts of the atom y
 x+.y is x OR y if x and y are Boolean; generally, the greatest common divisor of x and y
-plusdot
+plusdot`plusdot#dyadic
 +:
 +:y is 2*y
 x+:y is the negation of x OR y
-plusco
+plusco`plusco#dyadic
 *
-*y is signum(y): _1 if y<0, 0 if y tolerantly=0, 1 if y>0
+*y is signum(y): _1 if y<0, 0 if y tolerantly=0, 1 if y>0`*!.f y is signum(y): _1 if y<0, 0 if y is within f of 0, 1 if y>0
 x*y is x times y
-star
+star`star#dyadic
 *.
 *.y is a 2-atom list of the length and angle of the atom y, in the complex plane
 x*.y is x AND y if x and y are Boolean; generally, the least common multiple of x and y
-stardot
+stardot`stardot#dyadic
 *:
 *:y is y^2
 x*:y is the negation of x AND y
-starco
+starco`starco#dyadic
 -
 -y is the negative of y
 x-y is x minus y
-minus
+minus`minus#dyadic
 -.
 -.y is 1-y
-x-.y is x, with any items removed that match cells of y
-minusdot
+x-.y is x, with any items removed that tolerantly match cells of y`x-.!.f y is x, with any items removed that match cells of y with tolerance f
+minusdot`minusdot#dyadic
 -:
 -:y is y%2
-x-:y is 1 if the arrays x and y match, in shape and values
-minusco
+x-:y is 1 if the arrays x and y match, in shape and values (tolerantly)`x-:!.f y is 1 if the arrays x and y match, in shape and values (with tolerance f)
+minusco`minusco#dyadic
 %
 %y is 1%y
 x%y is x divided by y
-percent
+percent`percent#dyadic
 %.
 %.y is the matrix inverse of y (pseudoinverse if y is not square)
 x%.y is ((%. y) +/ . * x)
-percentdot
+percentdot`percentdot#dyadic
 %:
 %:y is the square root of y
 x%:y is the xth root of y
-percentco
+percentco`percentco#dyadic
 ^
 ^y is e^y
-x^y is x raised to the power y
-hat
+x^y is x raised to the power y`x^!.f y is like x^y but f is added to x before each multiplication
+hat`hat#dyadic`hat`hat#stope
 ^.
 ^.y is ln(y)
 x^.y is the logarithm of y, using base x
-hatdot
+hatdot`hatdot#dyadic
 $
 $y is the shape of y
-x$y is an array made by using items of y, with the frame given by x
-dollar
+x$y is an array made by using items of y, with the frame given by x`x$!.f y is an array made by using items of y, with the frame given by x; after items of y are exhauseted, use the fill atom f
+dollar`dollar#dyadic
 $.
 $.y creates a sparse matrix from y
 x$.y performs a sparse-matrix operation
-dollardot
+dollardot`dollardot#dyadic
 $:
 $:y performs recursion
 x$:y performs recursion
-dollarco
+dollarco`collarco#dyadic
 ~.
-~.y is the unique items of y, in their original order
+~.y is the tolerantly unique items of y, in their original order`~.y is the unique items of y (to tolerance f), in their original order
 
-tildedot
+tildedot`tildedot#dyadic
 ~:
-~:y is a Boolean for each item of y, 1 if no previous item matches it
-x~:y is 1 if the atoms x and y are not tolerantly equal
-tildeco
+~:y is a Boolean for each item of y, 1 if no previous item tolerantly matches it`~:!.f y is a Boolean for each item of y, 1 if no previous item matches it to tolerance f
+x~:y is 1 if the atoms x and y are not tolerantly equal`x~:!.f y is 1 if the atoms x and y are not equal to tolerance f
+tildeco`tildeco#dyadic
 |
 |y is the magnitude of y
-x|y is y(mod x), the remainder after dividing y by x
-bar
+x|y is y(mod x), the remainder after dividing y by x.  0 if the quotient is tolerantly equal to an integer.`x|!.f y is y(mod x), the remainder after dividing y by x.  0 if the quotient is equal to an integer to tolerance f.
+bar`#dyadic
 |.
-|.y is y, in reversed item order
-x|.y is y, with the items rotated left x positions
-bardot
+|.y is y, in reversed item order`|.!.f y is y, shifted right 1 position, with position 0 filled by f
+x|.y is y, with the items rotated left x positions`x|.!.f y is y, with the items shifted left x positions and vacated positions filled by f
+bardot`bardot#dyadic`bardot#monadicfit`bardot#dyadicfit
 |:
 |:y is the transpose of y, y with the axes running in reversed order
 x|:y is y with the axes x moved to the end
-barco
+barco`barco#dyadic
 ,
 ,y is a list of all the atoms of y
-x,y joins x and y into a single array, with the items of x followed by the items of y
-comma
+x,y joins x and y into a single array, with the items of x followed by the items of y.  An atom is replicated to the shape of a result item; other short items are padded with fill.`x,!.f y joins x and y into a single array, with the items of x followed by the items of y.  An atom is replicated to the shape of a result item; other short items are padded with the fill atom f.
+comma`comma#dyadic
 ,.
 ,.y is a table where each row is a list of the atoms from one item of y
-x,.y is x,"_1 y, and joins corresponding items of x and y
-commadot
+x,.y is x,"_1 y, and joins corresponding items of x and y.  An atom is replicated to the shape of a result item; other short items are padded with fill.`x,.!.f y is x,"_1 y, and joins corresponding items of x and y.  An atom is replicated to the shape of a result item; other short items are padded with the fill atom f.
+commadot`commadot#dyadic
 ,:
 ,:y is y with a leading axis of length 1 added
-x,:y is an arfay with two items, the first coming from x and the second from y
-commaco
+x,:y is an array with two items, the first coming from x and the second from y.  An atom is replicated to the shape of a result item; other short items are padded with fill.`x,:!.f y is an array with two items, the first coming from x and the second from y.  An atom is replicated to the shape of a result item; other short items are padded with the fill atom f.
+commaco`commaco#dyadic
 #
 #y is the number of items of y
-x#y is an array in which each atom of x tells how many times the corresponding item of y appears
-number
+x#y is an array in which each atom of x tells how many times the corresponding item of y appears.  Complex values in x generate fill.`x#!.f y is an array in which each atom of x tells how many times the corresponding item of y appears.  Complex values in x insert copies of the fill atom f.
+number`number#dyadic
 #.
 #.y is 2 #. y
 x#.y converts the list y to a single number, using x as the place values of the representation
-numberdot
+numberdot`numberdot#dyadic
 #:
 #:y is the binary representation of y
-x#:y converts the number y to a list, using x as the place values of the representation
-numberco
+x#:y converts the number y to a list, using x as the place values of the representation.  Comparison to integer values is tolerant.`x#:!.f y converts the number y to a list, using x as the place values of the representation.  Comparison to integer values uses tolerance f.
+numberco`numberco#dyadic
 !
 !.y is factorial(y)
 x!.y if the number of combinations of y things taken x at a time
-bang
+bang`#dyadic
 /:
 /:y is the permutation that would put y into ascending order
 x/:y is x sorted into ascending order using the corresponding values of y as keys
-slashco
+slashco`slashco#dyadic
 \:
 \:y is the permutation that would put y into descending order
 x\:y is x sorted into descending order using the corresponding values of y as keys
-bslashco
+slashco`slashco#dyadic
 [
 [y is y
 x[y is x
-squarelf
+squarelf`squarelf#dyadic
 ]
 ]y is y
 x]y is y
-squarert
+squarert`squarert#dyadic
 {
 {y is the Cartesian product of the contents of boxes of y
 x{y is a selection from y, using x to control the selection
-curlyf
+curlyf`curlylf#dyadic
 {.
 {.y is the first item of y
-x{.y takes the first x items of y (last items if x is negative)
-curlylfdot
+x{.y takes the first x items of y (last items if x is negative)`x{.!.f y takes the first x items of y (last items if x is negative).  The fill atom f is used for nonexistent positions.
+curlylfdot`curlylfdot#dyadic
 {:
 {:y is the last item of y
 
-curlylfco
+curlylfco`curlylfco#dyadic
 }.
 }.y is all the items of y except the first
 x}.y drops the first x items of y (last items if x is negative)
-curlyrtdot
+curlyrtdot`curlyrtdot#dyadic
 }:
 }:y is all the items of y except the last
 
-curlyrtco
+curlyrtco`curlyrtco#dyadic
 ".
 ".y executes the sentence y, giving its result (if a noun)
 x".y converts the string y to numeric, using x as default in case of invalid values
-quotedot
+quotedot`quotedot#dyadic
 ":
-":y converts y to string form using default conversions
+":y converts y to string form using default conversions`":!.f y converts y to string form using default conversions, but accuarte to f significant digits.
 x":y converts y to string form using conversions specified by x
-quoteco
+quoteco`quoteco#dyadic
 ?
 ?y is a random number (between 0 and 1 if y=0, a nonnegative integer less than y otherwise)
 x?y is x distinct nonnegative random integers less than y
-query
+query`query#dyadic
 ?.
 ?.y is like ?y but uses a fixed starting value
 x?.y is like x?y but uses a fixed starting value
-quesrydot
+querydot`querydot#dyadic
 A.
 A.y is the permutation number of the permutation y
 x A.y reorders the items of y using the permtation whose number is x
-acapdot
+acapdot`acapdot#dyadic
 C.
 C.y converts the permutation y between direct and cycle form
 x C.y  reorders the items of y using the permtation x
-ccapdot
+ccapdot`ccapdot#dyadic`ccapdot#permparity`ccapdot#dyadic
 e.
-e.y gives, for each opened atom of y, a list indicating which items of ;y are in it
-x e.y is 1 for each cell of x that is an item of y, 0 for cells of x not in y
-edot
+e.y gives, for each opened atom of y, a list indicating which items of ;y are tolerantly in it`e.!.f y gives, for each opened atom of y, a list indicating which items of ;y are in it to tolerance f
+x e.y is 1 for each cell of x that is tolerantly an item of y, 0 for cells of x not in y`x e.!.f y is 1 for each cell of x that is an item of y to tolerance f, 0 for cells of x not in y
+edot`edot#dyadic
 E.
 
-x E.y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that match x
+x E.y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that tolerantly match x`x E.y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that match x to tolerance f
 ecapdot
 i.
 i.y is an array of consecutive natural numbers of shape y
-x i.y for each cell of y (whose rank is the rank of an item of x), the index of the first matching item of x, or #x if there is no match
-idot
+x i.y for each cell of y (whose rank is the rank of an item of x), the index of the first tolerantly matching item of x, or #x if there is no match`x i.!.f y for each cell of y (whose rank is the rank of an item of x), the index of the first matching item of x to tolerance f, or #x if there is no match
+idot`idot#dyadic
 i:
 i:y equally-spaced numbers between -y and +y
-x i:y for each cell of y (whose rank is the rank of an item of x), the index of the last matching item of x, or #x if there is no match
-ico
+x i:y for each cell of y (whose rank is the rank of an item of x), the index of the last tolerantly matching item of x, or #x if there is no match`x i:!.f y for each cell of y (whose rank is the rank of an item of x), the index of the last matching item of x to tolerance f, or #x if there is no match
+ico`ico#dyadic
 I.
 I.y for Boolean y, a list of the indexes of 1s
 x I.y the index within y before which x could be inserted keeping the list in order
-icapdot
+icapdot`icapdot#dyadic
 j.
 j.y is 0j1*y
 xj.y is x + 0j1 y
-jdot
+jdot`jcapdot#dyadic
 L.
 L.y is the boxing level of y, 0 if unboxed
 
-lcapdot
+lcapdot`lcapdot#dyadic
 o.
 o.y is 1p1*y
 x o.y is a trigonometric function of y depending on x
-odot
+odot`odot#dyadic
 p.
 p.y converts polynomial y between coefficient and product-of-roots form
-x p.y evaluates the polynomial x and y
-pdot
+x p.y evaluates the polynomial x at value y`x p.!.f y evaluates the polynomial x at value y, but adding f to y before each power
+pdot`pdot#dyadic
 p..
 p..y is the first derivative of polynomial y
 x p..y is the integral of polynomial y, with x the integration constant
-pdotdot
+pdotdot`pdotdot#dyadic
 p:
 p:y is the yth prime number (2 is the 0th)
 x p:y is a prime-related function of y depending on x
-pco
+pco`pco#dyadic
 q:
 q:y is the prime factorization of y, in ascending order
 x q:y is the exponents of the prime factorization of y
-qco
+qco`qco#dyadic
 r.
 r.y is a complex number on the unit circle, with angle y
 x r.y is the complex number with length x and angle y
-rdot
+rdot`rdot#dyadic
 s:
 s:y creates a symbol to stand for the string y
 x s:y is a symbol-related function of y depending on x
-sco
+sco`sco#dyadic
 u:
 u:y is the Unicode character corresponding to y
 x u:y is a Unicode-conversion function of y depending on x
-uco
+uco`uco#dyadic
 x:
-x:y converts y to extended precision
+x:y converts y to extended precision`x:!.f y converts y to extended precision, with precision f used to determine fractional approximation
 x x:y is a precision-conversion function of y depending on x
-xco
+xco`xco#dyadic
 ;
 ;y is the items of the contents of y, assembled in order
-x;y boxes x (and y, if y is unboxed), and joins the boxes into a list
-semi
+x;y boxes x (and y, if y is unboxed), and joins the boxes into a list.  An atom is replicated to the shape of a result item; other short items are padded with fill.`x;!.f y boxes x (and y, if y is unboxed), and joins the boxes into a list.  An atom is replicated to the shape of a result item; other short items are padded with the fill atom f.
+semi`semi#dyadic
 ;:
 ;:y is a boxed list containing the words in the string y
 x;:y executes the sequential machine x on the data y
-semico
+semico`semico#dyadic
 {::
 {::y creates the map of y: each leaf is replaced by its path
-x{::y fetchs from y using the path x
-curlylfcoco
+x{::y fetches from y using the path x
+curlylfcoco`curlylfcoco#dyadic
 )
 
 
@@ -12929,6 +12943,33 @@ NB. Traversal up and down the tree.
 NB. The result is the DOL, up through the result of u
 traverse =: 4 : 'x traverse__actop y'
 
+NB. **** !. ****
+
+primlocale '!.'
+
+NB. Fit has very light footprint: it passes the fit-noun to u, which is responsible
+NB. for all display and inclusion into the sentence.  This is necessary since fit must be applied
+NB. directly to the verb it is set for, inside all instrumentation.  We should show the calculation of the
+NB. fit and bring it in as a right-side input, but we don't.
+create =: 3 : 0
+if. noun bwand 0 0 {:: y do.
+  failmsg 'domain error: left operand of !. must be a verb'
+  return.
+end.
+if. verb bwand 2 0 {:: y do.
+  failmsg 'domain error: right operand of !. must be a noun'
+  return.
+end.
+'uop vop' =: (<0 2;1) { y
+NB.?lintonly uop =: vop =: <'dissectverb'
+if. ((1 2 {:: y) , tokensource__vop) applyfit__uop (1 1 {:: y) , defstring__vop 3 do.
+  failmsg 'domain error: !. not supported'
+  return.
+end.
+codestroy''
+verb;uop;tokensource__uop
+)
+
 
 NB. ******* verbs with explicit support ***********
 
@@ -14234,6 +14275,10 @@ ctup = 8
 2 dissect '+: : [: 5'
 2 dissect '4 [: : * 5'
 2 dissect '1 2 + : * i. 3 3'
+'domain error: left operand of !. must be a verb' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '2!.3'
+'domain error: right operand of !. must be a noun' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '>.!.>. 5'
+'domain error: !. not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+:@+:!.0 (5)'
+2 dissect '3 {.!.4 '''''
 )
 
 testsandbox_base_ =: 3 : 0
