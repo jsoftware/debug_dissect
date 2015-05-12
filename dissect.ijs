@@ -1,6 +1,6 @@
 NB. Copyright (c) Henry H. Rich, 2012-2015.  All rights reserved.
 
-locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops fitok powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector nadverb conjunction'
+locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops fitok powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector adverb conjunction'
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
 NB. The 2 1 gives the name-table sizes: 2 1 0 0 0 ...
 NB. The dissectionlist thing is to preserve the list over reloads, for debugging.  This is also its initialization
@@ -59,6 +59,7 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
+NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
@@ -7847,8 +7848,9 @@ x ,&< coname'' NB. no v, so no change to the DOLs
 
 NB. Find explanation for verb - overriden in other locales
 lookupexplanation =: 3 : 0
+QP'execform '
 if. (#primexplains) > tx =. (0{"1 primexplains) i. <execform do.
-  LF ,~ (*#fitstring) {:: 2 $ <;._1 '`' , ((<tx,valence) {:: primexplains)
+  LF ,~ ((*@# - 2 * '!.0'&-:) fitstring) {:: 3 $ <;._1 '`' , ((<tx,valence) {:: primexplains)  NB. 0=norm 1=fit _1=exact
 else. ''
 end.
 )
@@ -7881,31 +7883,31 @@ NB. Quick descriptions of all primitives
 primexplains =: _4 ]\ <;._2 (0 : 0)
 =
 =y indicates, for each item in the nub of y, whether it matches each item of y
-x=y is 1 if the atoms x and y are tolerantly equal`x=!.f y is 1 if the atoms x and y are equal to with tolerance f
+x=y is 1 if the atoms x and y are tolerantly equal`x=!.f y is 1 if the atoms x and y are equal to with tolerance f`x=!.0 y is 1 if the atoms x and y are exactly equal
 eq`#dyadic
 <
 <y boxes y
-x<y is 1 if the atom x is tolerantly less than the atom y`x<!.f y is 1 if the atom x is less than y with tolerance f
+x<y is 1 if the atom x is tolerantly less than the atom y`x<!.f y is 1 if the atom x is less than y with tolerance f`x<!.0 y is 1 if the atom x is intolerantly less than y
 lt`lt#dyadic
 <.
-<.y is the largest integer not tolerantly exceeding y`<.!.f y is the largest integer not exceeding y by the tolerance f
+<.y is the largest integer not tolerantly exceeding y`<.!.f y is the largest integer not exceeding y by the tolerance f`<.!.0 y is the largest integer not exceeding y (using exact comparison)
 x<.y is the smaller of the atoms x and y
 ltdot`ltdot#dyadic
 <:
 <:y is y-1
-x<:y is 1 if the atom x is tolerantly less than or equal to the atom y`x<:!.f y is 1 if the atom x is less than or equal to the atom y with tolerance f
+x<:y is 1 if the atom x is tolerantly less than or equal to the atom y`x<:!.f y is 1 if the atom x is less than or equal to the atom y with tolerance f`x<:!.0 y is 1 if the atom x is less than or equal to the atom y using exact comparison
 ltco`ltco#dyadic
 >
 >y unboxes each atom of y
-x>y is 1 if the atom x is tolerantly greater than the atom y`x>y is 1 if the atom x is greater than the atom y with tolerance f
+x>y is 1 if the atom x is tolerantly greater than the atom y`x>!.f y is 1 if the atom x is greater than the atom y with tolerance f`x>!.0 y is 1 if the atom x is greater than the atom y using exact comparison
 gt`gt#dyadic
 >.
->.y is the smallest integer not tolerantly less than y`>.!.f y is the smallest integer not less than y by the tolerance f
+>.y is the smallest integer not tolerantly less than y`>.!.f y is the smallest integer not less than y by the tolerance f`>.!.0 y is the smallest integer not less than y (using exact comparison)
 x>.y is the larger of the atoms x and y
 gtdot`gtdot#dyadic
 >:
 >:y is y+1
-x>:y is 1 if the atom x is tolerantly greater than or equal to the atom y`x>:!.f y is 1 if the atom x is greater than or equal to the atom y with tolerance f
+x>:y is 1 if the atom x is tolerantly greater than or equal to the atom y`x>:!.f y is 1 if the atom x is greater than or equal to the atom y with tolerance f`x>:!.0 y is 1 if the atom x is greater than or equal to the atom y using exact comparison
 gtco`gtco#dyadic
 _:
 _:y is infinity, regardless of y
@@ -7924,7 +7926,7 @@ plusdot`plusdot#dyadic
 x+:y is the negation of x OR y
 plusco`plusco#dyadic
 *
-*y is signum(y): _1 if y<0, 0 if y tolerantly=0, 1 if y>0`*!.f y is signum(y): _1 if y<0, 0 if y is within f of 0, 1 if y>0
+*y is signum(y): _1 if y<0, 0 if y tolerantly=0, 1 if y>0`*!.f y is signum(y): _1 if y<0, 0 if y is within f of 0, 1 if y>0`*!.0 y is signum(y): _1 if y<0, 0 if y is exactly 0, 1 if y>0
 x*y is x times y
 star`star#dyadic
 *.
@@ -7941,11 +7943,11 @@ x-y is x minus y
 minus`minus#dyadic
 -.
 -.y is 1-y
-x-.y is x, with any items removed that tolerantly match cells of y`x-.!.f y is x, with any items removed that match cells of y with tolerance f
+x-.y is x, with any items removed that tolerantly match cells of y`x-.!.f y is x, with any items removed that match cells of y with tolerance f`x-.!.0 y is x, with any items removed that exactly match cells of y
 minusdot`minusdot#dyadic
 -:
 -:y is y%2
-x-:y is 1 if the arrays x and y match, in shape and values (tolerantly)`x-:!.f y is 1 if the arrays x and y match, in shape and values (with tolerance f)
+x-:y is 1 if the arrays x and y match, in shape and values (tolerantly)`x-:!.f y is 1 if the arrays x and y match, in shape and values (with tolerance f)`x-:!.0 y is 1 if the arrays x and y match exactly, in shape and values
 minusco`minusco#dyadic
 %
 %y is 1%y
@@ -7980,12 +7982,12 @@ $:y performs recursion
 x$:y performs recursion
 dollarco`collarco#dyadic
 ~.
-~.y is the tolerantly unique items of y, in their original order`~.y is the unique items of y (to tolerance f), in their original order
+~.y is the tolerantly unique items of y, in their original order`~.!.f y is the unique items of y (to tolerance f), in their original order`~.!.0 y is the unique items of y (using exact comparison), in their original order
 
 tildedot`tildedot#dyadic
 ~:
 ~:y is a Boolean for each item of y, 1 if no previous item tolerantly matches it`~:!.f y is a Boolean for each item of y, 1 if no previous item matches it to tolerance f
-x~:y is 1 if the atoms x and y are not tolerantly equal`x~:!.f y is 1 if the atoms x and y are not equal to tolerance f
+x~:y is 1 if the atoms x and y are not tolerantly equal`x~:!.f y is 1 if the atoms x and y are not equal to tolerance f`x~:!.0 y is 1 if the atoms x and y are not exactly equal
 tildeco`tildeco#dyadic
 |
 |y is the magnitude of y
@@ -8068,7 +8070,7 @@ curlyrtco`curlyrtco#dyadic
 x".y converts the string y to numeric, using x as default in case of invalid values
 quotedot`quotedot#dyadic
 ":
-":y converts y to string form using default conversions`":!.f y converts y to string form using default conversions, but accuarte to f significant digits.
+":y converts y to string form using default conversions`":!.f y converts y to string form using default conversions, but accurate to f significant digits.
 x":y converts y to string form using conversions specified by x
 quoteco`quoteco#dyadic
 ?
@@ -8088,20 +8090,20 @@ C.y converts the permutation y between direct and cycle form
 x C.y  reorders the items of y using the permtation x
 ccapdot`ccapdot#dyadic`ccapdot#permparity`ccapdot#dyadic
 e.
-e.y gives, for each opened atom of y, a list indicating which items of ;y are tolerantly in it`e.!.f y gives, for each opened atom of y, a list indicating which items of ;y are in it to tolerance f
-x e.y is 1 for each cell of x that is tolerantly an item of y, 0 for cells of x not in y`x e.!.f y is 1 for each cell of x that is an item of y to tolerance f, 0 for cells of x not in y
+e.y gives, for each opened atom of y, a list indicating which items of (;y) are tolerantly in it`e.!.f y gives, for each opened atom of y, a list indicating which items of (;y) are in it to tolerance f`e.!.0 y gives, for each opened atom of y, a list indicating which items of (;y) are in it (using exact comparison)
+x e.y is 1 for each cell of x that is tolerantly an item of y, 0 for cells of x not in y`x e.!.f y is 1 for each cell of x that is an item of y to tolerance f, 0 for cells of x not in y`x e.!.0 y is 1 for each cell of x that is an item of y using exact comparison, 0 for cells of x not in y
 edot`edot#dyadic
 E.
 
-x E.y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that tolerantly match x`x E.y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that match x to tolerance f
+x E.y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that tolerantly match x`x E.!.f y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that match x to tolerance f`x E.!.0 y a Boolean array, whose shape is the same as that of y, with 1s at the starting corners of subarrays that match x exactly
 ecapdot
 i.
 i.y is an array of consecutive natural numbers of shape y
-x i.y for each cell of y (whose rank is the rank of an item of x), the index of the first tolerantly matching item of x, or #x if there is no match`x i.!.f y for each cell of y (whose rank is the rank of an item of x), the index of the first matching item of x to tolerance f, or #x if there is no match
+x i.y for each cell of y (whose rank is the rank of an item of x), the index of the first tolerantly matching item of x, or #x if there is no match`x i.!.f y for each cell of y (whose rank is the rank of an item of x), the index of the first matching item of x to tolerance f, or #x if there is no match`x i.!.0 y for each cell of y (whose rank is the rank of an item of x), the index of the first exactly matching item of x, or #x if there is no match
 idot`idot#dyadic
 i:
 i:y equally-spaced numbers between -y and +y
-x i:y for each cell of y (whose rank is the rank of an item of x), the index of the last tolerantly matching item of x, or #x if there is no match`x i:!.f y for each cell of y (whose rank is the rank of an item of x), the index of the last matching item of x to tolerance f, or #x if there is no match
+x i:y for each cell of y (whose rank is the rank of an item of x), the index of the last tolerantly matching item of x, or #x if there is no match`x i:!.f y for each cell of y (whose rank is the rank of an item of x), the index of the last matching item of x to tolerance f, or #x if there is no match`x i:!.0 y for each cell of y (whose rank is the rank of an item of x), the index of the last exactly matching item of x, or #x if there is no match
 ico`ico#dyadic
 I.
 I.y for Boolean y, a list of the indexes of 1s
@@ -11720,7 +11722,7 @@ end.
 )
 
 exegesispartitiondesc =: 3 : 0
-'operates on partitions of y corresponding to identical items of x'
+((*@# - 2 * '!.0'&-:) fitstring) {:: 'operates on partitions of y corresponding to tolerantly identical items of x';('operates on partitions of y corresponding to items of x that are identical within the given tolerance ',2}.fitstring);'operates on partitions of y corresponding to exactly identical items of x'
 )
 
 
