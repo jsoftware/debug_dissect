@@ -64,7 +64,6 @@ NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
 NB.   similarly on dissect '(3 4 ,: 2 3) +:`*:`%:;._3 i. 10 10' which doesn't run verb
-NB. dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'  fails on selection.  Needs to support axis permutation
 NB. Add rank-calculus for primitives with known behavior
 NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
@@ -73,7 +72,7 @@ NB. support u . v y
 
 NB. display:
 NB. Unicode?
-NB. Give some indication of assignment?
+NB. Give some indication of assignment?  And support (expr) =. by executing expr and putting the result into the display.  Distinguish public & private assignment
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
@@ -7848,7 +7847,6 @@ x ,&< coname'' NB. no v, so no change to the DOLs
 
 NB. Find explanation for verb - overriden in other locales
 lookupexplanation =: 3 : 0
-QP'execform '
 if. (#primexplains) > tx =. (0{"1 primexplains) i. <execform do.
   LF ,~ ((*@# - 2 * '!.0'&-:) fitstring) {:: 3 $ <;._1 '`' , ((<tx,valence) {:: primexplains)  NB. 0=norm 1=fit _1=exact
 else. ''
@@ -8666,17 +8664,8 @@ NB. If uop is a name, we just return its token number; if a value, we return the
 )
 
 NB. Traversal up and down the tree.
-NB. x is the DOL(s) for the input operands
-NB. The input y gives the selection level and inherited state of selection, which is passed to travdowncalcselect,
-NB. where it is combined with the selector for this level to produce the selector for v and u.
-NB. We call travdowncalcselect to get the selection for this level; then we traverse v (using the
-NB. selector found here), and display v; then we traverse u using the selector found here.
-NB. When we display v, its data will display only if it collects at this level
-NB. We do not display u: we pass its display information back so that it can eventually
-NB. be displayed if it ever reaches a collector.
-NB. The result is the DOL, with everything except the result of u
 traverse =: endtraverse@:(4 : 0)
-NB. We just pass this traversal on through
+NB. Realize the v operand, and then create a block for the assigned name
 x traverse__vop y
 )
 
@@ -11756,6 +11745,9 @@ case. 1;_1;2;_2 do.
   NB. default in case of error
   NB. canonize x: convert to list of boxes; then within each box, convert atom to full list, or empty to list of one partition
   boxp =. <^:(0=L.) partitionx__xop
+  NB. empty boxes do not participate in the partitioning: we take them in full.  We need to remember their
+  NB. position for highlighting
+  partitionedaxes =: ,boxp ~: a:
   canonx =: shapeofy ((<.&# {. [) ((#^:(''-:$@])) [^:(0=#@])~ ({. 1:))&.> (<.&# {. ])) boxp
   usedyshape =: ({:@$ canonx) {. shapeofy
   if. 1 < #$canonx do.
@@ -11774,10 +11766,10 @@ case. 1;_1;2;_2 do.
     NB. partition shape doesn't match y
     ny =. FRAMETOCREATEABORT
   elseif. do.
-    NB. Get shape of result partitions.
-    ny =. +/@(0&~:)@> canonx
+    NB. Get shape of result partitions.  Nonpartitioned axes don't show up in the frame.
+    ny =. +/@(0&~:)@> partitionedaxes # canonx
   end.
-case. 3;_3 do.
+case. do.   NB. 3 or _3
   if. (3!:0 partitionx__xop) -.@e. 1 4 8 16 do. ny =. FRAMETOCREATEABORT
   elseif. (-.@-: <.) partitionx__xop do. ny =. FRAMETOCREATEABORT
   elseif. do.
@@ -11794,9 +11786,6 @@ case. 3;_3 do.
     ny =. (0 ~: 0{canonx)} 1 ,: >. (|0{canonx) %~ (| 1 { canonx) -~^:(partitionn=_3) usedyshape
     ny =. (#shapeofy) {.!.1 ny
   end.
-case. do.
-  NB.?lintonly ny =. 0
-  NB.?lintonly canonx =: usedyshape =: $0
 end.
 NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
 NB. call to u.  So make that the frame.
@@ -11846,7 +11835,12 @@ select. partitionn
 case. 0 do.
   hlit =: (usedyshape | ([ - (({"0 1 (0 ,. <:@:|))~ 0&>)~)/ canonx) +&.> (i.&.> {: canonx)
 case. 1;_1;2;_2 do.
-  hlit =: (>y) {&> (<;.partitionn i.@#)&.> canonx
+  NB. For each partitioned axis, we calculate the index list in each partition; then we select
+  NB. along each axis to create a list of boxes, one per axis, with the highlight.
+  NB. nonpartitioned axes are taken in full and produce a single box containing all indexes;
+  NB. we insert zeros into y to highlight those axes in full
+  NB.?lintonly partitionedaxes =: ,1
+  hlit =: (partitionedaxes #^:_1 >y) {&> (<;.partitionn i.@#)&.> canonx
 case. 3;_3 do.
   hlit =: usedyshape (> # ])&.> ((>y) * ({. canonx)) +&.> (i.&.> {: canonx)
 case. do.
@@ -14289,6 +14283,9 @@ ctup = 8
 2 dissect '3 {.!.4 '''''
 2 dissect '1 2 1 1 3 </.!.0 i. 5'
 2 dissect '1.00000000000001 2 1 1 3 </.!.0 i. 5'
+2 dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'
+2 dissect '(($0);1 0 1 1 0) crash9_dissect_@>:;.1 i. 4 5'
+2 dissect '(($0);1 0 1 1 0) crash9_dissect_@:(2&+);.1 i. 4 5'
 )
 
 testsandbox_base_ =: 3 : 0
