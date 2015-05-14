@@ -59,11 +59,11 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
+NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
+NB.   similarly on dissect '(3 4 ,: 2 3) +:`*:`%:;._3 i. 10 10' which doesn't run verb
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
-NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
-NB.   similarly on dissect '(3 4 ,: 2 3) +:`*:`%:;._3 i. 10 10' which doesn't run verb
 NB. Add rank-calculus for primitives with known behavior
 NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
@@ -3829,6 +3829,12 @@ LINKTEXTCOLOR =: 0 0 192
 LINKFONT =: FONTIMSG
 LINKFONTSIZE =: _2
 LINKMARGIN =: 0
+NB. for assignment
+ASSIGNCOLOR =: 40 40 40
+ASSIGNTEXTCOLOR =: 240 240 240
+ASSIGNFONT =: FONTCHAR
+ASSIGNFONTSIZE =: 0
+ASSIGNMARGIN =: 1
 
 
 NB. The shape colors/textcolors give the main data colors for the selection level
@@ -3922,6 +3928,9 @@ titlcfm =: TITLCOLOR;TITLTEXTCOLOR;TITLFONT;(modfontsize TITLFONTSIZE);TITLMARGI
 
 NB. For links
 linkcfm =: LINKCOLOR;LINKTEXTCOLOR;LINKFONT;(modfontsize LINKFONTSIZE);LINKMARGIN
+
+NB. For assignments
+assigncfm =: ASSIGNCOLOR;ASSIGNTEXTCOLOR;ASSIGNFONT;(modfontsize ASSIGNFONTSIZE);ASSIGNMARGIN
 
 NB.?lintsaveglobals
 ''
@@ -4419,23 +4428,36 @@ NB. during sniff.  This handles the case where the user makes a selection after 
 NB. no error detected at the point of error, and the enclosing conjunction shows its error.
 if. errorwasdisplayedhere +. errorlevel ~: ERRORLEVELNONE do.
   DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,EINADVERSE) i. errorcode
-elseif. do.
+else.
   DOstatusstring =: ''
 end.
 if. #DOstatusstring do.
-NB. If this failure is in a try path, parenthesize the error
+  NB. If this failure is in a try path, parenthesize the error
   if. (errorlevel ~: ERRORLEVELNONE) +. errorcode e. EFILLERROR,EINADVERSE do.
     DOstatusstring =: '(' , DOstatusstring , ')'
     DOcfmstatus =: cfmimsgs
   else.
     DOcfmstatus =: cfmstatus
   end.
-  thw =. DOcfmstatus sizetext <DOstatusstring
-else. thw =. 0 0
+  statuslast =. 0   NB. Put error line before data
+elseif. 0 = 4!:0 <'assignmentlabel' do.
+  NB. No error; check to see if this value is the source of an assignment.  If so, make the statusstring into an
+  NB. assignment line (if there is an error, the assignment must fail)
+  DOstatusstring =: assignmentlabel  NB.?lintonly =. ''
+  DOcfmstatus =: assigncfm
+  statuslast =. 1  NB. Put assignment line after data
+elseif. do.
+  statuslast =. 0  NB. immaterial
   NB.?lintonly DOcfmstatus =: cfmimsgs
 end.
+if. #DOstatusstring do.
+  thw =. DOcfmstatus sizetext <DOstatusstring
+else.
+  NB. No error string, but there is an assignment string (which will succeed, since there was no error).
+  NB. Use the status block to report the assignment - we will move it to below the data
+  thw =. 0 0
+end.
 statusdesc =. ALIGNSPREAD addalignmentrect thw
-
 NB. Create the shape/selector line if we can
 NB. The shape is the concatenation of the frames, so that in an expansion node it includes the expansion.
 NB. We also append the shape of the max result cell in the last node, to get the total shape of the result
@@ -4592,8 +4614,15 @@ NB. If data doesn't fit in the allocated area, append scrollbars as needed.  We 
 NB. bars here; the endpoints and traveler are added when the box is drawn
   hwtable =. hwtable +"1 SCROLLBARWIDTH * |."1 displayscrollbars =: hwtable <"1 extractDOLsize valueformat
   datadesc =. ALIGNCENTER addalignmentrect hwtable
-  picknames =: 'DOlabelpos DOshapepos DOstatuspos DOdatapos'
-  arects =. ,@:alignrects@:>@:((ALIGNLEFT;ALIGNCENTER)&addalignmentgroup)"_1 (namedesc , shapedesc ,: statusdesc) ,"_ _1 datadesc
+  NB. If the status block contains an assignment, move it to after the data.  Otherwise it's either empty
+  NB. or has an error indicator; leave it before the data
+  if. statuslast do.
+    picknames =: 'DOlabelpos DOshapepos DOdatapos DOstatuspos'
+    arects =. ,@:alignrects@:>@:((ALIGNLEFT;ALIGNCENTER)&addalignmentgroup)"_1 (namedesc ,: shapedesc) ,"_ _1 datadesc ,:"_1 _ statusdesc
+  else.
+    picknames =: 'DOlabelpos DOshapepos DOstatuspos DOdatapos'
+    arects =. ,@:alignrects@:>@:((ALIGNLEFT;ALIGNCENTER)&addalignmentgroup)"_1 (namedesc , shapedesc ,: statusdesc) ,"_ _1 datadesc
+  end.
 elseif. do.
   NB. No data.
   picknames =: 'DOlabelpos DOshapepos DOstatuspos'
@@ -8653,19 +8682,36 @@ initloggingtable ''
 if. uopisname do.
   auditstg '(' , (tokensvisible # uop , ' ' , cop) , (exestring__vop '') , ')'
 else.
-  auditstg '(' , (tokensvisible # '(' , (exestring__uop '') , ' )' , cop) , (exestring__vop '') , ')'
+  NB. Make sure we execute u, even if we don't see it, so we see what assignments we are missing
+  if. tokensvisible do.
+    auditstg '(' , ('(' , (exestring__uop '') , ' )' , cop) , (exestring__vop '') , ')'
+  else.
+  auditstg '(' , ('(' , (exestring__uop '') , ' ) ] ') , (exestring__vop '') , ')'
+  end.
 end.
 )
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
 NB. If uop is a name, we just return its token number; if a value, we return the locale of the noun
-((y = 3) # (utoken [^:uopisname uop),<tokensource),(vop #~ y > 1)
+if. uopisname do. (y>2 2 1) # utoken,tokensource;vop
+else. (y>1 2 1) # uop,tokensource;vop
+end.
 )
 
+MAXNAMELEN =: 30  NB. Maximum length of names for assignment
 NB. Traversal up and down the tree.
 traverse =: endtraverse@:(4 : 0)
-NB. Realize the v operand, and then create a block for the assigned name
+NB. Put the names assigned into the 'assignmentlabel' variable in the source object (v).
+NB. If there is an error, this might not be the block being displayed, but in that case
+NB. we wouldn't be showing the assignment anyway, so no big deal.  Limit the length.
+if. uopisname do. assignmentlabel__vop =: cop ,~ MAXNAMELEN ('...' ,~ {.)^:(<#) uop
+else.
+  udol =. NOLAYOUTS traverse__uop TRAVNOUN
+  NB. If noun operand failed, pull the plug and display only that result
+  if. errorcode__vop > EOK do. udol return. end.  NB. If the noun failed, this node must have failed too
+  assignmentlabel__vop =: cop ,~ MAXNAMELEN ('...' ,~ {.)^:(<#) ;:^:_1^:(0<L.) fillmask__uop frameselresult__uop selresult__uop
+end.
 x traverse__vop y
 )
 
@@ -14286,6 +14332,13 @@ ctup = 8
 2 dissect '(($0);1 0 1 1 0) +:;.1 i. 4 5'
 2 dissect '(($0);1 0 1 1 0) crash9_dissect_@>:;.1 i. 4 5'
 2 dissect '(($0);1 0 1 1 0) crash9_dissect_@:(2&+);.1 i. 4 5'
+2 dissect '(z) =: i. 3' [ z =. 'a b c'
+2 dissect '(z) =: i. 3' [ z =. ;:'a b c'
+2 dissect '(;:^:_1 z) =: i. 3' [ z =. ;:'a b c'
+2 dissect '(z) =. i. 3' [ z =. 'a b c'
+2 dissect '(z) =. a' [ z =. 'p q r' [ a =. i. 3
+2 dissect 'q =. 2 + (z) =: i. 3' [ z =. ;:'a b c'
+2 dissect 'sesquipedalianapparatchikiindeterminacy =: 5'
 )
 
 testsandbox_base_ =: 3 : 0
