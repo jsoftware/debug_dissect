@@ -59,20 +59,17 @@ config_displayshowfillcalc_dissect_ =: 1
 config_displayshowfillcalc_dissect_ =: 0
 )
 NB. TODO
-NB. dissect '5 (5 + ''a'')} i. 6'   left 5 never runs, so the verb never runs, and the error is not detected properly.  must run the verb
-NB.   similarly on dissect '(3 4 ,: 2 3) +:`*:`%:;._3 i. 10 10' which doesn't run verb
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. Add rank-calculus for primitives with known behavior
 NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
-NB. right-clicking on vbname (if tacit) should launch sandbox for that name.
+NB. right-clicking on vbname (if tacit) should launch sandbox for that name
 NB. support u . v y
 
 NB. display:
 NB. Unicode?
-NB. Give some indication of assignment?  And support (expr) =. by executing expr and putting the result into the display.  Distinguish public & private assignment
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
 NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
@@ -663,7 +660,8 @@ NB. and 'verb' for modifier executions
 
     NB. We can't deal with assignments to object locatives since we track only the part of speech, not the value, at parse time
     if. +./ elocs =. '__'&(+./@:E.)@> rname do.
-      smoutput 'Assignment to object locatives not supported: ' , ;:^:_1 elocs # rname
+      NB. We used to give a warning but that's probably doing too much
+      NB. smoutput 'Assignment to object locatives not supported: ' , ;:^:_1 elocs # rname
       rname =. (-. elocs) # rname
     end.
 
@@ -3130,7 +3128,7 @@ NB. Nilad.  We know that the current node has no selection but has valid selopsh
 NB. Result is 2 if it is OK to turn this into a rank-calculus probe, 0 if not.
 rankcalculus =: 0:
 NB. y is selopinfovalid or a selection thereof (suitable for v-types, where validity comes from the selected operands)
-NB. result is operand validity: 0 if operand shapes are invalid, 1 if valid, 2 if valid but not selected, and this should turn into a rank-calculus probe
+NB. result is selector validity, operand validity: 0 if operand shapes are invalid, 1 if valid, 2 if valid but not selected, and this should turn into a rank-calculus probe
 NB. If the operand is invalid, but shapes exist, we consult rankcalculus to see whether a rank-calculus probe can be performed, keeping the
 NB.  operand shapes but clearing the selector
 vopval =: 3 : 0
@@ -3147,7 +3145,7 @@ else.
 end.
 )
 NB. y is one or two operand locales (suitable for u-types where validity comes from results of v-types)
-NB. result is operand validity: 0 if operand shapes are invalid, 1 if valid, 2 if valid but not selected, and this should turn into a rank-calculus probe
+NB. result is selector validity,operand validity: 0 if operand shapes are invalid, 1 if valid, 2 if valid but not selected, and this should turn into a rank-calculus probe
 NB. If the operand is invalid, but shapes exist, we consult rankcalculus to see whether a rank-calculus probe can be performed, keeping the
 NB.  operand shapes but clearing the selector
 uopval =: 3 : 0
@@ -3830,8 +3828,9 @@ LINKFONT =: FONTIMSG
 LINKFONTSIZE =: _2
 LINKMARGIN =: 0
 NB. for assignment
-ASSIGNCOLOR =: 40 40 40
-ASSIGNTEXTCOLOR =: 240 240 240
+ASSIGNCOLOR =: 96 96 192
+ASSIGNCOLORERROR =: 224 0 0
+ASSIGNTEXTCOLOR =: 255 255 255
 ASSIGNFONT =: FONTCHAR
 ASSIGNFONTSIZE =: 0
 ASSIGNMARGIN =: 1
@@ -3875,7 +3874,8 @@ HIGHLIGHTCOLORS =:  <. (*    1 <. 110 % RGBTOLUMINANCE) (0 0 0 (0}) SHAPECOLORS)
 NB. Colors to use for empty, including a checkerboard
 EMPTYCOLORS =: <. (120 120 120)  *"1/ 1 1 1 ,: 0 0 0
 
-FRINGECOLOR =: (128 128 128 , 200 200 0 , 255 128 128 ,: 255 255 255) ;"1 (0 0 0 1)   NB. color/border of fringes: in order label,shape,status,data
+FRINGECOLOR =: _3 <\ 128 128 128    200 200 0    255 128 128   255 255 255   0 0 0  NB. color(RGB) of fringes: in order label,shape,status,data,assignment
+FRINGEBORDER =: 5 $ <0 0 0 1   NB. border of fringes: RGB,width
 
 DOBORDERCOLORS =: _3 ]\ 0 0 255 0 0 255  0 0 0  255 0 0   NB. Black border for box, but red if incomplete, blue if empty
 RANKCOLOR =: 0 0 255  NB. color of dashed line for high-rank ops
@@ -4351,6 +4351,7 @@ origshape;rcextents,subDOLs
 NB.?lintsaveglobals
 )
 
+MAXNAMELEN =: 30  NB. Maximum length of names for assignment
 NB. create the display object for a verb/noun: header + result
 NB. y is color/font/margin info:
 NB.  (info for label);(info for shape);(info for status line);(info for data)
@@ -4394,6 +4395,7 @@ NB. string; no ranks
   else. namedesc =. 0 addalignmentrect 0 0
   end.
 else.
+  assert. *#displaylevrank
 NB. table; contains string;locale;rank[;rank].
 NB. Remove lines with no display symbol
   nonemptylevrank =. (#~   ('';DLRCOMPEND) -.@:e.~ {."1) displaylevrank
@@ -4441,14 +4443,20 @@ if. #DOstatusstring do.
   end.
   statuslast =. 0   NB. Put error line before data
 elseif. 0 = 4!:0 <'assignmentlabel' do.
-  NB. No error; check to see if this value is the source of an assignment.  If so, make the statusstring into an
-  NB. assignment line (if there is an error, the assignment must fail)
-  DOstatusstring =: assignmentlabel  NB.?lintonly =. ''
+  NB.?lintonly assignmentlabel =. ''
+  NB. No error, and this value is the source of an assignment.  If so, make the statusstring into an
+  NB. assignment line (if there is an error, the assignment must fail).  Enforce maximum display size
+  DOstatusstring =: (_2 {. assignmentlabel) ,~ MAXNAMELEN ('...' ,~ {.)^:(<#) _2 }. assignmentlabel
   DOcfmstatus =: assigncfm
+  NB. If there was an error, make the background red
+  if. ' ' = {. assignmentlabel do.
+    DOcfmstatus =: (<ASSIGNCOLORERROR) 0} DOcfmstatus
+    DOstatusstring =: }. DOstatusstring
+  end.
   statuslast =. 1  NB. Put assignment line after data
 elseif. do.
   statuslast =. 0  NB. immaterial
-  NB.?lintonly DOcfmstatus =: cfmimsgs
+  DOcfmstatus =: cfmimsgs
 end.
 if. #DOstatusstring do.
   thw =. DOcfmstatus sizetext <DOstatusstring
@@ -4587,7 +4595,7 @@ QP^:DEBDOL'defstring]0 >coname'''' shapetouse sellevel DOshapes selections resul
 NB. Early error is special: it formats the status above the verb, it aborts traversal,
 NB. and it suppresses the display of data.  Go ahead and
 NB. handle that here.
-'DOlabelpos DOshapepos DOstatuspos DOdatapos displayscrollbars' =: <,:0  NB. make sure all names defined
+'DOlabelpos DOshapepos DOstatuspos DOdatapos DOassignpos displayscrollbars' =: <,:0  NB. make sure all names defined
 if. errorcode e. EEARLYERROR do.
   NB. Create rectangles for status and verb, and stack them, expanding the status line if needed
   NB. No data on early error
@@ -4617,7 +4625,7 @@ NB. bars here; the endpoints and traveler are added when the box is drawn
   NB. If the status block contains an assignment, move it to after the data.  Otherwise it's either empty
   NB. or has an error indicator; leave it before the data
   if. statuslast do.
-    picknames =: 'DOlabelpos DOshapepos DOdatapos DOstatuspos'
+    picknames =: 'DOlabelpos DOshapepos DOdatapos DOassignpos'
     arects =. ,@:alignrects@:>@:((ALIGNLEFT;ALIGNCENTER)&addalignmentgroup)"_1 (namedesc ,: shapedesc) ,"_ _1 datadesc ,:"_1 _ statusdesc
   else.
     picknames =: 'DOlabelpos DOshapepos DOstatuspos DOdatapos'
@@ -4691,7 +4699,7 @@ NB. Force the scrollpoint to 0 in any dimension that doesn't have a scrollbar.  
 NB. a scrolled display and the user enlarges the max datasize; then the scrollbar would be removed with data not
 NB. on the screen
 scrollpoints =: displayscrollbars * scrollpoints
-NB.?lintonly 'DOlabelpos DOshapepos DOstatuspos DOdatapos' =: <2 2 $ 0
+NB.?lintonly 'DOlabelpos DOshapepos DOstatuspos DOdatapos DOassignpos' =: <2 2 $ 0
 NB.?lintonly 'DOranks DOranklevels DOshapes DOshapehasfill' =: ($0);($0);(0$a:);0
 NB.?lintonly 'DOlabelpospickrects DOranklocales' =: (1 0 2 2$0);(0$a:)
 NB.?lintonly 'DOshapepospickrects DOshapelocales' =: (1 0 2 2$0);(0$a:)
@@ -5380,7 +5388,7 @@ drawDOvnall =: 3 : 0
 a: drawDOvnall y
 :
 if. #y do. DOyx =: (#DOsize) {. y ,: EXPLORERYX end.
-drawDOvn"1 x { (>:*#winhwnd) {. ((#DOsize) {. (winhwnd__COCREATOR;winhwnd),.(0;1),.(1<#DOsize);0) ,. |: <"_1@> DOyx;DOsize;DOlabelpos;DOshapepos;DOstatuspos;DOdatapos;displayscrollbars;pickrects;scrollpoints
+drawDOvn"1 x { (>:*#winhwnd) {. ((#DOsize) {. (winhwnd__COCREATOR;winhwnd),.(0;1),.(1<#DOsize);0) ,. |: <"_1@> DOyx;DOsize;DOlabelpos;DOshapepos;DOstatuspos;DOdatapos;DOassignpos;displayscrollbars;pickrects;scrollpoints
 )
 
 NB. y is info for the surface we are drawing (position, size, etc)
@@ -5394,7 +5402,7 @@ NB.  for shape and data, we have a table which we will index by selector.
 NB. Result is pick window (yx,:hw) for the DO
 drawDOvn =: 3 : 0
 NB. These local variables cover the global names inside this routine (kludge).  hwindex is the window number we are displaying
-'hwnd hwindex explorable DOyx DOsize DOlabelpos DOshapepos DOstatuspos DOdatapos displayscrollbars pickrects scrollpoint' =. y
+'hwnd hwindex explorable DOyx DOsize DOlabelpos DOshapepos DOstatuspos DOdatapos DOassignpos displayscrollbars pickrects scrollpoint' =. y
 wd 'psel ' , hwnd
 glsel 'dissectisi'
 'cfmlabel cfmshape cfmstatus cfmimsgs' =. DOcfm
@@ -5406,11 +5414,11 @@ glclipreset''
 glclip 0 0 1 1 + , |."1 DOyx ,: DOsize
 
 NB. See which elements are present
-'labelpresent shapepresent statuspresent datapresent' =. (i. 4) e. presentx =. (;: 'DOlabelpos DOshapepos DOstatuspos DOdatapos') i. picknames
+'labelpresent shapepresent statuspresent datapresent assignpresent' =. (i. #FRINGECOLOR) e. presentx =. (;: 'DOlabelpos DOshapepos DOstatuspos DOdatapos DOassignpos') i. picknames
 
 NB. Draw covering rectangles for each component - filling out to the full width of the box
 if. #presentx do.
-  ((<presentx;0) { FRINGECOLOR) drawrect"0 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
+  (presentx { (0 { DOcfmstatus) 2 4} FRINGECOLOR) drawrect"0 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
 end.
 
 NB. Draw the verb/name string, if any
@@ -5438,11 +5446,13 @@ NB. Draw the result-cell shape, the last column of the first row
   ({: DOshapecfm) drawtext (<0 _1) { shapeseltext
 end.
 
-NB. draw the status string, if any
+NB. draw the status/assignment string, if any
 if. statuspresent do.
   DOcfmstatus drawtext DOstatusstring;actyx2 + DOstatuspos
   NB. If we put out an error message, remember that fact so we keep stealth disabled
   if. '(' ~: {.!.'(' DOstatusstring do. needtocheckerrordisplayed__COCREATOR =: 0 end. 
+elseif. assignpresent do.
+  DOcfmstatus drawtext DOstatusstring;actyx2 + DOassignpos
 end.
 
 
@@ -5539,14 +5549,19 @@ NB. vertical
     QP^:DEBDOL 'scrolltravelers '
   end.
   
+  NB. Save some status info for tooltips
+  'DOdataisboxed DOdatashape' =: ((32 = 3!:0) ; $) dispvalue
+else.
+  'DOdataisboxed DOdatashape' =: 0 0
 end.
+
 
 NB. *** reset clip rect ***
 glclipreset''
 
-NB. Draw border rectangles for each component - filling out to the full width of the box
+NB. Draw rectangles (border only) for each component - filling out to the full width of the box
 if. #presentx do.
-  ((<'') ,. (<presentx;1) { FRINGECOLOR) drawrect"1 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
+  ((<'') ,. presentx { FRINGEBORDER) drawrect"1 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
 end.
 
 NB. Draw a hollow rectangle for the object, just to get the border line.  Color is used to show (no data,NA,all drawn,explorable)
@@ -6548,6 +6563,94 @@ This block is part of an execution on a cell of fills started in another block. 
 hoverDOstatuspos =: 4 : 0
 origemsg =. (<<<0 _1)&{^:('('={.) DOstatusstring
 reflowtoscreensize ((1 {"1 errorlookup) , <'') {::~ (0 {"1 errorlookup) i. <origemsg 
+)
+
+hoverDOassignpos =: 4 : 0
+NB. Get the target names.  If there are names that were totally left out of the display, they show up as a trailing '+'
+NB. (which will be a word by itself).  A name that was cut off shows as '...'
+names =. ;: _2 }. assignmentlabel  NB.?lintonly =. 'a b c'
+NB. See which ones are locatives
+locatives =. '_' (('__' (+./@:E.) ]) +. (={:) *. 1 < +/@:=)&> names
+NB. See if there were too many names to fit
+omittednames =. '.' e. _2 }. DOstatusstring
+NB. get type of assignment
+public =. ':' = {: DOstatusstring
+if. ' ' = {. assignmentlabel do.
+  NB. The assignment failed.  Try to figure out why
+  if. (1 < #names) *. (#names) ~: {.!.(#names) DOdatashape do.
+    NB. length error
+    text =. 'The number of names being assigned does not match the number of items in the value.'
+  elseif. public do.
+    NB. public assignment.  Might be to privately-assigned name
+    if. 1 = #names do.
+      NB. simple assignment
+      if. {. locatives do.
+        text =. 'The assignment failed.  Perhaps the locale is invalid.'
+      else.
+        text =. 'The assignment failed.  It is illegal to make a public assignment to a name that has been privately assigned in the same verb.'
+      end.
+    else.
+      if. *./ locatives do.
+        text =. 'The assignment failed.  Perhaps one of the locales is invalid.'
+      elseif. +./ locatives do.
+        text =. 'The assignment failed.  One of the locales may be invalid, or you may have attempted to make a public assignment to a name that has been privately assigned in the same verb.'
+      elseif. do.
+        text =. 'The assignment failed.  It is illegal to make a public assignment to a name that has been privately assigned in the same verb.'
+      end.
+    end.
+  elseif. do.
+    if. +./ locatives do.
+      text =. 'The assignment failed.  Check the validity of the locales.'
+    else.
+      text =. 'The assignment failed.'
+    end.
+  end.
+else.
+  if. 1 < #names do.
+    if. '' -: DOdatashape do.
+      text =. 'The value in this block is assigned to each of the names shown.'
+    else.
+      text =. 'The value in this block is assigned to the names shown, one item to each name.'
+    end.
+    if. DOdataisboxed do.
+      text =. text , '  One level of boxing is removed.'
+    end.
+    if. omittednames do.
+      text =. text , '  There are more names assigned than would fit into the display.'
+    end.
+  else.
+    if. omittednames do.
+      text =. 'The value in this block is assigned.  The name is too long to fit into the display.'
+    else.
+      text =. 'The value in this block is assigned to the name shown.'
+    end.
+  end.
+  if. public do.
+    if. 1 < #names do.
+      text =. text , '  The names are assigned publicly and can be used outside of the verb they are assigned in.'
+    else.
+      text =. text , '  The name is assigned publicly and can be used outside of the verb it is assigned in.'
+    end.
+  else.
+    select. 0 1 e. locatives
+    case. 1 0 do.   NB. all simple names
+      if. 1 < #names do.
+        text =. text , '  The names are assigned privately and can be used only in the verb they are assigned in.'
+      else.
+        text =. text , '  The name is assigned privately and can be used only in the verb it is assigned in.'
+      end.
+    case. 0 1 do.   NB. All locatives
+      if. 1 < #names do.
+        text =. text , '  Because the names are locatives, they is assigned publicly in their locales and can be used outside of the verb they are assigned in.'
+      else.
+        text =. text , '  Because the name is a locative, it is assigned publicly in its locale and can be used outside of the verb it is assigned in.'
+      end.
+    case. do.   NB. Must be a mixture
+      text =. text , '  The locatives are assigned publicly in their locales; the simple names are assigned privately and can be used only in the verb they are assigned in.'
+    end.
+  end.
+end.
+reflowtoscreensize text,LF
 )
 
 hoverDOdatapostutorial =: 0 : 0
@@ -8337,6 +8440,8 @@ if. recursionhere =: recursionencountered__COCREATOR do.
   NB. If there is a recursion inside this execution, insert a recursion point
   uop =: 'dissectrecursionpoint' 1 createmodifier uop,yop,xop
 end.
+NB. Clear the flag that is set if the x argument starts execution
+dyadxstarted =: 0
 NB.?lintonly uop =: <'dissectrecursionpoint'
 noun;(coname'');''
 NB.?lintsaveglobals
@@ -8351,7 +8456,7 @@ NB. return string form of operands, including instrumentation
 NB. y is ignored - always 0 1 1
 exestring =: 3 : 0
 initloggingtable ''
-auditstg '(' , (logstring '') , '(' , (exestring__xop '') , ') ' , (exestring__uop '') , ' (' , (exestring__yop '') , '))'
+auditstg '(' , (logstring '') , '(' , (exestring__xop '') , '[ dyadxstarted_',(>coname''),'_ =: 1) ' , (exestring__uop '') , ' (' , (exestring__yop '') , '))'
 )
 
 NB. Return the locales for propsel
@@ -8375,7 +8480,11 @@ traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs h
 ylayo =. x traverse__yop TRAVNOUN
 if. errorcode__yop > EOK do. ylayo return. end.  NB. If an argument failed, this node will have failed also
 xlayo =. x traverse__xop TRAVNOUN
-if. errorcode__xop > EOK do. xlayo return. end.
+NB. Same for x - but don't detect failure on x unless it actually started: u might have an error
+NB. in an interior noun which would abort u before x ever got a chance to run.
+NB.  BUT: it is vital that we NOT try to run u if there was an error in y.  In that case, u will never
+NB. have executed at all, not even to the point of having ranks; and trying to display it will fail.
+if. dyadxstarted *. (errorcode__xop > EOK) do. xlayo return. end.
 NB. put this locale on the stack as the outermost monad/dyad execution
 executingmonaddyad__COCREATOR =: executingmonaddyad__COCREATOR ,~ coname''
 if. hasrecursiveexpansion =: 1 = #ures =. (xlayo ,&(joinlayoutsl`<@.recursionhere) ylayo) traverse__uop travops TRAVOPSSTARTHEAVY;TRAVOPSPHYSNEW;(uopval xop,yop);<selresultshape__xop ,&< selresultshape__yop do.
@@ -8680,13 +8789,13 @@ NB. y is ignored - always 0 1 1
 exestring =: 3 : 0
 initloggingtable ''
 if. uopisname do.
-  auditstg '(' , (tokensvisible # uop , ' ' , cop) , (exestring__vop '') , ')'
+  auditstg '(' , (logstring'') , (tokensvisible # uop , ' ' , cop) , (exestring__vop '') , ')'
 else.
   NB. Make sure we execute u, even if we don't see it, so we see what assignments we are missing
   if. tokensvisible do.
-    auditstg '(' , ('(' , (exestring__uop '') , ' )' , cop) , (exestring__vop '') , ')'
+    auditstg '(' , (logstring'') , ('(' , (exestring__uop '') , ' )' , cop) , (exestring__vop '') , ')'
   else.
-  auditstg '(' , ('(' , (exestring__uop '') , ' ) ] ') , (exestring__vop '') , ')'
+  auditstg '(' , (logstring'') , ('(' , (exestring__uop '') , ' ) ] ') , (exestring__vop '') , ')'
   end.
 end.
 )
@@ -8699,20 +8808,31 @@ else. (y>1 2 1) # uop,tokensource;vop
 end.
 )
 
-MAXNAMELEN =: 30  NB. Maximum length of names for assignment
 NB. Traversal up and down the tree.
 traverse =: endtraverse@:(4 : 0)
-NB. Put the names assigned into the 'assignmentlabel' variable in the source object (v).
-NB. If there is an error, this might not be the block being displayed, but in that case
-NB. we wouldn't be showing the assignment anyway, so no big deal.  Limit the length.
-if. uopisname do. assignmentlabel__vop =: cop ,~ MAXNAMELEN ('...' ,~ {.)^:(<#) uop
-else.
-  udol =. NOLAYOUTS traverse__uop TRAVNOUN
-  NB. If noun operand failed, pull the plug and display only that result
-  if. errorcode__vop > EOK do. udol return. end.  NB. If the noun failed, this node must have failed too
-  assignmentlabel__vop =: cop ,~ MAXNAMELEN ('...' ,~ {.)^:(<#) ;:^:_1^:(0<L.) fillmask__uop frameselresult__uop selresult__uop
+res =. x traverse__vop y
+NB. We have to transfer the result code from v to this node, so that an error in v will stop monad/dyad
+NB. traversal.
+if. (errorcode =: errorcode__vop) <: EOK do.
+  NB. Put the names assigned into the 'assignmentlabel' variable in the source object (v).
+  NB. If there is an error, this might not be the block being displayed, but in that case
+  NB. we wouldn't be showing the assignment anyway, so no big deal.  Limit the length.
+  if. uopisname do. assignmentlabel__vop =: cop ,~ uop
+  else.
+    udol =. NOLAYOUTS traverse__uop TRAVNOUN
+    NB. If noun operand failed, pull the plug and display only that result
+    if. errorcode__vop > EOK do. udol return. end.  NB. If the noun failed, this node must have failed too
+    assignmentlabel__vop =: cop ,~ ;:^:_1^:(0<L.) fillmask__uop frameselresult__uop selresult__uop
+  end.
+  NB. See if the assignment failed.  (it might fail on a length error, or domain error if a name had been
+  NB. assigned locally already).  If the assignment failed, raise an error code here.  Leave the error code
+  NB. is the source block cleared, so that the error is picked up in the assignment block.
+  if. 0 = #logvalues do.
+    errorcode =: ENOEXECD   NB. Indicate this didn't run
+    assignmentlabel__vop =: ' ' , assignmentlabel__vop  NB. Add leading space to indicate error
+  end.
 end.
-x traverse__vop y
+res
 )
 
 
@@ -14333,12 +14453,26 @@ ctup = 8
 2 dissect '(($0);1 0 1 1 0) crash9_dissect_@>:;.1 i. 4 5'
 2 dissect '(($0);1 0 1 1 0) crash9_dissect_@:(2&+);.1 i. 4 5'
 2 dissect '(z) =: i. 3' [ z =. 'a b c'
-2 dissect '(z) =: i. 3' [ z =. ;:'a b c'
-2 dissect '(;:^:_1 z) =: i. 3' [ z =. ;:'a b c'
+2 dissect 'n_loc_ =. i. 3'
+2 dissect '''n_loc_ n'' =. i. 3'
+2 dissect 'nn =. i. 3'
+2 dissect 'n =: i. 3'
+2 dissect '(z) =: 3' [ z =. ;:'a b__ c'
+2 dissect '(;:^:_1 z) =. <"0 i. 3' [ z =. ;:'a b__ c'
 2 dissect '(z) =. i. 3' [ z =. 'a b c'
 2 dissect '(z) =. a' [ z =. 'p q r' [ a =. i. 3
-2 dissect 'q =. 2 + (z) =: i. 3' [ z =. ;:'a b c'
+2 dissect 'q =. 2 + (z) =: i. 3' [ z =. ;:'a b c' [ a =. '5'
+2 dissect 'q =. 2 + (z) =. i. 3' [ z =. ;:'a b c' [ a =. '5'
 2 dissect 'sesquipedalianapparatchikiindeterminacy =: 5'
+2 dissect '''sesquipedalianapparatchikiindeterminacy extra'' =: 5'
+2 dissect '2 + d =. '' '' + 5'
+2 dissect '2 + ''d e'' =. ,5'
+3 : '2 dissect ''z =: 5'' [ z =. 3' ''
+3 : '2 dissect ''''''z zz'''' =: 5'' [ z =. 3' ''
+3 : '2 dissect ''z__ =: 5'' [ z =. 3' ''  NB. ok
+3 : '2 dissect ''''''z z__'''' =: 5'' [ z =. 3' ''
+2 dissect 'name__loc =: 5' [ loc =: 'abc'
+2 dissect '''a name__loc'' =: 5' [ loc =: 'abc'
 )
 
 testsandbox_base_ =: 3 : 0
