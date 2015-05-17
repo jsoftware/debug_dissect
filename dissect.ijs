@@ -57,13 +57,15 @@ displaycompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
 config_displayshowfillcalc_dissect_ =: 0
+config_displaystealth_dissect_ =: 1
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+config_displaystealth_dissect_ =: 0
 )
 NB. TODO
+NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
-NB. reconsider how to display nilad fully based on switch
 NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
 NB. Add rank-calculus for primitives with known behavior
-NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. right-clicking on vbname (if tacit) should launch sandbox for that name
 NB. support u . v y
@@ -938,9 +940,9 @@ menupopz;
 menupop "Display precision for floats";
 rem prec;
 menupopz;
-menu fmshowstealth "Show ][ and 0-9:";
+menu fmshowstealth "Show ][ 0-9:";
 menu fmshowcompmods "Show full compound-names";
-menu fmshowstructmods "Show @ @: etc";
+menu fmshowstructmods "Show @ @: hook fork etc";
 menu fmautoexpand2 "Show u/ on 2 items as dyad";
 menu fmshowfillcalc "Show when argument with empty frame is replaced by a cell of fills";
 menupopz;
@@ -999,7 +1001,7 @@ rem prec;
 menupopz;
 menu fmshowstealth "Show ][ and 0-9:";
 menu fmshowcompmods "Show full compound-names";
-menu fmshowstructmods "Show @ @: etc";
+menu fmshowstructmods "Show @ @: hook fork etc";
 menu fmautoexpand2 "Show u/ on 2 items as dyad";
 menu fmshowfillcalc "Show when argument with empty frame is replaced by a cell of fills";
 menupopz;
@@ -1275,7 +1277,7 @@ NB. through the tree for that exec
 executingmonaddyad =: 0$a:
 NB. Initialize the traversal stats: we use these to decide what options to offer the user
 maxactualnounsize =: 0 0  NB. The number of pixels needed to show all nouns in their entirety
-stealthopencountered =: 0   NB. Set if there is a stealth op on the display
+stealthopencountered =: 0   NB. Set if there is a stealth op or nilad on the display
 NOLAYOUTS traverse__resultroot TRAVNOUN
 NB.?lintsaveglobals
 )
@@ -1345,18 +1347,15 @@ NB. give the user the option of changing the display size
   enablesz =. '01' {~ actualpctused >:"0 1 |.!.0 MAXNOUNPCTCHOICES  NB. Prepend 0 so that 9 eg will enable 10
   (0 { enablesz) (wdsetenable~   'fmmaxnounsizey' , ":)"0 MAXNOUNPCTCHOICES
   (1 { enablesz) (wdsetenable~   'fmmaxnounsizex' , ":)"0 MAXNOUNPCTCHOICES
-NB. If there are stealth operands on the display, enable the button and caption it
+NB. If there are stealth/nilad operands on the display, enable the button and caption it
 NB. according to whether we are displaying them
-  if. stealthopencountered do.
   'fmshowstealth' wdsetenable ": stealthopencountered
-  end.
+
   'fmshowcompmods' wdsetvalue ": displaycompmods
   'fmshowstructmods' wdsetvalue ": displaystructmods
   'fmautoexpand2' wdsetvalue ": displayautoexpand2
   'fmshowfillcalc' wdsetvalue ": displayshowfillcalc
   'fmshowstealth' wdsetvalue ": displaystealth
-  
-NB. stealthopencountered =: 0   NB. Set if there is a stealth op on the display
   
   NB. Restore the user's environment before returing to immediate mode
   restoreJenvirons''
@@ -1663,7 +1662,9 @@ NB. common routines used by the object locales.  Objects are subclasses of disse
 cocurrent 'dissectobj'
 coinsert 'dissect'
 
-NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+NB. Return 1 if children should display their nilad inputs.  y indicates whether this node displays
+NB. nilad inputs.  This is 1 if we think this node may have less than infinite rank; 0 if infinite (no
+NB. need to force nilad display then)
 shownilad =: 0:    NB. normally not
 
 EMPTYPRH =: 3 0$a:
@@ -7897,7 +7898,8 @@ proplocales =: 3 : 0
 NB. Set globals, then initialize display for the noun.  There must be no DOLs, and we
 NB. return no U dols
 traverse =: endtraverse@:(4 : 0)
-assert. 0 = #x [ 'Noun must have no layouts'
+NB. Normally a noun will have no layouts BUT in the case of m"_ when display is turned on,
+NB. m will be given inputs
 traversedowncalcselect y  NB. To set globals, including selresult
 'displaylevrank nounhasdetail' =: varname;0
 x ,&< coname''  NB. Return the empty DOLs
@@ -8938,9 +8940,10 @@ coname''
 NB.?lintsaveglobals
 )
 
-NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+NB. 1 if this verb may not have infinite rank, or if this node displays already
 shownilad =: 3 : 0
-NB. For @, treat it like @>, which is like "0, always displaying NB. for @:, pass y on through
+NB. For @, treat it like @>, which is like "0, always displaying
+NB. for @:, pass y on through
 y +. -. ':' e. cop
 )
 
@@ -9148,8 +9151,10 @@ NB. We always get both operands for v, since we have cloned vop0/vop1 (it's not 
 NB.?lintsaveglobals
 )
 
+NB. 1 if this verb may not have infinite rank, or if this node displays already
 shownilad =: 3 : 0
-NB. For @, treat it like @>, which is like "0, always displaying NB. for @:, pass y on through
+NB. For &, treat it like &>, which is like "0, always displaying
+NB. for &:, pass y on through
 y +. -. ':' e. cop
 )
 
@@ -9490,7 +9495,7 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 NB. Handle m"nv as a general verb, except when it's m"_ which we handle as a nilad
 if. noun bwand (<0 0) {:: y do.
   if. _ -: ". ". 'op__vop' do.
-    nilad =: 1
+    nilad =: 1  NB. Mark nilads as allowing display
   else.
     changeobjtypeto localedefault
     create y
@@ -9531,8 +9536,8 @@ coname''
 NB.?lintsaveglobals
 )
 
-NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
-shownilad =: 1:    NB. always display (the nilad case was taken as special)
+NB. 1 if this verb may not have infinite rank, or if this node displays already
+shownilad =: 1:   NB. assuming " will be followed by not _
 
 NB. return string form of operands, not including instrumentation
 NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
@@ -9570,11 +9575,11 @@ NB. for u"n, resolve n internally.  It will not display, but we need a result fo
 if. vtype bwand noun do. NOLAYOUTS traverse__vop TRAVNOUN end.
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
-NB. If this is m"_, all we can do is display m, regradless of whether shownilad is set: there are in
-NB. general no input handles on m.
 if. nilad do.
+  stealthopencountered__COCREATOR =: 1  NB. Note that we saw a nilad
   NB. Traverse the noun, but keep sellevel in order so highlights are calculated correctly
-  0 inheritu NOLAYOUTS traverse__uop bnsellevel 0} TRAVNOUN
+  NB. Remove the input if we should not display them
+  0 inheritu (x #~ dispniladinputs +. displaystealth) traverse__uop bnsellevel 0} TRAVNOUN
   NB. This returned a noun result, which may have a character value for the name in displaylevrank.  So we inherit it
   NB. into m"_, which in inheritu converts it to a verb for subsequent inheritance.  This turns the noun into a niladic verb.
 else.
@@ -11179,7 +11184,8 @@ resultissdt =: resultissdt__uop
 coname''
 NB.?lintsaveglobals
 )
-NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+
+NB. 1 if this verb may not have infinite rank, or if this node displays already
 shownilad =: ]
 
 NB. return string form of operands, not including instrumentation
@@ -13201,6 +13207,7 @@ NB. Set globals, then initialize display for the verb
 traverse =: endtraverse@:(4 : 0)
 assert. 1 2 e.~ #x
 traversedowncalcselect y  NB. Just to set error globals
+stealthopencountered__COCREATOR =: 1  NB. Note that we saw a nilad
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 if. -. dispniladinputs +. displaystealth do.
   NB. we are not displaying the inputs.  Remove inputs to x
@@ -13532,7 +13539,8 @@ if. IFQT do. nuvocpage =: 'ampdot#each' end.
 coname''
 NB.?lintsaveglobals
 )
-NB. Return 1 if nilad should have its inputs displayed.  y is 1 if the parent displayed its nilads.
+
+NB. 1 if this verb may not have infinite rank, or if this node displays already
 shownilad =: 0:    NB. like "0
 
 NB. return string form of operands, not including instrumentation
@@ -14376,6 +14384,7 @@ ctup = 8
 2 dissect '2:"0 i. 5'
 2 dissect '(2:"0 * +:) i. 5'
 2 dissect '(2: * +:)"0 i. 5'
+2 dissect '1 2 3 4 5 (2: * >.)"0 i. 5'
 2 dissect '2"_ i. 5'
 2 dissect '2"_"0 i. 5'
 2 dissect '(2"_"0 * +:) i. 5'
@@ -14386,9 +14395,11 @@ ctup = 8
 2 dissect '((5 * 7)"_ * +:)"0 i. 5'
 2 dissect '2 vb i. 5' [ *(vb =. "_) 4
 2 dissect 'z"_"0 i. 5' [ z =. 6
+2 dissect 'z"_ i. 5' [ z =. 6
 2 dissect '(i. - +:@{.) 10 5'
 2 dissect '+:^:z 5' [ z =. 1
 2 dissect '0:^:z 5' [ z =. 1
+2 dissect '0:^:z 5' [ z =. 0
 2 dissect '0:"0^:z 5' [ z =. 1
 2 dissect '0:"0^:z 555555' [ z =. 1
 2 dissect '+:`*:/. i. 3 3'
