@@ -62,13 +62,13 @@ config_displaystealth_dissect_ =: 1
 config_displaystealth_dissect_ =: 0
 )
 NB. TODO
-NB. Give more-detailed error info during hover?, like what in the frame didn't agree, or where error in m} was
-NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
-NB. have a locale for verb primitives like m} 0: and eventually {:: and {, to hold operationfailed etc.
-NB. Add rank-calculus for primitives with known behavior
-NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. right-clicking on vbname (if tacit) should launch sandbox for that name
+NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
+NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
+NB. support {::
+NB. support {
+NB. Add rank-calculus for primitives with known behavior?
 
 NB. display:
 NB. Unicode?
@@ -395,10 +395,10 @@ NB. This makes sure we leave the user in his original state always
 restoreJenvirons =: 3 : 0   NB. called AFTER removing instance from the list
 9!:39 Jenvirons
 if. (0 = #a: -.~ {."1 dissectionlist_dissect_) *. (ALLOWNONQTTOOLTIP *. -. IFQT) do.
-  if. (<'sys_timer_dissect_') -: 5!:1 <'sys_timer_z_' do.
+  if. 3 = 4!:0 <'sys_timer_z_' do. if. (<'sys_timer_dissect_') -: 5!:1 <'sys_timer_z_' do.
     NB. If we created a timer, remove it
     4!:55 <'sys_timer_z_'
-  end.
+  end. end.
 end.
 0 0$0 
 )
@@ -2347,9 +2347,13 @@ NB. Verb.  Get the frames of the verb and check for agreement error.
   NB. Clear the selector to short-circuit further processing
   -.@-:/ (<.&#&>/ {.&> ]) 2 {. execdframes,<$0 do.  NB. No agreement error on monad
     NB. Here for verb with agreement error.
+    NB. Remember the locale of the agreement error.  If we come here multiple times, that's OK; only the
+    NB. last one will be the actual failure
+    agreeerrorlocale__COCREATOR =: coname''
     'errorcode selector selopinfovalid selresult arglevel resultlevel frames selframe frame' =: ENOAGREE;(0$0);(0:"0 physreqandhighlights);(0$a:);($0);($0);execdframes;execdframe;execdframe
   elseif. a: -: 'selframe frame frames resultlevel arglevel' =: selopshapes calcdispframe execdframes do.
     NB. Partitioning verbs can detect agreement on infinite-rank operands eg.  (1 ]/. 2 3)
+    agreeerrorlocale__COCREATOR =: coname''
     'errorcode selector selopinfovalid selresult' =: ENOAGREE;(0$0);(0:"0 physreqandhighlights);<(0$a:)
   elseif.
 NB. No agreement error.  Calculate the frames that we will use
@@ -2437,7 +2441,7 @@ NB. See if all the cells executed
 NB. Cells did not execute.  If the selector is the one we found when sniffing errors, the error is in this cell.
 NB. Mark this cell as an execution error.  But if the selector is different, there is no permanent error here: either the user
 NB. changed the selector to a later cell which didn't execute anything, or we have determined that this cell
-NB. was partially-executed because of an error elsewhere, and there's no error here.  In those case, we mark
+NB. was partially-executed because of an error elsewhere, and there's no error here.  In those cases, we mark
 NB. the cell as partially-executed, with no error
         if. operationfailed'' do. 
           NB. See if incomplete operation represents failure.  It does for a verb, but not for something like u@v.  In general
@@ -6464,11 +6468,26 @@ end.
 tt
 )
 
+erroragree =: 3 : 0
+NB.?lintonly agreeerrorlocale =. <'dissectverb'
+text =. 'This dyadic verb has x and y operands that cannot be matched up cell-for-cell:',CR
+text =. text , (defstring__agreeerrorlocale 0),LF
+text =. text , 'The verb has left rank of ' , (": lr =. 0{vranks__agreeerrorlocale), '; the left-argument shape is ' , (": ls =. $^:(0<L.)@> {. inputselopshapes__agreeerrorlocale),LF
+text =. text , 'The verb has right rank of ' , (": rr =. 1{vranks__agreeerrorlocale), '; the right-argument shape is ' , (": rs =. $^:(0<L.)@> {: inputselopshapes__agreeerrorlocale),LF
+text =. text , 'The left frame is ' , (": lf =. (-lr) }. ls),LF
+text =. text , 'The right frame is ' , (": rf =. (-rr) }. rs),LF
+if. lf =&# rf do.
+  text =. text , 'The frames must match.'
+else.
+  text =. text , 'The frames must be identical, or one of the frames must be a prefix of the other.'
+end.
+text , '  This error is reported as a ''length error'' in the J session.',LF
+)
+
+NB. If the error is a single word, it is the name of a verb that will analyze the error
 errorlookup =: (LF&taketo ; LF&takeafter);._1 (0 : 0)
 ?agreement
-This dyadic verb has x and y operands that cannot be matched up cell-for-cell.  Look through the rank stack to see where the error occurs.
-
-This error is reported as a 'length error' in the J session.
+erroragree
 ?framing
 The verb completed correctly on each cell, but the result-cells are of different types and cannot be assembled into a single result.
 
@@ -6563,7 +6582,10 @@ This block is part of an execution on a cell of fills started in another block. 
 
 hoverDOstatuspos =: 4 : 0
 origemsg =. (<<<0 _1)&{^:('('={.) DOstatusstring
-reflowtoscreensize ((1 {"1 errorlookup) , <'') {::~ (0 {"1 errorlookup) i. <origemsg 
+if. ' ' -.@e. vnm =. LF taketo msgtext =. ((1 {"1 errorlookup) , <' ') {::~ (0 {"1 errorlookup) i. <origemsg do.
+  msgtext =. vnm~ ''
+end.
+reflowtoscreensize msgtext
 )
 
 hoverDOassignpos =: 4 : 0
