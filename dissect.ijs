@@ -67,7 +67,6 @@ NB. fit value needs to be evaluated in its locale to get the value right (needed
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
 NB. support {::
-NB. support {
 NB. Add rank-calculus for primitives with known behavior?
 
 NB. display:
@@ -1815,7 +1814,7 @@ NB.?lintsaveglobals
 ''
 )
 
-NB. add to log.  Always called in the locale of the parse object.  x, if given, is the values log intot he secondary area logvaluesd
+NB. add to log.  Always called in the locale of the parse object.  x, if given, is the values log into the secondary area logvaluesd
 NB. y is the value to log; it becomes the result
 addlog =: 3 : 0
 NB.?lintmsgsoff
@@ -2489,10 +2488,10 @@ NB. Thus, we have to skip the selection when the frame is empty
 NB. We also ignore a forced selection (ex: u/ when y has 2 items), which shows up as an empty selector.  We leave the selector, so that
 NB. we get predictable sellevels, but it is known not to be needed (i. e. it is created only when we have seen that the current
 NB. selection is forced, on a previous traversal).  If we get a change of selection this gets reexamined.
-    'seltype thissel' =. getselection rawselx  NB. classify the type of selection.  Selections not normally needed (recursion uses them)
+    'seltype thissel' =. getselection rawselx  NB. classify the type of selection.  Selections not normally needed (recursion uses them, as does {)
     QP^:DEBTRAVDOWN'seltype thissel sellevel selections '
     select. seltype  NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only, 4=autoselect of node with no frame,
-                     NB. 5=removal of forced selection
+                     NB. 5=removal of forced selection 6=node like { that always selects even if no frame
     case. 2 do.
       NB. Forced selection: if this is the first time we see it, perform the forced selection, propagating it to lower nodes
       if. unforcedselection'' do. makeselection , thissel end.
@@ -2536,7 +2535,7 @@ NB. based on frame, so we suppress lower analysis
       NB. Whether we keep the highlight or not, honor the change-of-valence it represents, by replicating the old highlight as needed
       physreqandhighlights =: physreqandhighlights ($&.|.~ #) newp
       QP^:DEBHLIGHT'ishighlightnode '
-      if. ishighlightnode do.
+      if. ishighlightnode +. seltype=6 do.
         physreqandhighlights =: physreqandhighlights ,"1&.> ,&(<sellevel)&.> newp
         QP^:DEBHLIGHT'physreqandhighlights '
       end.
@@ -4812,7 +4811,7 @@ NB.
 NB. Each 1{::y is a sequence of boxes: each box contains an array of boxed ISFs, where each list corresponds to one selection
 NB. If the selector contains an array,
 NB. each list describes one selected cell (obviously all such cells have the same rank) and the shape with respect to lists
-NB. gives the shape of the selected group of cells, which may become important fs subsequent selectors select from the group.
+NB. gives the shape of the selected group of cells, which may become important if subsequent selectors select from the group.
 NB.
 NB. We go through the sequence, appending each new selection to the previous one, leaving a sequence of increasingly long
 NB. ISFs.  The interesting part comes when one of the selections has rank >1 (example: u/.).  When this is first
@@ -12348,7 +12347,7 @@ proplocales =: 3 : 0
 )
 
 NB. y is rawselx
-NB. result is selx to use, whic ich just y.  But we hook this to select from logvaluesd
+NB. result is selx to use, which just y.  But we hook this to select from logvaluesd
 calcdispselx =: 3 : 0
 selvaluesd =: y { logvaluesd
 y
@@ -12638,7 +12637,7 @@ elseif. #inputselopshapes do.
     NB. selector out of bounds.  leave as index error
     errorloc =: ($mval) #: 1 i.~ emsk
   end. 
-  NB. We have run the gsuntlet, and have set errorloc if there is an error
+  NB. We have run the gauntlet, and have set errorloc if there is an error
 
   NB. If there was a selection, calculate the highlight for the selection part
   if. selectable *. sellevel < #selections do.
@@ -13238,6 +13237,81 @@ end.
 displaylevrank =: rankhistory
 x ,&< coname'' NB. no v, so no change to the DOLs
 )
+
+NB. **** { ****
+
+'dissectverb' primlocale '{'
+
+setvalence =: 3 : 0
+if. 1 = #y do. changeobjtypeto 'dissectverb' end.
+setvalence_dissectverb_ f. y
+)
+
+exestring =: 3 : 0
+NB. init for logging
+initloggingtable 1
+NB. Instrument the forward verb - bivalent
+auditstg '(' ,  , '(<@[ ' , (logstring'') , (verblogstring '') , '{)"0 _)'
+NB.?lintonly 'logvalues logticket' =: (1$a:);$0
+NB.?lintsaveglobals
+)
+
+NB. y is rawselx
+NB. result is selx to use, which just y.  But we hook this to select from logvaluesd
+calcdispselx =: 3 : 0
+selvaluesd =: y { logvaluesd
+y
+NB.?lintsaveglobals
+)
+
+NB. Nilad.  Result is the selection for this node:  type;selection where type=
+NB. 0=no selection, 1=normal selection, 2=forced selection, 3=pick-only
+getselection =: 3 : 0
+NB. We ALWAYS show the highlights for this verb, even if there is no selection
+if. selectable *. (sellevel < #selections) do. 1 ;< sellevel { selections
+elseif. 0 e. $^:(0<L.) 0 {:: selopshapes do. 0 0  NB. If empty x, don't highlight
+elseif. selectable do. 0 0  NB. If selectable but not selected, don't presume to select
+elseif. #selvaluesd do. 6 0   NB. otherwise, must be singleton: autoselect it to show the selection, since user can't click it.  But only if we executed
+elseif. do. 0 0
+end.
+)
+
+NB. The only thing special here is the highlighting.  
+calcphysandhighlights =: 3 : 0
+assert. valence = #frames
+NB. Get shape of y operand
+yshape =. $^:(0<L.) 1 {:: selopshapes
+sval =. >y
+selector =. sval {:: selvaluesd
+bsel =. ({.@> isfensureselection isftorank2 y) <@({.~ #)&.> frames
+NB. Create ISF for the left operand - just the chosen atom.  But if there is no frame, we highlight wrong if we try to highlight the atom,
+NB.  so suppress the highlight then
+if. 0 = #>{.frames do. lsel =. (< 2 0$a:) else. lsel =. <<,sval end.
+rsel =. (< 2 0$a:)
+NB. Create ISF for the right operand - the selected values for each axis
+NB. We have to audit for validity, and perform no selection if invalid
+if. 0 = L. selector do. selector =. <"0 selector end.  NB. bring up to boxing level 1
+if. *./ 2 > #@$@> selector do.  NB. Level-1 selectors must be atom or list
+  if. 3 >: L. selector do.  NB. No box with more than 3 levels
+    if. *./ ((0=L.) +. '' -: $)@> > selector do.  NB. complementary selectors are atomic
+      if. (#>selector) <: #yshape do.   NB. No extra axes
+        selector =. <"0^:(0=L.) > selector  NB. Remove outer boxing; bring up to level 1
+        selector =. (#yshape) {.!.(<<'') selector  NB. add complementary empty axes to end of shape
+        if. *./ (((] , -~) i.)&.> yshape) (*./@:e.~ ,@:>)&> selector do.  NB. all indexes valid
+          selector =. yshape |L:0"0 selector  NB. switch all indexes to positive
+          selector =. yshape ((i.@[ -. >@])^:(1=L.@]))&.> selector  NB. Convert complementary indexes
+          NB. Create the selector: a single selector, containing (two levels down) a list of boxes, one per axis,
+          NB. with each box containing an atomic box of alternatives
+          rsel =. < < <@,&.> selector
+        end.
+      end.
+    end.
+  end.
+end.
+<@(2 1&$)"0 lsel,rsel
+)
+
+
 
 NB. **** default ****
 localedefault_dissect_ =: primlocale ''
@@ -14506,6 +14580,17 @@ ctup = 8
 3 : '2 dissect ''''''z z__'''' =: 5'' [ z =. 3' ''
 2 dissect 'name__loc =: 5' [ loc =: 'abc'
 2 dissect '''a name__loc'' =: 5' [ loc =: 'abc'
+2 dissect '0 2 4 { i. 7 8'
+2 dissect '(0;1;2) { i. 7 8'
+2 dissect '(0 3;1 4;2 2) { i. 7 8'
+2 dissect '(0 3;1 4;<3 2;2 4) { i. 7 8'
+2 dissect '1 0 { i. 2 3 4 5'
+2 dissect '(3;<a:;2) { i. 4 5'
+2 dissect '(<a:;2) { i. 4 5'
+2 dissect 'a: { i. 4 5'
+2 dissect '($0) { i. 4 5'
+2 dissect '2 {"1 i. 4 5'
+2 dissect '3 2 {"1 i. 4 5'
 )
 
 testsandbox_base_ =: 3 : 0
