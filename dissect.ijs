@@ -3774,6 +3774,9 @@ NB. FONTIMSG - Font for easy readability - tooltips, error messages
 '"Courier"' ; '"Lucida Console"' ; '"Arial"'    NB. Mec version
 '"Courier New"' ; '"Lucida Console"' ; '"Arial"'    NB. Version for all others
 )
+NB. y is string, result is string with characters translated for display.  We do this
+NB. to make the J boxing characters visible
+dataxlate =: ((1 22 2 25 16 23 3 21 4 5 6 { a.) (16+i. 11)} a.) {~ a. i. ]
 
 NB. for the verb-name cell
 VERBCOLOR =: 114 30 30
@@ -4330,7 +4333,7 @@ elseif. do.
     extentsyx =. charcts { lookuptbl
   else.
     NB. for variable-pitch font, use this
-    extentsyx =. |."1 glqextent@(":!.displayprecision)"0 value
+    extentsyx =. |."1 glqextent@dataxlate@(":!.displayprecision)"0 value
   end.
   hw =. (+/ 2 2 ($,) (<0 2) {:: fontdesc) +"1 extentsyx
 end.
@@ -5686,7 +5689,7 @@ if. -. a: e. onscreenbdys =. onscreenmskext #&.> yxpositions do.
      if. emptydata do.
        (emptycfm rectcolorfromfillmask (<:#emptycfm) colorlimitsellevel sel) drawrect"0 2 rects
      else.
-       (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) (# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
+       (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) dataxlate@(# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
      end.
   end.
   
