@@ -6962,6 +6962,8 @@ NB. is called when the timer expires: we then see where the cursor is and call t
 NB. y is the mouse position yx.  Start/continue a hover timer, clearing an old one if the mouse has moved
 MAXHOVERMOVEMENT =: 6 8   NB. Allow this much movement from start-of-hover position, depending on button status
 'HOVEROFFSETY HOVEROFFSETX' =: _8 5  NB. amount to offset tooltip from the hover
+CURSORYSIZE =: 20  NB. Our estimate of cursor size
+CURSORXSIZE =: 10
 
 NB. This is called in whichever locale and psel of whatever form is active - the main or an explorer.
 NB. The timer will run in the main form
@@ -7080,11 +7082,22 @@ NB. Copy the pixels we are about to overwrite
 'ctly ctlx' =. 3 2 { 0 ". wdqchildxywh 'dissectisi'
 'hovery hoverx' =. cpos
 'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;(ttfontsizex { TOOLTIPFONTSIZECHOICES);TOOLTIPMARGIN;'') sizetext <string  NB. kludge
-NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset.
-NB. Get desired top position; if it's off the top of the screen, switch to below the hover
-if. 0 > ttipy =. HOVEROFFSETY + hovery - ttiph do. ttipy =. hovery - HOVEROFFSETY end.
+NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset, above the cursor
+NB. Get desired top position; if it's off the top of the screen, switch to the right of the hover
+ttipx =. hoverx
+if. 0 > ttipy =. HOVEROFFSETY + hovery - ttiph do.
+  NB. default too high: try to position to the right of the cursor
+  ttipy =. hovery
+  ttipx =. ttipx + HOVEROFFSETX >. CURSORXSIZE
+end.
+NB. If that's too far right, we back the x onto the screen (adn then right if offscreen), and drop the y to below the cursor
 NB. Get desired left position, but if that goes offscreen right, move left; then if offscreen left, move right
-ttipx =. 0 >. (+   0 <. ctlx - ttipw + ]) hoverx + HOVEROFFSETX
+if. ctlx < ttipx + ttipw do.
+  ttipx =. 0 >. ctlx - ttipw  NB. back x onto the screen
+  NB. If we were trying the right of the cursor position, it dodn't work, drop below cursor
+  if. ttipy = hovery do. ttipy =. hovery + CURSORYSIZE end.
+end.
+
 NB. That's the topleft of the tooltip.  Now calculate the rectangle that we will use to save the pixels
 NB. We have to save an extra pixel all the way around (seeming glrect error), and we have to make sure
 NB. that the rectangle is all onscreen, else QT will crash
@@ -8906,10 +8919,11 @@ NB. Nilad.  Executed at setvalence time.  Inserts the monad/dyad locale and its 
 NB. of the current object, depending on the valence.
 NB. Path becomes 'moddyad';'mod';dyad attribute locales;obj etc.
 separatevalences =: 3 : 0
-NB. Since the current object cannot be a clone (it comes from u/ or the like),
-NB. It is safe to assume that the top of the search path is the current modifier name
-newtype =. ((valence=2) { 'monad';'dyad') ,~&.> oldtype =. {. oldpath =. 18!:2 loc =. coname''
-((/: =&(<,'z')) ~. newtype , (18!:2 newtype) , }. oldpath) 18!:2 loc
+NB. The current object may be a clone, if it comes from dyad &; so we search to find the type locale,
+NB. and preserve everything before it as a prefix 
+oldpreflen =. i.&0@:e.&'0123456789' {.@> oldpath =. 18!:2 loc =. coname''
+newtype =. ((valence=2) { 'monad';'dyad') ,~&.> oldpreflen { oldpath
+((/: =&(<,'z')) ~. (oldpreflen {. oldpath) , newtype , (18!:2 newtype) , (>: oldpreflen) }. oldpath) 18!:2 loc
 ''
 )
 
@@ -14594,6 +14608,8 @@ ctup = 8
 2 dissect '($0) { i. 4 5'
 2 dissect '2 {"1 i. 4 5'
 2 dissect '3 2 {"1 i. 4 5'
+2 dissect '(''[]'' -&(+/\)/@:(=/) ])''[[]][]'''
+2 dissect '1 2 =&(+/) 1 2 3 4 5 6'
 )
 
 testsandbox_base_ =: 3 : 0
