@@ -914,8 +914,8 @@ NB. The tooltip size will be selected according to detail and expanded according
 TOOLTIPMINISISIZE =: 200 300,300 500,:900 600
 MINIMUMISISIZE =: 300 500     NB. minimum size for graphics, needed to allow room for tooltip
 
-TOOLTIPMAXPIXELS =: 450  NB. Max width of tooltip, in pixels
-TOOLTIPMAXFRAC =: 0.8  NB. Max tooltip width, as frac of isigraph width
+TOOLTIPMAXPIXELS =: 900  NB. Max width of tooltip, in pixels
+TOOLTIPMAXFRAC =: 0.6  NB. Max tooltip width, as frac of isigraph width
 
 TOOLTIPDELAYCHOICES =: ('immed';'250';'500';'1000') ,. ('immediate';'0.25 sec';'0.5 sec';'1 sec') ,. <"0 (1 250 500 1000)
 TOOLTIPDETAILCHOICES =: ('0';'1';'2') ,. ('laconic';'verbose';'tutorial') ,. <"0 (0 1 2)
