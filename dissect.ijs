@@ -207,7 +207,7 @@ dissectinstance =: 0$a:
 
 defstring =: 'start of traversal'"_   NB. for debugging only
 
-NB. Handle apwcial inputa: 0=last errpr. 1=clipboard, others pass through unchanged
+NB. Handle special inputs: 0=last error, 1=clipboard, others pass through unchanged (numeric 2 will be a quiet return)
 getsentence =: (' ' takeafter LF (i:~ }. ]) [: }:^:(LF={:) (13!:12)@(''"_))`(LF (>:@i:~ }. ]) LF , [: }:^:(LF={:) CR -.~ [: wd 'clippaste'"_)`]@.((0;1) i. <)
 
 NB. Maximum line length that we will try to display in a grid cell
@@ -221,13 +221,21 @@ NB.?lintonly  WinText_jqtide_ =: WinSelect_jqtide_ =: 0 0
 NB. y tells what kind of run: 0=line under cursor, 1=last error, 2=clipboard
 select. y
 case. 0 do.
-  ft =. WinText_jqtide_
+  NB. fs is a character index; if window contains non-ASCII, convert to unicode
+  ft =. 7 u: WinText_jqtide_
   fs =. WinSelect_jqtide_
   NB. If a single value is selected, take the whole line; otherwise the selected region
   if. 1 < # ~. fs do.
-    (-~/\ fs) (];.0~ ,.)~ ft 
+    sentence =. 8 u: (-~/\ fs) (];.0~ ,.)~ ft 
   else.
-    (LF taketo&.|. ({.fs) {. ft) , LF taketo ({.fs) }. ft
+    sentence =. 8 u: (LF taketo&.|. ({.fs) {. ft) , LF taketo ({.fs) }. ft
+  end.
+  NB. If user selected all blanks, give a message and use a sentence of 2 to create quiet return from parse
+  if. sentence +./@:~: ' ' do.
+    sentence
+  else.
+    smoutput 'nothing to dissect'
+    2  NB. this will cause quiet return from parse
   end.
 case. 1 do.
   0  NB. 0 means 'last error'
@@ -529,6 +537,8 @@ NB. bit 3 is 'debug', reserved for future use
 parsemain =: 3 : 0   NB. runs in object locale
 defnames =. }. y  NB. table of names
 'options loc sentence' =. {. y
+NB. The numeric atom 2 is used by finddissectline to create a quiet return of an empty string
+if. 2 -: sentence do. '' return. end.
 if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
   failmsg 'The sentence to be dissected must be a string.' return. 
 end.
