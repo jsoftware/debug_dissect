@@ -216,7 +216,7 @@ MAXSENTENCEWIDTH =: 0.5  NB. max frac of screenwidth that we allow for sentence 
 ifdefined =: 0 <: [: 4!:0 <
 
 NB. ******************* code for function keys ******************
-finddissectline =: 3 : 0
+finddissectline =: (3 : 0) :. (smoutput^:(*@# *. 2 = 3!:0))
 NB.?lintonly  WinText_jqtide_ =: WinSelect_jqtide_ =: 0 0
 NB. y tells what kind of run: 0=line under cursor, 1=last error, 2=clipboard
 select. y
@@ -228,7 +228,30 @@ case. 0 do.
   if. 1 < # ~. fs do.
     sentence =. 8 u: (-~/\ fs) (];.0~ ,.)~ ft 
   else.
-    sentence =. 8 u: (LF taketo&.|. ({.fs) {. ft) , LF taketo ({.fs) }. ft
+    NB. Select sentence - but find the part between control words
+    pref =. 8 u: (LF taketo&.|. ({.fs) {. ft)   NB. The line before the cursor, in UTF-8
+    line =. pref , 8 u: LF taketo ({.fs) }. ft  NB. The whole line
+    words =. ;: line  NB. convert to words
+    NB. For each word, calc number of nonblanks from begin line to end of word
+    wordnb =. +/\ +/@:~:&' '@> words
+    prefnb =. +/@:~:&' ' pref   NB. number of nonblanks in prefix
+    NB. Get mask of control words
+    cwx =. words I.@:e. ,&'.'&.> controlwords
+    NB. Get the index of the control-word containing the cursor: the frets are the beginning of each cw,
+    NB. so that cursor before the first char of a cw indicates the previous cw
+    currcwx =. (cwx { 0 , wordnb) I. prefnb
+    NB. Get #nonblanks before the beginning of the cursor cw.  We have a list of starting nb counts, prepending 0 for start of line
+    bgnnb =. currcwx { 0 , cwx { wordnb
+    NB. Get #nonblanks to the end of the cursor cw.  0,wordnb is a list of ENDING nb counts; we add one for the end-of-line
+    endnb =. currcwx { (cwx { 0 , wordnb) , {: wordnb
+    if. bgnnb < endnb do.
+      NB. Convert nonblank counts to char counts by indexing the user's nonblanks
+      NB. This indexes the beginning char & the end char
+      be =. (+/\@:~:&' ' line) i. (>:bgnnb),endnb
+      NB. Extract from beginning to before end+1
+      sentence =. line (];.0~ ,.) -~/\ 0 1 + be
+    else. sentence =. ''  NB. No nonblanks in selected region
+    end.
   end.
   NB. If user selected all blanks, give a message and use a sentence of 2 to create quiet return from parse
   if. sentence +./@:~: ' ' do.
@@ -525,7 +548,8 @@ NB. inparms is the environment:
 NB.  table of local variables (name;type from 4!:0;ranks if verb)
 NB. the first line of the table is special: it's options;locale;sentence to execute
 NB. giving the locale in which the verb will execute
-NB. Result is the string form of the instrumented sentence, ready to execute
+NB. Result is the boxed string form of the instrumented sentence, ready to execute;
+NB.  or a string containing an error message.  If result is a string, processing ceases
 NB. As a side effect, many objects are created indicating the parse structure
 NB. In paticular, resultroot is the boxed locale of the sentence result.
 NB. If there is an error, resultroot is empty
