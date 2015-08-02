@@ -120,6 +120,9 @@ require 'strings gl2'
 cocurrent 'dissect'
 coinsert 'jgl2'
 
+NB. The address of the jsoftware wiki
+JWIKIURL =: 'http:/www.jsoftware.com/jwiki/'
+
 NB. lines beginning config_ are names that are initialized in the instance from the globals here
 NB. the others are global, shared amond running dissections
 CONFIG =: 0 : 0
@@ -238,7 +241,7 @@ case. 0 do.
     NB. Get mask of control words
     cwx =. words I.@:e. ,&'.'&.> controlwords
     NB. Get the index of the control-word containing the cursor: the frets are the beginning of each cw,
-    NB. so that cursor before the first char of a cw indicates the previous cw
+    NB. so that cursor just before the first char of a cw indicates the previous cw; cursor in cw means following sentence
     currcwx =. (cwx { 0 , wordnb) I. prefnb
     NB. Get #nonblanks before the beginning of the cursor cw.  We have a list of starting nb counts, prepending 0 for start of line
     bgnnb =. currcwx { 0 , cwx { wordnb
@@ -579,9 +582,11 @@ NB. Break the input into words.  If there is an error, fail.  Discard any commen
 NB. Discard anything past the first LF, and remove CR
 sentence =. CR -.~ ({.~ i.&LF) sentence
 try. queue =. ;: sentence catch. queue =. 0$a: end.
+NB. If the last word is a comment, delete it
 if. #queue do.  NB. following fails on no words
 NB. Get mask of words to discard: discard leading control words, or anything starting with a control word after a non-control
   dischdtl =. (*./\ ,: [: +./\ 0 , (2) </\ ]) iscw queue
+  if. (('.:' -.@-:~ {:) *. 'NB.' -: }:) 4 {. > {: queue do. dischdtl =. 1 (<1 _1)} dischdtl end.
   NB. Get the sentence in the form the user gave it, by deleting the nonblank characters corresponding
   NB. to the discarded words.
   ndiscardshdtl =. dischdtl (#@(-.&' ')@;@#)"1 queue
@@ -1568,14 +1573,14 @@ dissect_fmlab_button '~addons/labs/labs/debug/dissect2.ijt'
 
 dissect_fmwikidissect_button =: 3 : 0
 NB.?lintonly browse_j_ =. 3 : 'y'
-browse_j_ 'http://www.jsoftware.com/jwiki/Vocabulary/Dissect'
+browse_j_ JWIKIURL,'Vocabulary/Dissect'
 0 0$0
 )
 dissect_f1_fkey =: dissect_fmwikidissect_button
 
 dissect_fmwikinuvoc_button =: 3 : 0
 NB.?lintonly browse_j_ =. 3 : 'y'
-browse_j_ 'http://www.jsoftware.com/jwiki/NuVoc'
+browse_j_ JWIKIURL,'NuVoc'
 0 0$0
 )
 dissect_f1shift_fkey =: dissect_fmwikinuvoc_button
@@ -6347,7 +6352,7 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
     NB.?lintonly labelloc =. <'dissectobj'
     if. #nuvocpage__labelloc do.
       NB.?lintonly browse_j_ =. 3 : 'y'
-      browse_j_ 'http://www.jsoftware.com/jwiki/Vocabulary/' , nuvocpage__labelloc
+      browse_j_ JWIKIURL,'Vocabulary/' , nuvocpage__labelloc
     else.
       msgtext =. 'No NuVoc available'
     end.
@@ -14644,6 +14649,7 @@ ctup = 8
 2 dissect '3 2 {"1 i. 4 5'
 2 dissect '(''[]'' -&(+/\)/@:(=/) ])''[[]][]'''
 2 dissect '1 2 =&(+/) 1 2 3 4 5 6'
+2 dissect '3 + 5 NB. comment'
 )
 
 testsandbox_base_ =: 3 : 0
