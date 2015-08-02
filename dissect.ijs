@@ -14649,7 +14649,7 @@ ctup = 8
 2 dissect '3 2 {"1 i. 4 5'
 2 dissect '(''[]'' -&(+/\)/@:(=/) ])''[[]][]'''
 2 dissect '1 2 =&(+/) 1 2 3 4 5 6'
-2 dissect '3 + 5 NB. comment'
+2 dissect '3 + 5 N','B. comment'
 )
 
 testsandbox_base_ =: 3 : 0
