@@ -1459,7 +1459,6 @@ dissect_dissectisi_paint 1
 )
 NB. Toggle the state of structmod display
 dissect_fmshowstructmods_button =: 3 : 0
-QP'displaystructmods displaystructmods_dissect_ '
 'fmshowstructmods' wdsetvalue ": displaystructmods_dissect_ =: -. displaystructmods
 dissect_dissectisi_paint 1
 )
