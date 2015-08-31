@@ -121,7 +121,7 @@ cocurrent 'dissect'
 coinsert 'jgl2'
 
 NB. The address of the jsoftware wiki
-JWIKIURL =: 'http:/www.jsoftware.com/jwiki/'
+JWIKIURL =: 'http://www.jsoftware.com/jwiki/'
 
 NB. lines beginning config_ are names that are initialized in the instance from the globals here
 NB. the others are global, shared amond running dissections
@@ -1459,6 +1459,7 @@ dissect_dissectisi_paint 1
 )
 NB. Toggle the state of structmod display
 dissect_fmshowstructmods_button =: 3 : 0
+QP'displaystructmods displaystructmods_dissect_ '
 'fmshowstructmods' wdsetvalue ": displaystructmods_dissect_ =: -. displaystructmods
 dissect_dissectisi_paint 1
 )
