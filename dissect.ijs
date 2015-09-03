@@ -13805,7 +13805,7 @@ pas 0 0;
 )
 HELP =: 0 : 0 [^:IFQT HELP
 pc help;
-minwh winsize;cc helptext edith readonly;
+minwh winsize;cc helptext edith;set helptext edit 0;
 pas 0 0;
 )
 
