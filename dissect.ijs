@@ -1583,7 +1583,7 @@ try.
   NB. Run our lab - will give message of not found
   lab_jlab_ y
 catch.
-  wdinfo 'Labs Addon Required',DEL,'To get the J Labs, use Package Manager and select labs/labs'
+  wdinfo 'Labs Addon Required';'To get the J Labs, use Package Manager and select labs/labs'
 end.
 0 0$0
 )
@@ -13805,7 +13805,7 @@ pas 0 0;
 )
 HELP =: 0 : 0 [^:IFQT HELP
 pc help;
-minwh winsize;cc helptext edith;set helptext edit 0;
+minwh winsize;cc helptext edith;set helptext edit 0;set helptext wh _1 _1;
 pas 0 0;
 )
 
@@ -13816,7 +13816,9 @@ if. #hwndp do.
   wd 'psel ' , hwndp
   wdsetfocus 'helptext'
 else.
-  wd HELP rplc 'winsize';helpsize
+  NB. Limit starting wh to 80% of screen
+  wd HELP rplc 'winsize';": helpsize <. <. 0.8 * 2 3 { ". wd 'qscreen'
+
   hwndp =: wd 'qhwndp'
   wd 'pn *' , helptitle
   'helptext' wdsettext helptext
@@ -13837,7 +13839,7 @@ cocurrent 'dissecthelplearning'
 coinsert 'dissecthelp'
 hwndp =: ''
 helptitle =: 'Learning Dissect'
-helpsize =: IFQT {:: '200 200';'300 400'
+helpsize =: IFQT {:: 200 200;300 400
 helptext =: htmltoplain^:(-.IFQT) 0 : 0
 <strong>Dissect</strong> displays each verb-execution in a <strong>block</strong> so that you can see its result.  The flow of execution goes generally from top to bottom, with the final result at the bottom of the display.
 <p>
@@ -13865,7 +13867,7 @@ cocurrent 'dissecthelpusing'
 coinsert 'dissecthelp'
 hwndp =: ''
 helptitle =: 'Using Dissect'
-helpsize =: IFQT {:: '400 600';'600 800'
+helpsize =: IFQT {:: 400 600;600 800
 helptext =: htmltoplain^:(-.IFQT) 0 : 0
 <h1>Flow of execution</h1>
 Inputs come in at the top of a block, the output comes out of the bottom.  Execution flows generally from top to bottom.  For blocks such as u^:v and m@.v that have a control input, the control input comes from the right.
