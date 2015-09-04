@@ -1362,9 +1362,9 @@ dissect_dissectisi_paint =: 3 : 0
 NB. To avoid an error loop, terminate quietly if there is an error
 try.
   NB. Establish local J environment.  The user's environment was saved when we started
-NB. if we need to refigure the placement because of a change like selection or a display parameter, do so.
+  NB. if we need to refigure the placement because of a change like selection or a display parameter, do so.
   if. 1 = {. y do. placeddrawing =: calcplacement screensize end.
-NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
+  NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
   QP^:DEBTIME'startdraw=?6!:1'''' '
   drawplacement }. sizedrawingandform 0
   NB. If we didn't put out the error message, show stealth and try again
@@ -1377,17 +1377,19 @@ NB. Draw the revised placement and wiring.  Save the placement to speed scrollin
   end.
   glpaint''
   
-NB. Set the user-option buttons based on the display results
-NB. If the largest noun on the display is bigger than our smallest display option,
-NB. give the user the option of changing the display size
+  NB. Set the user-option buttons based on the display results
+  NB. If the largest noun on the display is bigger than our smallest display option,
+  NB. give the user the option of changing the display size
   actualpctused =. >. 100 * maxactualnounsize % screensize
   NB. Disable all choices that are two notches above the actual max size
   enablesz =. '01' {~ actualpctused >:"0 1 |.!.0 MAXNOUNPCTCHOICES  NB. Prepend 0 so that 9 eg will enable 10
   (0 { enablesz) (wdsetenable~   'fmmaxnounsizey' , ":)"0 MAXNOUNPCTCHOICES
   (1 { enablesz) (wdsetenable~   'fmmaxnounsizex' , ":)"0 MAXNOUNPCTCHOICES
-NB. If there are stealth/nilad operands on the display, enable the button and caption it
-NB. according to whether we are displaying them
-  'fmshowstealth' wdsetenable ": stealthopencountered
+  NB. If there are stealth/nilad operands on the display, enable the button and caption it
+  NB. according to whether we are displaying them.  Enable the button if
+  NB. (we are suppressing stealth and we suppressed something) or
+  NB. (we are allowing stealth, which might be a config default)
+  'fmshowstealth' wdsetenable ": displaystealth +. stealthopencountered
 
   'fmshowcompmods' wdsetvalue ": displaycompmods
   'fmshowstructmods' wdsetvalue ": displaystructmods
@@ -2935,7 +2937,7 @@ NB.?lintonly loc =. <'dissectobj'
 SM^:DEBINHU 'inheritu: in ' , (>coname'') , ' ' , defstring 0
 QP^:DEBINHU'$floc >loc defstring__loc]0 edisp'''' edisp__loc'''' >selector selresult '
 QP^:DEBINHU'$fillmask fillmask fillmask__loc selresult selresult__loc selectable sellevel selections resultlevel resultlevel__loc '
-QP^:DEBINHU'displaylevrank__loc '
+QP^:DEBINHU'displaylevrank__loc copystealth dispstealthoperand '
 QP^:DEBDOL2'physreqandhighlights physreqandhighlights__loc '
 NB. The display information is always inherited from the last u, which creates it.
 NB. The only time we wouldn't inherit is if the error is detected before the last u, example 1.5 u/ y which
@@ -5064,9 +5066,9 @@ if. #right do.
 NB. Install highlights
   addselecttoDOL&>/"1 right
 end.
-NB. If this node is a stealth operand, whether displayed or not, remember the fact so we can give the user the option of showing it
+NB. If this node is a suppressed stealth operand, remember the fact so we can give the user the option of showing it
 assert. stealthoperand__loc e. 0 1 2 4 5 6
-if. stealthoperand__loc e. 1 2 do. stealthopencountered__COCREATOR =: 1 end.
+if. dispstealthoperand__loc e. 1 2 do. stealthopencountered__COCREATOR =: 1 end.
 NB. If stealth verb, there is no display; but because of inheritance and suppressed detail, we might have the stealthoperand flag
 NB. set in a locale that is creating a noun; we'd better create that.  We detect nouns, as usual, by absence of handles in
 if. (dispstealthoperand__loc e. 1 2 5 6) *. (*#dol) do.
@@ -8074,7 +8076,7 @@ traversedowncalcselect y  NB. Just to set error globals
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. If no vranks, this verb must have failed to execute owing to upstream error.  Leave no levrank then
 displaylevrank =: rankhistory
-NB. Pass the DOLs through, but mark a stealthoperand for removal by deleting the layout locale
+NB. Pass the DOLs through, but mark a dyadic stealthoperand for removal by deleting the layout locale
 if. (valence = 2) *. dispstealthoperand e. 1 2 5 6 do.
   x =. a: (<0 ,~ <:3 bwand dispstealthoperand)} x
 end.
@@ -9687,7 +9689,8 @@ if. nilad do.
   NB. into m"_, which in inheritu converts it to a verb for subsequent inheritance.  This turns the noun into a niladic verb.
 else.
   NB. Insert end-of-computation unless this node is hidden (as part of u&n or u&.v)
-  (cop -: ,'"') inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
+  NB. Don't inherit stealth: (]"0) should display
+  (0 ,~ cop -: ,'"') inheritu x traverse__uop travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
 end.
 )
 
