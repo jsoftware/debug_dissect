@@ -1447,18 +1447,18 @@ codestroy''
 y
 )
 
-NB. Return 1 if this looks like a repeat event that should be ignored
-NB. discard identical events occurring within 5 seconds
-reclickblocktime =: 0
-reclickblockevent =: ''
-reclickblock =: 3 : 0
-fastclick =. (reclickblocktime =: 6!:1'') (< 0.5&+) reclickblocktime
-fastclick *. (reclickblockevent =: y) -: reclickblockevent
-)
-
+NB. obsolete NB. Return 1 if this looks like a repeat event that should be ignored
+NB. obsolete NB. discard identical events occurring within 5 seconds
+NB. obsolete reclickblocktime =: 0
+NB. obsolete reclickblockevent =: ''
+NB. obsolete reclickblock =: 3 : 0
+NB. obsolete fastclick =. (reclickblocktime =: 6!:1'') (< 0.5&+) reclickblocktime
+NB. obsolete fastclick *. (reclickblockevent =: y) -: reclickblockevent
+NB. obsolete )
+NB. obsolete 
 NB. Toggle the state of stealth display
 dissect_fmshowstealth_button =: 3 : 0
-if. reclickblock 'fmshowstealth' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmshowstealth' do. i. 0 0 return. end.
 'fmshowstealth' wdsetvalue ": displaystealth =: -. displaystealth
 NB. The operand is the list of types that should NOT be displayed
 calcdispstealth__resultroot displaystealth # 1 2
@@ -1466,25 +1466,25 @@ dissect_dissectisi_paint 1
 )
 NB. Toggle the state of compmod display
 dissect_fmshowcompmods_button =: 3 : 0
-if. reclickblock 'fmshowcompmods' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmshowcompmods' do. i. 0 0 return. end.
 'fmshowcompmods' wdsetvalue ": displaycompmods_dissect_ =: -. displaycompmods
 dissect_dissectisi_paint 1
 )
 NB. Toggle the state of structmod display
 dissect_fmshowstructmods_button =: 3 : 0
-if. reclickblock 'fmshowstructmods' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmshowstructmods' do. i. 0 0 return. end.
 'fmshowstructmods' wdsetvalue ": displaystructmods_dissect_ =: -. displaystructmods
 dissect_dissectisi_paint 1
 )
 NB. Toggle the state of structmod display
 dissect_fmautoexpand2_button =: 3 : 0
-if. reclickblock 'fmshowautoexpand2' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmshowautoexpand2' do. i. 0 0 return. end.
 'fmautoexpand2' wdsetvalue ": displayautoexpand2 =: -. displayautoexpand2
 dissect_dissectisi_paint 1
 )
 NB. Toggle the state of fill-cell display
 dissect_fmshowfillcalc_button =: 3 : 0
-if. reclickblock 'fmshowfillcalc' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmshowfillcalc' do. i. 0 0 return. end.
 'fmshowfillcalc' wdsetvalue ": displayshowfillcalc =: -. displayshowfillcalc
 dissect_dissectisi_paint 1
 )
@@ -1494,7 +1494,7 @@ dissect_cancel =: dissect_close
 
 dissect_fmfontsize_button =: 3 : 0
 NB.?lintonly fmfontsize_select =. '0'
-if. reclickblock 'fmfontsize' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmfontsize' do. i. 0 0 return. end.
 ('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '0'
 ('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex_dissect_ =: y) wdsetvalue  '1'
 calccfms minimumfontsizex { FONTSIZECHOICES
@@ -1506,7 +1506,7 @@ dissect_dissectisi_paint 1
 
 NB. We use dissect locale for ttfontsize, because it is shared between instances
 dissect_fmttfontsize_button =: 3 : 0
-if. reclickblock 'fmttfontsize' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmttfontsize' do. i. 0 0 return. end.
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '0'
 ('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex_dissect_ =: y) wdsetvalue  '1'
 )
@@ -1515,7 +1515,7 @@ if. reclickblock 'fmttfontsize' do. i. 0 0 return. end.
 )
 
 dissect_fmmaxnounsize_button =: 4 : 0
-if. reclickblock 'fmmaxnounsize' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmmaxnounsize' do. i. 0 0 return. end.
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '0'
 ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '0'
 maxnoundisplaysizex =: y x} maxnoundisplaysizex
@@ -1530,7 +1530,7 @@ dissect_dissectisi_paint 1
 )
 
 dissect_fmtooltipdelay_button =: 3 : 0
-if. reclickblock 'fmtooltipdelay' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmtooltipdelay' do. i. 0 0 return. end.
 ('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx) wdsetvalue  '0'
 ('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx_dissect_ =: y) wdsetvalue  '1'
 )
@@ -1539,7 +1539,7 @@ if. reclickblock 'fmtooltipdelay' do. i. 0 0 return. end.
 )
 
 dissect_fmtooltipdetail_button =: 3 : 0
-if. reclickblock 'fmtooltipdetail' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmtooltipdetail' do. i. 0 0 return. end.
 ('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx) wdsetvalue  '0'
 ('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx_dissect_ =: y) wdsetvalue  '1'
 )
@@ -1550,7 +1550,7 @@ if. reclickblock 'fmtooltipdetail' do. i. 0 0 return. end.
 NB. We do not use dissect locale for displayprecision, because it is not shared between instances
 dissect_fmprec_button =: 3 : 0
 NB.?lintonly fmfontsize_select =. '0'
-if. reclickblock 'fmprec' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmprec' do. i. 0 0 return. end.
 ('fmprec' , ": DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue  '0'
 ('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx =: y) wdsetvalue  '1'
 dissect_dissectisi_paint 1
@@ -1560,12 +1560,12 @@ dissect_dissectisi_paint 1
 )
 
 dissect_fmsaveconfig_button =: 3 : 0
-if. reclickblock 'fmsaveconfig' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmsaveconfig' do. i. 0 0 return. end.
 saveconfig''
 )
 
 dissect_fmapplyconfig_button =: 3 : 0
-if. reclickblock 'fmapplyconfig' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmapplyconfig' do. i. 0 0 return. end.
 loadconfig_dissect_''  NB. get values from config file
 applyconfig 0   NB. apply them to this instance, ignoring input options
 setformconfig''   NB. put the values into the form
@@ -1578,7 +1578,7 @@ dissect_fmhelplearning_button =: helpshow_dissecthelplearning_
 dissect_fmhelpusing_button =: helpshow_dissecthelpusing_
 
 dissect_fmlab_button =: 3 : 0
-if. reclickblock 'fmlab' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmlab' do. i. 0 0 return. end.
 try.
   NB. See if labs are installed
   require 'labs/labs'
@@ -1598,7 +1598,7 @@ dissect_fmlab_button '~addons/labs/labs/debug/dissect2.ijt'
 
 dissect_fmwikidissect_button =: 3 : 0
 NB.?lintonly browse_j_ =. 3 : 'y'
-if. reclickblock 'fmwikidissect' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmwikidissect' do. i. 0 0 return. end.
 browse_j_ JWIKIURL,'Vocabulary/Dissect'
 0 0$0
 )
@@ -1606,7 +1606,7 @@ dissect_f1_fkey =: dissect_fmwikidissect_button
 
 dissect_fmwikinuvoc_button =: 3 : 0
 NB.?lintonly browse_j_ =. 3 : 'y'
-if. reclickblock 'fmwikinuvoc' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmwikinuvoc' do. i. 0 0 return. end.
 browse_j_ JWIKIURL,'NuVoc'
 0 0$0
 )
@@ -1614,7 +1614,7 @@ dissect_f1shift_fkey =: dissect_fmwikinuvoc_button
 4!:55^:(-.IFQT) 'dissect_f1_fkey';'dissect_f1shift_fkey'
 
 dissect_jctrl_fkey =: 3 : 0
-if. reclickblock 'fmctrlj' do. i. 0 0 return. end.
+NB. obsolete if. reclickblock 'fmctrlj' do. i. 0 0 return. end.
 if. 0 < 4!:0 <'labrun_jlab_' do.
   9!:27 'labrun_jlab_$0'   NB. create immex sentence
   9!:29 (1)
