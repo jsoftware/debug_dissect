@@ -121,7 +121,7 @@ cocurrent 'dissect'
 coinsert 'jgl2'
 
 NB. The address of the jsoftware wiki
-JWIKIURL =: 'http://code.jsoftware.com/jwiki/'
+JWIKIURL =: 'http://code.jsoftware.com/wiki/'
 
 NB. lines beginning config_ are names that are initialized in the instance from the globals here
 NB. the others are global, shared amond running dissections
