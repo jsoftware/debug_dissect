@@ -123,11 +123,16 @@ coinsert 'jgl2'
 NB. The address of the jsoftware wiki
 JWIKIURL =: 'http://code.jsoftware.com/wiki/'
 
+defaultfonts =: (<"0 (12 12 14 8)) ,.~ ((;:'Darwin') i. <UNAME) { ".;._2 (0 : 0)
+'"Courier"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"'    NB. Mac version
+'"Courier New"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"'    NB. Version for all others
+)
+
+
 NB. lines beginning config_ are names that are initialized in the instance from the globals here
-NB. the others are global, shared amond running dissections
+NB. the others are global, shared among running dissections
 CONFIG =: 0 : 0
-minimumfontsizex =: 2   NB. font size to use in main window
-ttfontsizex =: 0   NB. tooltip font size
+fontchoices =: defaultfonts
 tooltipdelayx =: 2  NB. tooltip delay
 tooltipdetailx =: 1   NB. tooltip detail level
 displaycompmods =: 0   NB. display full modified verb, not just modifier line
@@ -183,24 +188,22 @@ if. #y do.
     maxnoundisplaysizex =: (}:MAXNOUNPCTCHOICES) I. 2 ($,) 0 ". (dsx,1) {:: y
   end.
 end.
-NB.?lintonly minimumfontsizex =: ttfontsizex =: tooltipdelayx =: tooltipdetailx =: displaycompmods =: displaystructmods =: 0
+NB.?lintonly tooltipdelayx =: tooltipdetailx =: displaycompmods =: displaystructmods =: 0
 NB.?lintonly maxnoundisplaysizex =: 0 0 [ displaystealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: 0
 0 0$0
 NB.?lintsaveglobals
 )
 
-NB. Applyconfig setting to form - must wait until form exists
+NB. Apply config setting to form - must wait until form exists
 setformconfig =: 3 : 0
 NB. We have to set the form after loading the values
-('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '1'
-('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '1'
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '1'
 ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '1'
 ('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0 ,~ tooltipdelayx) wdsetvalue '1'
 ('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0 ,~ tooltipdetailx) wdsetvalue '1'
 maxnoundisplayfrac =: 0.01 * maxnoundisplaysizex { MAXNOUNPCTCHOICES
 ('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue '1'
-calccfms minimumfontsizex { FONTSIZECHOICES
+calccfms fontchoices
 NB. The rest of the form settings are performed each traversal
 NB.?lintsaveglobals
 )
@@ -942,15 +945,13 @@ ntypeval
 )
 
 NB. Following lines must match the menus!
-FONTSIZECHOICES =: 8 10 12 14 16 20 24
-TOOLTIPFONTSIZECHOICES =: 8 10 12 14
 MAXNOUNPCTCHOICES =: 10 20 30 40 50 60 70 80 90
 DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 NB. The tooltip size will be selected according to detail and expanded according to fontsize
-TOOLTIPMINISISIZE =: 200 300,300 500,:900 600
+ISISIZEPERTTPOINT =: _2 ]\ 25 35   35 60   112 75
 MINIMUMISISIZE =: 300 500     NB. minimum size for graphics, needed to allow room for tooltip
 
 TOOLTIPMAXPIXELS =: 900  NB. Max width of tooltip, in pixels
@@ -959,21 +960,19 @@ TOOLTIPMAXFRAC =: 0.6  NB. Max tooltip width, as frac of isigraph width
 TOOLTIPDELAYCHOICES =: ('immed';'250';'500';'1000') ,. ('immediate';'0.25 sec';'0.5 sec';'1 sec') ,. <"0 (1 250 500 1000)
 TOOLTIPDETAILCHOICES =: ('0';'1';'2') ,. ('laconic';'verbose';'tutorial') ,. <"0 (0 1 2)
 
-fontlines =. ; <@('menu fmfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 FONTSIZECHOICES
-ttfontlines =. ; <@('menu fmttfontsize' , ": , ' "' , ": , '";' , LF"_ )"0 TOOLTIPFONTSIZECHOICES
 preclines =. ; <@('menu fmprec' , ": , ' "' , ": , '";' , LF"_ )"0 DISPLAYPRECCHOICES
 sizexlines =. ; <@('menu fmmaxnounsizex' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
 sizeylines =. ; <@('menu fmmaxnounsizey' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
 ttdlines =. ; ('menu fmtooltipdelay' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {."1 TOOLTIPDELAYCHOICES
 ttdetlines =. ; ('menu fmtooltipdetail' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {."1 TOOLTIPDETAILCHOICES
-DISSECT=: ((,&LF&.> 'rem font;';'rem ttfont;';'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0
+DISSECT=: ((,&LF&.> 'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0
 pc dissect;
 menupop "&Preferences";
-menupop "&Font Size";
-rem font;
-menupopz;
-menupop "&Tooltip Font Size";
-rem ttfont;
+menupop "&Fonts";
+menu fmfontvalues "Select font for values...";
+menu fmfontheadings "Select font for headings...";
+menu fmfontimsgs "Select font for messages...";
+menu fmfontttips "Select font for tooltips...";
 menupopz;
 menupop "Display precision for floats";
 rem prec;
@@ -1025,14 +1024,14 @@ pas 0 0;
 rem form end;
 )
 
-DISSECT =: (((,&LF&.> 'rem font;';'rem ttfont;';'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. fontlines;ttfontlines;preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0) [^:IFQT DISSECT
+DISSECT =: (((,&LF&.> 'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0) [^:IFQT DISSECT
 pc dissect;
 menupop "&Preferences";
-menupop "&Font Size";
-rem font;
-menupopz;
-menupop "&Tooltip Font Size";
-rem ttfont;
+menupop "&Fonts";
+menu fmfontvalues "Select font for values...";
+menu fmfontheadings "Select font for headings...";
+menu fmfontimsgs "Select font for messages...";
+menu fmfontttips "Select font for tooltips...";
 menupopz;
 menupop "Display precision for floats";
 rem prec;
@@ -1336,7 +1335,7 @@ topminsize =. ((0 2 * 1 < #) + >./@:({."1) , +/@:({:"1)) sentencesizes
 yxneeded =. topminsize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
 NB. Get the current size of the isi; if insufficient, make it bigger, with expansion added
 if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
-  minisi =. MINIMUMISISIZE >. <. (%/ TOOLTIPFONTSIZECHOICES {~ ttfontsizex,0) * tooltipdetailx { TOOLTIPMINISISIZE
+  minisi =. MINIMUMISISIZE >. <. (tooltipdetailx{ISISIZEPERTTPOINT) * (<3 1) {:: fontchoices
   NB. For QT, always size the canvas to the full screen
   'dissectisi' wdsetxywh _1"0^:IFQT 1 0 3 2 { cyxhw =. (minisi >. EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
   NB. If the main form has grown now that the isi has grown, resize it too.
@@ -1492,27 +1491,25 @@ dissect_dissectisi_paint 1
 dissect_close =: 1&destroy
 dissect_cancel =: dissect_close
 
-dissect_fmfontsize_button =: 3 : 0
-NB.?lintonly fmfontsize_select =. '0'
-NB. obsolete if. reclickblock 'fmfontsize' do. i. 0 0 return. end.
-('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex) wdsetvalue  '0'
-('fmfontsize' , ": FONTSIZECHOICES {~ minimumfontsizex_dissect_ =: y) wdsetvalue  '1'
-calccfms minimumfontsizex { FONTSIZECHOICES
-dissect_dissectisi_paint 1
+NB. We use dissect locale for fontsize, because it is shared between instances
+dissect_fmfontsize_button =: 4 : 0
+NB. If the system supports titling the font dialog, do so
+if. 0 = /: 1 4 7 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter JVERSION do.
+  title =. '"Select font to use for ' , x , '" '
+else. title =. ''
+end.
+if. #fontsel =. wd 'mb font ' , title , ;:^:_1 ":&.> y { fontchoices do.
+  NB. Extract font and size; convert size to numeric; discard adornments
+  fontname =. '"' , '"' dropafter '"' takeafter fontsel
+  fontsize =. 0 ". > {. ;: '"' takeafter '"' takeafter fontsel
+  calccfms fontchoices_dissect_ =: (fontname;fontsize) y} fontchoices
+  dissect_dissectisi_paint 1
+end.
 )
-(4 : 0"0 i.@#) FONTSIZECHOICES
-". 'dissect_fmfontsize' , (":x) , '_button =: dissect_fmfontsize_button@(', (":y) ,'"_)'
-)
-
-NB. We use dissect locale for ttfontsize, because it is shared between instances
-dissect_fmttfontsize_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmttfontsize' do. i. 0 0 return. end.
-('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex) wdsetvalue  '0'
-('fmttfontsize' , ": TOOLTIPFONTSIZECHOICES {~ ttfontsizex_dissect_ =: y) wdsetvalue  '1'
-)
-(4 : 0"0 i.@#) TOOLTIPFONTSIZECHOICES
-". 'dissect_fmttfontsize' , (":x) , '_button =: dissect_fmttfontsize_button@(', (":y) ,'"_)'
-)
+dissect_fmfontvalues_button =: 'values'&(dissect_fmfontsize_button 0:)
+dissect_fmfontheadings_button =: 'headings'&(dissect_fmfontsize_button 1:)
+dissect_fmfontimsgs_button =: 'messages'&(dissect_fmfontsize_button 2:)
+dissect_fmfontttips_button =: 'tooltips'&(dissect_fmfontsize_button 3:)
 
 dissect_fmmaxnounsize_button =: 4 : 0
 NB. obsolete if. reclickblock 'fmmaxnounsize' do. i. 0 0 return. end.
@@ -1549,7 +1546,6 @@ NB. obsolete if. reclickblock 'fmtooltipdetail' do. i. 0 0 return. end.
 
 NB. We do not use dissect locale for displayprecision, because it is not shared between instances
 dissect_fmprec_button =: 3 : 0
-NB.?lintonly fmfontsize_select =. '0'
 NB. obsolete if. reclickblock 'fmprec' do. i. 0 0 return. end.
 ('fmprec' , ": DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue  '0'
 ('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx =: y) wdsetvalue  '1'
@@ -3837,10 +3833,8 @@ SCROLLBARTRAVELERCOLOR =: <128 128 128
 NB. FONTNUM - Font for 'data' - numeric data, shape, rank, etc
 NB. FONTCHAR - Font for 'text' - verb names, noun names, status messages
 NB. FONTIMSG - Font for easy readability - tooltips, error messages
-'FONTNUM FONTCHAR FONTIMSG' =: ((;:'Darwin') i. <UNAME) { ".;._2 (0 : 0)
-'"Courier"' ; '"Lucida Console"' ; '"Arial"'    NB. Mec version
-'"Courier New"' ; '"Lucida Console"' ; '"Arial"'    NB. Version for all others
-)
+'FONTNUM FONTCHAR FONTIMSG FONTTTIP' =: i. 4
+
 NB. y is string, result is string with characters translated for display.  We do this
 NB. to make the J boxing characters visible
 dataxlate =: ((1 22 2 25 16 23 3 21 4 5 6 { a.) (16+i. 11)} a.) {~ a. i. ]
@@ -3886,20 +3880,19 @@ DATAMARGIN =: 2 2 $ 1 1 2 1
 NB. for tooltips
 TOOLTIPCOLOR =: 255 255 0
 TOOLTIPTEXTCOLOR =: 0 0 0
-TOOLTIPFONT =: FONTIMSG
 TOOLTIPMARGIN =: 1
 NB. for title
 NB. for the user's sentence
 TITLCOLOR =: 240 240 240
 TITLTEXTCOLOR =: 0 0 0
 TITLFONT =: FONTIMSG
-TITLFONTSIZE =: 4
+TITLFONTSIZE =: 2
 TITLMARGIN =: 0
 NB. for links
 LINKCOLOR =: 240 240 240
 LINKTEXTCOLOR =: 0 0 192
 LINKFONT =: FONTIMSG
-LINKFONTSIZE =: _2
+LINKFONTSIZE =: _4
 LINKMARGIN =: 0
 NB. for assignment
 ASSIGNCOLOR =: 96 96 192
@@ -3973,39 +3966,48 @@ MAXDATASIZEYX =: 200 200
 
 MINFONTSIZE =: 7   NB. As small as we can readably display
 
-NB. Create cfms for later use.  y is the font size selected.
+
+COLORSFORCLASSSHAPE =: (SHAPETEXTCOLORS ;"1 SHAPECOLORS) , RESULTSHAPETEXTCOLOR;RESULTSHAPECOLOR
+
+NB. Create cfms for later use.  y is table of font;size
 NB. called in locale of main instance, leaves names defined there
 NB. Operands to drawtext/sizetext
 NB. These take colors from the selectors, except for the first one, which tells part of speech, and the last
 NB. few, which are status/unexecd/fill
 calccfms =: 3 : 0
-modfontsize =. MINFONTSIZE >. y&+
-nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;NOUNFONT;(modfontsize NOUNFONTSIZE);NOUNMARGIN
-nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(modfontsize SHAPEFONTSIZE);SHAPEMARGIN
-nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(modfontsize STATUSFONTSIZE);STATUSMARGIN
-nouncfm =: nouncfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(modfontsize ISTATUSFONTSIZE);ISTATUSMARGIN
+modfontsize =. ] ({.@] , [ (MINFONTSIZE >. +)&.> {:@]) y {~ [
+nouncfm =: < NOUNCOLOR;NOUNTEXTCOLOR;(NOUNFONT modfontsize NOUNFONTSIZE),<NOUNMARGIN
+nouncfm =: nouncfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 (SHAPEFONT modfontsize SHAPEFONTSIZE),<SHAPEMARGIN
+nouncfm =: nouncfm , < STATUSCOLOR;STATUSTEXTCOLOR;(STATUSFONT modfontsize STATUSFONTSIZE),<STATUSMARGIN
+nouncfm =: nouncfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;(ISTATUSFONT modfontsize ISTATUSFONTSIZE),<ISTATUSMARGIN
 
-verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;VERBFONT;(modfontsize VERBFONTSIZE);VERBMARGIN
-verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 SHAPEFONT;(modfontsize SHAPEFONTSIZE);SHAPEMARGIN
-verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;STATUSFONT;(modfontsize STATUSFONTSIZE);STATUSMARGIN
-verbcfm =: verbcfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;ISTATUSFONT;(modfontsize ISTATUSFONTSIZE);ISTATUSMARGIN
+verbcfm =: < VERBCOLOR;VERBTEXTCOLOR;(VERBFONT modfontsize VERBFONTSIZE),<VERBMARGIN
+verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 (SHAPEFONT modfontsize SHAPEFONTSIZE),<SHAPEMARGIN
+verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;(STATUSFONT modfontsize STATUSFONTSIZE),<STATUSMARGIN
+verbcfm =: verbcfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;(ISTATUSFONT modfontsize ISTATUSFONTSIZE),<ISTATUSMARGIN
 
-cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (<DATAFONT) ,. ((; ,&' bold italic') ": modfontsize DATAFONTSIZE) ,. <DATAMARGIN
+cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (({. ,. (('';' bold italic') (,~ ":)&.> {:)) DATAFONT modfontsize DATAFONTSIZE) ,. <DATAMARGIN
 
-RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;RESULTSHAPEFONT;(modfontsize RESULTSHAPEFONTSIZE);RESULTSHAPEMARGIN
+RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;(RESULTSHAPEFONT modfontsize RESULTSHAPEFONTSIZE),<RESULTSHAPEMARGIN
 
 NB. For the displayed sentence
-satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 SATZFONT;(modfontsize SATZFONTSIZE);SATZMARGIN
+satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 (SATZFONT modfontsize SATZFONTSIZE),<SATZMARGIN
 
 NB. For titles
-titlcfm =: TITLCOLOR;TITLTEXTCOLOR;TITLFONT;(modfontsize TITLFONTSIZE);TITLMARGIN
+titlcfm =: TITLCOLOR;TITLTEXTCOLOR;(TITLFONT modfontsize TITLFONTSIZE),<TITLMARGIN
 
 NB. For links
-linkcfm =: LINKCOLOR;LINKTEXTCOLOR;LINKFONT;(modfontsize LINKFONTSIZE);LINKMARGIN
+linkcfm =: LINKCOLOR;LINKTEXTCOLOR;(LINKFONT modfontsize LINKFONTSIZE),<LINKMARGIN
 
 NB. For assignments
-assigncfm =: ASSIGNCOLOR;ASSIGNTEXTCOLOR;ASSIGNFONT;(modfontsize ASSIGNFONTSIZE);ASSIGNMARGIN
+assigncfm =: ASSIGNCOLOR;ASSIGNTEXTCOLOR;(ASSIGNFONT modfontsize ASSIGNFONTSIZE),<ASSIGNMARGIN
 
+NB. Calculate for each class in the rank and selection
+NB. font pen margin tcolor bcolor
+fontsforclassrankverb =: (((<VERBFONT,0){y),'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR) ,"1 0 <.&.-:@>:&.> ((<VERBFONT,1){::y) * 1 1.6
+fontsforclassrankshape =: (((<SHAPEFONT,0){y),.(<''),.SHAPEMARGIN ;"_ 1 COLORSFORCLASSSHAPE) ,"1 0 ((<SHAPEFONT,1){y)
+
+TOOLTIPFONT =: FONTTTIP { y
 NB.?lintsaveglobals
 ''
 )
@@ -4013,20 +4015,12 @@ NB.?lintsaveglobals
 NB. For empty nouns, use a dark rectangle.  There is no text
 emptycfm =: (FILLMASKSELLEVEL_dissectobj_%FILLMASKCHECKER_dissectobj_) $ EMPTYCOLORS ;"1 a: , a: , a: , <DATAMARGIN
 
-
-
-NB. font pen margin tcolor bcolor
-FONTSFORCLASSRANKVERB =: 2 $ ,: VERBFONT;'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR
-SIZESFORCLASSRANKVERB =: 1 1.6
-
-COLORSFORCLASSSHAPE =: (SHAPETEXTCOLORS ;"1 SHAPECOLORS) , RESULTSHAPETEXTCOLOR;RESULTSHAPECOLOR
-
 FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
 
 NB. Calculate a font from a class and selection
 NB. x is the class of the characters:
 NB.  0=verb in rank stack
-NB.  1=shape/selection (in rank stack or in shape/sel line
+NB.  1=shape/selection (in rank stack or in shape/sel line)
 NB. y is selection[,decoration]
 NB. selection is a number that is meaningful to the class
 NB. decoration is a choice from below
@@ -4055,12 +4049,12 @@ bcolor;tcolor;font;size;margin
 NB. The center column of the rank stack.
 NB. Selection is 0 (normal) or 1 (for the verb at the bottom) 
 cfmforclassrankverb =: 3 : 0
-(VERBFONT;'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR) , < <.&.-: 1 + (y { SIZESFORCLASSRANKVERB) * minimumfontsizex { FONTSIZECHOICES
+y { fontsforclassrankverb
 )
 NB. shape/selection, and shapes in the rank stack
 NB. y is sellevel if positive, or negative for special types (_1 = result-cell)
 cfmforclassshape =: 3 : 0
-(SHAPEFONT;'';SHAPEMARGIN),((y <. <:#STATUSCOLOR) { COLORSFORCLASSSHAPE) , < minimumfontsizex { FONTSIZECHOICES
+y (] {~ (<.    2 -~ #)) fontsforclassrankshape
 )
 
 NB. ************** drawing the sentence *****************
@@ -7119,7 +7113,7 @@ NB. LF indicates mandatory newline, CR is a newline with no break allowed after 
 NB. Result is text, with LF between lines
 reflowtooltip =: 4 : 0
 NB. Find the width of a space
-glfontextent TOOLTIPFONT , ": ttfontsizex { TOOLTIPFONTSIZECHOICES
+glfontextent ;:^:_1 ":&.> TOOLTIPFONT
 spacewidth =. {. glqextent ' '
 NB. Split the string into lines
 bl =. (<;.2~   e.&(CR,LF)) y
@@ -7148,7 +7142,7 @@ hoverinitloc =: cpos
 NB. Copy the pixels we are about to overwrite
 'ctly ctlx' =. 3 2 { 0 ". wdqchildxywh 'dissectisi'
 'hovery hoverx' =. cpos
-'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;(ttfontsizex { TOOLTIPFONTSIZECHOICES);TOOLTIPMARGIN;'') sizetext <string  NB. kludge
+'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT,TOOLTIPMARGIN;'') sizetext <string  NB. kludge
 NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset, above the cursor
 NB. Get desired top position; if it's off the top of the screen, switch to the right of the hover
 ttipx =. hoverx
@@ -7171,7 +7165,7 @@ NB. that the rectangle is all onscreen, else QT will crash
 ttpyx =. 0 >. _1 + ttipy,ttipx
 ttphw =. (2 + ttiph,ttipw) <. (ctly,ctlx) - ttpyx
 tooltippixels =: glqpixels 1 0 3 2 { , tooltippixpos =: ttpyx,:ttphw
-(TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT;(ttfontsizex { TOOLTIPFONTSIZECHOICES);TOOLTIPMARGIN;'') drawtext string;2 2 $ ttipy,ttipx,ttiph,ttipw  NB. kludge
+(TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT,TOOLTIPMARGIN;'') drawtext string;2 2 $ ttipy,ttipx,ttiph,ttipw  NB. kludge
 glpaint''
 NB.?lintsaveglobals
 )
