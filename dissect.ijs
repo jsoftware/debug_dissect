@@ -62,7 +62,10 @@ config_displaystealth_dissect_ =: 1
 config_displaystealth_dissect_ =: 0
 )
 NB. TODO
-NB. right-clicking on vbname (if tacit) should launch sandbox for that name
+NB.  
+NB. To get operand for debug, use selection to pull from savedselection
+NB. Test recursive debug for monad/dyad, and other locales, and object locales, tacit and explicit; and verbs with header
+NB.  re-click when debug window open fails
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
@@ -102,7 +105,7 @@ NB.  'datasize'  string is vpct hpct   max size of noun, in % of screen (must be
 NB.  'check'  string is 'all'=full comparison, shape'=shape and type only; 'error'=success/failure only; 'no'=no comparison (and don't execute the original sentence)
 NB.
 NB. If y is boxed, it should be a table ready for use in parse, i. e. nx3 where the first line gives
-NB. parameters;locale;text of sentence
+NB. options;locale;text of sentence
 NB. and the remaining lines are the local names defined in the running explicit definition, as described in z458095869 below
 NB.
 NB. Result is a string containing an error message if a window couldn't be created, otherwise an empty string EXCEPT when the
@@ -113,7 +116,7 @@ dissect_z_ =: [: ([: display_dissect_ <@". :: (''"_)&.>)`nodisplay_dissect_@.(2=
 NB. The locale dissectnopath is used to find local names.  Its path is empty.  The locale contains only one name, z458095869
 cocurrent 'dissectnopath'
 copath ''
-NB. The verb z458095869 returns a table of defined local names.  It is a table of (name;(type from 4!:0);(numeric ranks, invertible if verb/value if noun, '' if other))
+NB. The verb z458095869 returns a table of defined local names.  It is a table of (name;(type from 4!:0);(5!:5 form of name))
 z458095869 =: (([ ,. <"0@] ,. (".@[`(rankinv_dissect_@[)`(rankinv_dissect_@[)`(rankinv_dissect_@[))@.]&.>) (4!:0)) @ ((<'z458095869') -.~ 4!:1@i.@4:)
 
 require 'strings gl2'
@@ -147,7 +150,7 @@ config_displayprecisionx =: 2   NB. default display precision
 NB. Read & apply config file.  Run in dissect locale.
 loadconfig =: 3 : 0
 try.
-  cfile =. 1!:1 <jpath '~config/dissect.ijs'
+  cfile =. CONFIG , 1!:1 <jpath '~config/dissect.ijs'
 catch.
   cfile =. CONFIG
 end.
@@ -361,6 +364,29 @@ elseif. do.
 end.
 )
 
+NB. y is name;<<locale to look in
+NB. y may have object names appended
+NB. Result is simplename;locale the name was found in; empty if not found
+findnameloc =: 3 : 0
+'name loc' =. y
+NB. If there are object names, resolve them in loc and replace loc with
+NB. the result
+if. '__' +./@:E. name do.
+  cocurrent loc
+  loc =. ('__' takeafter name)~
+  name =. '__' taketo name
+end.
+NB.?lintonly loc =. <'dissectverb'
+NB. Follow search path starting in loc, and stop when the name is encountered
+ret =. ''
+for_l. loc , 18!:2 loc do.
+  NB.?lintonly l =. <'dissectverb'
+  cocurrent l
+  if. (<name) e. ({. name) (4!:1) 0 1 2 3 do. ret =. name ; l break. end.
+end.
+ret
+)
+
 NB. called after error. y is the ARs of the operands that were executed
 NB. x is 1 (default 1) to include J error info - use only if there has been an error
 postmortem =: 3 : 0
@@ -469,6 +495,7 @@ dissectionlist_dissect_ =: (coname'') (<slottouse,0)}  dissectionlist_dissect_
 objtable =: 0$a:   NB. list of parse objects
 ticket =: 0   NB. sequential log number
 loggingallowed =: 1   NB. allow logging
+debuglocs =: 0$a:  NB. List of locales created by expanding tacit names from this window
 
 NB. Variables used to control hovering in this window
 hoverinitloc =: $0   NB. Init no hover active
@@ -509,7 +536,7 @@ iscw =: ('NB.' -: 3 {. >) +. e.&controlwords@(('_'&taketo)@}:&.>) *. ('.'={:)@> 
 
 NB. **** verbs to create nodes.  DO NOT USE CONEW because it doesn't set COCREATOR properly
 
-NB. Create a verb node.  y is (string form of the verb[;display form]);(token number)
+NB. Create a verb node.  y is (string form of the verb[;display form]);(token number)[;(one-line def)]
 NB. if display form is not given, string form is not boxed
 NB. x is locale to use for COCREATOR (if omitted, we must be calling from the main instance, just use its name)
 NB. Result is result from create which is type;locale;token #
@@ -565,7 +592,7 @@ NB. bit 1 is 'return locale', which returns boxed locale (an atom) if there is n
 NB. bit 2 is 'noassign' which neuters assignments (useful in debug)
 NB. bit 3 is 'debug', reserved for future use 
 parsemain =: 3 : 0   NB. runs in object locale
-defnames =. }. y  NB. table of names
+defnames =: }. y  NB. table of names
 'options loc sentence' =. {. y
 NB. The numeric atom 2 is used by finddissectline to create a quiet return of an empty string
 if. 2 -: sentence do. '' return. end.
@@ -709,7 +736,7 @@ NB. and 'verb' for modifier executions
     end.
 
     NB. Define the names, as nouns (J nameclass 0).
-    defnames =. (rname ,"0 1 ((0+256*noassignment);'')) , defnames
+    defnames =: (rname ,"0 1 ((0+256*noassignment);'')) , defnames
 
   case. 8 do.  NB. ( x ) - but remember the token numbers of the parens
     if. (noun+verb) bwand 1 { exetypes do.
@@ -755,7 +782,8 @@ NB. and 'verb' for modifier executions
       else.
         'glopart objloc' =. '';qend
       end.
-      NB. Look up the object locative in the local name table, resolving to type;value/rank if found
+      NB. Look up the (object locative)/(simple name) [depending on whether there is an
+      NB. object locative] in the local name table, resolving to type;value/rank if found
       if. (<objloc) e. {."1 defnames do.
         'objtype objval' =. 1 2 { (({."1 defnames) i. <objloc) { defnames
         gloc =. objval
@@ -770,7 +798,7 @@ NB. and 'verb' for modifier executions
         glopart =. qend
       end.
       NB. Now we have resolved any local that we are going to use.  If there was one, it is in
-      NB. objtype/objval.  But a global search may be needed: if there was
+      NB. objtype/objval.  But a global search may still be needed: if there was
       NB. an object locative, or if the local search failed.  This search will start in locale gloc.
       NB. This search, if performed, must succeed, and we will convert the result to a type/(rank if verb)
       if. #glopart do.
@@ -821,7 +849,7 @@ NB. and 'verb' for modifier executions
         ntypeval =. conj;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
       case. 3 do.
          NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
-        ntypeval =. createverb (qend;(#queue)) , (-. LF e. objval)#<objval
+        ntypeval =. createverb qend;(#queue);glopart;gloc;objval;loc;(#defnames)
       case. 0+256 do.  NB. Special type: name previously assigned which in ignore assignment mode
         failmsg 'The name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',(fromdebugger # ' when dissect is called from the debugger'),'.'
         return.
@@ -883,15 +911,8 @@ vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot ''
 execsentences_dissect_ =: vissentence ;^:(comparisonlevel<3) ,<exestring__resultroot''
 if. sandbox do.
   NB. create the sandbox verb in the user's locale
-  NB.?lintmsgsoff
-  (sandname_dissect_ =: 'sandbox4768539054_',(>loc),'_') =: sandboxtemplate f.
-  NB.?lintmsgson
-  defnounmask =. (<0) = 1 {"1 defnames
-  NOUNNAMES_dissect_ =: defnounmask # 0 {"1 defnames
-  NOUNVALUES_dissect_ =: defnounmask # 2 {"1 defnames
-  DEFSTRING_dissect_ =: (*#NOUNNAMES_dissect_) # '(NOUNNAMES_dissect_) =. NOUNVALUES_dissect_',LF
-  DEFSTRING_dissect_ =: DEFSTRING_dissect_ , ; ([ , ' =. ' , LF ,~ ])&.>/"1 (0 2) {"1 (-. defnounmask) # defnames
-  '01' ([ , ' ' , sandname_dissect_ , ' ' , ''''&,@(,&'''')@(#~ >:@(=&''''))@])&.> execsentences_dissect_
+  nm =. defnames createsandbox loc
+  0 1 ('''' , (nm #~ [) , ''' ' , nm , ' ' , ''''&,@(,&'''')@(#~ >:@(=&''''))@])&.> execsentences_dissect_
   NB.?lintsaveglobals
 else.
   execsentences_dissect_
@@ -899,8 +920,26 @@ end.
 NB.?lintsaveglobals
 )
 
+NB. x is table of names
+NB. y is locale
+NB. We create globals in the dissect locale that describe the names to be
+NB. created in the sandbox, and the string DEFSTRING_dissect_ that will
+NB. cause them to be defined.  No result.
+createsandbox =: 4 : 0
+NB.?lintmsgsoff
+(nm =. 'sandbox4768539054_',(>y),'_') =: sandboxtemplate f.
+NB.?lintmsgson
+defnounmask =. (<0) = 1 {"1 x
+NOUNNAMES_dissect_ =: defnounmask # 0 {"1 x
+NOUNVALUES_dissect_ =: defnounmask # 2 {"1 x
+DEFSTRING_dissect_ =: (*#NOUNNAMES_dissect_) # '(NOUNNAMES_dissect_) =. NOUNVALUES_dissect_',LF
+DEFSTRING_dissect_ =: DEFSTRING_dissect_ , ; ([ , ' =. ' , LF ,~ ])&.>/"1 (0 2) {"1 (-. defnounmask) # x
+nm
+NB.?lintsaveglobals
+)
+
 sandboxtemplate =: 4 : 0
-if. x do. 4!:55 <sandname_dissect_ end.
+if. #x do. 4!:55 <x end.
 v4768539054_dissect_ =. y
 4!:55 ;: 'x y'
 0!:100 DEFSTRING_dissect_
@@ -1422,6 +1461,8 @@ NB. dissectinstance is used only during the initial setup; when we return to wai
 NB. it must be empty.  Here we clear it for the cases of nodisplay and of error during initial display
 dissectinstance_dissect_ =: 0$a:
 if. NOCLEANUP *. -. x do. '' return. end.
+NB. Destroy all debug windows started here.  This saves the user the trouble of deleting them by hand
+for_o. debuglocs do. if. 1 = 18!:0 o do. destroy__o '' end. end.
 for_o. ~. objtable do. destroy__o '' end.
 NB.?lintmsgson
 resultroot =: 0$a:
@@ -1864,19 +1905,27 @@ if. 0 = #oloc =. ;:^:(0=L.) y do. oloc =. coname'' end.
 (copath~   ~.@(({. , oloc , }.)~   # | i.&iloc)@copath) coname''
 )
 
-NB. Init the logging table.  if y is 1 (default 0), create the dyad logging table that saves an additional value
-NB. for each logged item
+NB. Init the logging table.  if y is 0, create the dyad logging table that saves an additional value
+NB. for each logged item; if y is 1 or 2, create logging table for y [& x] (used by named verbs)
 initloggingtable =: 3 : 0
 logticket =: 0 $ 0
 logvalues =: 0 $ 0
 logvaluesarchive =: 0$a:
-if. {. y do. logvaluesd =: 0 $ 0 end.
-NB.?lintonly logticket =: logvaluesd =: 0$0 [ logvalues =: 0$a:
+select. ,y
+case. ,0 do. logvaluesd =: 0 $ 0
+case. ,1 do. logvaluesy =: 0 $ 0
+logvaluesarchivey =: 0$a:
+case. ,2 do. logvaluesx =: logvaluesy =: 0 $ 0
+logvaluesarchivex =: logvaluesarchivey =: 0$a:
+end.
+NB.?lintonly logticket =: logvaluesd =: 0$0 [ logvalues =: logvaluesx =: logvaluesy =: 0$a:
 NB.?lintonly verbex =: ]
 NB.?lintsaveglobals
 ''
 )
 
+NB. return the type of y: 0=numeric 1=character 2=box 3=sparse 4=symbol
+nountype =:  0 1 0 0 0 2 0 0 3 3 3 3 3 3 4 1 {~ 1 2 4 8 16 32 64 128 1024 2048 4096 8192 16384 32768 65536 131072 I. 3!:0
 NB. add to log.  Always called in the locale of the parse object.  x, if given, is the values log into the secondary area logvaluesd
 NB. y is the value to log; it becomes the result
 addlog =: 3 : 0
@@ -1887,7 +1936,7 @@ if. loggingallowed__COCREATOR do.
   logticket =: logticket , ticket__COCREATOR =: >: ticket__COCREATOR
   if. 0 = #logvalues do.
     logvalues =: 0 $ ,: y
-  elseif. y (=&(3!:0) *: (-: }.)&$) logvalues do.
+  elseif. y (=&nountype *: (-: }.)&$) logvalues do.
     logvaluesarchive =: logvaluesarchive , <logvalues
     logvalues =: 0 $ ,: y
   end.
@@ -1903,17 +1952,58 @@ end.
 addlog_dissectobj_ f. y  NB. In case addlog has a cover in the calling locale, try THIS monad
 )
 
+NB. Bivalent; add y [& x] arguments to their logs.  We know that this is called immediately after the result is logged,
+NB. so we don't need to get a ticket; just add the argument.
+NB. Result is immaterial
+addlogxy =: 3 : 0
+NB.?lintmsgsoff
+if. NOCLEANUP_dissect_ do. if. -. ifdefined 'logvaluesarchivey' do. logvaluesarchivey =: 0$a: end. end.
+NB. If we detect a restarted primitive, we suppress logging while the restart is in progress.
+if. loggingallowed__COCREATOR do.
+  if. 0 = #logvaluesy do.
+    logvaluesy =: 0 $ ,: y
+  elseif. y (=&nountype *: (-: }.)&$) logvaluesy do.
+    logvaluesarchivey =: logvaluesarchivey , <logvaluesy
+    logvaluesy =: 0 $ ,: y
+  end.
+  logvaluesy =: logvaluesy , y
+end.
+NB.?lintmsgson
+''
+:
+NB.?lintmsgsoff
+if. NOCLEANUP_dissect_ do. if. -. ifdefined 'logvaluesarchivex' do. logvaluesarchivex =: 0$a: end. end.
+NB. If we detect a restarted primitive, we suppress logging while the restart is in progress.
+if. loggingallowed__COCREATOR do.
+  if. 0 = #logvaluesx do.
+    logvaluesx =: 0 $ ,: x
+  elseif. x (=&nountype *: (-: }.)&$) logvaluesx do.
+    logvaluesarchivex =: logvaluesarchivex , <logvaluesx
+    logvaluesx =: 0 $ ,: x
+  end.
+  logvaluesx =: logvaluesx , x
+end.
+NB.?lintmsgson
+addlogxy y
+)
+
+
 NB. Nilad.  Convert the log to one boxed value for each result
 coalescelog =: 3 : 0
 NB. Make sure we do this only once per node.  We can come through here twice for conjunction noun operands,
 NB. and we wipe out logvaluesarchive the first time
-if. ifdefined 'logvaluesarchive' do.
-  if. #logvalues do. logvaluesarchive =: logvaluesarchive , <logvalues end.
-    if. #logvaluesarchive do.
-      logvalues =: ; <"_1&.> logvaluesarchive
-      4!:55 <'logvaluesarchive'
-  else.
-    logvalues =: 0$a:
+for_t. '';'y';'x' do.
+  'a v' =. (;: 'logvaluesarchive logvalues') ,&.> t
+  if. ifdefined a do.
+NB.?lintmsgsoff
+    if. #v~ do. (a) =: a~ , <v~ end.
+      if. #a~ do.
+        (v) =: ; <"_1&.> a~
+        4!:55 <a
+    else.
+      (v) =: 0$a:
+NB.?lintmsgson
+    end.
   end.
 end.
 0 0$0
@@ -1923,6 +2013,10 @@ NB. create string to use to add log entry.  If y is nonempty, it is the value to
 NB. The string produces a verb of infinite rank whose value is the same as its y
 logstring =: 3 : 0
 (')' ,~ ('((' , ')&' ,~ (5!:5 <'y'))&,)^:(*#y) 'addlog_' , (>coname'') , '_ '
+)
+NB. Same, to log y [and x] - never has an operand
+logstringxy =: 3 : 0
+'addlogxy_' , (>coname'') , '_ '
 )
 
 NB. Create string to add for logging a verb.  This creates a verb, named verbex, in the current locale
@@ -2465,18 +2559,24 @@ NB. when the frame contains 0, in which case there will be 0 or 1 result.
     QP^:DEBTRAVDOWN '$selopshapes $&.>selopshapes selopshapes $frames frames $frame frame resultlevel arglevel $selx '
     if. 0 e. frame do.
       smoutput^:DEBTRAVDOWN 'execution on fill-cell'
-NB. Execution on a cell of fills.  We should have 0 or 1 result.  If 0, it means that the
-NB. execution on the cell of fills failed, and we will use a scalar numeric as the replacement
+      NB. Execution on a cell of fills.  We should have 0 or 1 result.  If 0, it means that the
+      NB. execution on the cell of fills failed, and we will use a scalar numeric as the replacement
       assert. 0 1 e.~ #selx
-NB. create a result of the required type and shape
+      selresult =: selx performselection logvalues
       if. 0 = #selx do.
+        NB. No result.  must be error processing fill-cell.  Assume result of 'integer'
         selresult =: ,<0
         NB. Since error-in-fill is automatically handled, it can't coexist with any other error, so
         NB. we can signal the case with an errorcode, if we want to display that.
         if. displayshowfillcalc do. errorcode =: EFILLERROR end.
-      else.
-        selresult =: , ({.selx) { logvalues
-      end.   NB. error in fill cell - use scalar numeric
+      end.
+NB. obsolete NB. create a result of the required type and shape
+NB. obsolete       if. 0 = #selx do.
+NB. obsolete         selresult =: ,<0
+NB. obsolete         if. displayshowfillcalc do. errorcode =: EFILLERROR end.
+NB. obsolete       else.
+NB. obsolete         selresult =: , ({.selx) { logvalues
+NB. obsolete       end.   NB. error in fill cell - use scalar numeric
 NB. we will extend fill-cell with frame
 NB. Keep selector unchanged, since there was just one cell in the operand and there still will be
       NB. fill-cells run, as it were, in a try block; if they fail, they do not show the error.
@@ -2540,7 +2640,7 @@ NB. the cell as partially-executed, with no error
         errorcode =: (#. reporterror , cellswereexecuted #selx) { ENOEXECD,EUNEXECD , EABORTED,EEXEC
       end.
       NB. We need to save the selected value.  We use this to calculate the predicted frame after collection.
-      selresult =: selx { logvalues NB. This is the (unopened, since it might not collect) result from this object's verb, in execution order
+      selresult =: selx performselection logvalues NB. This is the (unopened, since it might not collect) result from this object's verb, in execution order
     end.
     
 NB. If the selection trims down the selection of results, apply that trim to the selector.
@@ -5937,6 +6037,7 @@ EXEGESISRANKSTACKPARTITIONSTART 0 Description
 EXEGESISONELINEDESC 0 Verb
 EXEGESISVERBDESC 0 Verb
 EXEGESISVERBRANK 0 Verb
+EXEGESISVERBRUNDEBUG 0 Verb
 EXEGESISFRAMEFILLSTART 1 Frame
 EXEGESISFRAMENUGATORY 1 Frame
 EXEGESISFRAMENONNOUN 1 Frame
@@ -6362,14 +6463,14 @@ end.
 text
 )
 
-NB. Hovering in the label 
+NB. Picking in the label.  Left-click gets NuVoc
 picklDOlabelpos =: 4 : 0
 'flags exp' =. x
 msgtext =. ''
 if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
   'ix pyx' =. {. r   NB. index of pickrect found
   if. 2 ~: 3!:0 displaylevrank do.
-    NB. If there is a rank stack, process it.  First the frame, then the individual item
+    NB. If there is a rank stack, process it.
     labelloc =. ix { DOranklocales
     NB.?lintonly labelloc =. <'dissectobj'
     if. #nuvocpage__labelloc do.
@@ -6392,6 +6493,35 @@ end.
 0 0$0
 )
 
+NB. Picking in the label.  Right-click lauches debug/dissect, but only if the verb
+NB. is named
+pickrDOlabelpos =: 4 : 0
+'flags exp' =. x
+msgtext =. ''
+if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
+  'ix pyx' =. {. r   NB. index of pickrect found
+  if. 2 ~: 3!:0 displaylevrank do.
+    NB. If there is a rank stack, process it.
+    labelloc =. ix { DOranklocales
+    NB.?lintonly labelloc =. <'dissectobj'
+    msgtext =. pickrlaunchdebug__labelloc ''
+  end.
+  if. #msgtext do.
+    NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
+    formloc =. exp { COCREATOR,coname''
+    NB.?lintonly formloc =. <'dissect'
+    drawtooltip__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
+    hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
+  end.
+end.
+0 0$0
+)
+
+NB. Nilad.  Launch debug/dissect for right-click.  Result is tooltip text ti
+NB. display (no tooltip if empty)
+pickrlaunchdebug =: 3 : 0
+'Only named verbs can be debugged.'
+)
 
 getselectedcell =: 3 : 0
 NB. sel1 is the path to the selection.  It may go down multiple levels, but it will
@@ -7769,6 +7899,11 @@ NB. axes; otherwise do the selection and open if there is a drop-down
 selopshapes ((}.~ #)&.> {.) ` (] >@]^:(1<#@[) <@(({ >)~ {.))  @. (1<L.@[)"0 1 opsel
 )
 
+NB. x is selx, the indexes of the selected result tickets
+NB. y is logvalues
+NB. Result is selresult
+performselection =: {
+
 NB. x is the selected indices that matched the selector
 NB. y is max size of a selresult as calculated by checkframe
 NB. Result is the shape we expect this result to have, for use in later traversal
@@ -8005,7 +8140,7 @@ x ,&< coname''  NB. Return the empty DOLs
 
 cocurrent 'dissectverb'
 coinsert 'dissectfitok dissectobj'
-NB. y is (string form of the verb);tokens it came from
+NB. y is (string form of the verb);tokens it came from[verb name;verb locale, '' if local;definition of named verb;execution locale;number of names defined at time of parse]
 NB. If the string form is boxed, it contains (string form);(title for display purposes)
 create =: 3 : 0
 create_dissectobj_ f. 1 { y
@@ -8021,7 +8156,16 @@ fitstring =: ''
 NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
 NB. If this verb has a one-line description, save it
-onelinedesc =: 2 {:: y , <''
+onelinedesc =: ''
+if. verbisnamed =: 2 < #y do.
+  NB. named verb: remember the definition, and also the number of names that were defined when it
+  NB. was encountered
+  'verbglopart verbloc verbtext verbexeloc ndefnames' =: 2 }. y
+  if. verbistacit =: LF -.@e. verbtext do.
+    onelinedesc =: verbtext
+  end.
+NB.?lintonly else. ndefnames =: verbistacit =: 0 [ verbtext =: verbloc =: verbexeloc =: verbglopart =: ''
+end.
 verb;(coname'');tokensource
 NB.?lintsaveglobals
 )
@@ -8047,14 +8191,18 @@ enparen^:((y>2) *. 1 < #@;: ) execform,fitstring
 )
 
 NB. return string form of operands, including instrumentation
-NB. y tells what intrumentation is needed:
+NB. y tells what instrumentation is needed:
 NB.  (1 if inputs need logging) , (1 2 3 for monad/dyad/unknown) , (1 for inverse also)
 
 exestring =: 3 : 0
 NB. init for logging
-initloggingtable ''
-NB. Instrument the forward verb - bivalent
-auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (execform,fitstring) , '))'
+initloggingtable verbisnamed # valence
+if. verbisnamed do.
+  auditstg '((' , (logstring '') , '@(' , (verblogstring '') , execform , ') [ ', (logstringxy '') , ')"',execform,')'
+else.
+  NB. Instrument the forward verb - bivalent
+  auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (execform,fitstring) , '))'
+end.
 NB.?lintonly 'logvalues logticket' =: (1$a:);$0
 NB.?lintsaveglobals
 )
@@ -8101,6 +8249,21 @@ elseif. do. r =. 0 2$a:
 end.
 if. #onelinedesc do.
   r =. r , EXEGESISONELINEDESC ; 'The definition of this verb is:',LF,onelinedesc,CR
+end.
+if. verbisnamed do.
+  if. (selectable+sellevel) > #selections do.
+    if. verbistacit do.
+      r =. r , EXEGESISVERBRUNDEBUG ; 'After you have selected a single result-cell, you may right-click the verb to dissect execution on that cell.',LF
+    else.
+      r =. r , EXEGESISVERBRUNDEBUG ; 'After you have selected a single result-cell, you may right-click the verb to examine execution on that cell using the debugger.',LF
+    end.
+  else.
+    if. verbistacit do.
+      r =. r , EXEGESISVERBRUNDEBUG ; 'You may right-click the verb to dissect execution on the selected cell.',LF
+    else.
+      r =. r , EXEGESISVERBRUNDEBUG ; 'You may right-click the verb to examine execution on the selected cell using the debugger.',LF
+    end.
+  end.
 end.
 if. #t =. lookupexplanation'' do.
   if. 0: #nuvocpage do. t =. t , 'Left-click to see the NuVoc page for this primitive.',LF end.
@@ -8401,6 +8564,116 @@ curlylfcoco`curlylfcoco#dyadic
 NB. *** traversal support ***
 operationfailed =: 1:   NB. An error found during verb execution is a stopper
 
+NB. x is selx, y is logvalues.  Return selection.
+NB. Save selx here in case we need it for launching debug
+performselection =: 4 : 0
+QP'x y '
+selectedindex =: x
+x { y
+NB.?lintsaveglobals
+)
+
+
+pickrlaunchdebug =: 3 : 0
+if. -. verbisnamed do. 'Only named verbs can be debugged.' return. end.
+if. (selectable + sellevel) > #selections do. 'You must select a single result-cell for analysis' return. end.
+NB. Get the argument(s) for the selected cell, and the text of the sentence (monad or dyad)
+NB. If there is no selected index, the only explanation is that the named verb failed
+NB. and we are pointing to the failure.  On that assumption, use the last inputs for y[x].
+if. 0 = #selectedindex do. selectedindex =. <:#logvaluesy
+elseif. selectable do. selectedindex =. (sellevel { selections) { selectedindex
+end.
+NB. Create the variables in scope for the execution
+argvbls =. ,: ((,'y') ; 0) , selectedindex { logvaluesy
+QP'selectedindex logvaluesy argvbls '
+if. 2 = valence do.
+  argvbls =. argvbls , ((,'x') ; 0) , selectedindex { logvaluesx
+end.
+NB. Make sure the new x and y override any previous definitions in the locale; more generally
+NB. that any reassigned names keep the most recent value.  Use only definitions in place when the
+NB. verb was encountered during execution.
+argvbls =. (#~   ~:@:({."1)) argvbls , (-ndefnames) {. defnames
+if. verbistacit do.
+  NB. Tacit verb: dissect it
+  NB. Create the sentence to use, with the verb definition expanded
+  txt =. ('x ' #~ 2 = valence) , '(' , verbtext , ') y'
+
+  NB. Run the sentence in a sandbox; save the locale, if there was no error.
+  NB. If there was an error, give a message.
+  if. '' -: $ debugloc =. dissect (3 ; verbloc ; txt) , argvbls do.
+    debuglocs__COCREATOR =: debuglocs__COCREATOR , debugloc
+  else.
+    wdinfo 'Error running dissect';debugloc
+  end.
+else.
+  NB. Explicit verb: debug it - if the new debugger is installed
+  if. 0 ~: /: 1 4 5 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter JVERSION do.
+    'You must update your JQt to support debugging' return.
+  end.
+  NB. Load the debugger if it's not loaded
+NB. obsolete  require 'debug'
+  NB. Clear the debugger.  It must be initialized, so initialize it if needed
+NB. obsolete if. 0 > 4!:0 <'STOPS_jdebug_' do. jdb_open_jdebug_'' end.
+NB. obsolete jdb_clear_jdebug_''
+  NB. Turn debug on, wiping out any active session
+  NB.?lintonly jdb_close_jdebug_ =: jdb_open_jdebug_ =: jdebug_splitheader_jdebug_ =: jdb_stoponall_jdebug_ =: nl_z_
+  if. 13!:17'' do.
+    'Stop your previous debug session before starting another' return.
+  end.
+  dbg_z_ 1
+NB. obsolete   if. 0 = 4!:0 <'STOPS_jdebug_' do. jdb_close_jdebug_'' end.
+NB. obsolete QP'13!:17'''' 13!:13'''' '
+NB. obsolete   jdb_open_jdebug_ 1
+NB. obsolete   13!:0 ] 1
+NB. obsolete QP'13!:17'''' '
+
+  NB. We have to find the locale in which the name is defined, regardless of where it
+  NB. is referenced from, so that we can set stops in it.
+  NB. This means that we have to pick up where name resolution stopped.  There
+  NB. we had glopart and gloc, and we looked up the name glopart starting in gloc.
+  NB. If the name was a local definition, glopart was empty.
+  if. #verbglopart do.
+QP'verbglopart '
+    NB. glopart is a simplename, or name_loc_, or name__loc[__loc].  In the last case,
+    NB. The first object locative has been stripped off already and is in gloc.
+    NB. We want to look up the name starting in gloc.
+    NB. First: if glopart ends with '_', split it into name and loc, and replace glopart/gloc
+    NB. Note this assignment covers the global names, no prob
+    if. '_' = {: verbglopart do. 'verbglopart verbloc' =. ('_' i:~ }: verbglopart) ({. ,&< <@((<<<0 _1)&{)@}.) verbglopart end.
+QP'verbglopart verbloc '
+    NB. Given the name & locale, see where the name is defined
+    if. #nameloc =. findnameloc :: (''"_) verbglopart ,&< verbloc do.
+      stopname =. {. jdebug_splitheader_jdebug_ nameloc
+QP'nameloc stopname '
+    else.
+      NB. should not occur
+      wdinfo 'Name not found';'No global definition found for name ',verbglopart,'.'
+      '' return.
+    end.
+  else.
+    NB. Name was resolved locally: set stops in its name, but don't split the header
+    NB. (we can't since there is no locale)
+    stopname =. verbglopart
+  end.
+  NB. Set stops in every line of the verb we are about to execute
+  NB. First we split the definition if it is a multiline definition,
+  NB. into header/body.  Then we install stops on all lines of the body.
+  NB. The stop code works on names, insensitive to locale
+  1 jdb_stoponall_jdebug_ stopname
+
+  NB. Execute the verb.  The verb may refer to private verbs, so
+  NB. we execute it in a sandbox
+  NB. create the sandbox verb in the user's locale
+  nm =. argvbls createsandbox verbloc
+QP'nm 13!:17'''' '
+  NB. The sentence to be debugged is just a single execution of the verb, in the sandbox
+  9!:27 '9!:27 ' , (quote (quote nm), nm , ' ' , quote ('x ' #~ 2 = valence) , execform , ' y') , ' [ 9!:29 (1) [ 13!:0 (1)'
+  9!:29 (1)
+end.
+NB. Normal completion: empty string
+''
+)
+
 
 cocurrent 'dissectmonad'
 coinsert 'dissectallnouns dissectobj'
@@ -8651,7 +8924,7 @@ enparen^:(y=3) (defstring__uop 2)
 
 NB. return string form of operands, including instrumentation within u but not within inverse of u
 exestring =: 3 : 0
-initloggingtable 1
+initloggingtable 0
 NB. Use dyad logging to log out the type of logentry.  0/1 are operand x/y on entry; _1 is result on exit
 NB. If u has an unused operand, we should put @] or @[ after the inverse, because Roger can't handle x u@[^:_1 y but he can handle x u@[^:_1@[ y
 xlogstring =. valence {:: ''  ;  '[:'  ;  '(',(logstring 0),')@['
@@ -8761,7 +9034,7 @@ NB. Result is array of boxes with one box for each selector, containing the
 NB. indices of the results for each selector
 findselection =: 3 : 0
 NB. In this node the selector selects everything.  We just return all the indexes
-NB. where valued is _1 (those are the results) 
+NB. where valuesd is _1 (those are the results) 
 , < _1 I.@:= logvaluesd
 )
 
@@ -10864,7 +11137,7 @@ enparen^:(y=3) (defstring__uop 2) , cop
 
 NB. return string form of operands, including instrumentation within u but not within inverse of u
 exestring =: 3 : 0
-initloggingtable 1
+initloggingtable 0
 NB. If u has an unused operand, we should put @] or @[ after the inverse, because Roger can't handle x u@[^:_1 y but he can handle x u@[^:_1@[ y
 monadstring =. invertiblymonadic__uop {:: '';'@]';'@['
 NB. We log 5 types: 0 for the original input, 1 for the forward input , _1 for the inverse input, 2 for forward output, _2 for inverse output, and we sort them out in the local addlog
@@ -12416,7 +12689,7 @@ enparen^:(y=3) (defstring__uop 2) jd '::' jd (defstring__vop 3)
 
 NB. return string form of operands, including instrumentation
 exestring =: 3 : 0
-initloggingtable ''
+initloggingtable 0
 auditstg '(' , (verblogstring '') , '(' ,  (logstring 0) , ,'@: ' , (exestring__uop '') , ' :: (' , (logstring 1) , '@: ' , (exestring__vop '') , ')))'
 )
 
@@ -13322,14 +13595,15 @@ NB. **** { ****
 'dissectverb' primlocale '{'
 
 setvalence =: 3 : 0
+NB. We only handle the dyad
 if. 1 = #y do. changeobjtypeto 'dissectverb' end.
 setvalence_dissectverb_ f. y
 )
 
 exestring =: 3 : 0
-NB. init for logging
-initloggingtable 1
-NB. Instrument the forward verb - bivalent
+NB. init for logging.  We log the x operand as d
+initloggingtable 0
+NB. Instrument the forward verb - using dyadic logstring
 auditstg '(' ,  , '(<@[ ' , (logstring'') , (verblogstring '') , '{)"0 _)'
 NB.?lintonly 'logvalues logticket' =: (1$a:);$0
 NB.?lintsaveglobals
@@ -14675,6 +14949,9 @@ ctup = 8
 2 dissect '(''[]'' -&(+/\)/@:(=/) ])''[[]][]'''
 2 dissect '1 2 =&(+/) 1 2 3 4 5 6'
 2 dissect '3 + 5 N','B. comment'
+2 dissect 'a taketo&.> c' [ a =. ;:'a b c' [ c =. 'cba';'def';2
+2 dissect '''a''&taketo&.> c' [ c =. 'cba';'def';2
+2 dissect '(,''a'')&taketo&.> c' [ c =. 'cba';'def';2
 )
 
 testsandbox_base_ =: 3 : 0
@@ -14694,6 +14971,32 @@ dissect arg
 )
 
 crash9 =: ([ [ 13!:8^:]@(9 e. ,))"0
+
+3 : 0 ''
+tv_a_ =: +
+mv_a_ =: 3 : ('y + 5')
+dv_a_ =: 4 : ('2 * x';'x + y')"0
+bv_a_ =: 3 : ('2 * y';':';'2 * x';'x * y')
+cocurrent 'b'
+('a';'z') copath <'b'
+l =: <,'a'
+k =: <,'d'
+cocurrent 'c'
+l =: <,'a'
+k =: <,'b'
+tv_d_ =: +:
+''
+)
+0 : 0
+findnameloc_dissect_ 'tv',&< <,'a'
+findnameloc_dissect_ 'tv',&< <,'b'
+findnameloc_dissect_ 'tv__l',&< <,'b'
+findnameloc_dissect_ 'tv__l',&< <,'c'
+findnameloc_dissect_ 'tv__k__k',&< <,'c'
+findnameloc_dissect_ 'tv__k__k',&< <,'b'
+)
+
+
 
 0 : 0  NB. Testcases that fail
 )
