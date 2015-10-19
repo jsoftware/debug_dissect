@@ -8567,7 +8567,6 @@ operationfailed =: 1:   NB. An error found during verb execution is a stopper
 NB. x is selx, y is logvalues.  Return selection.
 NB. Save selx here in case we need it for launching debug
 performselection =: 4 : 0
-QP'x y '
 selectedindex =: x
 x { y
 NB.?lintsaveglobals
