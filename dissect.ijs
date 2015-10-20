@@ -11,6 +11,8 @@ NB. 10 10 here is the starting position of the first window
 NB. DISSECTLEVEL is updated from time to time whenever there is a change to an external interface, indicating the dissect release level
 NB. at the time of the change
 DISSECTLEVEL_dissect_ =: 4 0
+NB. CONFIGFILELEVEL is the current EC level of the config file
+CONFIGFILELEVEL_dissect_ =: 1
 
 NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).  In J6 tooltips
 NB. take over the timer interrupt
@@ -51,19 +53,17 @@ config_displayautoexpand2_dissect_ =: 0
 config_displayautoexpand2_dissect_ =: 1
 0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 config_displayautoexpand2_dissect_ =: 0
-displaycompmods_dissect_ =: 1
+displayshowcompmods_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-displaycompmods_dissect_ =: 0
+displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
 config_displayshowfillcalc_dissect_ =: 0
-config_displaystealth_dissect_ =: 1
+config_displayshowstealth_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-config_displaystealth_dissect_ =: 0
+config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB.  
-NB. To get operand for debug, use selection to pull from savedselection
 NB. Test recursive debug for monad/dyad, and other locales, and object locales, tacit and explicit; and verbs with header
 NB.  re-click when debug window open fails
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
@@ -135,13 +135,15 @@ defaultfonts =: (<"0 (12 12 14 8)) ,.~ ((;:'Darwin') i. <UNAME) { ".;._2 (0 : 0)
 NB. lines beginning config_ are names that are initialized in the instance from the globals here
 NB. the others are global, shared among running dissections
 CONFIG =: 0 : 0
+configfilelevel =: 0
+tooltipctrl =: 0
 fontchoices =: defaultfonts
-tooltipdelayx =: 2  NB. tooltip delay
-tooltipdetailx =: 1   NB. tooltip detail level
-displaycompmods =: 0   NB. display full modified verb, not just modifier line
-displaystructmods =: 0   NB. display a line for @ @: & etc
+tooltipdelayx =: 2 NB. tooltip delay
+tooltipdetailx =: (1 {"1 TOOLTIPDETAILCHOICES) i. <'verbose'    NB. tooltip detail level
+displayshowcompmods =: 0   NB. display full modified verb, not just modifier line
+displayshowstructmods =: 0   NB. display a line for @ @: & etc
 config_maxnoundisplaysizex =: 3 3
-config_displaystealth =: 0
+config_displayshowstealth =: 0
 config_displayautoexpand2 =: 0   NB. Automatically show u/ on 2 items as dyad
 config_displayshowfillcalc =: 0  NB. Make a rankstack mark when fill-cell is used
 config_displayprecisionx =: 2   NB. default display precision
@@ -150,21 +152,35 @@ config_displayprecisionx =: 2   NB. default display precision
 NB. Read & apply config file.  Run in dissect locale.
 loadconfig =: 3 : 0
 try.
+  NB. Define the defaults first, in case config format has changed
   cfile =. CONFIG , 1!:1 <jpath '~config/dissect.ijs'
 catch.
-  cfile =. CONFIG
+  cfile =. CONFIG , 'configfilelevel =: _1' , LF
 end.
 NB. Remove CR, force LF termination
 cfile =. LF ,~^:(~: {:) cfile -. CR,TAB
 0!:0 cfile
+NB. If the config file was downlevel, here is where we take action
+select. configfilelevel
+case. _1 do.
+  NB. no config file
+case. 0 do.
+  NB. config file, but created before levels assigned
+  tooltipdetailx =: >: tooltipdetailx  NB. we added a 'none' option
+  displayshowcompmods =: {. ". 'displaycompmods'   NB. we renamed this
+  displayshowstructmods =: {. ". 'displaystructmods'   NB. we renamed this
+case. CONFIGFILELEVEL do.
+  NB. current level - that's OK
+case. do.
+  NB. Here for downlevel config file
+end.
 0 0$0
 )
 
-NB. Read the config file at startup
-loadconfig''
-
 NB. Write current settings to config file.  Called in the instance that we want to save
 saveconfig =: 3 : 0
+NB. Save the config file witht he current level
+configfilelevel =: CONFIGFILELEVEL
 NB. Get the variable names we want to save under
 cnames =. {.@;:;._2 CONFIG
 NB. Get the name to save from - same with config removed, so we get the instance value
@@ -191,8 +207,8 @@ if. #y do.
     maxnoundisplaysizex =: (}:MAXNOUNPCTCHOICES) I. 2 ($,) 0 ". (dsx,1) {:: y
   end.
 end.
-NB.?lintonly tooltipdelayx =: tooltipdetailx =: displaycompmods =: displaystructmods =: 0
-NB.?lintonly maxnoundisplaysizex =: 0 0 [ displaystealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: 0
+NB.?lintonly tooltipdelayx =: tooltipdetailx =: displayshowcompmods =: displayshowstructmods =: 0
+NB.?lintonly maxnoundisplaysizex =: 0 0 [ displayshowstealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: 0
 0 0$0
 NB.?lintsaveglobals
 )
@@ -372,6 +388,7 @@ findnameloc =: 3 : 0
 NB. If there are object names, resolve them in loc and replace loc with
 NB. the result
 if. '__' +./@:E. name do.
+  NB.?lintonly loc =. <'dissectobj'
   cocurrent loc
   loc =. ('__' takeafter name)~
   name =. '__' taketo name
@@ -902,8 +919,8 @@ calcdispniladinputs__resultroot 0
 NB. Init the instance variables from the defaults in the dissect locale
 NB. This also sets the values in the form.  We pass in the display options so they can be used
 applyconfig dispoptions
-NB. Init the displaystealth in every object.  Must be refigured if we change dispstealth
-calcdispstealth__resultroot displaystealth # 1 2
+NB. Init the displayshowstealth in every object.  Must be refigured if we change dispstealth
+calcdispstealth__resultroot displayshowstealth # 1 2
 
 NB. Create the string to execute.  If we have to create a sandbox, do so
 NB. The raw sentence has the user's tokens, but the the invisible ones removed (for noassign sentences).
@@ -990,14 +1007,13 @@ DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 NB. The tooltip size will be selected according to detail and expanded according to fontsize
-ISISIZEPERTTPOINT =: _2 ]\ 25 35   35 60   112 75
-MINIMUMISISIZE =: 300 500     NB. minimum size for graphics, needed to allow room for tooltip
-
+ISISIZEPERTTPOINT =: _2 ]\ 0 0   25 35   35 60   112 75
+MINIMUMISISIZE =: 100 80     NB. minimum size for graphics - low to allow small screen
 TOOLTIPMAXPIXELS =: 900  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.6  NB. Max tooltip width, as frac of isigraph width
 
 TOOLTIPDELAYCHOICES =: ('immed';'250';'500';'1000') ,. ('immediate';'0.25 sec';'0.5 sec';'1 sec') ,. <"0 (1 250 500 1000)
-TOOLTIPDETAILCHOICES =: ('0';'1';'2') ,. ('laconic';'verbose';'tutorial') ,. <"0 (0 1 2)
+TOOLTIPDETAILCHOICES =: ('0';'1';'2';'3') ,. ('none';'laconic';'verbose';'tutorial') ,. <"0 (0 1 2 3)
 
 preclines =. ; <@('menu fmprec' , ": , ' "' , ": , '";' , LF"_ )"0 DISPLAYPRECCHOICES
 sizexlines =. ; <@('menu fmmaxnounsizex' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
@@ -1037,6 +1053,8 @@ menupopz;
 menupop "Detail";
 rem ttdetlines;
 menupopz;
+menusep;
+menu fmtooltipctrl "Show tooltips only while CTRL pressed";
 menupopz;
 menupop "&Config";
 menu fmsaveconfig "Save current settings";
@@ -1096,6 +1114,8 @@ menupopz;
 menupop "Detail";
 rem ttdetlines;
 menupopz;
+menusep;
+menu fmtooltipctrl "Show tooltips only while CTRL pressed";
 menupopz;
 menupop "&Config";
 menu fmsaveconfig "Save current settings";
@@ -1124,7 +1144,7 @@ minwh 5 28;cc fmspacer static;cn "";
 bin zh1;
 minwh 50 16;cc fmstatline static;
 bin zz;
-minwh 400 80;cc dissectisi isidraw;
+minwh 100 80;cc dissectisi isidraw;
 bin z;
 pas 0 0;
 rem form end;
@@ -1313,8 +1333,8 @@ initselections''
 NB. If the user codes a verb whose result is never used (owing to stealth), and that verb crashes,
 NB. we will never see the error (unless we have the wit to show ][).  We look out for that here.
 NB. We create a flag that will be cleared if we display an error block.  If that is still set after the
-NB. first display, we will turn on displaystealth and retry
-needtocheckerrordisplayed =: crashed *. -. displaystealth
+NB. first display, we will turn on displayshowstealth and retry
+needtocheckerrordisplayed =: crashed *. -. displayshowstealth
 if. crashed do.
   joinlayoutsl traverse 1   NB. Don't forget the final display!
   setdisplayerror__resultroot''
@@ -1332,7 +1352,12 @@ NB. Do the initial traversal, calculate the initial placement.
 placeddrawing =: calcplacement screensize
 NB. Set the starting scroll position, just below the sentence/link
 scrolltlc =: 0 ,~ 2 + >./ (<a:;0) { sentencesizes  NB. y sizes of brects
-sizedrawingandform 1
+NB. Init scrolling vbl in case the window system fails to give a left-click before leftdbl
+dblclickismainscroll =: 0
+NB. autosizestate is 2 initially, to get initial position
+NB. 0 from then on to resize according to required size
+NB. If user resizes, autosizestate goes negative to indicate that e has taken control
+autosizestate =: 2
 wd 'pshow'
 NB. On J6, we will get an immediate paint event.
 NB. On QT, the pshow will instantly call resize (before returning to immediate mode), which will
@@ -1358,27 +1383,29 @@ NOLAYOUTS traverse__resultroot TRAVNOUN
 NB.?lintsaveglobals
 )
 
-EXPANSIONROOMAROUNDISI =: 200 100  NB. Number of pixels to leave at margin
+EXPANSIONROOMAROUNDISI =: 200 100  NB. Number of pixels to leave at margin, yx
 NB. Size the isigraph and the parent, and size the drawing for display
-NB. If y is 1, set the initial position based on the session history
+NB. y is resizestate: positive for first call, zero for non-first call
+NB. that has not resized, negative if user has taken control with resize.
 NB. Globals sentencesizes, scrolltlc, placeddrawing have been set
 NB. Result is the drawing (the result of sizeplacement)
 NB. Side effect: the isigraph and parent are resized (up only) as required
 NB. When we resize the isigraph, we include expansion room
 sizedrawingandform =: 3 : 0
-initfromsess =. y
+NB. Decide what we will automaticall control: position, size
+'initxy autosize' =. (y > 0) , (y >: 0)
 NB. Get the required size - mostly the isi, but must be wide enough for the sentence/links too
 NB. Minimum top size is total width, and maximum height, of brects, plus some spacing if there is more than
 NB. 1 brect
 topminsize =. ((0 2 * 1 < #) + >./@:({."1) , +/@:({:"1)) sentencesizes
 yxneeded =. topminsize >. 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
 NB. Get the current size of the isi; if insufficient, make it bigger, with expansion added
-if. initfromsess +. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
+if. initxy +. autosize *. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
   minisi =. MINIMUMISISIZE >. <. (tooltipdetailx{ISISIZEPERTTPOINT) * (<3 1) {:: fontchoices
   NB. For QT, always size the canvas to the full screen
-  'dissectisi' wdsetxywh _1"0^:IFQT 1 0 3 2 { cyxhw =. (minisi >. EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
+  'dissectisi' wdsetxywh _1"0^:IFQT 1 0 3 2 { cyxhw =. (minisi >. autosize * EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
   NB. If the main form has grown now that the isi has grown, resize it too.
-  if. initfromsess do. xywh =. 1 0 3 2 { (getsessionyx'') , +/ 2 2 $ cyxhw
+  if. initxy do. xywh =. 1 0 3 2 { (getsessionyx'') , +/ 2 2 $ cyxhw
   else. xywh =. (0 ". wdqform'') >. 0 0 , |. +/ 2 2 $ cyxhw
   end.
   wdpmove ": xywh 
@@ -1404,15 +1431,17 @@ try.
   if. 1 = {. y do. placeddrawing =: calcplacement screensize end.
   NB. Draw the revised placement and wiring.  Save the placement to speed scrolling
   QP^:DEBTIME'startdraw=?6!:1'''' '
-  drawplacement }. sizedrawingandform 0
+  drawplacement }. sizedrawingandform autosizestate
   NB. If we didn't put out the error message, show stealth and try again
   if. needtocheckerrordisplayed do.
     NB. set stealth visible and retry
-    calcdispstealth__resultroot (displaystealth =: 1) # 1 2
+    calcdispstealth__resultroot (displayshowstealth =: 1) # 1 2
     placeddrawing =: calcplacement screensize
-    drawplacement }. sizedrawingandform 0
+    drawplacement }. sizedrawingandform autosizestate
     needtocheckerrordisplayed =: 0   NB. do this only once
   end.
+  NB. Once we have made initial display, go into autosizing mode, until user resizes
+  autosizestate =: autosizestate <. 0
   glpaint''
   
   NB. Set the user-option buttons based on the display results
@@ -1427,13 +1456,9 @@ try.
   NB. according to whether we are displaying them.  Enable the button if
   NB. (we are suppressing stealth and we suppressed something) or
   NB. (we are allowing stealth, which might be a config default)
-  'fmshowstealth' wdsetenable ": displaystealth +. stealthopencountered
+  'fmshowstealth' wdsetenable ": displayshowstealth +. stealthopencountered
 
-  'fmshowcompmods' wdsetvalue ": displaycompmods
-  'fmshowstructmods' wdsetvalue ": displaystructmods
-  'fmautoexpand2' wdsetvalue ": displayautoexpand2
-  'fmshowfillcalc' wdsetvalue ": displayshowfillcalc
-  'fmshowstealth' wdsetvalue ": displaystealth
+  ('fm'&, wdsetvalue ":@:".@('display'&,))@> ;: 'showcompmods showstructmods autoexpand2 showfillcalc showstealth tooltipctrl' 
   
   NB. Restore the user's environment before returing to immediate mode
   restoreJenvirons''
@@ -1487,46 +1512,36 @@ codestroy''
 y
 )
 
-NB. obsolete NB. Return 1 if this looks like a repeat event that should be ignored
-NB. obsolete NB. discard identical events occurring within 5 seconds
-NB. obsolete reclickblocktime =: 0
-NB. obsolete reclickblockevent =: ''
-NB. obsolete reclickblock =: 3 : 0
-NB. obsolete fastclick =. (reclickblocktime =: 6!:1'') (< 0.5&+) reclickblocktime
-NB. obsolete fastclick *. (reclickblockevent =: y) -: reclickblockevent
-NB. obsolete )
-NB. obsolete 
 NB. Toggle the state of stealth display
 dissect_fmshowstealth_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmshowstealth' do. i. 0 0 return. end.
-'fmshowstealth' wdsetvalue ": displaystealth =: -. displaystealth
+'fmshowstealth' wdsetvalue ": displayshowstealth =: -. displayshowstealth
 NB. The operand is the list of types that should NOT be displayed
-calcdispstealth__resultroot displaystealth # 1 2
+calcdispstealth__resultroot displayshowstealth # 1 2
 dissect_dissectisi_paint 1
 )
 NB. Toggle the state of compmod display
 dissect_fmshowcompmods_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmshowcompmods' do. i. 0 0 return. end.
-'fmshowcompmods' wdsetvalue ": displaycompmods_dissect_ =: -. displaycompmods
+'fmshowcompmods' wdsetvalue ": displayshowcompmods_dissect_ =: -. displayshowcompmods
 dissect_dissectisi_paint 1
 )
 NB. Toggle the state of structmod display
 dissect_fmshowstructmods_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmshowstructmods' do. i. 0 0 return. end.
-'fmshowstructmods' wdsetvalue ": displaystructmods_dissect_ =: -. displaystructmods
+'fmshowstructmods' wdsetvalue ": displayshowstructmods_dissect_ =: -. displayshowstructmods
 dissect_dissectisi_paint 1
 )
 NB. Toggle the state of structmod display
 dissect_fmautoexpand2_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmshowautoexpand2' do. i. 0 0 return. end.
 'fmautoexpand2' wdsetvalue ": displayautoexpand2 =: -. displayautoexpand2
 dissect_dissectisi_paint 1
 )
 NB. Toggle the state of fill-cell display
 dissect_fmshowfillcalc_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmshowfillcalc' do. i. 0 0 return. end.
 'fmshowfillcalc' wdsetvalue ": displayshowfillcalc =: -. displayshowfillcalc
 dissect_dissectisi_paint 1
+)
+NB. Toggle the state of tooltipctrl display
+dissect_fmtooltipctrl_button =: 3 : 0
+'fmtooltipctrl' wdsetvalue ": tooltipctrl_dissect_ =: -. tooltipctrl
 )
 
 dissect_close =: 1&destroy
@@ -1553,7 +1568,6 @@ dissect_fmfontimsgs_button =: 'messages'&(dissect_fmfontsize_button 2:)
 dissect_fmfontttips_button =: 'tooltips'&(dissect_fmfontsize_button 3:)
 
 dissect_fmmaxnounsize_button =: 4 : 0
-NB. obsolete if. reclickblock 'fmmaxnounsize' do. i. 0 0 return. end.
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '0'
 ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue '0'
 maxnoundisplaysizex =: y x} maxnoundisplaysizex
@@ -1568,7 +1582,6 @@ dissect_dissectisi_paint 1
 )
 
 dissect_fmtooltipdelay_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmtooltipdelay' do. i. 0 0 return. end.
 ('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx) wdsetvalue  '0'
 ('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx_dissect_ =: y) wdsetvalue  '1'
 )
@@ -1577,7 +1590,6 @@ NB. obsolete if. reclickblock 'fmtooltipdelay' do. i. 0 0 return. end.
 )
 
 dissect_fmtooltipdetail_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmtooltipdetail' do. i. 0 0 return. end.
 ('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx) wdsetvalue  '0'
 ('fmtooltipdetail' , TOOLTIPDETAILCHOICES {::~ <0,~ tooltipdetailx_dissect_ =: y) wdsetvalue  '1'
 )
@@ -1587,7 +1599,6 @@ NB. obsolete if. reclickblock 'fmtooltipdetail' do. i. 0 0 return. end.
 
 NB. We do not use dissect locale for displayprecision, because it is not shared between instances
 dissect_fmprec_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmprec' do. i. 0 0 return. end.
 ('fmprec' , ": DISPLAYPRECCHOICES {~ displayprecisionx) wdsetvalue  '0'
 ('fmprec' , ": displayprecision =: DISPLAYPRECCHOICES {~ displayprecisionx =: y) wdsetvalue  '1'
 dissect_dissectisi_paint 1
@@ -1597,12 +1608,10 @@ dissect_dissectisi_paint 1
 )
 
 dissect_fmsaveconfig_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmsaveconfig' do. i. 0 0 return. end.
 saveconfig''
 )
 
 dissect_fmapplyconfig_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmapplyconfig' do. i. 0 0 return. end.
 loadconfig_dissect_''  NB. get values from config file
 applyconfig 0   NB. apply them to this instance, ignoring input options
 setformconfig''   NB. put the values into the form
@@ -1615,7 +1624,6 @@ dissect_fmhelplearning_button =: helpshow_dissecthelplearning_
 dissect_fmhelpusing_button =: helpshow_dissecthelpusing_
 
 dissect_fmlab_button =: 3 : 0
-NB. obsolete if. reclickblock 'fmlab' do. i. 0 0 return. end.
 try.
   NB. See if labs are installed
   require 'labs/labs'
@@ -1635,7 +1643,6 @@ dissect_fmlab_button '~addons/labs/labs/debug/dissect2.ijt'
 
 dissect_fmwikidissect_button =: 3 : 0
 NB.?lintonly browse_j_ =. 3 : 'y'
-NB. obsolete if. reclickblock 'fmwikidissect' do. i. 0 0 return. end.
 browse_j_ JWIKIURL,'Vocabulary/Dissect'
 0 0$0
 )
@@ -1643,7 +1650,6 @@ dissect_f1_fkey =: dissect_fmwikidissect_button
 
 dissect_fmwikinuvoc_button =: 3 : 0
 NB.?lintonly browse_j_ =. 3 : 'y'
-NB. obsolete if. reclickblock 'fmwikinuvoc' do. i. 0 0 return. end.
 browse_j_ JWIKIURL,'NuVoc'
 0 0$0
 )
@@ -1651,7 +1657,6 @@ dissect_f1shift_fkey =: dissect_fmwikinuvoc_button
 4!:55^:(-.IFQT) 'dissect_f1_fkey';'dissect_f1shift_fkey'
 
 dissect_jctrl_fkey =: 3 : 0
-NB. obsolete if. reclickblock 'fmctrlj' do. i. 0 0 return. end.
 if. 0 < 4!:0 <'labrun_jlab_' do.
   9!:27 'labrun_jlab_$0'   NB. create immex sentence
   9!:29 (1)
@@ -1839,8 +1844,8 @@ fulltitlestring =: 4 : 0
 isstruct =. x
 if. y -: '' do. ''
 elseif. ' ' e. 0 _1 { y do. ''
-elseif. isstruct *. -. displaystructmods do. ''
-elseif. displaycompmods do. defstring 0
+elseif. isstruct *. -. displayshowstructmods do. ''
+elseif. displayshowcompmods do. defstring 0
 elseif. do. y
 end.
 )
@@ -2570,13 +2575,6 @@ NB. when the frame contains 0, in which case there will be 0 or 1 result.
         NB. we can signal the case with an errorcode, if we want to display that.
         if. displayshowfillcalc do. errorcode =: EFILLERROR end.
       end.
-NB. obsolete NB. create a result of the required type and shape
-NB. obsolete       if. 0 = #selx do.
-NB. obsolete         selresult =: ,<0
-NB. obsolete         if. displayshowfillcalc do. errorcode =: EFILLERROR end.
-NB. obsolete       else.
-NB. obsolete         selresult =: , ({.selx) { logvalues
-NB. obsolete       end.   NB. error in fill cell - use scalar numeric
 NB. we will extend fill-cell with frame
 NB. Keep selector unchanged, since there was just one cell in the operand and there still will be
       NB. fill-cells run, as it were, in a try block; if they fail, they do not show the error.
@@ -6026,37 +6024,37 @@ NB. These are the morphemes we use, in the order they should appear in the final
 NB. Some may be extended with selection levels when they are created.
 NB. The number is the detail level at which the value is displayed
 exegesismorphemes =. 3&{.@;:;._2 (0 : 0)
-EXEGESISTUTORIAL 2 Tutorial
-EXEGESISRANKOVERALLNODISP 0 Description
-EXEGESISRANKOVERALLCOMPEND 0 Description
-EXEGESISRANKOVERALLNOOPS 0 Description
-EXEGESISRANKOVERALLEXPLAIN 0 Description
-EXEGESISRANKSTACKEXPLAIN 0 Description
-EXEGESISRANKSTACKPOWERSTART 0 Description
-EXEGESISRANKSTACKPARTITIONSTART 0 Description
-EXEGESISONELINEDESC 0 Verb
-EXEGESISVERBDESC 0 Verb
-EXEGESISVERBRANK 0 Verb
-EXEGESISVERBRUNDEBUG 0 Verb
-EXEGESISFRAMEFILLSTART 1 Frame
-EXEGESISFRAMENUGATORY 1 Frame
-EXEGESISFRAMENONNOUN 1 Frame
-EXEGESISFRAMENOSHAPE 1 Frame
-EXEGESISFRAMEVALID 1 Frame
-EXEGESISFRAMESURROGATE 1 Frame
-EXEGESISFRAMENOFRAME 1 Frame
-EXEGESISSHAPESELECTINGVERB 0
-EXEGESISSHAPEFRAME 0
-EXEGESISSHAPERESULT 0
-EXEGESISDATASOURCE 1
-EXEGESISDATASHAPE 1
-EXEGESISDATAPATH 0
-EXEGESISDATAARRANGEMENT 1
-EXEGESISDATAEXPLORABLE 1
-EXEGESISDATACLIPINFO 1 Clipboard
+EXEGESISTUTORIAL tutorial Tutorial
+EXEGESISRANKOVERALLNODISP laconic Description
+EXEGESISRANKOVERALLCOMPEND laconic Description
+EXEGESISRANKOVERALLNOOPS laconic Description
+EXEGESISRANKOVERALLEXPLAIN laconic Description
+EXEGESISRANKSTACKEXPLAIN laconic Description
+EXEGESISRANKSTACKPOWERSTART laconic Description
+EXEGESISRANKSTACKPARTITIONSTART laconic Description
+EXEGESISONELINEDESC laconic Verb
+EXEGESISVERBDESC laconic Verb
+EXEGESISVERBRANK laconic Verb
+EXEGESISVERBRUNDEBUG laconic Verb
+EXEGESISFRAMEFILLSTART verbose Frame
+EXEGESISFRAMENUGATORY verbose Frame
+EXEGESISFRAMENONNOUN verbose Frame
+EXEGESISFRAMENOSHAPE verbose Frame
+EXEGESISFRAMEVALID verbose Frame
+EXEGESISFRAMESURROGATE verbose Frame
+EXEGESISFRAMENOFRAME verbose Frame
+EXEGESISSHAPESELECTINGVERB laconic
+EXEGESISSHAPEFRAME laconic
+EXEGESISSHAPERESULT laconic
+EXEGESISDATASOURCE verbose
+EXEGESISDATASHAPE verbose
+EXEGESISDATAPATH laconic
+EXEGESISDATAARRANGEMENT verbose
+EXEGESISDATAEXPLORABLE verbose
+EXEGESISDATACLIPINFO verbose Clipboard
 )
 ({."1 exegesismorphemes) =: i. # exegesismorphemes
-exegesislevels =: (1) 0&".@{::"1 exegesismorphemes
+exegesislevels =: (1 {"1 TOOLTIPDETAILCHOICES) i. 1 {"1 exegesismorphemes
 exegesislabels =: 2 {"1 exegesismorphemes
 
 NB. Instructions for pruning
@@ -7158,19 +7156,26 @@ CURSORXSIZE =: 10
 
 NB. This is called in whichever locale and psel of whatever form is active - the main or an explorer.
 NB. The timer will run in the main form
-NB. x is (window type 0=main 1=exp);(1 to write to the statline (which doesn't exist on explorers));(radius for continuation);(1 to allow new timer-start)
+NB. x is ((window type 0=main 1=exp),(1 to write to the statline (which doesn't exist on explorers)));(sysdata at tme of click)
 hoverstart =: 4 : 0
-'isexp writestat radius startok' =. x
+'opts sd' =. x
+'isexp writestat' =. opts
+NB. Is a button down?  We will use that to calculate the jiggle tolerance
+buttonisdown =. 1 e. 4 5 { sd
 if. #hoverinitloc do.  NB. We are hovering.  Does this continue the same hover?
-  if. (radius { MAXHOVERMOVEMENT) < >./ | y - hoverinitloc do. hoverend'' end.
+  if. (buttonisdown { MAXHOVERMOVEMENT) < >./ | y - hoverinitloc do. hoverend'' end.
 end.
-if. startok *. 0 = #hoverinitloc do.   NB. If no hover running (and perhaps we just cleared it), start one
+NB. Allow starting a hover only if no button is down (don't hover during dragging of window)
+if. (-. buttonisdown) *. 0 = #hoverinitloc do.   NB. If no hover running (and perhaps we just cleared it), start one
 NB.?lintonly wdtimer =: wd
 QP^:DEBMOUSE'hoverstart:hwnd=?winhwnd wd''qhwndp'' '
-  wdtimer (tooltipdelayx,2) {:: TOOLTIPDELAYCHOICES  NB. start the hover timer
+  NB. Is it OK to create a tooltip?  Yes if tooltips are enabled, except when control required and not pressed
+  if. (0 ~: tooltipdetailx) *. -. tooltipctrl *. 0 = 6 { sd do.
+    wdtimer (tooltipdelayx,2) {:: TOOLTIPDELAYCHOICES  NB. start the hover timer
+  end.
   hoverinitloc =: y
   hoverisexp =: isexp
-  NB. The same action that starts the hover timer will set the status line immediately
+  NB. The same action that would start the hover timer will set the status line immediately - even if hover disabled
   if. writestat do. statlinedo y end.
   NB.?lintsaveglobals
 end.
@@ -7345,7 +7350,7 @@ NB. Remember the clicked position, and the pixels in the screen (we use the pres
 NB. the screen buffer as an indicator of scroll-in-progress, and delete it when we're done,
 NB. since it's big)
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
-if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
+if. dblclickismainscroll =: 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
   winsize =. 3 2 { sd   NB. y,x of control.  Mustn't read outside!
 NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
   picksentencepixels =: glqpixels 1 0 3 2 { , picksentencerect =: ({. ,: winsize <. {:)&.(+/\) topbrect
@@ -7382,7 +7387,7 @@ NB. Perform the scroll, on the main window, but in the locale of the data
 elseif. do.
   NB. mmove not for scrolling.  Set radius to use depending on whether a button is down
   NB. If button down, use larger radius but don't allow a new tooltip to start
-  (0 1 , (1 e. 4 5 { sd) { 0 1,:1 0) hoverstart 1 0 { sd
+  (0 1 ; sd) hoverstart 1 0 { sd
 end.
 )
 
@@ -7392,7 +7397,7 @@ dissect_dissectisi_mblup =: 3 : 0
 hoverend''
 if. 0 = 4!:0 <'pickpixels' do.
   4!:55 ;: 'pickpixels picksentencepixels'  NB. indicate end-of-scroll
-NB. Use the last-drawn position as the new position.  If it hasn't changed from the original, redraw
+NB. Use the last-drawn position as the new position.  If it hasn't changed from the original, don't bother to redraw
   if. pickscrollcurryx -.@-: pickscrollstartyx do.
     scrolltlc =: <. scrolltlc + pickscrollcurryx - pickscrollstartyx
     dissect_dissectisi_paint 0  NB. no need to recalc placement
@@ -7410,8 +7415,22 @@ dissect_dissectisi_focuslost =: 3 : 0
 hoverend''
 )
 
+dissect_dissectisi_mbldbl =: 3 : 0
+hoverend''
+if. dblclickismainscroll do.
+  NB. Put sizing back under automatic control
+  autosizestate =: 0
+  NB. Draw, without changing the placement
+  dissect_dissectisi_paint 0
+end.
+)
+
+
 NB. Resize happens at the beginning for QT to kick off display
 dissect_dissectisi_resize =: 3 : 0
+NB. Make autosizestate negative to indicate user in control - except first time,
+NB. where we leave it > 0
+autosizestate =: <: autosizestate
 dissect_dissectisi_paint 1
 )
 
@@ -7713,7 +7732,7 @@ NB. abort it.
 elseif. do.
   NB. mmove not for scrolling.  Set radius to use depending on whether a button is down
   NB. If button down, use larger radius but don't allow a new tooltip to start
-  (1 0 , (1 e. 4 5 { sd) { 0 1,:1 0) hoverstart 1 0 { sd
+  (1 0 ; sd) hoverstart 1 0 { sd
 end.
 )
 
@@ -8610,21 +8629,13 @@ else.
     'You must update your JQt to support debugging' return.
   end.
   NB. Load the debugger if it's not loaded
-NB. obsolete  require 'debug'
   NB. Clear the debugger.  It must be initialized, so initialize it if needed
-NB. obsolete if. 0 > 4!:0 <'STOPS_jdebug_' do. jdb_open_jdebug_'' end.
-NB. obsolete jdb_clear_jdebug_''
   NB. Turn debug on, wiping out any active session
   NB.?lintonly jdb_close_jdebug_ =: jdb_open_jdebug_ =: jdebug_splitheader_jdebug_ =: jdb_stoponall_jdebug_ =: nl_z_
   if. 13!:17'' do.
     'Stop your previous debug session before starting another' return.
   end.
   dbg_z_ 1
-NB. obsolete   if. 0 = 4!:0 <'STOPS_jdebug_' do. jdb_close_jdebug_'' end.
-NB. obsolete QP'13!:17'''' 13!:13'''' '
-NB. obsolete   jdb_open_jdebug_ 1
-NB. obsolete   13!:0 ] 1
-NB. obsolete QP'13!:17'''' '
 
   NB. We have to find the locale in which the name is defined, regardless of where it
   NB. is referenced from, so that we can set stops in it.
@@ -9950,7 +9961,7 @@ if. nilad do.
   stealthopencountered__COCREATOR =: 1  NB. Note that we saw a nilad
   NB. Traverse the noun, but keep sellevel in order so highlights are calculated correctly
   NB. Remove the input if we should not display them
-  0 inheritu (x #~ dispniladinputs +. displaystealth) traverse__uop bnsellevel 0} TRAVNOUN
+  0 inheritu (x #~ dispniladinputs +. displayshowstealth) traverse__uop bnsellevel 0} TRAVNOUN
   NB. This returned a noun result, which may have a character value for the name in displaylevrank.  So we inherit it
   NB. into m"_, which in inheritu converts it to a verb for subsequent inheritance.  This turns the noun into a niladic verb.
 else.
@@ -13581,7 +13592,7 @@ assert. 1 2 e.~ #x
 traversedowncalcselect y  NB. Just to set error globals
 stealthopencountered__COCREATOR =: 1  NB. Note that we saw a nilad
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
-if. -. dispniladinputs +. displaystealth do.
+if. -. dispniladinputs +. displayshowstealth do.
   NB. we are not displaying the inputs.  Remove inputs to x
   x =. a:"0 x
 end.
@@ -13772,11 +13783,11 @@ titlestring =: 1 fulltitlestring 'fork'
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 if. vvv do.
-  dolv =. joinlayoutsl x traverse__vop ((<displaystructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
-  dolu =. joinlayoutsl x traverse__uop ((<displaystructmods#'\fork')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
+  dolv =. joinlayoutsl x traverse__vop ((<displayshowstructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
+  dolu =. joinlayoutsl x traverse__uop ((<displayshowstructmods#'\fork')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
 else.
 NB. nvv.  Traverse n as a noun; but keep sellevel so that highlighting is calculated correctly
-  dolv =. joinlayoutsl x traverse__vop ((<displaystructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
+  dolv =. joinlayoutsl x traverse__vop ((<displayshowstructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
   dolu =. joinlayoutsl NOLAYOUTS traverse__uop bnsellevel 0} TRAVNOUN
 end.
 NB. If u or v are stealth, we need to preserve the original rank-stack info associated with the inputs, and route that info to
@@ -13794,7 +13805,7 @@ else.
   rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) }: (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 |."1 (2) }."1 rankhistory
 end.
 NB. If we are showing structural tags, add one for this middle tine of fork
-if. displaystructmods do. rankhistory =: ('\fork/';coname'') , rankhistory end.
+if. displayshowstructmods do. rankhistory =: ('\fork/';coname'') , rankhistory end.
 
 NB. We keep the highlights from the input, to both the left and right ops.  This will not be needed EXCEPT when u or v is ][.  Other times,
 NB. the highlights go from u to v, and they are at the same sellevel (since u has infinite rank), so nothing that happened below u's sellevel matters.
@@ -13907,7 +13918,7 @@ end.
 NB. Then, unless v is a stealthop, wipe out the y column
 if. dispstealthoperand__vop -.@e. 1 2 5 6 do. rankhistory =: a: 2}"1 rankhistory end.
 NB. If we are displaying the label, put the left-hand label on u
-if. displaystructmods do. rankhistory =: (< 'hook/' ,~ valence { ' /\') (<_1 0)} rankhistory end.
+if. displayshowstructmods do. rankhistory =: (< 'hook/' ,~ valence { ' /\') (<_1 0)} rankhistory end.
 NB. Use selop0 for x, and selresult for y - but only if selop0 exists, and no travdownuops error
 NB. replace the rank with the left rank of the hook, alone.  Preserve previous highlighting from u to the left operand
 NB. We keep the highlights from the input, to both the left and right ops.  This will not be needed EXCEPT when v is ][.  Other times,
@@ -14209,6 +14220,10 @@ Reverse crosshatching indicates cells that were not executed owing to earlier er
 )
 
 cocurrent 'dissect'
+NB. Read the config file at startup
+loadconfig''
+
+
 
 NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ dissectinstanceforregression_dissect_ 4 : ''destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 NB. wd@('psel dissect;pclose'"_)"0 i. 100
