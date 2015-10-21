@@ -1008,7 +1008,7 @@ MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explo
 
 NB. The tooltip size will be selected according to detail and expanded according to fontsize
 ISISIZEPERTTPOINT =: _2 ]\ 0 0   25 35   35 60   112 75
-MINIMUMISISIZE =: 100 80     NB. minimum size for graphics - low to allow small screen
+MINIMUMISISIZE =: 200 200     NB. minimum size for graphics - low to allow small screen
 TOOLTIPMAXPIXELS =: 900  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.6  NB. Max tooltip width, as frac of isigraph width
 
@@ -1144,7 +1144,7 @@ minwh 5 28;cc fmspacer static;cn "";
 bin zh1;
 minwh 50 16;cc fmstatline static;
 bin zz;
-minwh 100 80;cc dissectisi isidraw;
+minwh 50 140;cc dissectisi isidraw;
 bin z;
 pas 0 0;
 rem form end;
@@ -1357,7 +1357,9 @@ dblclickismainscroll =: 0
 NB. autosizestate is 2 initially, to get initial position
 NB. 0 from then on to resize according to required size
 NB. If user resizes, autosizestate goes negative to indicate that e has taken control
-autosizestate =: 2
+NB. We MUST resize before pshow, to get initial size right
+NB. This means we do the initial sizing twice, but Qt seems to fail otherwise
+sizedrawingandform autosizestate =: 2
 wd 'pshow'
 NB. On J6, we will get an immediate paint event.
 NB. On QT, the pshow will instantly call resize (before returning to immediate mode), which will
@@ -1392,7 +1394,7 @@ NB. Result is the drawing (the result of sizeplacement)
 NB. Side effect: the isigraph and parent are resized (up only) as required
 NB. When we resize the isigraph, we include expansion room
 sizedrawingandform =: 3 : 0
-NB. Decide what we will automaticall control: position, size
+NB. Decide what we will automatically control: position, size
 'initxy autosize' =. (y > 0) , (y >: 0)
 NB. Get the required size - mostly the isi, but must be wide enough for the sentence/links too
 NB. Minimum top size is total width, and maximum height, of brects, plus some spacing if there is more than
@@ -1403,12 +1405,15 @@ NB. Get the current size of the isi; if insufficient, make it bigger, with expan
 if. initxy +. autosize *. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
   minisi =. MINIMUMISISIZE >. <. (tooltipdetailx{ISISIZEPERTTPOINT) * (<3 1) {:: fontchoices
   NB. For QT, always size the canvas to the full screen
-  'dissectisi' wdsetxywh _1"0^:IFQT 1 0 3 2 { cyxhw =. (minisi >. autosize * EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
+  cyxhw =. (minisi >. autosize * EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
+  if. IFQT do. wd 'set dissectisi wh _1 _1'
+  else. 'dissectisi' wdsetxywh 1 0 3 2 { cyxhw
+  end.
   NB. If the main form has grown now that the isi has grown, resize it too.
   if. initxy do. xywh =. 1 0 3 2 { (getsessionyx'') , +/ 2 2 $ cyxhw
   else. xywh =. (0 ". wdqform'') >. 0 0 , |. +/ 2 2 $ cyxhw
   end.
-  wdpmove ": xywh 
+  wdpmove ": xywh
   if. -. IFQT do. wd 'pas 6 6' end.  NB. JQt ignores pas
 end.
 NB. Now that we have the size of the isigraph, center the sentence in the screen area; remember brect
@@ -7272,6 +7277,7 @@ NB. Draw a tooltip there after saving the pixels
 drawtooltip =: 3 : 0
 'cpos string' =. y
 NB. There is a tooltip.  Display it.
+glsel 'dissectisi'
 NB. Remember where the tooltip is to be drawn.  From now on we check for movement from this spot
 hoverinitloc =: cpos
 NB. Copy the pixels we are about to overwrite
