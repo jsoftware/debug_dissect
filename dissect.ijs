@@ -64,6 +64,10 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. + (1 : (':'; '(((#~LF-.@e.])5!:5<''u'');,.y),.({.;}.)":x,y u/x')~) 1 2 3    fails
+NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
+NB.     going to leave the ^:1 in to show what happened
+NB. lower-right by scrollbars gets filled, incorrectly
 NB. Test recursive debug for monad/dyad, and other locales, and object locales, tacit and explicit; and verbs with header
 NB.  re-click when debug window open fails
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
@@ -213,7 +217,7 @@ NB.?lintonly maxnoundisplaysizex =: 0 0 [ displayshowstealth =: displayautoexpan
 NB.?lintsaveglobals
 )
 
-NB. Apply config setting to form - must wait until form exists
+NB. Apply config setting to form - must wait until form exists.
 setformconfig =: 3 : 0
 NB. We have to set the form after loading the values
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '1'
@@ -238,7 +242,8 @@ getsentence =: (' ' takeafter LF (i:~ }. ]) [: }:^:(LF={:) (13!:12)@(''"_))`(LF 
 NB. Maximum line length that we will try to display in a grid cell
 MAXSENTENCEWIDTH =: 0.5  NB. max frac of screenwidth that we allow for sentence display
 
-ifdefined =: 0 <: [: 4!:0 <
+ifdefined =: 0 <: [: 4!:0 <  NB. true if name defined in path
+ifinlocale =: < e. (0 1 2 3) 4!:1~ {.   NB. true if name defined in current locale 
 
 NB. ******************* code for function keys ******************
 finddissectline =: (3 : 0) :. (smoutput^:(*@# *. 2 = 3!:0))
@@ -788,7 +793,7 @@ NB. and 'verb' for modifier executions
       stack =. ((qend;(#queue)) ;~ (lpar,rpar,2#asgn) {~  (;:'() =. =:') i. qendb) , stack
     NB. If self-defining term, create a noun block for it, mark as sdt.  String, number, a. a: _.
     elseif. (qend e. ;:'a. a: _.') +. (-. '.:' e.~ {: qend) *. ({. qend) e. '''_0123456789' do.
-      stack =. stack ,~ (<sdt+noun) 0} createnoun qend;'';(#queue)
+      stack =. stack ,~ (<sdt+noun) 0} createnoun qend;'';(#queue);<".qend
     elseif. isname qend do.
       NB. Name.  Resolve the name to find part of speech.
       NB. split the name into (global part),(object locative).  If the name is absolute (ending in _),
@@ -829,9 +834,13 @@ NB. and 'verb' for modifier executions
           NB.?lintmsgsoff
           cocurrent gloc
           NB.?lintmsgson
-          if. 0 <: objtype =. 4!:0 :: _2: <glopart do.
+          NB. Get the value: the value itelf for a noun; the linear rep for others
+          select. objtype =. 4!:0 :: _2: <glopart
+          case. 0 do.
+            objval =. ". glopart
+          case. 1;2;3 do.
             objval =. rankinv_dissect_ f. glopart
-          else.
+          case. do.
             objtype =. _1
           end.
           cocurrent savloc
@@ -841,7 +850,7 @@ NB. and 'verb' for modifier executions
       NB.?lintonly 'objtype objval' =. 0;0 0 0 0
       select. objtype
       case. 0 do.
-        ntypeval =. createnoun qend;qend;(#queue)  NB. Keep name, and save name for display
+        ntypeval =. createnoun qend;qend;(#queue);<objval  NB. Keep name, and save name for display
       case. 1 do.
         NB. adverb: handle the special code (currently only &.>)
         NB. If the value of the user name matches special code, expand it on the stack
@@ -853,11 +862,11 @@ NB. and 'verb' for modifier executions
           NB. eventually execute verb N0 erroneously)
           ntypeval =. adv ; ((conj;'&.';(#queue)) ,: createverb (,'>');(0$0)) ; $0
         case. '"_' do.
-          NB. Create an adverb containing the &.>, with correct tokens.  We have to put the single
+          NB. Create an adverb containing the "_, with correct tokens.  We have to put the single
           NB. adverb on the stack, rather than conj verb, to avoid a parse error (if we had
           NB. N0 V1 N2 on the stack, A N V N would execute the dyad but C V N V N would not and would
           NB. eventually execute verb N0 erroneously
-          ntypeval =. adv ; ((conj;(,'"');(#queue)) ,: createnoun (,'_');'';0$0) ; $0
+          ntypeval =. adv ; ((conj;(,'"');(#queue)) ,: createnoun (,'_');'';(0$0);_) ; $0
         case. do.
           NB. If the value of the user name matches a supported primitive, replace the name by the supported value
           ntypeval =. adv;(((<objval) +./@:((e.>)"0) dissectprimindex) {:: qend;objval);(#queue)
@@ -883,8 +892,8 @@ NB. and 'verb' for modifier executions
       try. 
         ". 'exeobj =. ' , qend
         select. 4!:0 <'exeobj'
-        case. 0 do.
-          ntypeval =. (<sdt+noun) 0} createnoun qend;'';(#queue)
+        case. 0 do.   NB.?lintonly exeobj =. 0
+          ntypeval =. (<sdt+noun) 0} createnoun qend;'';(#queue);<exeobj
         case. 1 do.
           ntypeval =. (sdt+adv);qend;(#queue)
         case. 2 do.
@@ -999,6 +1008,9 @@ NB.?lintonly nobj =. localedefault
 end.
 ntypeval
 )
+
+NB. Values for scrolltype, which tells what the user is doing
+'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA' =: i. 4
 
 NB. Following lines must match the menus!
 MAXNOUNPCTCHOICES =: 10 20 30 40 50 60 70 80 90
@@ -1353,7 +1365,7 @@ placeddrawing =: calcplacement screensize
 NB. Set the starting scroll position, just below the sentence/link
 scrolltlc =: 0 ,~ 2 + >./ (<a:;0) { sentencesizes  NB. y sizes of brects
 NB. Init scrolling vbl in case the window system fails to give a left-click before leftdbl
-dblclickismainscroll =: 0
+lastscrollingtype =: scrollingtype =: SCROLLTYPENONE
 NB. autosizestate is 2 initially, to get initial position
 NB. 0 from then on to resize according to required size
 NB. If user resizes, autosizestate goes negative to indicate that e has taken control
@@ -1463,7 +1475,8 @@ try.
   NB. (we are allowing stealth, which might be a config default)
   'fmshowstealth' wdsetenable ": displayshowstealth +. stealthopencountered
 
-  ('fm'&, wdsetvalue ":@:".@('display'&,))@> ;: 'showcompmods showstructmods autoexpand2 showfillcalc showstealth tooltipctrl' 
+  ('fm'&, wdsetvalue ":@:".@('display'&,))@> ;: 'showcompmods showstructmods autoexpand2 showfillcalc showstealth' 
+  ('fm'&, wdsetvalue ":@:".)@> ;: 'tooltipctrl' 
   
   NB. Restore the user's environment before returing to immediate mode
   restoreJenvirons''
@@ -1588,7 +1601,7 @@ dissect_dissectisi_paint 1
 
 dissect_fmtooltipdelay_button =: 3 : 0
 ('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx) wdsetvalue  '0'
-('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx_dissect_ =: y) wdsetvalue  '1'
+('fmtooltipdelay' , TOOLTIPDELAYCHOICES {::~ <0,~ tooltipdelayx_dissect_ =: y) wdsetvalue '1'
 )
 (4 : 0&> i.@#) 0 {"1 TOOLTIPDELAYCHOICES
 ". 'dissect_fmtooltipdelay' , x , '_button =: dissect_fmtooltipdelay_button@(', (":y) ,'"_)'
@@ -1850,7 +1863,7 @@ isstruct =. x
 if. y -: '' do. ''
 elseif. ' ' e. 0 _1 { y do. ''
 elseif. isstruct *. -. displayshowstructmods do. ''
-elseif. displayshowcompmods do. defstring 0
+elseif. displayshowcompmods do. MAXSTACKDEFSTRINGLENGTH defstring 0
 elseif. do. y
 end.
 )
@@ -2959,7 +2972,7 @@ NB.   where rightoperand is dol;highlights suitable for joinlayoutsl
 NB. result is a suitable return value from traverse, viz (y ,&< locale) [; right]
 earlyerror =: 3 : 0
 NB. Since we abort the traversal, roll up the failing part and install it as the last name in the rank stack
-displaylevrank =: (<defstring 0) (<_1 0)} rankhistory
+displaylevrank =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
 if. 2 > #$y do.
   1 0 1&(#!.(<coname'')^:_1) y
 else.
@@ -4044,8 +4057,8 @@ HIGHLIGHTCOLORS =:  <. (*    1 <. 110 % RGBTOLUMINANCE) (0 0 0 (0}) SHAPECOLORS)
 NB. Colors to use for empty, including a checkerboard
 EMPTYCOLORS =: <. (120 120 120)  *"1/ 1 1 1 ,: 0 0 0
 
-FRINGECOLOR =: _3 <\ 128 128 128    200 200 0    255 128 128   255 255 255   0 0 0  NB. color(RGB) of fringes: in order label,shape,status,data,assignment
-FRINGEBORDER =: 5 $ <0 0 0 1   NB. border of fringes: RGB,width
+FRINGECOLOR =: _3 <\ 128 128 128    200 200 0    255 128 128   255 255 255   0 0 0    NB. color(RGB) of fringes: in order label,shape,status,data,assignment
+FRINGEBORDER =: (<0 0 0 1)"0 FRINGECOLOR   NB. border of fringes: RGB,width
 
 DOBORDERCOLORS =: _3 ]\ 0 0 255 0 0 255  0 0 0  255 0 0   NB. Black border for box, but red if incomplete, blue if empty
 RANKCOLOR =: 0 0 255  NB. color of dashed line for high-rank ops
@@ -4065,10 +4078,7 @@ BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
 
 EMPTYEXTENT =: 15 10   NB. Size to use for displaying empty
 
-MAXDATASIZEYX =: 200 200
-
 MINFONTSIZE =: 7   NB. As small as we can readably display
-
 
 COLORSFORCLASSSHAPE =: (SHAPETEXTCOLORS ;"1 SHAPECOLORS) , RESULTSHAPETEXTCOLOR;RESULTSHAPECOLOR
 
@@ -4119,6 +4129,18 @@ NB. For empty nouns, use a dark rectangle.  There is no text
 emptycfm =: (FILLMASKSELLEVEL_dissectobj_%FILLMASKCHECKER_dissectobj_) $ EMPTYCOLORS ;"1 a: , a: , a: , <DATAMARGIN
 
 FORCEDTOOLTIPMINVISTIME =: 0.4   NB. Minimum time a forced tooltip will be displayed
+
+NB. Maximum length for a defstring that we put into the display stack
+MAXSTACKDEFSTRINGLENGTH =: 50
+NB. Maximum length for a defstring that we put into the final verb name for a compound
+MAXFINALDEFSTRINGLENGTH =: 50
+
+NB. Size and position of resize handle, relative to lower-right corner of data
+RESIZEHANDLEXYWH =: 2 2 $ _2 _2 4 4
+RESIZEHANDLECOLOR =: 0 0 0  NB. color of resize handle
+MINRESIZABLE =: 50 80  NB. Don't put resize handles on anything smaller
+RESIZERECTCOLOR =: <192 192 192 3  NB. Color of resizing rect, width
+RESIZEMAXFRAC =: 0.9 0.9   NB. Maximum size to resize up to
 
 NB. Calculate a font from a class and selection
 NB. x is the class of the characters:
@@ -4284,16 +4306,19 @@ cfms drawtext txts ,. <"2 tlc +"2 rects
 
 NB. Pick for display object, vectoring to the indicated type
 NB. x is ('l' or 'r') flag
-NB. y is main/explorer;(y,x relative to pickrect);pickflags (numeric atom of left,right,ctrl,shift)
+NB. y is main/explorer;(y,x relative to pickrect);formatted sysdata
 NB. no result.  selections are performed
-pickDO =: 4 : 0  NB. Called in locale of the node that drew the DO
+NB. This version, which is defined in dissect locale, is used for pickrects that do not
+NB. have a DO, but are tied to the display instance.  Those are always links.  They are
+NB. processed in the locale of the display instance, but come here.
+pickDO =: 4 : 0
 QP^:DEBPICK 'coname'''' y '
-'exp yx flags' =. y
+'exp yx sd' =. y
 if. 'l' = x do.
   'cfms txts rects links' =. 1 1 {:: topinfo
   for_r. rects findpickhits yx do.
     'ix pyx' =. r
-    QP^:DEBPICK 'x ix pyx exp yx flags ix{::picknames '
+    QP^:DEBPICK 'x ix pyx exp yx sd ix{::picknames '
     if. IFQT do.   NB.?lintonly browse_j_ =. 3 : 'y'
       browse_j_ ix {:: links
     else.
@@ -4767,6 +4792,7 @@ NB. Early error is special: it formats the status above the verb, it aborts trav
 NB. and it suppresses the display of data.  Go ahead and
 NB. handle that here.
 'DOlabelpos DOshapepos DOstatuspos DOdatapos DOassignpos displayscrollbars' =: <,:0  NB. make sure all names defined
+resizable =. 0
 if. errorcode e. EEARLYERROR do.
   NB. Create rectangles for status and verb, and stack them, expanding the status line if needed
   NB. No data on early error
@@ -4787,10 +4813,11 @@ NB. Stack vertically: string/rank,shape,status,data
 NB. Find the sizes to display: main, and explorer if allowed.  A table of 2 rows, one for each data type (normal and hidden-axes)
   hwtable =. calcformsize valueformat =: createDOL ((<0 2;2 3 4) { cfmdata)
 QP^:DEBDOL'valueformat '
-NB. Keep track of the size of the largest noun encountered
-  maxactualnounsize__COCREATOR =: maxactualnounsize__COCREATOR >. extractDOLsize valueformat
-NB. If data doesn't fit in the allocated area, append scrollbars as needed.  We install the
-NB. bars here; the endpoints and traveler are added when the box is drawn
+  NB. Keep track of the size of the largest noun encountered
+  NB. Also remember the full size of this noun, in case we want to resize it
+  maxactualnounsize__COCREATOR =: maxactualnounsize__COCREATOR >. maxdispsize =. extractDOLsize valueformat
+  NB. If data doesn't fit in the allocated area, append scrollbars as needed.  We install the
+  NB. bars here; the endpoints and traveler are added when the box is drawn
   hwtable =. hwtable +"1 SCROLLBARWIDTH * |."1 displayscrollbars =: hwtable <"1 extractDOLsize valueformat
   datadesc =. ALIGNCENTER addalignmentrect hwtable
   NB. If the status block contains an assignment, move it to after the data.  Otherwise it's either empty
@@ -4802,6 +4829,10 @@ NB. bars here; the endpoints and traveler are added when the box is drawn
     picknames =: 'DOlabelpos DOshapepos DOstatuspos DOdatapos'
     arects =. ,@:alignrects@:>@:((ALIGNLEFT;ALIGNCENTER)&addalignmentgroup)"_1 (namedesc , shapedesc ,: statusdesc) ,"_ _1 datadesc
   end.
+  NB. A block is resizable if it is bigger than the minimum threshold, where the minimum width is increased to
+  NB. account for the width of the label and shape
+  NB. Remember the minimum size in case we resize
+  resizable =. +./ maxdispsize > MINRESIZABLE >. 0 , (<1 1) { brect brect@> (<0;0 1) { arects
 elseif. do.
   NB. No data.
   picknames =: 'DOlabelpos DOshapepos DOstatuspos'
@@ -4817,6 +4848,23 @@ pickrects =: pickok #"_1 pickrects
 NB.?lintmsgsoff
 (picknames =: ({.pickok) # ;: picknames) =: |: arects =. pickok #"_1 arects
 NB.?lintmsgson
+
+NB. There should always be SOMETHING to display (shape, label, or data), but during sniff we don't allow
+NB. any space for the data, which could leave us with nothing.  Make sure we have a valid DOsize then
+DOsize =: 2 2&>.@{:@brect"_1 pickrects
+
+NB. If this data block is resizable, create the resizing handle (in the main display only).  The resizing handle
+NB. is outside the main data area, so we don't include it in DOsize
+if. resizable do.
+  NB. Extract the position(s) of the data blocks
+  datarects =. (picknames i. <'DOdatapos') {"1 arects
+  NB. append resize handle, as last item for high visual priority
+  pickrects =: pickrects ,. (RESIZEHANDLEXYWH + ,:&0)"1 ({:"1 DOsize) 1}"0 1 (+/)@> datarects
+  NB. Indicate resize handle present
+  picknames =: picknames ,<'DOresizepos'
+end.
+NB. For picking, refigure the bbox to include the pick handle
+DOpicksize =: 2 2&>.@{:@brect"_1 pickrects
 
 NB. If there is a label stack, create an index for it.  The index will be a brect for each row of the label stack,
 NB. but offset from the starting point of the pickrect for the rank stack.  If there is a label instead of a rank
@@ -4839,11 +4887,6 @@ if. (#picknames) > shapex =. picknames i. <'DOshapepos' do.
   DOshapepospickrects =: (brect"0@{.@> shapex {"1 arects) -"2"_1 (1 0) *"1 2 shapex {"3 pickrects
   assert. (#DOshapelocales) = <: 1 { $DOshapepospickrects
 end.
-
-NB. There should always be SOMETHING to display (shape, label, or data), but during sniff we don't allow
-NB. any space for the data, which could leave us with nothing.  Make sure we have a valid DOsize then
-DOsize =: 2 2&>.@{:@brect"_1 pickrects
-
 
 NB. If selections have changed such that this locale cannot raise an explorer, delete any old one that exists
 if. 2 > #DOsize do. destroyexplorer '' end.
@@ -5585,13 +5628,12 @@ glclipreset''
 glclip 0 0 1 1 + , |."1 DOyx ,: DOsize
 
 NB. See which elements are present
-'labelpresent shapepresent statuspresent datapresent assignpresent' =. (i. #FRINGECOLOR) e. presentx =. (;: 'DOlabelpos DOshapepos DOstatuspos DOdatapos DOassignpos') i. picknames
-
-NB. Draw covering rectangles for each component - filling out to the full width of the box
+pickactx =. I. picknames ~: <'DOresizepos'  NB. indexes of rects to draw.  Don't include resize handle because it doesn't go to full width
+'labelpresent shapepresent statuspresent datapresent assignpresent' =. (i. #FRINGECOLOR) e. presentx =. (;: 'DOlabelpos DOshapepos DOstatuspos DOdatapos DOassignpos') i. pickactx { picknames
+NB. Draw covering rectangles for each component - filling out to the full width of the box.  Don't include the resize handle if any
 if. #presentx do.
-  (presentx { (0 { DOcfmstatus) 2 4} FRINGECOLOR) drawrect"0 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
+  (presentx { (0 { DOcfmstatus) 2 4} FRINGECOLOR) drawrect"0 2 actyx2 +"2  ((<pickactx;a:;0) { pickrects) ,."1 (0) 0} DOsize
 end.
-
 NB. Draw the verb/name string, if any
 if. labelpresent do.
 NB. If DOranks is a string, it contains ranks with no labels.  It is the only thing
@@ -5601,7 +5643,7 @@ NB. in the box; draw it there
   else.
 NB. DOranks contains [rank],string,rank.  Draw them all, except rects that contain just a space.
 NB. They were added to get the centering right when the rank stack contains a mix of monads and dyads, but
-NB. should not actually display
+NB. should not actually display	
     (,&.:(<"1)DOrankcfm) drawtext`(''"_)@.((<' ') -: {.@])"1 (,DOranks) ,"0 <"2 actyx2 +"2 ]S:0 DOlabelpos
   end.
 end.
@@ -5631,8 +5673,8 @@ NB. Draw the data - if the node has data to display.  If not, we never created a
 if. datapresent do.
   assert. 0 = 4!:0 <'fillmask'  [ 'drawDOvn'
   
-NB. Calculate the cliprect for the data portion, as tlhw
-  cliptlhw =. (DOyx,:0) + DOdatapos   NB. startpos + tlhw rect
+  NB. Calculate the cliprect for the data portion, as tlhw
+  cliptlhw =: (DOyx,:0) + DOdatapos   NB. startpos + tlhw rect
 NB. Convert cliprect to tlbr form, and calculate the starting (y,x), which is the window position, plus boxing margin if
 NB. the data is boxed, but all backed up by the scroll offset
   boxyx =. BOXMARGIN +^:(3<#valueformat) ({. cliptlbr =. +/\ cliptlhw) - scrollpoint
@@ -5732,12 +5774,18 @@ glclipreset''
 
 NB. Draw rectangles (border only) for each component - filling out to the full width of the box
 if. #presentx do.
-  ((<'') ,. presentx { FRINGEBORDER) drawrect"1 2 actyx2 +"2  ({."1 pickrects) ,."1 (0) 0} DOsize
+  ((<'') ,. presentx { FRINGEBORDER) drawrect"1 2 actyx2 +"2  ((<pickactx;a:;0) { pickrects) ,."1 (0) 0} DOsize
 end.
 
 NB. Draw a hollow rectangle for the object, just to get the border line.  Color is used to show (no data,NA,all drawn,explorable)
 ('';((#.datapresent,explorable) { DOBORDERCOLORS),1) drawrect DOyx ,: DOsize
 
+NB. If there is a resize handle, draw it as a solid rect - only in the main display
+if. #resizeh =. (<<<pickactx) { pickrects do.
+  if. 1 ~: hwindex do.
+    RESIZEHANDLECOLOR drawrect actyx2 + {. resizeh
+  end.
+end.
 
 NB. If we drew to the explorer, we must paint it
 if. 1 = hwindex do. glpaint'' end.
@@ -5793,7 +5841,7 @@ if. emptydata =. 0 e. $ usedd =. data do.
   usedd =. (truncemptyshape $ usedd) $ 0
 end.
 NB. Get the y and x endpoint lists, prepend a zero to give the start of the first cell,  and then
-NB. adjust for the starting position of te object
+NB. adjust for the starting position of the object
 yxpositions =. boxyx (+ 0&,)&.> 1 2 { vf
 NB. The shape of the array of rectangles.  We will shape the user's data and the fillmask into this shape
 flatshape =. <: #@> yxpositions   NB. <: to remove the leading 0
@@ -5902,7 +5950,7 @@ else.
   locpickrects =: 0 2 2 $ 0
   picklocs =: dos
 end.
-locpickrects =: locpickrects , yx ,:"1 ({."2) 3 : 'DOsize__y'"0 dos
+locpickrects =: locpickrects , yx ,:"1 ({."2) 3 : 'DOpicksize__y'"0 dos
 lines =. (2 2&$)"1 (0 = 4 {"1 wires) # wires
 arcs =. (2 2&$)"1 (1 = 4 {"1 wires) # wires
 NB. Get the max size drawn, and set the control to just big enough to hold it
@@ -6343,11 +6391,11 @@ NB. y is main/explorer;(y,x relative to pickrect);pickflags (numeric atom of lef
 NB. no result.  selections are performed
 pickDO =: 4 : 0  NB. Called in locale of the node that drew the DO
 QP^:DEBPICK 'coname'''' y '
-'exp yx flags' =. y
+'exp yx sd' =. y
 for_r. (exp{pickrects) findpickhits yx do.
   'ix pyx' =. r
-  QP^:DEBPICK 'x ix pyx exp yx flags ix{::picknames '
-  if. 3 = 4!:0 <name =. 'pick' , x , ix {:: picknames do. (flags,exp) name~ pyx end.
+  QP^:DEBPICK 'x ix pyx exp yx sd ix{::picknames '
+  if. 3 = 4!:0 <name =. 'pick' , x , ix {:: picknames do. (sd;exp) name~ pyx end.
 end.
 0 0$0
 )
@@ -6468,7 +6516,7 @@ text
 
 NB. Picking in the label.  Left-click gets NuVoc
 picklDOlabelpos =: 4 : 0
-'flags exp' =. x
+'sd exp' =. x
 msgtext =. ''
 if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
   'ix pyx' =. {. r   NB. index of pickrect found
@@ -6499,7 +6547,7 @@ end.
 NB. Picking in the label.  Right-click lauches debug/dissect, but only if the verb
 NB. is named
 pickrDOlabelpos =: 4 : 0
-'flags exp' =. x
+'sd exp' =. x
 msgtext =. ''
 if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
   'ix pyx' =. {. r   NB. index of pickrect found
@@ -6557,7 +6605,7 @@ tmodx {:: selresult
 )
 
 pickrDOshapepos =: 4 : 0
-'flags exp' =. x
+'sd exp' =. x
 if. 0 = #DOshapes do.
 elseif. #r =. (exp{DOshapepospickrects) findpickhits y do.
   'ix pyx' =. {. r   NB. index of pickrect found
@@ -6971,7 +7019,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
   if. 1 < #DOsize do.
     if. 0=#winhwnd do.
-      disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can change the limit on the Sizes menu. You can also right-click the data to open a separate window for exploring the value.',LF
+      disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can (1) right-click-and-drag the lower right corner to resize the window; (2) change the maximum size of all blocks on the Sizes menu; (3) right-click the data to open a separate window for exploring this value.',LF
     elseif. exp=0 do.
       disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to bring up the explorer window.',LF
     elseif. do.
@@ -7033,11 +7081,12 @@ NB. For all these verbs, x is (button flags,view number), y is the yx position o
 picklDOdatapos =: 4 : 0
 QP^:DEBPICK 'valueformat scrollpoints y '
 NB. Click in the data region.
-'flags exp' =. x
+'sd exp' =. x
 NB. If the click is in the scrollbar, handle scrolling
 NB. See which scrollbar, if any, the click is in
 dhw =. (<exp,1) { DOdatapos
-if. 1 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
+select. +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars
+case. 1 do.
 NB. sclick is the mask indicating which axis was selected
 NB. select the information for the selected axis, for analysis
   'trav clickpos end bindlist spt' =. (sclickx =. sclick i. 1)&{&.> (exp{scrolltravelers);y;shw;(1 2{valueformat);(exp{scrollpoints)
@@ -7062,7 +7111,7 @@ NB. Classify the click as +-creep, +-page, or click in traveler
   NB. which locale is scrolling (for main view); which axis is scrolling; starting clickpos (on the entire isigraph control) for that axis;
   NB. start/trav/end limits for that axis (on the entire isigraph control)
       dwo =. sclickx { exp { DOyx + 0 {"2 DOdatapos  NB. Data Window Offset in selected window
-      'scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit' =: (coname'');sclickx;spt;(clickpos+dwo);(dwo+0 _1 { scrollbarsections);(end -~ {:>bindlist)
+      'scrollingtype__COCREATOR scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit' =: SCROLLTYPESCROLLBAR;(coname'');sclickx;spt;(clickpos+dwo);(dwo+0 _1 { scrollbarsections);(end -~ {:>bindlist)
   NB.?lintonly scrollinglocale__COCREATOR =: <'dissectobj'
   NB.?lintsaveglobals
   NB.?lintonly case. do. newspt =. 0
@@ -7077,7 +7126,7 @@ NB. If the scrollpoint changed, remember the new value and call for a redraw of 
     if. 0 = exp do. glpaint'' end.
   end.
 
-else.
+case. 0 do.
 NB. Not scrollbar.  Find the indexes of the clicked cell
 NB. Find the y,x position of the click and go process it
   if. PICKTOOLTIPMSGOK = selres =. exp processdataclick y do.
@@ -7107,6 +7156,26 @@ if. 1 < #DOsize do.
 end.
 )
 
+NB. Click on a resize handle
+NB. save a screenshot, and enough info for mouse-move to do the resizing
+picklDOresizepos =: 4 : 0
+'sd exp' =. x
+NB. Ignore resize in explorer.  The handle is not displayed, but the pick window is there
+if. exp do. '' return. end.
+NB. Read the pixels in the image
+NB. obsolete pickpixels__COCREATOR =: (3 2&{ $ glqpixels) 0 0 , |. screensize =. 3 2 { sd
+pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. 3 2 { sd
+'scrollingtype__COCREATOR scrollinglocale__COCREATOR pickscrollcurryx__COCREATOR' =: SCROLLTYPESIZEDATA;(coname'');(1 0 { sd)
+NB. There's a minimum size; but also don't try to resize width to smaller than the label.
+NB. Clear starting x position to get true width
+minsize =. MINRESIZABLE >. 0 , (<1 1) { topsize =. brect 0 (<a:;0 1)} (brect DOlabelpos) ,: (brect DOshapepos)
+NB. The maximum size is the size of the data, but also limited by screen size.  Remove top header from allowed size
+maxsize =. (extractDOLsize valueformat) <. <. RESIZEMAXFRAC * screensize - ((<1 0) { topsize),0
+NB. pickscrollinfo is table of yx: tl of data,min,max,startsize,startcursor
+pickscrollinfo__COCREATOR =: ((exp { DOyx) + (<exp,0) {  DOdatapos) , minsize , maxsize , ((<exp;,1) { DOdatapos) , pickscrollcurryx
+''
+)
+
 cocurrent 'dissect'
 
 NB. Utility to look up a yx offset in a set of pickrects
@@ -7114,8 +7183,12 @@ NB. x is pick rectangles, YX,;HW
 NB. y is y,x
 NB. result is table of (index to hit rect);relative y,x in rect    empty if no hits
 findpickhits =: 4 : 0
-index =. (+/\"2 x) I.@:(*./"1)@:(>/"2)@:(<:"1) y
-index ;"0 1 y -"1 (<index;0) { x
+if. #index =. (+/\"2 x) I.@:(*./"1)@:(>/"2)@:(<:"1) y do.
+  NB. Because the resize handle overlaps the data, we return only the first hit if any
+  index =. _1 {. index
+  index ;"0 1 y -"1 (<index;0) { x
+else. 0 2$a:
+end.
 )
 
 NB. ****** tooltips *****
@@ -7344,24 +7417,27 @@ for_r. pr =. locpickrects findpickhits 1 0 { y do.
   pickloc =. l { picklocs
 NB.?lintonly pickloc =. <'dissectobj'
   if. 3 = 4!:0 <'pickDO__pickloc' do.
-    x pickDO__pickloc 0;yx;#. 4 5 6 7 { y
+    x pickDO__pickloc 0;yx;y
   end.
 end.
 #pr
 NB.?lintsaveglobals
 )
+
 dissect_dissectisi_mbldown =: 3 : 0
 NB. If the user left-clicked outside a pickrect, that is the start of a scroll operation.
 NB. Remember the clicked position, and the pixels in the screen (we use the presence of
 NB. the screen buffer as an indicator of scroll-in-progress, and delete it when we're done,
 NB. since it's big)
-NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
-if. dblclickismainscroll =: 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
+NB.?lintonly pickscrollinfo =: 5 2 $ 0
+if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
+  scrollingtype =: SCROLLTYPEIMAGE
   winsize =. 3 2 { sd   NB. y,x of control.  Mustn't read outside!
 NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
-  picksentencepixels =: glqpixels 1 0 3 2 { , picksentencerect =: ({. ,: winsize <. {:)&.(+/\) topbrect
+  picksentencepixels =: (, glqpixels) 1 0 3 2 { , picksentencerect =. ({. ,: winsize <. {:)&.(+/\) topbrect
   scrollblock =. -~/\ (0 (1}) {: picksentencerect) ,: winsize
-  pickpixels =: ({: $ glqpixels@:,@:(|."1)) scrollblock
+NB. obsolete  pickpixels =: ({: $ glqpixels@:,@:(|."1)) scrollblock
+  pickpixels =: (, glqpixels) , |."1 scrollblock
   pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
 NB.?lintsaveglobals
 end.
@@ -7380,17 +7456,28 @@ dissect_dissectisi_mmove =: 3 : 0
 QP^:DEBMOUSE'mainmmove:hwnd=?winhwnd wd''qhwndp'' sysdata '
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 sd =. 0 ". sysdata
-if. 0 = 4!:0 <'pickpixels' do.
+select. scrollingtype
+case. SCROLLTYPEIMAGE do.
   pickscrollcurryx =: 1 0 { sd
   glclear''
   scrollblock =. -~/\ (0 (1}) {: topbrect) ,: 3 2 { sd
-  glpixels (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) , (|. $ pickpixels) , , pickpixels
-  glpixels (1 0 3 2 { , picksentencerect) , picksentencepixels
+  pickpixels =: (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) 0 1} pickpixels
+  glpixels pickpixels
+NB. obsolete  glpixels (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) , (|. $ pickpixels) , , pickpixels
+NB. obsolete  glpixels (1 0 3 2 { , picksentencerect) , picksentencepixels
+  glpixels picksentencepixels
   glpaint''
-elseif. 0 = 4!:0 <'scrollinglocale' do.
+case. SCROLLTYPESCROLLBAR do.
 NB. Perform the scroll, on the main window, but in the locale of the data
   0 scrollmmove__scrollinglocale 1 0 { sd
-elseif. do.
+case. SCROLLTYPESIZEDATA do.
+  NB. redraw the original screen to erase any previous box
+  glpixels pickpixels
+  NB. Draw the resizing rect, from the start of data to the audited cursor position
+  NB. pickscrollinfo is table of yx: tl of data,min,max,startsize,startcursor
+  ('';RESIZERECTCOLOR) drawrect ,:`>.`<.`+`(-~)/ pickscrollinfo , pickscrollcurryx =: 1 0 { sd
+  glpaint''
+case. do.
   NB. mmove not for scrolling.  Set radius to use depending on whether a button is down
   NB. If button down, use larger radius but don't allow a new tooltip to start
   (0 1 ; sd) hoverstart 1 0 { sd
@@ -7400,17 +7487,37 @@ end.
 NB. mouse release.  If we are scrolling, set the new offset and redraw
 NB. If we are dragging a scrollbar, vector to the object locale to finish that
 dissect_dissectisi_mblup =: 3 : 0
+NB. On mouse-up, save the scrolling type for use if there is a doubleclick
+lastscrollingtype =: scrollingtype
 hoverend''
-if. 0 = 4!:0 <'pickpixels' do.
-  4!:55 ;: 'pickpixels picksentencepixels'  NB. indicate end-of-scroll
+select. scrollingtype
+case. SCROLLTYPEIMAGE do.
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
 NB. Use the last-drawn position as the new position.  If it hasn't changed from the original, don't bother to redraw
   if. pickscrollcurryx -.@-: pickscrollstartyx do.
     scrolltlc =: <. scrolltlc + pickscrollcurryx - pickscrollstartyx
     dissect_dissectisi_paint 0  NB. no need to recalc placement
   end.
-elseif. 0 = 4!:0 <'scrollinglocale' do.
+case. SCROLLTYPESCROLLBAR do.
   4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
+case. SCROLLTYPESIZEDATA do.
+  NB. Save current info in case of doubleclick
+  lastscrollingtype =: lastscrollingtype , (ifinlocale__scrollinglocale 'maxnoundisplaysizes') , (2 { pickscrollinfo)
+  NB. pickscrollinfo is table of yx: tl of data,min,max,startsize,startcursor
+  NB. extract the hw of the last pick.  Set as the size to use in the selected locale.  If the
+  NB. the cursor didn't move, do nothing (to speed up response in case of double-click)
+  if. pickscrollcurryx -.@-: {: pickscrollinfo do.
+    maxnoundisplaysizes__scrollinglocale =: (]`>.`<.`+`(-~)/ pickscrollinfo , pickscrollcurryx) 0} maxnoundisplaysizes
+    dissect_dissectisi_paint 1  NB. recalc placement with new sizes
+  else.
+    NB. redraw the original screen to erase any previous box, in case there is one
+    glpixels pickpixels
+  end.
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
 end.
+NB. In all cases, mouse-up terminates a scroll
+scrollingtype =: SCROLLTYPENONE
+NB.?lintsaveglobals
 )
 
 dissect_dissectisi_mbrup =: 3 : 0
@@ -7423,12 +7530,25 @@ hoverend''
 
 dissect_dissectisi_mbldbl =: 3 : 0
 hoverend''
-if. dblclickismainscroll do.
+select. {. lastscrollingtype
+case. SCROLLTYPEIMAGE do.
   NB. Put sizing back under automatic control
   autosizestate =: 0
   NB. Draw, without changing the placement
   dissect_dissectisi_paint 0
+case. SCROLLTYPESIZEDATA do.
+  NB. In this case lastscrollingtype contains info about the click
+  NB. If maxnoundisplaysizes was previously defined, clear it, to revert to original size
+  if. 1 { lastscrollingtype do.
+    4!:55 <'maxnoundisplaysizes__scrollinglocale'
+  else.
+  NB. If not, set to max possible size
+    maxnoundisplaysizes__scrollinglocale =: (2 3 { lastscrollingtype) 0} maxnoundisplaysizes
+  end.
+  NB. Redraw with the new sizes
+  dissect_dissectisi_paint 1
 end.
+lastscrollingtype =: SCROLLTYPENONE
 )
 
 
@@ -7717,7 +7837,7 @@ explorer_dissectisi_mbldown =: 3 : 0
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 hoverend''
 yx =. EXPLORERYX -~ 1 0 { sd =. 0 ". sysdata
-if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;#. 4 5 6 7 { sd end.
+if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;sd end.
 )
 
 
@@ -7727,7 +7847,7 @@ explorer_dissectisi_mmove =: 3 : 0
 QP^:DEBMOUSE'expmmove:hwnd=?winhwnd wd''qhwndp'' sysdata '
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 sd =. 0 ". sysdata
-if. 0 = 4!:0 <'scrollinglocale__COCREATOR' do.
+if. scrollingtype = SCROLLTYPESCROLLBAR do.
 NB. Perform the scroll, on this explorer window.  If the scroll was started in a different locale,
 NB. abort it.
   if. scrollinglocale__COCREATOR -: coname'' do.
@@ -7745,9 +7865,10 @@ end.
 NB. mouse release.  If we are scrolling, set the new offset and redraw
 NB. If we are dragging a scrollbar, vector to the object locale to finish that
 explorer_dissectisi_mblup =: 3 : 0
-if. 0 = 4!:0 <'scrollinglocale__COCREATOR' do.
+if. scrollingtype = SCROLLTYPESCROLLBAR do.
   4!:55 ;: 'scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 end.
+scrollingtype =: SCROLLTYPENONE
 )
 
 explorer_dissectisi_focuslost =: 3 : 0
@@ -8044,7 +8165,7 @@ if. selectable do. < SFOPEN ;~ x #: _1 - y else. '' end. NB. count back from the
 cocurrent 'dissectallnouns'
 
 NB. Inherit pickDO from default object
-NB. For all these verbs, x is button flags, y is the yx position of the click relative to start of pickrect
+NB. For all these verbs, x is formatted sysdata, y is the yx position of the click relative to start of pickrect
 
 NB. Since labeled nouns are never SDTs, ignore a click on the name
 NB. Nouns are either primitives or SDTs.  Clicking on the shape will expand an SDT if possible.  Once expanded,
@@ -8119,14 +8240,15 @@ end.
 NB. Terminal nouns - names or self-defining terms
 cocurrent 'dissectnoun'
 coinsert 'dissectallnouns dissectobj'
-NB. Monad.  y is string form of the noun;name if it is a name;tokens it came from
+NB. Monad.  y is string form of the noun;name if it is a name;tokens it came from;value
 create =: 3 : 0
 NB. Not clonable
 create_dissectobj_ f. 2 { y
 NB. Register this object so we can clean up at end
 newobj__COCREATOR coname''
 NB. Save the operand, and the name if any.  We look into op from other locales to get the value of sdts
-'op varname' =: 2 {. y
+NB. The value is given, for original noun tokens.  It is undefined in results
+'op varname nounvalue' =: 0 1 3 { y
 NB. If the name is empty, this must be an SDT
 resultissdt =: 0 = #varname
 noun;(coname'');tokensource
@@ -8134,7 +8256,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 NB. Apply parentheses if left verb operand or conjunction operand operand - but only if more than 1 word
 enparen^:((y>0) *. 1 < #@;: op ) op
 )
@@ -8210,7 +8332,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 NB. Apply parentheses if right conjunction operand - but only if more than 1 word
 enparen^:((y>2) *. 1 < #@;: ) execform,fitstring
 )
@@ -8722,7 +8844,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y>0) (defstring__uop 0) jd ' ' , (defstring__yop 0)
 )
 
@@ -8837,7 +8959,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y>0) (defstring__xop 1) jd ' ' , (defstring__uop 0) jd ' ' , (defstring__yop 0)
 )
 
@@ -8934,7 +9056,7 @@ coname''
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2)
 )
 
@@ -9159,7 +9281,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 if. uopisname do.
   enparen^:(y>0) uop jd cop jd (defstring__vop 0)
 else.
@@ -9336,7 +9458,7 @@ y +. -. ':' e. cop
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 if. capped do.
   enparen^:(y~:0) '[: ' jd (defstring__uop 3) jd (defstring__vop 0)
 else.
@@ -9682,7 +9804,7 @@ NB. We will return the locale of the overall verb
   NB. indicates the position of the noun operand.  The space also tells fulltitlestring not to display ^:
   uatrpwrl =. 1 {:: localepower 1 createmodifier _3 [\ verb;uatr;($0);  conj;(verboperandx {:: '^: ';' ^:');($0);  verb;lbkt;$0  NB. u&m@]^:[  don't display ^:
   NB.?lintonly uatrpwrl =. localepower
-  rank =. 1 {:: COCREATOR createnoun ('_ 0 _');'';($0)  NB. 0 1 0
+  rank =. 1 {:: COCREATOR createnoun ('_ 0 _');'';($0);_ 0 _  NB. 0 1 0
   final =. 1 {:: localerank 1 createmodifier _3 [\ verb;uatrpwrl;($0);  conj;'';($0);  noun;rank;$0  NB. u&m@]^:["_ 0 _  don't display "
   NB.?lintonly final =. localerank
   setvalence__final y
@@ -9712,6 +9834,15 @@ NB.?lintsaveglobals
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0
 enparen^:(y=3) (defstring__uop 2) jd '&' jd (defstring__vop 3)
+:
+if. verboperandx do.
+  rstg =. defstring__vop 3
+  lstg =. (x - 1 + #rstg) ([ '...'"_^:(< #) defstring__uop) 2
+else.
+  lstg =. defstring__uop 2
+  rstg =. (x - 1 + #lstg) ([ '...'"_^:(< #) defstring__vop) 2
+end.
+enparen^:(y=3) lstg jd '&' jd rstg
 )
 
 NB. return string form of operands, including instrumentation
@@ -9766,7 +9897,7 @@ coinsert 'dissectvandnm'
 
 NB. This locale contains the overrides needed to display dyad & properly
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 NB.?lintmsgsoff
 enparen^:(y=3) (defstring__uop__disploc 2) jd '&' jd (defstring__vop__disploc 3)
 NB.?lintmsgson
@@ -9830,7 +9961,7 @@ NB.?lintsaveglobals
 
 NB. return string form of operands, not including instrumentation
 NB. We keep the original form
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop0 2) jd cop0 jd (defstring__vop0 3)
 )
 
@@ -9929,7 +10060,7 @@ shownilad =: 1:   NB. assuming " will be followed by not _
 
 NB. return string form of operands, not including instrumentation
 NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd '"' jd (defstring__vop 3)
 )
 
@@ -10080,7 +10211,7 @@ NB.?lintsaveglobals
 
 NB. return string form of operands, not including instrumentation
 NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
 )
 
@@ -10346,7 +10477,7 @@ NB. return string form of operands, not including instrumentation.
 NB. The expansion has the full form of the verb, so use it
 NB. This version is the one used if we need defstring before setvalence, as for example when we
 NB. take this verb into an unknown compound
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop
 )
 
@@ -10355,7 +10486,7 @@ startmonad ''
 
 NB. return string form of operands, not including instrumentation.
 NB. The expansion has the full form of the verb, so use it
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 defstring__uop y
 )
 
@@ -10393,12 +10524,12 @@ if. forcedsel do.
 elseif. shouldexpand do.
   NB. expansion node created, display it and display this result as a final
   resdol =. (joinlayoutsl resdol) ,&< coname''
-  displaylevrank =: (<'Final ' , defstring 0) (<_1 0)} rankhistory
+  displaylevrank =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
   physreqandhighlights__inheritroot =: NOPHYSREQ
 elseif. do.
   NB. No expansion node created, display this result as a simple result
   resdol =. x ,&< coname''
-  displaylevrank =: (<defstring 0) (<_1 0)} rankhistory
+  displaylevrank =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
 end.
 
 resdol
@@ -10434,7 +10565,7 @@ NB. The dyadic valence:
 startdyad ''
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop
 )
 
@@ -10497,7 +10628,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop
 )
 
@@ -10714,7 +10845,7 @@ else.
   visnoun =: * noun bwand (<2 0) {:: y  NB. Remember whether it's u^:n or u^:v
 end.
 NB. We implement u^:v with two locales, because there are two levels of
-NB. selection: first the selection from v, is that result is not an atom; then
+NB. selection: first the selection from v, if that result is not an atom; then
 NB. the expansion node and selection of powers.  We create a new
 NB. node that looks like a modifier, i. e. u*^:v where * is the expansion.
 NB. The display of the result of u^:v (as an inheritable u) comes from
@@ -10754,7 +10885,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd (defstring__vvop 3)
 )
 
@@ -10883,7 +11014,7 @@ if. errorcode__vop > EOK do.
     resdol =. (_1 {. ux) ,&< coname''
     physreqandhighlights__inheritroot =: _1 {. physreqandhighlights__inheritroot
   end.
-  displaylevrank =: (<defstring 0) (<_1 0)} rankhistory
+  displaylevrank =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
 elseif. do.
 NB. v ran. Get the actual result of v.  We know v collected successfully
 
@@ -10894,10 +11025,10 @@ NB. But if this node is not displaying as '^:', it must be coming from dyad u&m;
 NB. remove the x operand
     if. cop -: '^:' do.
       formatcode =: 2   NB. ^:0 or ^:_1
-      labelstg =. (defstring__uop 2) , (#. 0 _1 e. ; logvalues__vop) {:: '()';'_1';'0';'(0 or _1)'
+      labelstg =. (MAXFINALDEFSTRINGLENGTH defstring__uop 2) , (#. 0 _1 e. ; logvalues__vop) {:: '()';'_1';'0';'(0 or _1)'
     else.
       formatcode =: 3   NB. dyad &
-      labelstg =. defstring 0
+      labelstg =. MAXFINALDEFSTRINGLENGTH defstring 0
       resdol =. (_1 {. ux) ,&< coname''
       physreqandhighlights__inheritroot =: _1 {. physreqandhighlights__inheritroot
     end.
@@ -10969,14 +11100,14 @@ NB. expansion: realize it as a v-type result
           resdol =. (_1 {. ux) ,&< coname''
           physreqandhighlights__inheritroot =: _1 {. physreqandhighlights__inheritroot
         end.
-        displaylevrank =: (<(defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
+        displaylevrank =: (<(MAXFINALDEFSTRINGLENGTH defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
       case. 2 do.
   NB. skeletalu: u is there for show only; the actual value comes from y.  Create a reference to y and add it as the first input.
         resdol =. joinlayoutsl expdol
         resdol =. resdol , _1 { ux
   NB. Clear the wiring locale from u, indicating 'no wire'
         resdol =. a: (<_1 1)} resdol
-        displaylevrank =: (<'Final ' , (defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
+        displaylevrank =: (<'Final ' , (MAXFINALDEFSTRINGLENGTH defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
   NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
   NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
         physreqandhighlights__inheritroot =: NOPHYSREQ
@@ -10985,7 +11116,7 @@ NB. expansion: realize it as a v-type result
   NB. Expansion node executed with u attached, or just u by itself
         resdol =. joinlayoutsl expdol
   NB. expansion node or u where the current selector is <1, use it as a v-type
-        displaylevrank =: (<'Final ' , (defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
+        displaylevrank =: (<'Final ' , (MAXFINALDEFSTRINGLENGTH defstring__uop 2) , (cop -: '^:') # visnoun {'un') (<_1 0)} rankhistory
   NB. Whenever we instantiate an expansion node, we alter the number of inputs to the u^:v node.  This invalidates the highlights from
   NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
         physreqandhighlights__inheritroot =: NOPHYSREQ
@@ -11147,7 +11278,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) , cop
 )
 
@@ -11314,7 +11445,7 @@ NB. Run u and inherit it into this node
       ures =. 0 1 1 inheritu x traverse__uop (, applyintree 0)^:(selectedpower<0) travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;((-.skeletalu) vopval selopinfovalid);<selopshapes
     else.
 NB. No u.  Create the expansion, with input coming from y or self
-      displaylevrank =: (<(defstring 0) ,( visnoun {'un') , (selectedpower<0) # ' (inv)') (<_1 0)} rankhistory
+      displaylevrank =: (<(MAXFINALDEFSTRINGLENGTH defstring 0) ,( visnoun {'un') , (selectedpower<0) # ' (inv)') (<_1 0)} rankhistory
       ures =. x ,&< coname''
     end.
     NB. Append the end-of-expansion marker to the display stack
@@ -11507,7 +11638,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
 )
 
@@ -11578,7 +11709,7 @@ NB. 1 if this verb may not have infinite rank, or if this node displays already
 shownilad =: ]
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) , cop
 )
 
@@ -11645,7 +11776,7 @@ NB. Pass fit request down the line
 applyfit =: 4 : 'x applyfit__uop y'
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 defstring__uop y
 )
 
@@ -11782,7 +11913,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop,fitstring
 )
 
@@ -11833,15 +11964,15 @@ if. (*./ selopinfovalid) *. (*#>selector) do.
   x =. ({.udol) _1} x
   if. selectable *. sellevel < #selections do.
     NB. If this node is marked as Final, it repeats the rank stack.
-    rankhistory =: (< 'Final ' , defstring 0) (<_1 0)} rankhistory
+    rankhistory =: (< 'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
   else.
     NB. If this node is not final (which could happen only if there is
     NB. a single selection that we are showing for courtesy), remove the light lines
-    rankhistory =: ((#~  (<DLRCOMPEND) = 0&{"1) rankhistory) ,  (< defstring 0) 0} {: rankhistory
+    rankhistory =: ((#~  (<DLRCOMPEND) = 0&{"1) rankhistory) ,  (<MAXFINALDEFSTRINGLENGTH defstring 0) 0} {: rankhistory
   end.
 else.
   NB. If we do not display u, we have to keep the rank stack to display here, because that's the only chance we'll get
-  rankhistory =: (< defstring 0) (<_1 0)} rankhistory
+  rankhistory =: (< MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
 end.
 NB. Create a display for this node, as if it were a u-type verb.  This display will be inherited into the selector.
 NB. We initialize the rank stack, and it is that that will give the label for this display.
@@ -11937,7 +12068,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop jd defstring__vop 3
 )
 
@@ -12539,7 +12670,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
 )
 
@@ -12568,7 +12699,7 @@ NB. is hope for a later traversal.  If there is no selection, we don't know whic
 NB.?lintonly vval =: 0
 if. (errorcode__vop > EOK) +. -. *./ selopinfovalid do.
   vselect =. <EMPTYPRH   NB. Indic no v highlight
-  rankhistory =: (<defstring 0) (<_1 0)} rankhistory
+  rankhistory =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
 elseif. do.
   NB. v ran, and there is only one choice for the selection.  We will be able to display u
   NB. Get the actual result of v.  We know v collected successfully
@@ -12597,7 +12728,7 @@ elseif. do.
   NB. Turn it into a highlight record
   vselect =. < (2 1 $ vselect) , <0
   NB. Since we have used the rankhistory in the detail node, don't repeat it on the summary
-  rankhistory =: (<'Final ' , defstring 0) (<_1 0)} rankhistory
+  rankhistory =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
 end.
 
 NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
@@ -12699,7 +12830,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd '::' jd (defstring__vop 3)
 )
 
@@ -12742,12 +12873,12 @@ if. blockismarkable =: blockismarked do.
   NB. be no highlights from this node anyway, so suppress them
   physreqandhighlights__inheritroot =: NOPHYSREQ
   NB. Create this block - with an invisible wire to u
-  displaylevrank =: (<'Final ' , defstring 0) (<_1 0)} rankhistory
+  displaylevrank =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
    dol ,&< coname''
 elseif. (0 = *./ selopinfovalid) +. (0 = $>selector) do.
   NB. Multiple results were selected.  We don't know what to traverse.  Realize this node, labeled as
   NB. u ::v
-  displaylevrank =: (<defstring 0) (<_1 0)} rankhistory
+  displaylevrank =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
    x ,&< coname''  NB. no need to inherit, since not markable
 elseif. do.
   NB. A single result was selected; traverse and inherit it
@@ -12872,7 +13003,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uuop 2) jd cop
 )
 
@@ -13326,8 +13457,8 @@ else. restype =: 3   NB. assume verb if unknown
   NB.?lintonly tokennums =. 0 [ uvval =: 1;2;3
 end.
 select. restype
-case. 0 do.
-  createnoun (5!:5 <'exeobj');'';tokennums
+case. 0 do.  NB.?lintonly exeobj =. 0
+  createnoun (5!:5 <'exeobj');'';tokennums;<exeobj
 case. 1 do.
   adv;(enparen defstg);tokennums
 case. 2 do.
@@ -13452,19 +13583,43 @@ create =: 3 : 0
 if. bwxor/ verb bwand > (<0 2;0) { y do.
   failmsg 'domain error: operands of u :v must be verb-verb or noun-noun'
 end.
+'uop vop' =: (<0 2;1) { y
+NB.?lintonly uop =: vop =: <'dissectnoun'
 if. noun bwand (<0 0) {:: y do.
-  NB. noun : noun - treat as generic verb
-  changeobjtypeto localedefault
-  create y
+  NB. m : n - we must be able to resolve m at parse time.  Create an object of the appropriate type
+  if. ifinlocale__uop 'nounvalue' do.
+  else.
+    failmsg 'dissect restriction: in m :n, m must be a constant or a name'
+  end.
+  select. nounvalue__uop
+  case. 3;4;13 do.
+    NB. 3 : n etc.  These define verbs.  This is just as if the : were a generic modifier
+    changeobjtypeto localedefault
+    create y
+  case. 0 do.
+    NB. 0 : n - define a noun - silly - just switch to n
+    noun;vop;tokensource__vop
+  case. 1;2 do.
+    NB. 1,2 : n - define an adverb/conj, which is then a generic modifier producing a verb
+    NB. This is a kludge, because the m : n is not instrumented in the executed sentence.  We would need
+    NB. a locale to execute that, and then another to execute the derived modifier; and all that for no analytical
+    NB. benefit.  So we just lump together the entire n as part of m : n and make that a modifier of the correct
+    NB. type.  This produces a problem: if n is the result of a verb execution, there is no way to find its tokens,
+    NB. because the execution has been swallowed up in the m : n.  We could try to ferret them out, but here we
+    NB. employ another kludge, noting that since : is a conjunction its right operand must be either a single
+    NB. word or in parentheses, and we can get either from tokensource; if there are gaps we fill them in
+    (nounvalue__uop{0,adv,conj);('(' , (defstring__uop 0) , ' : ' , (defstring__vop 2) , ')');(tokensource__uop,((<1 2){::y),([ + i.@>:@(-~))/ (<./ , >./) tokensource__vop)
+  case. do.
+    failmsg 'Invalid m in m :n'
+  end.
   return.
 else.
+  NB.?lintonly uop =: vop =: <'dissectverb'
   NB. verb : verb.  We will wait till we know the valence and then
   NB. treat as if only that valence were given
   NB. Register this object so we can clean up at end
   newobj__COCREATOR coname''
   create_dissectobj_ f. (<1 2) { y
-  'uop vop' =: (<0 2;1) { y
-  NB.?lintonly uop =: vop =: <'dissectverb'
   NB. Set resultissdt for modifier processing
   resultissdt =: resultissdt__uop *. resultissdt__vop
   verb;(coname'');tokensource
@@ -13487,7 +13642,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd ':' jd (defstring__vop 3)
 )
 
@@ -13764,7 +13919,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y~:0) (defstring__uop 1) jd ' ' , (defstring__cop 1) jd ' ' , (defstring__vop 0)
 )
 
@@ -13890,7 +14045,7 @@ NB.?lintsaveglobals
 )
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen (defstring__uop 1) jd ' ' , (defstring__vop 0)
 )
 
@@ -14009,7 +14164,7 @@ NB. 1 if this verb may not have infinite rank, or if this node displays already
 shownilad =: 0:    NB. like "0
 
 NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0
+defstring =: 3 : 0@]
 enparen^:(y=3) (defstring__uop 2) jd '&.>'
 )
 
@@ -14972,6 +15127,10 @@ ctup = 8
 2 dissect 'a taketo&.> c' [ a =. ;:'a b c' [ c =. 'cba';'def';2
 2 dissect '''a''&taketo&.> c' [ c =. 'cba';'def';2
 2 dissect '(,''a'')&taketo&.> c' [ c =. 'cba';'def';2
+2 dissect '''abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ''&i. ''bc'''
+2 dissect '3 * 1 : ('':'';''x u y'') 5'
+2 dissect '*: 1 : ''u y'' 5'
+2 dissect '+ (1 : ('':''; ''(((#~LF-.@e.])5!:5<''''u'''');,.y),.({.;}.)":x,y u/x'')~) 1 2 3'
 )
 
 testsandbox_base_ =: 3 : 0
