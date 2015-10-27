@@ -64,22 +64,22 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. + (1 : (':'; '(((#~LF-.@e.])5!:5<''u'');,.y),.({.;}.)":x,y u/x')~) 1 2 3    fails
+NB. Remove blank lines from explicit defs
+NB. verbistacit must reject 3 : verbs
+NB. show defn for short explicit verbs (maybe just the first few)
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
-NB. lower-right by scrollbars gets filled, incorrectly
 NB. Test recursive debug for monad/dyad, and other locales, and object locales, tacit and explicit; and verbs with header
 NB.  re-click when debug window open fails
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
 NB. support {::
-NB. Add rank-calculus for primitives with known behavior?
+NB. Add rank-calculus for primitives with known behavio?
 
 NB. display:
 NB. Unicode?
 NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
-NB. hovering over data: allow clicking in low-right of scrollbars to change individual size
 NB. Highlight net on a click/hover of a wire
 NB. Revise sentence creation to point each symbol to the locale of its current selection level (and parens for hook/fork to the hook/fork)?
 
@@ -3945,6 +3945,7 @@ SCROLLBARCOLOR =: <192 192 192   NB. color for scrollbar - no pen
 SCROLLBARENDCOLOR =: <240 240 240
 SCROLLBARENDTHICKNESS =: 10
 SCROLLBARTRAVELERCOLOR =: <128 128 128
+SCROLLBARCORNERCOLOR =: <64 64 64
 
 NB. FONTNUM - Font for 'data' - numeric data, shape, rank, etc
 NB. FONTCHAR - Font for 'text' - verb names, noun names, status messages
@@ -5726,7 +5727,7 @@ NB. Restore cliprect to just the data area
     end.
   end.
   SM^:DEBHLIGHT'finished drawing hlights'
-NB. If there are scrollbars, draw them
+  NB. If there are scrollbars, draw them
   if. +./ displayscrollbars do.
     't l b r' =. , DOyx +"1 +/\ DOdatapos  NB. t l b r of region
     'sh sw' =. (2 * SCROLLBARENDTHICKNESS) -~ 'h w' =. ({: DOdatapos) - SCROLLBARWIDTH * |. displayscrollbars  NB. actual data h/w
@@ -5734,7 +5735,7 @@ NB. If there are scrollbars, draw them
     datahw =. extractDOLsize valueformat
     QP^:DEBDOL 'displayscrollbars DOyx DOdatapos datahw t l b r h w scrollpoint sw sh '
     scrolltravv =. scrolltravh =. 0 0
-NB. draw horizontal scroll
+    NB. draw horizontal scroll
     if. 1 { displayscrollbars do.
       NB. Draw the scrollbar itself
       SCROLLBARCOLOR drawrect (vpos =. -/\. b , SCROLLBARWIDTH) ,. (l , w)
@@ -5749,7 +5750,7 @@ NB. draw horizontal scroll
       scrolltravh =. scrolltravh + SCROLLBARENDTHICKNESS + <. leeway * 0 >. SCROLLBARMINWIDTH - (-~/ scrolltravh)
       SCROLLBARTRAVELERCOLOR drawrect vpos ,. -~/\ l + scrolltravh
     end.
-NB. vertical
+    NB. vertical
     if. 0 { displayscrollbars do.
       SCROLLBARCOLOR drawrect (hpos =. -/\. r , SCROLLBARWIDTH) ,.~ (t , h)
       SCROLLBARENDCOLOR drawrect hpos ,.~"1 (t , SCROLLBARENDTHICKNESS) ,: (-/\. (t+h) , SCROLLBARENDTHICKNESS)
@@ -5757,6 +5758,11 @@ NB. vertical
       leeway =. (% -~/) (0,sh) - scrolltravv
       scrolltravv =. scrolltravv + SCROLLBARENDTHICKNESS + <. leeway * 0 >. SCROLLBARMINWIDTH - (-~/ scrolltravv)
       SCROLLBARTRAVELERCOLOR drawrect hpos ,.~ -~/\ t + scrolltravv
+    end.
+    NB. If both scrollbars are drawn, the lower-right area, which was filled by data,
+    NB. still has data, which is distracting.  Black it out
+    if. 1 1 -: displayscrollbars do.
+      SCROLLBARCORNERCOLOR drawrect -/\. (b,r) ,: SCROLLBARWIDTH
     end.
     scrolltravelers =: (scrolltravv ,: scrolltravh) hwindex} scrolltravelers
     QP^:DEBDOL 'scrolltravelers '
@@ -8304,14 +8310,17 @@ NB. Every verb counts as an sdt for modifier processing.
 resultissdt =: 1
 NB. If this verb has a one-line description, save it
 onelinedesc =: ''
-if. verbisnamed =: 2 < #y do.
+NB. verbstate: 0=unnamed 1=named tacit 2=named explicit, short 3=named explicit, long
+if. verbstate =: 2 < #y do.
   NB. named verb: remember the definition, and also the number of names that were defined when it
   NB. was encountered
   'verbglopart verbloc verbtext verbexeloc ndefnames' =: 2 }. y
-  if. verbistacit =: LF -.@e. verbtext do.
-    onelinedesc =: verbtext
-  end.
-NB.?lintonly else. ndefnames =: verbistacit =: 0 [ verbtext =: verbloc =: verbexeloc =: verbglopart =: ''
+  NB. Remove blank lines from the definition
+  verbtext =: (LF,LF) (-.@:E. # ]) verbtext
+  NB. The 3 in the next 2 lines is the number of lines we display, max)
+  verbstate =: 1 + (3 < LF +/@:= verbtext) + +./ (LF;'1234' ,&.> <' :') +./@:E.&> <verbtext  NB. 1, but 2 if LF or explicit
+  onelinedesc =: ,&(LF,'...')^:(verbstate=3) }:^:(LF={:) ((+/\ LF = verbtext) i. 3) {. verbtext
+NB.?lintonly else. ndefnames =: verbstate =: 0 [ verbtext =: verbloc =: verbexeloc =: verbglopart =: ''
 end.
 verb;(coname'');tokensource
 NB.?lintsaveglobals
@@ -8343,8 +8352,8 @@ NB.  (1 if inputs need logging) , (1 2 3 for monad/dyad/unknown) , (1 for invers
 
 exestring =: 3 : 0
 NB. init for logging
-initloggingtable verbisnamed # valence
-if. verbisnamed do.
+initloggingtable (verbstate>0) # valence
+if. verbstate>0 do.
   auditstg '((' , (logstring '') , '@(' , (verblogstring '') , execform , ') [ ', (logstringxy '') , ')"',execform,')'
 else.
   NB. Instrument the forward verb - bivalent
@@ -8395,17 +8404,17 @@ elseif.  '^:_1' -: _4 {. execform do.
 elseif. do. r =. 0 2$a:
 end.
 if. #onelinedesc do.
-  r =. r , EXEGESISONELINEDESC ; 'The definition of this verb is:',LF,onelinedesc,CR
+  r =. r , EXEGESISONELINEDESC ; 'The definition of this verb ' , ((verbstate = 3) {:: 'is:';'starts with:'),LF,onelinedesc,CR
 end.
-if. verbisnamed do.
+if. verbstate > 0 do.
   if. (selectable+sellevel) > #selections do.
-    if. verbistacit do.
+    if. verbstate = 1 do.
       r =. r , EXEGESISVERBRUNDEBUG ; 'After you have selected a single result-cell, you may right-click the verb to dissect execution on that cell.',LF
     else.
       r =. r , EXEGESISVERBRUNDEBUG ; 'After you have selected a single result-cell, you may right-click the verb to examine execution on that cell using the debugger.',LF
     end.
   else.
-    if. verbistacit do.
+    if. verbstate = 1 do.
       r =. r , EXEGESISVERBRUNDEBUG ; 'You may right-click the verb to dissect execution on the selected cell.',LF
     else.
       r =. r , EXEGESISVERBRUNDEBUG ; 'You may right-click the verb to examine execution on the selected cell using the debugger.',LF
@@ -8721,7 +8730,7 @@ NB.?lintsaveglobals
 
 
 pickrlaunchdebug =: 3 : 0
-if. -. verbisnamed do. 'Only named verbs can be debugged.' return. end.
+if. verbstate=0 do. 'Only named verbs can be debugged.' return. end.
 if. (selectable + sellevel) > #selections do. 'You must select a single result-cell for analysis' return. end.
 NB. Get the argument(s) for the selected cell, and the text of the sentence (monad or dyad)
 NB. If there is no selected index, the only explanation is that the named verb failed
@@ -8739,7 +8748,7 @@ NB. Make sure the new x and y override any previous definitions in the locale; m
 NB. that any reassigned names keep the most recent value.  Use only definitions in place when the
 NB. verb was encountered during execution.
 argvbls =. (#~   ~:@:({."1)) argvbls , (-ndefnames) {. defnames
-if. verbistacit do.
+if. verbstate = 1 do.
   NB. Tacit verb: dissect it
   NB. Create the sentence to use, with the verb definition expanded
   txt =. ('x ' #~ 2 = valence) , '(' , verbtext , ') y'
