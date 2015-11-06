@@ -44,29 +44,29 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~2+errorcode) ,
 
 0 : 0
 alltests''
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 )
 alltests__ =: 3 : 0
 config_displayautoexpand2_dissect_ =: 0
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 config_displayautoexpand2_dissect_ =: 1
-0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 config_displayautoexpand2_dissect_ =: 0
 displayshowcompmods_dissect_ =: 1
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 1
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
 config_displayshowfillcalc_dissect_ =: 0
 config_displayshowstealth_dissect_ =: 1
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. Remove blank lines from explicit defs
-NB. verbistacit must reject 3 : verbs
-NB. show defn for short explicit verbs (maybe just the first few)
+NB. When we resize the screen, we seem to generate our own call to _resize; that should be ignored
+NB. crash on events after reexecuting testmonadh
+
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
 NB. Test recursive debug for monad/dyad, and other locales, and object locales, tacit and explicit; and verbs with header
@@ -531,6 +531,9 @@ NB. Use lightweight locales - we use less than 100 entries usually
 NB. For nodes that do not have a parallel path (i. e. all but forks and &), this locale will
 NB. be the predecessor locale, and will not signal an error
 errorcode =: 0
+NB. Because of debug irregularities, we execute debug out of a different event from
+NB. the one that started it.  The presence of sandbox on mbrup indicates that we need to execute it
+sandboxsentence =: ''
 NB.?lintsaveglobals
 )
 
@@ -823,7 +826,7 @@ NB. and 'verb' for modifier executions
       NB. objtype/objval.  But a global search may still be needed: if there was
       NB. an object locative, or if the local search failed.  This search will start in locale gloc.
       NB. This search, if performed, must succeed, and we will convert the result to a type/(rank if verb)
-      if. #glopart do.
+      if. #glopart do.  NB. If was not resolved in table either as (simple, or immed locative)
         NB. First, see if this global name was assigned in this sentence.  If so, use that value
         if. (<objloc =. glopart , '_' , (>gloc) , '_') e. {."1 defnames do.
           NB. Name is in our local table.  Use that
@@ -951,9 +954,10 @@ NB. y is locale
 NB. We create globals in the dissect locale that describe the names to be
 NB. created in the sandbox, and the string DEFSTRING_dissect_ that will
 NB. cause them to be defined.  No result.
+sandboxseqno =: 4768539054
 createsandbox =: 4 : 0
 NB.?lintmsgsoff
-(nm =. 'sandbox4768539054_',(>y),'_') =: sandboxtemplate f.
+(nm =. 'sandbox_',(0 ": sandboxseqno_dissect_ =: >: sandboxseqno_dissect_),'_',(>y),'_') =: sandboxtemplate f.
 NB.?lintmsgson
 defnounmask =. (<0) = 1 {"1 x
 NOUNNAMES_dissect_ =: defnounmask # 0 {"1 x
@@ -965,11 +969,12 @@ NB.?lintsaveglobals
 )
 
 sandboxtemplate =: 4 : 0
-if. #x do. 4!:55 <x end.
-v4768539054_dissect_ =. y
+v4768539054x =. x
+if. #v4768539054x do. 4!:55 <v4768539054x end.
+v4768539054y =. y
 4!:55 ;: 'x y'
 0!:100 DEFSTRING_dissect_
-". v4768539054_dissect_
+". v4768539054y
 )
 
 NB. Here to execute a modifier.  We do that when we encounter a modified verb.
@@ -7528,6 +7533,12 @@ NB.?lintsaveglobals
 
 dissect_dissectisi_mbrup =: 3 : 0
 hoverend''
+NB. If there is a sandbox, execute it
+if. #sandboxsentence do.
+  9!:27 sandboxsentence
+  9!:29 (1)
+  sandboxsentence =: ''
+end.
 )
 
 dissect_dissectisi_focuslost =: 3 : 0
@@ -8740,7 +8751,6 @@ elseif. selectable do. selectedindex =. (sellevel { selections) { selectedindex
 end.
 NB. Create the variables in scope for the execution
 argvbls =. ,: ((,'y') ; 0) , selectedindex { logvaluesy
-QP'selectedindex logvaluesy argvbls '
 if. 2 = valence do.
   argvbls =. argvbls , ((,'x') ; 0) , selectedindex { logvaluesx
 end.
@@ -8753,9 +8763,28 @@ if. verbstate = 1 do.
   NB. Create the sentence to use, with the verb definition expanded
   txt =. ('x ' #~ 2 = valence) , '(' , verbtext , ') y'
 
+  NB. Figure out the locale to run the sentence in.  It is the same as the locale the containing
+  NB. ran in, unless this name is a locative
+  if. '_' = {: execform do.
+    NB. Name was an immed locative.  Use the locale of the locative
+    subloc =. '_' (>:@i:~ }. ]) }: execform
+  elseif. #verbglopart do.
+    NB. Must be an unresolved simplename or object locative.  Extract the starting locale of the search
+    if. #oloc =. '__' takeafter verbglopart do.
+      NB. object locative.  Resolve it, starting in the search locale
+      subloc =. ". oloc , '__verbloc'
+    else.
+      NB. Unresolved simplename.  Use the search locale
+      subloc =. verbloc
+    end.
+      NB. (which is verbloc or the value of the first name), and also any additional references
+  elseif. do.
+    NB. Name was resolved locally, as simplename.  Use default locale
+    subloc =. verbloc
+  end.
   NB. Run the sentence in a sandbox; save the locale, if there was no error.
   NB. If there was an error, give a message.
-  if. '' -: $ debugloc =. dissect (3 ; verbloc ; txt) , argvbls do.
+  if. '' -: $ debugloc =. dissect (3 ; subloc ; txt) , argvbls do.
     debuglocs__COCREATOR =: debuglocs__COCREATOR , debugloc
   else.
     wdinfo 'Error running dissect';debugloc
@@ -8763,16 +8792,23 @@ if. verbstate = 1 do.
 else.
   NB. Explicit verb: debug it - if the new debugger is installed
   if. 0 ~: /: 1 4 5 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter JVERSION do.
-    'You must update your JQt to support debugging' return.
+    'You must update your JQt to support debugging explicit definitions' return.
   end.
   NB. Load the debugger if it's not loaded
   NB. Clear the debugger.  It must be initialized, so initialize it if needed
   NB. Turn debug on, wiping out any active session
   NB.?lintonly jdb_close_jdebug_ =: jdb_open_jdebug_ =: jdebug_splitheader_jdebug_ =: jdb_stoponall_jdebug_ =: nl_z_
   if. 13!:17'' do.
-    'Stop your previous debug session before starting another' return.
+    dbg_z_ 0
+NB. obsolete    'Stop your previous debug session before starting another' return.
   end.
-  dbg_z_ 1
+  NB. We have to copy this code from dbg_z_ so that we can pass in the 'forcereopen' flag to
+  NB. jdb_open.  This covers the fact that 13!:13 returns old data, but is used as a flag
+  if. _1 = 4!:0 <'jdb_open_jdebug_' do.
+    load '~addons/ide/qt/debugs.ijs'
+  end.
+  jdb_open_jdebug_ 1
+  13!:0 [ 1
 
   NB. We have to find the locale in which the name is defined, regardless of where it
   NB. is referenced from, so that we can set stops in it.
@@ -8780,42 +8816,39 @@ else.
   NB. we had glopart and gloc, and we looked up the name glopart starting in gloc.
   NB. If the name was a local definition, glopart was empty.
   if. #verbglopart do.
-QP'verbglopart '
     NB. glopart is a simplename, or name_loc_, or name__loc[__loc].  In the last case,
     NB. The first object locative has been stripped off already and is in gloc.
     NB. We want to look up the name starting in gloc.
     NB. First: if glopart ends with '_', split it into name and loc, and replace glopart/gloc
     NB. Note this assignment covers the global names, no prob
     if. '_' = {: verbglopart do. 'verbglopart verbloc' =. ('_' i:~ }: verbglopart) ({. ,&< <@((<<<0 _1)&{)@}.) verbglopart end.
-QP'verbglopart verbloc '
     NB. Given the name & locale, see where the name is defined
     if. #nameloc =. findnameloc :: (''"_) verbglopart ,&< verbloc do.
       stopname =. {. jdebug_splitheader_jdebug_ nameloc
-QP'nameloc stopname '
     else.
       NB. should not occur
-      wdinfo 'Name not found';'No global definition found for name ',verbglopart,'.'
-      '' return.
+      'No global definition found for name ',verbglopart,'.' return.
     end.
-  else.
-    NB. Name was resolved locally: set stops in its name, but don't split the header
-    NB. (we can't since there is no locale)
-    stopname =. verbglopart
+  elseif. '_' = {: execform do.
+    NB. Name was resolved locally, as an immed locative.  Extract name & locale, & split the header
+    stopname =. {. jdebug_splitheader_jdebug_ (({.~ ; (}.~ >:)) i:&'_') }: execform
+  elseif. do.
+    NB. Name was resolved locally, as simplename: set stops in its name, but don't split the header
+    NB. (we can't since there is no locale).
+    stopname =. execform
   end.
   NB. Set stops in every line of the verb we are about to execute
   NB. First we split the definition if it is a multiline definition,
   NB. into header/body.  Then we install stops on all lines of the body.
   NB. The stop code works on names, insensitive to locale
   1 jdb_stoponall_jdebug_ stopname
-
   NB. Execute the verb.  The verb may refer to private verbs, so
   NB. we execute it in a sandbox
   NB. create the sandbox verb in the user's locale
-  nm =. argvbls createsandbox verbloc
-QP'nm 13!:17'''' '
+  sandboxname =. argvbls createsandbox verbloc
+  sandboxsentence__COCREATOR =: (quote sandboxname),sandboxname,' ',quote('x '#~2=valence),execform,' y'
   NB. The sentence to be debugged is just a single execution of the verb, in the sandbox
-  9!:27 '9!:27 ' , (quote (quote nm), nm , ' ' , quote ('x ' #~ 2 = valence) , execform , ' y') , ' [ 9!:29 (1) [ 13!:0 (1)'
-  9!:29 (1)
+NB. obsolete   9!:27 '9!:27 ' , (quote (quote nm), nm , ' ' , quote ('x ' #~ 2 = valence) , execform , ' y') , ' [ 9!:29 (1) [ 13!:0 (1)'
 end.
 NB. Normal completion: empty string
 ''
@@ -15140,7 +15173,55 @@ ctup = 8
 2 dissect '3 * 1 : ('':'';''x u y'') 5'
 2 dissect '*: 1 : ''u y'' 5'
 2 dissect '+ (1 : ('':''; ''(((#~LF-.@e.])5!:5<''''u'''');,.y),.({.;}.)":x,y u/x'')~) 1 2 3'
+2 dissect 'testtacit_dissect_ 5 6 7'
+2 dissect 'toupper ''abc'''
+2 dissect 'toupper_base_ ''abc'''
+2 dissect 'testmonad_dissect_ 4 5'
+2 dissect '2 testdyad_dissect_ 4 5'
+2 dissect 'testbivalent_dissect_ 4 5'
+2 dissect '6 testbivalent_dissect_ 4 5'
+2 dissect 'testmonadh_dissect_ 4 5'
+2 dissect '2 testdyadh_dissect_ 4 5'
+2 dissect 'testbivalenth_dissect_ 4 5'
+2 dissect '6 testbivalenth_dissect_ 4 5'
+2 dissect 'testmonadh__z 4 5' [ z =. <'dissect'
 )
+
+testtacit =: testtacit2"0
+testtacit2 =: *: + -:
+
+testmonad =: 3 : 0
+i. #y
+)
+
+testdyad =: 4 : 0
+x + i. y
+)
+
+testbivalent =: 3 : 0
+*: i. #y
+:
+x * *: i. #y
+)
+
+testmonadh =: 3 : 0"0
+i. #y
+)
+testmonadh =: 3 : 0"0
+y
+i. #y
+)
+
+testdyadh =: 4 : 0"0
+x + i. y
+)
+
+testbivalenth =: 3 : 0
+*: i. #y
+:
+x * *: i. #y
+)
+
 
 testsandbox_base_ =: 3 : 0
 vn =. 1 2 3
