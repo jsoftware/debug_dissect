@@ -46,6 +46,7 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~2+errorcode) ,
 alltests''
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
+(3 ;< 'check';'no') testsandbox 2
 )
 alltests__ =: 3 : 0
 config_displayautoexpand2_dissect_ =: 0
@@ -64,8 +65,8 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. should delete DEFSTRING etc after finished with sandbox
 NB. When we resize the screen, we seem to generate our own call to _resize; that should be ignored
-NB. crash on events after reexecuting testmonadh
 
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
@@ -532,8 +533,8 @@ NB. For nodes that do not have a parallel path (i. e. all but forks and &), this
 NB. be the predecessor locale, and will not signal an error
 errorcode =: 0
 NB. Because of debug irregularities, we execute debug out of a different event from
-NB. the one that started it.  The presence of sandbox on mbrup indicates that we need to execute it
-sandboxsentence =: ''
+NB. the one that started it.  The presence of startdebuglocale on mbrup indicates that we need to execute it
+startdebuginfo =: 0$a:
 NB.?lintsaveglobals
 )
 
@@ -940,8 +941,10 @@ vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot ''
 execsentences_dissect_ =: vissentence ;^:(comparisonlevel<3) ,<exestring__resultroot''
 if. sandbox do.
   NB. create the sandbox verb in the user's locale
-  nm =. defnames createsandbox loc
-  0 1 ('''' , (nm #~ [) , ''' ' , nm , ' ' , ''''&,@(,&'''')@(#~ >:@(=&''''))@])&.> execsentences_dissect_
+NB. obsolete  nm =. defnames createsandbox loc
+  createsandbox defnames
+NB. obsolete  0 1 ('''' , (nm #~ [) , ''' ' , nm , ' ' , ''''&,@(,&'''')@(#~ >:@(=&''''))@])&.> execsentences_dissect_
+  ((quote >loc) , ' sandbox_dissect_ ' , quote)&.> execsentences_dissect_
   NB.?lintsaveglobals
 else.
   execsentences_dissect_
@@ -949,28 +952,26 @@ end.
 NB.?lintsaveglobals
 )
 
-NB. x is table of names
-NB. y is locale
+NB. y is table of names
 NB. We create globals in the dissect locale that describe the names to be
 NB. created in the sandbox, and the string DEFSTRING_dissect_ that will
 NB. cause them to be defined.  No result.
-sandboxseqno =: 4768539054
-createsandbox =: 4 : 0
-NB.?lintmsgsoff
-(nm =. 'sandbox_',(0 ": sandboxseqno_dissect_ =: >: sandboxseqno_dissect_),'_',(>y),'_') =: sandboxtemplate f.
-NB.?lintmsgson
-defnounmask =. (<0) = 1 {"1 x
-NOUNNAMES_dissect_ =: defnounmask # 0 {"1 x
-NOUNVALUES_dissect_ =: defnounmask # 2 {"1 x
+NB. The sandbox must be executed right after it is created, without an intervening return
+NB. to immex, because we use globals to hold the variable-names and -values
+createsandbox =: 3 : 0
+defnounmask =. (<0) = 1 {"1 y
+NOUNNAMES_dissect_ =: defnounmask # 0 {"1 y
+NOUNVALUES_dissect_ =: defnounmask # 2 {"1 y
 DEFSTRING_dissect_ =: (*#NOUNNAMES_dissect_) # '(NOUNNAMES_dissect_) =. NOUNVALUES_dissect_',LF
-DEFSTRING_dissect_ =: DEFSTRING_dissect_ , ; ([ , ' =. ' , LF ,~ ])&.>/"1 (0 2) {"1 (-. defnounmask) # x
-nm
+DEFSTRING_dissect_ =: DEFSTRING_dissect_ , ; ([ , ' =. ' , LF ,~ ])&.>/"1 (0 2) {"1 (-. defnounmask) # y
+''
 NB.?lintsaveglobals
 )
 
-sandboxtemplate =: 4 : 0
-v4768539054x =. x
-if. #v4768539054x do. 4!:55 <v4768539054x end.
+NB. x is the locale to run in, y is the sentence to execute
+sandbox =: 4 : 0
+NB.?lintonly x =. <'dissectobj'
+cocurrent x
 v4768539054y =. y
 4!:55 ;: 'x y'
 0!:100 DEFSTRING_dissect_
@@ -7534,10 +7535,11 @@ NB.?lintsaveglobals
 dissect_dissectisi_mbrup =: 3 : 0
 hoverend''
 NB. If there is a sandbox, execute it
-if. #sandboxsentence do.
-  9!:27 sandboxsentence
-  9!:29 (1)
-  sandboxsentence =: ''
+if. #startdebuginfo do.
+  NB. Debug info is (<locale of original verb);(arg tbl);(execution locale)
+  sdloc =. {. startdebuginfo  NB.?lintonly ] <'dissectverb'
+  startdebug__sdloc }. startdebuginfo
+  startdebuginfo =: 0$a:
 end.
 )
 
@@ -8842,16 +8844,29 @@ NB. obsolete    'Stop your previous debug session before starting another' retur
   NB. into header/body.  Then we install stops on all lines of the body.
   NB. The stop code works on names, insensitive to locale
   1 jdb_stoponall_jdebug_ stopname
-  NB. Execute the verb.  The verb may refer to private verbs, so
-  NB. we execute it in a sandbox
-  NB. create the sandbox verb in the user's locale
-  sandboxname =. argvbls createsandbox verbloc
-  sandboxsentence__COCREATOR =: (quote sandboxname),sandboxname,' ',quote('x '#~2=valence),execform,' y'
-  NB. The sentence to be debugged is just a single execution of the verb, in the sandbox
+  NB. Because of debug peculiarities we need to have an immex come between setting the stops
+  NB. and executing the debugged sentence.  So we store away our information and wait for the
+  NB. mbrup event, where we start the debugger
+  startdebuginfo__COCREATOR =: (coname''),argvbls;verbloc
+NB. obsolete   NB. Execute the verb.  The verb may refer to private verbs, so
+NB. obsolete   NB. we execute it in a sandbox
+NB. obsolete   NB. create the sandbox verb in the user's locale
+NB. obsolete   sandboxname =. argvbls createsandbox verbloc
+NB. obsolete  sandboxsentence__COCREATOR =: (quote sandboxname),sandboxname,' ',quote('x '#~2=valence),execform,' y'
+NB. obsolete   NB. The sentence to be debugged is just a single execution of the verb, in the sandbox
 NB. obsolete   9!:27 '9!:27 ' , (quote (quote nm), nm , ' ' , quote ('x ' #~ 2 = valence) , execform , ' y') , ' [ 9!:29 (1) [ 13!:0 (1)'
 end.
 NB. Normal completion: empty string
 ''
+)
+
+NB. y is (arg tbl);(execution locale, single-boxed)
+NB. We create the sandbox & execute it in immex
+startdebug =: 3 : 0
+'argtbl locale' =. y
+createsandbox argtbl
+9!:27 (quote locale) , ' sandbox_dissect_ ' , quote('x '#~2=valence),execform,' y'
+9!:29 (1)
 )
 
 
@@ -15208,7 +15223,7 @@ testmonadh =: 3 : 0"0
 i. #y
 )
 testmonadh =: 3 : 0"0
-y
+y =. >: y
 i. #y
 )
 
@@ -15224,13 +15239,15 @@ x * *: i. #y
 
 
 testsandbox_base_ =: 3 : 0
+1 testsandbox y
+:
 vn =. 1 2 3
 vn_base_ =: 'abc'
 va =. &.>
 vc =. &
 vv =. 3 : ('y =. y + 1';'y =. y + 2')&.>
 sentence =. 'vv y vc + va vn'
-arg =. ,: 1;(coname'');sentence
+arg =. ,: x;(coname'');sentence
 arg =. arg , 'vn';0;vn
 arg =. arg , (,'y');0;y
 arg =. arg , 'va';1;5!:5 <'va'
