@@ -65,18 +65,13 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. should delete DEFSTRING etc after finished with sandbox
-NB. When we resize the screen, we seem to generate our own call to _resize; that should be ignored
-
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
-NB. Test recursive debug for monad/dyad, and other locales, and object locales, tacit and explicit; and verbs with header
-NB.  re-click when debug window open fails
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
 NB. support {::
-NB. Add rank-calculus for primitives with known behavio?
+NB. Add rank-calculus for primitives with known behavior?
 
 NB. display:
 NB. Unicode?
@@ -941,10 +936,8 @@ vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot ''
 execsentences_dissect_ =: vissentence ;^:(comparisonlevel<3) ,<exestring__resultroot''
 if. sandbox do.
   NB. create the sandbox verb in the user's locale
-NB. obsolete  nm =. defnames createsandbox loc
   createsandbox defnames
-NB. obsolete  0 1 ('''' , (nm #~ [) , ''' ' , nm , ' ' , ''''&,@(,&'''')@(#~ >:@(=&''''))@])&.> execsentences_dissect_
-  ((quote >loc) , ' sandbox_dissect_ ' , quote)&.> execsentences_dissect_
+  (('(' , ] , ';' , (quote >loc) , ') sandbox_dissect_ ' , quote@[)&.> '01' {.~ -@#) execsentences_dissect_
   NB.?lintsaveglobals
 else.
   execsentences_dissect_
@@ -968,15 +961,19 @@ DEFSTRING_dissect_ =: DEFSTRING_dissect_ , ; ([ , ' =. ' , LF ,~ ])&.>/"1 (0 2) 
 NB.?lintsaveglobals
 )
 
-NB. x is the locale to run in, y is the sentence to execute
+NB. x (1 to delete globals;the locale to run in), y is the sentence to execute
 sandbox =: 4 : 0
-NB.?lintonly x =. <'dissectobj'
-cocurrent x
-v4768539054y =. y
-4!:55 ;: 'x y'
-0!:100 DEFSTRING_dissect_
-". v4768539054y
+NB.?lintonly x =. 0;'dissectobj'
+cocurrent 1{x
+NB. create list of names to delete: x,y,(possibly ones in dissect locale)
+NB. put y (the sentence to execute), list of names to delete, and DEFSTRING_dissect_ on the execution stack
+NB. delete x and y - but keeping value if y as result
+NB. run DEFSTRING - but keeping value of y as result
+NB. delete DEFSTRING etc. (optional) - but keeping value of y as result
+NB. execute y, and that gives the result
+". y (4!:55@] ] DEFSTRING_dissect_ ([ 0!:100)~ ((;: 'x y') ([ 4!:55)~ [)) (0{::x) # ;: 'NOUNNAMES_dissect_ NOUNVALUES_dissect_ DEFSTRING_dissect_'
 )
+
 
 NB. Here to execute a modifier.  We do that when we encounter a modified verb.
 NB. This will be from VN A or VN C VN, but the A in VN A might be a compound adverb.
@@ -1014,6 +1011,9 @@ NB.?lintonly nobj =. localedefault
 end.
 ntypeval
 )
+
+NB. Mac fails in glpixels if the read gets too close to the edge.
+SCROLLMARGIN =: (UNAME-:'Darwin') * 4 0
 
 NB. Values for scrolltype, which tells what the user is doing
 'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA' =: i. 4
@@ -1372,16 +1372,15 @@ NB. Set the starting scroll position, just below the sentence/link
 scrolltlc =: 0 ,~ 2 + >./ (<a:;0) { sentencesizes  NB. y sizes of brects
 NB. Init scrolling vbl in case the window system fails to give a left-click before leftdbl
 lastscrollingtype =: scrollingtype =: SCROLLTYPENONE
-NB. autosizestate is 2 initially, to get initial position
+NB. autosizestate is 1 initially, to get initial position
 NB. 0 from then on to resize according to required size
 NB. If user resizes, autosizestate goes negative to indicate that e has taken control
-NB. We MUST resize before pshow, to get initial size right
-NB. This means we do the initial sizing twice, but Qt seems to fail otherwise
-sizedrawingandform autosizestate =: 2
+NB. We MUST resize before pshow, to get initial size right, because pre-J8.04
+NB. releases called _resize immediately on pshow, rather than as a queued event
+sizedrawingandform autosizestate =: 1
 wd 'pshow'
 NB. On J6, we will get an immediate paint event.
-NB. On QT, the pshow will instantly call resize (before returning to immediate mode), which will
-NB.  do the first paint
+NB. On QT, resize event, which will call paint
 0 0$0
 NB.The initial paint event will draw the screen
 NB.?lintsaveglobals
@@ -7175,8 +7174,7 @@ picklDOresizepos =: 4 : 0
 NB. Ignore resize in explorer.  The handle is not displayed, but the pick window is there
 if. exp do. '' return. end.
 NB. Read the pixels in the image
-NB. obsolete pickpixels__COCREATOR =: (3 2&{ $ glqpixels) 0 0 , |. screensize =. 3 2 { sd
-pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. 3 2 { sd
+pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (3 2 { sd) - SCROLLMARGIN
 'scrollingtype__COCREATOR scrollinglocale__COCREATOR pickscrollcurryx__COCREATOR' =: SCROLLTYPESIZEDATA;(coname'');(1 0 { sd)
 NB. There's a minimum size; but also don't try to resize width to smaller than the label.
 NB. Clear starting x position to get true width
@@ -7366,7 +7364,7 @@ glsel 'dissectisi'
 NB. Remember where the tooltip is to be drawn.  From now on we check for movement from this spot
 hoverinitloc =: cpos
 NB. Copy the pixels we are about to overwrite
-'ctly ctlx' =. 3 2 { 0 ". wdqchildxywh 'dissectisi'
+'ctly ctlx' =. (3 2 { 0 ". wdqchildxywh 'dissectisi') - SCROLLMARGIN
 'hovery hoverx' =. cpos
 'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT,TOOLTIPMARGIN;'') sizetext <string  NB. kludge
 NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset, above the cursor
@@ -7436,7 +7434,32 @@ end.
 NB.?lintsaveglobals
 )
 
+NB. init left-click status to 'idle'
+NB. Before a left click, or after a mouse-up or double-click, we clear the scrolling state
+NB. to protect against lost events.
+NB. y indicates what we are clearing:
+NB. 0=clear mouse-down  info, leave mouse-up for double-click
+NB. 1=clear everything
+dissect_dissectisi_mblreset =: 3 : 0
+select. scrollingtype
+case. SCROLLTYPEIMAGE do.
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
+case. SCROLLTYPESCROLLBAR do.
+  4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
+case. SCROLLTYPESIZEDATA do.
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
+case. do.
+end.
+NB. After clearing saved info, revert to idle state
+scrollingtype =: SCROLLTYPENONE
+NB. if not mouse-up, clear the mouse-up info
+if. y do. lastscrollingtype =: SCROLLTYPENONE end.
+''
+)
+
 dissect_dissectisi_mbldown =: 3 : 0
+NB. In case a button sequence was interrupted, clear button state
+dissect_dissectisi_mblreset 1
 NB. If the user left-clicked outside a pickrect, that is the start of a scroll operation.
 NB. Remember the clicked position, and the pixels in the screen (we use the presence of
 NB. the screen buffer as an indicator of scroll-in-progress, and delete it when we're done,
@@ -7444,11 +7467,10 @@ NB. since it's big)
 NB.?lintonly pickscrollinfo =: 5 2 $ 0
 if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
   scrollingtype =: SCROLLTYPEIMAGE
-  winsize =. 3 2 { sd   NB. y,x of control.  Mustn't read outside!
+  winsize =. (3 2 { sd) - SCROLLMARGIN   NB. y,x of control.  Mustn't read outside!
 NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
   picksentencepixels =: (, glqpixels) 1 0 3 2 { , picksentencerect =. ({. ,: winsize <. {:)&.(+/\) topbrect
   scrollblock =. -~/\ (0 (1}) {: picksentencerect) ,: winsize
-NB. obsolete  pickpixels =: ({: $ glqpixels@:,@:(|."1)) scrollblock
   pickpixels =: (, glqpixels) , |."1 scrollblock
   pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
 NB.?lintsaveglobals
@@ -7458,6 +7480,8 @@ end.
 
 dissect_dissectisi_mbrdown =: 3 : 0
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
+NB. In case mbrup omitted, clear mouse state
+startdebuginfo =: 0$a:
 'r' dissect_dissectisi_mbdown 0 ". sysdata
 ''
 )
@@ -7475,8 +7499,6 @@ case. SCROLLTYPEIMAGE do.
   scrollblock =. -~/\ (0 (1}) {: topbrect) ,: 3 2 { sd
   pickpixels =: (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) 0 1} pickpixels
   glpixels pickpixels
-NB. obsolete  glpixels (|. ({. scrollblock) + pickscrollcurryx - pickscrollstartyx) , (|. $ pickpixels) , , pickpixels
-NB. obsolete  glpixels (1 0 3 2 { , picksentencerect) , picksentencepixels
   glpixels picksentencepixels
   glpaint''
 case. SCROLLTYPESCROLLBAR do.
@@ -7504,14 +7526,12 @@ lastscrollingtype =: scrollingtype
 hoverend''
 select. scrollingtype
 case. SCROLLTYPEIMAGE do.
-  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
 NB. Use the last-drawn position as the new position.  If it hasn't changed from the original, don't bother to redraw
   if. pickscrollcurryx -.@-: pickscrollstartyx do.
     scrolltlc =: <. scrolltlc + pickscrollcurryx - pickscrollstartyx
     dissect_dissectisi_paint 0  NB. no need to recalc placement
   end.
 case. SCROLLTYPESCROLLBAR do.
-  4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 case. SCROLLTYPESIZEDATA do.
   NB. Save current info in case of doubleclick
   lastscrollingtype =: lastscrollingtype , (ifinlocale__scrollinglocale 'maxnoundisplaysizes') , (2 { pickscrollinfo)
@@ -7525,10 +7545,9 @@ case. SCROLLTYPESIZEDATA do.
     NB. redraw the original screen to erase any previous box, in case there is one
     glpixels pickpixels
   end.
-  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
 end.
-NB. In all cases, mouse-up terminates a scroll
-scrollingtype =: SCROLLTYPENONE
+NB. Reset to 'button-up' state, but leave lastscrollingtype for possible double-click
+dissect_dissectisi_mblreset 0
 NB.?lintsaveglobals
 )
 
@@ -7567,14 +7586,15 @@ case. SCROLLTYPESIZEDATA do.
   NB. Redraw with the new sizes
   dissect_dissectisi_paint 1
 end.
-lastscrollingtype =: SCROLLTYPENONE
+NB. Reset to button-up state
+dissect_dissectisi_mblreset 1
 )
 
 
 NB. Resize happens at the beginning for QT to kick off display
 dissect_dissectisi_resize =: 3 : 0
-NB. Make autosizestate negative to indicate user in control - except first time,
-NB. where we leave it > 0
+NB. Make autosizestate negative to indicate user in control
+NB. On initial event, take resize from 1 to 0 to avoid repeating initial sizing
 autosizestate =: <: autosizestate
 dissect_dissectisi_paint 1
 )
@@ -8802,7 +8822,6 @@ else.
   NB.?lintonly jdb_close_jdebug_ =: jdb_open_jdebug_ =: jdebug_splitheader_jdebug_ =: jdb_stoponall_jdebug_ =: nl_z_
   if. 13!:17'' do.
     dbg_z_ 0
-NB. obsolete    'Stop your previous debug session before starting another' return.
   end.
   NB. We have to copy this code from dbg_z_ so that we can pass in the 'forcereopen' flag to
   NB. jdb_open.  This covers the fact that 13!:13 returns old data, but is used as a flag
@@ -8848,13 +8867,6 @@ NB. obsolete    'Stop your previous debug session before starting another' retur
   NB. and executing the debugged sentence.  So we store away our information and wait for the
   NB. mbrup event, where we start the debugger
   startdebuginfo__COCREATOR =: (coname''),argvbls;verbloc
-NB. obsolete   NB. Execute the verb.  The verb may refer to private verbs, so
-NB. obsolete   NB. we execute it in a sandbox
-NB. obsolete   NB. create the sandbox verb in the user's locale
-NB. obsolete   sandboxname =. argvbls createsandbox verbloc
-NB. obsolete  sandboxsentence__COCREATOR =: (quote sandboxname),sandboxname,' ',quote('x '#~2=valence),execform,' y'
-NB. obsolete   NB. The sentence to be debugged is just a single execution of the verb, in the sandbox
-NB. obsolete   9!:27 '9!:27 ' , (quote (quote nm), nm , ' ' , quote ('x ' #~ 2 = valence) , execform , ' y') , ' [ 9!:29 (1) [ 13!:0 (1)'
 end.
 NB. Normal completion: empty string
 ''
@@ -8865,7 +8877,7 @@ NB. We create the sandbox & execute it in immex
 startdebug =: 3 : 0
 'argtbl locale' =. y
 createsandbox argtbl
-9!:27 (quote locale) , ' sandbox_dissect_ ' , quote('x '#~2=valence),execform,' y'
+9!:27 ('(1;',quote locale) , ') sandbox_dissect_ ' , quote('x '#~2=valence),execform,' y'
 9!:29 (1)
 )
 
