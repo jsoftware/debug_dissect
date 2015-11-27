@@ -1013,7 +1013,7 @@ ntypeval
 )
 
 NB. Mac fails in glpixels if the read gets too close to the edge.
-SCROLLMARGIN =: (UNAME-:'Darwin') * 4 0
+SCROLLMARGIN =: (UNAME-:'Darwin') * 4 1
 
 NB. Values for scrolltype, which tells what the user is doing
 'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA' =: i. 4
@@ -1094,7 +1094,7 @@ xywh 3 4 20 12;cc fmshowerror button;cn "<<";
 xywh 26 4 20 12;cc fmbwd button;cn "<";
 xywh 48 4 20 12;cc fmfwd button;cn ">";
 xywh 74 4 120 12;cc fmstatline static;
-xywh 3 19 2 2;cc dissectisi isigraph;
+xywh 3 19 200 200;cc dissectisi isigraph rightmove bottommove;
 pas 0 0;
 rem form end;
 )
@@ -4143,7 +4143,7 @@ MAXFINALDEFSTRINGLENGTH =: 50
 
 NB. Size and position of resize handle, relative to lower-right corner of data
 RESIZEHANDLEXYWH =: 2 2 $ _2 _2 4 4
-RESIZEHANDLECOLOR =: 0 0 0  NB. color of resize handle
+RESIZEHANDLECOLOR =: <0 0 0  NB. color of resize handle
 MINRESIZABLE =: 50 80  NB. Don't put resize handles on anything smaller
 RESIZERECTCOLOR =: <192 192 192 3  NB. Color of resizing rect, width
 RESIZEMAXFRAC =: 0.9 0.9   NB. Maximum size to resize up to
