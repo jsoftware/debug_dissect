@@ -12,7 +12,7 @@ NB. DISSECTLEVEL is updated from time to time whenever there is a change to an e
 NB. at the time of the change
 DISSECTLEVEL_dissect_ =: 4 0
 NB. CONFIGFILELEVEL is the current EC level of the config file
-CONFIGFILELEVEL_dissect_ =: 1
+CONFIGFILELEVEL_dissect_ =: 2
 
 NB. set ALLOWNONQTTOOLTIP to enable tooltips for J6 (they are always on in JQT).  In J6 tooltips
 NB. take over the timer interrupt
@@ -126,9 +126,9 @@ coinsert 'jgl2'
 NB. The address of the jsoftware wiki
 JWIKIURL =: 'http://code.jsoftware.com/wiki/'
 
-defaultfonts =: (<"0 (12 12 14 8)) ,.~ ((;:'Darwin') i. <UNAME) { ".;._2 (0 : 0)
-'"Courier"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"'    NB. Mac version
-'"Courier New"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"'    NB. Version for all others
+defaultfonts =: (<"0 (12 12 14 8 10)) ,.~ ((;:'Darwin') i. <UNAME) { ".;._2 (0 : 0)
+'"Courier"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Mac version
+'"Courier New"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Version for all others
 )
 
 
@@ -163,16 +163,21 @@ cfile =. LF ,~^:(~: {:) cfile -. CR,TAB
 NB. If the config file was downlevel, here is where we take action
 select. configfilelevel
 case. _1 do.
-  NB. no config file
+  NB. no config file - keep defaults
 case. 0 do.
   NB. config file, but created before levels assigned
-  tooltipdetailx =: >: tooltipdetailx  NB. we added a 'none' option
+  tooltipdetailx =: 2 + tooltipdetailx  NB. we added 'none' & 'one line' options
   displayshowcompmods =: {. ". 'displaycompmods'   NB. we renamed this
   displayshowstructmods =: {. ". 'displaystructmods'   NB. we renamed this
-case. CONFIGFILELEVEL do.
-  NB. current level - that's OK
+  NB. Default the font for the status line
+  fontchoices =: fontchoices , (#fontchoices) }. defaultfonts
+case. 1 do.
+  NB. Downlevel config file
+  tooltipdetailx =: (tooltipdetailx > 0) + tooltipdetailx  NB. we added 'one line' option
+  NB. Default the font for the status line
+  fontchoices =: fontchoices , (#fontchoices) }. defaultfonts
 case. do.
-  NB. Here for downlevel config file
+  NB. current level - that's OK
 end.
 0 0$0
 )
@@ -1025,13 +1030,13 @@ DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 NB. The tooltip size will be selected according to detail and expanded according to fontsize
-ISISIZEPERTTPOINT =: _2 ]\ 0 0   25 35   35 60   112 75
+ISISIZEPERTTPOINT =: _2 ]\ 0 0   3 20   25 35   35 60   112 75
 MINIMUMISISIZE =: 200 200     NB. minimum size for graphics - low to allow small screen
 TOOLTIPMAXPIXELS =: 900  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.6  NB. Max tooltip width, as frac of isigraph width
 
 TOOLTIPDELAYCHOICES =: ('immed';'250';'500';'1000') ,. ('immediate';'0.25 sec';'0.5 sec';'1 sec') ,. <"0 (1 250 500 1000)
-TOOLTIPDETAILCHOICES =: ('0';'1';'2';'3') ,. ('none';'laconic';'verbose';'tutorial') ,. <"0 (0 1 2 3)
+TOOLTIPDETAILCHOICES =: ('0';'1';'2';'3';'4') ,. ('none';'one line';'laconic';'verbose';'tutorial') ,. <"0 (0 1 2 3 4)
 
 preclines =. ; <@('menu fmprec' , ": , ' "' , ": , '";' , LF"_ )"0 DISPLAYPRECCHOICES
 sizexlines =. ; <@('menu fmmaxnounsizex' , ": , ' "' , ": , '%";' , LF"_ )"0 MAXNOUNPCTCHOICES
@@ -1046,6 +1051,7 @@ menu fmfontvalues "Select font for values...";
 menu fmfontheadings "Select font for headings...";
 menu fmfontimsgs "Select font for messages...";
 menu fmfontttips "Select font for tooltips...";
+menu fmfontstatus "Select font for status line...";
 menupopz;
 menupop "Display precision for floats";
 rem prec;
@@ -1090,11 +1096,11 @@ rem menupopz;
 rem menu fmwikidissect "View Wiki Page" "F1";
 rem menu fmwikinuvoc "View NuVoc Page" "Shift+F1";
 menupopz;
-xywh 3 4 20 12;cc fmshowerror button;cn "<<";
-xywh 26 4 20 12;cc fmbwd button;cn "<";
-xywh 48 4 20 12;cc fmfwd button;cn ">";
-xywh 74 4 120 12;cc fmstatline static;
-xywh 3 19 200 200;cc dissectisi isigraph rightmove bottommove;
+xywh 3 4 20 18;cc fmshowerror button;cn "<<";
+xywh 26 4 20 18;cc fmbwd button;cn "<";
+xywh 48 4 20 18;cc fmfwd button;cn ">";
+xywh 74 4 120 18;cc fmstatline static rightmove;
+xywh 3 23 200 200;cc dissectisi isigraph rightmove bottommove;
 pas 0 0;
 rem form end;
 )
@@ -1107,6 +1113,7 @@ menu fmfontvalues "Select font for values...";
 menu fmfontheadings "Select font for headings...";
 menu fmfontimsgs "Select font for messages...";
 menu fmfontttips "Select font for tooltips...";
+menu fmfontstatus "Select font for status line...";
 menupopz;
 menupop "Display precision for floats";
 rem prec;
@@ -1152,15 +1159,15 @@ menu fmwikidissect "View Wiki Page" "F1";
 menu fmwikinuvoc "View NuVoc Page" "Shift+F1";
 menupopz;
 bin vhh0;
-minwh 6 28;cc fmshowerror button;cn "<<";
+cc fmshowerror button;cn "<<";set fmshowerror wh 40 36;
 set fmshowerror tooltip Go back to initial selection;
-minwh 6 28;cc fmbwd button;cn "<";
+cc fmbwd button;cn "<";set fmbwd wh 40 36;
 set fmbwd tooltip Undo selection;
-minwh 6 28;cc fmfwd button;cn ">";
+cc fmfwd button;cn ">";set fmfwd wh 40 36;
 set fmfwd tooltip Redo selection;
-minwh 5 28;cc fmspacer static;cn "";
+cc fmspacer static;cn "";set fmspacer wh 4 36;
 bin zh1;
-minwh 50 16;cc fmstatline static;
+minwh 200 36;cc fmstatline static;
 bin zz;
 minwh 50 140;cc dissectisi isidraw;
 bin z;
@@ -1180,8 +1187,10 @@ wdsetenable =: ([: wd 'setenable ', [ , ' ' , ])`([: wd 'set ', [ , ' enable ' ,
 wdsetxywh =: ([: wd 'setxywhx ', [ , ' ' , ":@])`([: wd 'set ', [ , ' wh ' , [: ": _2 {. ])@.IFQT
 wdqform =: ([: wd 'qformx'"_)`([: wd 'qform'"_)@.IFQT
 wdqchildxywh =: ([: wd 'qchildxywhx ' , ])`([: wd 'qchildxywh ' , ])@.IFQT
+wdsetfont =: ([: wd 'setfont ', [ , ' ' , ])`([: wd 'set ', [ , ' font ' , ])@.IFQT
 wdpmove =: ([: wd 'pmovex ' , ])`([: wd 'pmove ' , ])@.IFQT
 3 : '(glfontextent_jgl2_ =: glfont_jgl2_)^:0 (0)'^:(0 > 4!:0) <'glfontextent_jgl2_'  NB. defined in 8.03
+wdmbfont =:  ([: wd 'mbfont ' , ])`(([: wd 'mb font ' , ])`([: wd 'mb font ' , [ , ' ' , ])@.({. 0 = /: 1 4 7 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter JVERSION)) @. IFQT
 
 NB. timer covers.  On 602 we have a single global, shared by all instances, indicating which locale the
 NB. timer is running for.  Kludge, but seemingly OK since only one locale can have focus.  Called
@@ -1329,6 +1338,7 @@ NB. debug wd :: 0: 'psel dissect;pclose'
 wd DISSECT
 winhwnd =: wd 'qhwndp'
 wd 'pn *Dissecting ' , usersentence
+'fmstatline' wdsetfont ;:^:_1 ":&.> 4 {:: fontchoices
 'fmstatline' wdsettext ''
 setformconfig''
 
@@ -1572,12 +1582,9 @@ dissect_cancel =: dissect_close
 
 NB. We use dissect locale for fontsize, because it is shared between instances
 dissect_fmfontsize_button =: 4 : 0
-NB. If the system supports titling the font dialog, do so
-if. 0 = /: 1 4 7 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter JVERSION do.
-  title =. '"Select font to use for ' , x , '" '
-else. title =. ''
-end.
-if. #fontsel =. wd 'mb font ' , title , ;:^:_1 ":&.> y { fontchoices do.
+NB. Get title to tell the user what he's doing.  Some versions don't display the title
+title =. '"Select font to use for ' , x , '"'
+if. #fontsel =. title wdmbfont ;:^:_1 ":&.> y { fontchoices do.
   NB. Extract font and size; convert size to numeric; discard adornments
   fontname =. '"' , '"' dropafter '"' takeafter fontsel
   fontsize =. 0 ". > {. ;: '"' takeafter '"' takeafter fontsel
@@ -1589,6 +1596,10 @@ dissect_fmfontvalues_button =: 'values'&(dissect_fmfontsize_button 0:)
 dissect_fmfontheadings_button =: 'headings'&(dissect_fmfontsize_button 1:)
 dissect_fmfontimsgs_button =: 'messages'&(dissect_fmfontsize_button 2:)
 dissect_fmfontttips_button =: 'tooltips'&(dissect_fmfontsize_button 3:)
+dissect_fmfontstatus_button =: 3 : 0
+'status line' dissect_fmfontsize_button 4
+'fmstatline' wdsetfont ;:^:_1 ":&.> 4 {:: fontchoices
+)
 
 dissect_fmmaxnounsize_button =: 4 : 0
 ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue '0'
@@ -6465,44 +6476,49 @@ if. #r =. (exp{DOlabelpospickrects) findpickhits y do.
   NB. See if this block has data displayed
   datapresent =. picknames e.~ <'DOdatapos'
   'ix pyx' =. {. r   NB. index of pickrect found
-  tt =. 0 2 $a:
-  if. 2 ~: 3!:0 displaylevrank do.
-    tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposranktutorial
-    NB. If there is a rank stack, process it.  First the frame, then the individual item
-    labelloc =. ix { DOranklocales
-    NB.?lintonly labelloc =. <'dissectobj'
-    NB. Get the maximum scope for the selected line.  If there is no selection (i. e. no shapes) at
-    NB. the locale selected (ex: u@v, we look at v), go up (from v to u@v, which has no explicit line)
-    NB. to see if there are shapes there.  If the parent is & or @ (which are known to leave no line
-    NB. in the rank stack) and we are the v, we use the parent.  Result is locale;operand code:
-    NB. 2=@ (or monad &), 0=& (x operand), 1=&(y operand)
-    if. #inputselopshapes do.
-      'frameloc opno' =. labelloc;2
+  select. tooltipdetailx
+  case. 0 do. text =. ''
+  case. 1 do. text =. LF ,~ x statlineDOlabelpos y
+  case. do.
+    tt =. 0 2 $a:
+    if. 2 ~: 3!:0 displaylevrank do.
+      tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposranktutorial
+      NB. If there is a rank stack, process it.  First the frame, then the individual item
+      labelloc =. ix { DOranklocales
+      NB.?lintonly labelloc =. <'dissectobj'
+      NB. Get the maximum scope for the selected line.  If there is no selection (i. e. no shapes) at
+      NB. the locale selected (ex: u@v, we look at v), go up (from v to u@v, which has no explicit line)
+      NB. to see if there are shapes there.  If the parent is & or @ (which are known to leave no line
+      NB. in the rank stack) and we are the v, we use the parent.  Result is locale;operand code:
+      NB. 2=@ (or monad &), 0=& (x operand), 1=&(y operand)
+      if. #inputselopshapes do.
+        'frameloc opno' =. labelloc;2
+      else.
+        'frameloc opno' =. findparentwithshapes__parent labelloc
+      end.
+      NB. Get the explanation of frame
+      tt =. tt , exegesisframe__frameloc labelloc;opno;datapresent
+      NB. Append the analysis of the 
+      NB. Append any explanation unique to this line.  The y argument is the boxed rank text, [x,]y
+      tt =. tt , exegesisranks (<ix;<<_2) { DOranks
+      NB. (1 if this locale appears more than once);(1 if this is the last locale in the stack);(1 if this block displayed data)
+      NB. Computational flags display only when both are 0, leaving the display for the overall node
+      tt =. tt , exegesisrankstack__labelloc (1 < labelloc +/@:= 1 {"1 displaylevrank),(ix = <:#DOranklocales),datapresent
+      NB. Finally, any explanation for the node in general.  Expansions and Finals are explained here.  Every line contributes.
+      NB. y is (1 if this block displayed data);(1 if this block is the last one with nonempty title);(title string)
+      NB. x is (1 if this locale appears twice in the stack)
+      NB. We process bottom-up to leave explanations in reverse order, at the top of the tooltip
+      QP^:DEBEXEGESIS'tt displaylevrank '
+      if. DEBEXEGESIS do. for_l. 1{"1 displaylevrank do. QP 'defstring__l]0 ' end. end.
+      isfirsttitled =. [: (*. (= +/\)) (DLRCOMPEND;a:) -.@e.~ {."1
+      if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (<datapresent) ,. (;~"1 0   isfirsttitled) |. 2 {."1 displaylevrank end.
     else.
-      'frameloc opno' =. findparentwithshapes__parent labelloc
+      tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
+      NB. If the display was text, we will pass that text into the overall for the node
+      tt =. tt , 0 exegesisrankoverall datapresent;1;displaylevrank
     end.
-    NB. Get the explanation of frame
-    tt =. tt , exegesisframe__frameloc labelloc;opno;datapresent
-    NB. Append the analysis of the 
-    NB. Append any explanation unique to this line.  The y argument is the boxed rank text, [x,]y
-    tt =. tt , exegesisranks (<ix;<<_2) { DOranks
-    NB. (1 if this locale appears more than once);(1 if this is the last locale in the stack);(1 if this block displayed data)
-    NB. Computational flags display only when both are 0, leaving the display for the overall node
-    tt =. tt , exegesisrankstack__labelloc (1 < labelloc +/@:= 1 {"1 displaylevrank),(ix = <:#DOranklocales),datapresent
-    NB. Finally, any explanation for the node in general.  Expansions and Finals are explained here.  Every line contributes.
-    NB. y is (1 if this block displayed data);(1 if this block is the last one with nonempty title);(title string)
-    NB. x is (1 if this locale appears twice in the stack)
-    NB. We process bottom-up to leave explanations in reverse order, at the top of the tooltip
-    QP^:DEBEXEGESIS'tt displaylevrank '
-    if. DEBEXEGESIS do. for_l. 1{"1 displaylevrank do. QP 'defstring__l]0 ' end. end.
-    isfirsttitled =. [: (*. (= +/\)) (DLRCOMPEND;a:) -.@e.~ {."1
-    if. ix = <:#DOranklocales do. tt =. tt ,~ ; (}: (4 : '(1 < y +/@:= 1 {"1 displaylevrank) <@exegesisrankoverall__y x') {:)"1 (<datapresent) ,. (;~"1 0   isfirsttitled) |. 2 {."1 displaylevrank end.
-  else.
-    tt =. ,: EXEGESISTUTORIAL ; hoverDOlabelposchartutorial
-    NB. If the display was text, we will pass that text into the overall for the node
-    tt =. tt , 0 exegesisrankoverall datapresent;1;displaylevrank
+    text =. exegesisgrammar tt
   end.
-  text =. exegesisgrammar tt
 else.
   text =. ''
 end.
@@ -6663,47 +6679,53 @@ If the block includes modifiers that look inside the boxing structure, namely ea
 
 NB. default verbs for other hovering
 hoverDOshapepos =: 4 : 0
-tt =. ,: EXEGESISTUTORIAL ; hoverDOshapepostutorial
-exp =. x
-if. 2 = 3!:0 displaylevrank do.
-  tt =. tt , EXEGESISSHAPERESULT ; 'The shape of this noun.',LF
-elseif. #r =. (exp{DOshapepospickrects) findpickhits y do.
-  if. #DOshapelocales do.
-    'ix pyx' =. {. r   NB. index of pickrect found
-    if. ix < #DOshapelocales do.
-      l =. ix { DOshapelocales   NB. the locale of the selection
-      NB.?lintonly l =. <'dissectverb'
-      ttt =. 'This is the frame of the verb:',LF,(defstring__l 0),CR
-      if. (<resultlevel__l) e. 0;1 do.
-        if. 1 < #DOshapes do.
-           ttt =. ttt , 'This verb operates inside the boxed structure.  The top line shows the number of times the verb was executed inside the boxed structure.  The second line gives the path to the selected result.',LF
+select. tooltipdetailx
+case. 0 do. text =. ''
+case. 1 do. text =. LF ,~ x statlineDOshapepos y
+case. do.
+  tt =. ,: EXEGESISTUTORIAL ; hoverDOshapepostutorial
+  exp =. x
+  if. 2 = 3!:0 displaylevrank do.
+    tt =. tt , EXEGESISSHAPERESULT ; 'The shape of this noun.',LF
+  elseif. #r =. (exp{DOshapepospickrects) findpickhits y do.
+    if. #DOshapelocales do.
+      'ix pyx' =. {. r   NB. index of pickrect found
+      if. ix < #DOshapelocales do.
+        l =. ix { DOshapelocales   NB. the locale of the selection
+        NB.?lintonly l =. <'dissectverb'
+        ttt =. 'This is the frame of the verb:',LF,(defstring__l 0),CR
+        if. (<resultlevel__l) e. 0;1 do.
+          if. 1 < #DOshapes do.
+             ttt =. ttt , 'This verb operates inside the boxed structure.  The top line shows the number of times the verb was executed inside the boxed structure.  The second line gives the path to the selected result.',LF
+          else.
+             ttt =. ttt , 'This verb operates inside the boxed structure.  The number is how many times the verb was executed inside the boxed structure.',LF
+          end.
         else.
-           ttt =. ttt , 'This verb operates inside the boxed structure.  The number is how many times the verb was executed inside the boxed structure.',LF
+          if. 1 < #DOshapes do.
+            ttt =. ttt , 'The top line is the frame of the verb; the bottom line is the index of the selected result',LF
+          end.
         end.
+        if. '*' e. (0,ix) {:: DOshapes do.
+          ttt =. ttt , 'The frame contains 0, so the verb is executed on a cell of fills.  The place where computation of the fill-cell starts is marked with * after the rank.',LF
+        end.
+        tt =. tt , EXEGESISSHAPESELECTINGVERB ; ttt
       else.
-        if. 1 < #DOshapes do.
-          ttt =. ttt , 'The top line is the frame of the verb; the bottom line is the index of the selected result',LF
+        ttt =. 'The shape of a single result-cell of the verb:',LF,(defstring__lastexecutednode 0),CR
+        select. {: cellshapedisp
+        case. ')' do.
+           ttt =. ttt , LF,'Some cells are padded with fill.',LF
+        case. '?' do.
+           ttt =. ttt , LF,'The shape of a result-cell is unknown.',LF
         end.
+        tt =. tt , EXEGESISSHAPERESULT ; ttt
       end.
-      if. '*' e. (0,ix) {:: DOshapes do.
-        ttt =. ttt , 'The frame contains 0, so the verb is executed on a cell of fills.  The place where computation of the fill-cell starts is marked with * after the rank.',LF
-      end.
-      tt =. tt , EXEGESISSHAPESELECTINGVERB ; ttt
     else.
-      ttt =. 'The shape of a single result-cell of the verb:',LF,(defstring__lastexecutednode 0),CR
-      select. {: cellshapedisp
-      case. ')' do.
-         ttt =. ttt , LF,'Some cells are padded with fill.',LF
-      case. '?' do.
-         ttt =. ttt , LF,'The shape of a result-cell is unknown.',LF
-      end.
-      tt =. tt , EXEGESISSHAPERESULT ; ttt
+      tt =. tt , EXEGESISSHAPERESULT ; 'The shape of the result of this verb.',LF
     end.
-  else.
-    tt =. tt , EXEGESISSHAPERESULT ; 'The shape of the result of this verb.',LF
   end.
+  text =. exegesisgrammar tt
 end.
-reflowtoscreensize exegesisgrammar tt
+reflowtoscreensize text
 )
 statlineDOshapepos =: 4 : 0
 exp =. x
@@ -6975,77 +6997,82 @@ NB. Ignore hover in the scrollbar
 NB. See which scrollbar, if any, the click is in
 dhw =. (<exp,1) { DOdatapos
 if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
-  disp =. ,: EXEGESISTUTORIAL ; hoverDOdatapostutorial
-  NB. Start accumulating the display
-  if. 2 = 3!:0 DOranks do.
-    NB. This is either a noun or a monad/dyad that suppresses detail; verbs have rank stacks
-    t =. 'This is a ',((*#DOranks) # 'named '),'noun.'
-    if. nounhasdetail *. -. nounshowdetail do.
-      t =. ' The value shown is the result of a computation that does not depend on any names.  To see the details of this computation, click anywhere in the value.'
-    end.
-    t =. t,LF
-  else.
-    NB. Not a noun.
-    t =. exegesisverbdesc 0
-  end.
-  disp =. disp , EXEGESISDATASOURCE ; t , LF
-  if. sellevel <: #selections do.
-    NB. Display the shape of the result
-    rshape =. 0{::valueformat
-    disp =. disp , EXEGESISDATASHAPE ; 'This is ',(exegesisindefinite exegesisfmtcell rshape;''),'.',LF,LF
-
-    NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
-    NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
-    NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
-    selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
-    NB. Convert the isf to a path.
-    t =. 'You are hovering over the atom with path=' , (isftodisplayablepath selx),'.'
-    NB. Calculate the type and value of the selected atom
-    if. endempty =. _1 = {: > {: path =. {."1 selx do.
-      NB. The path ends on an empty.  Discard the last selection, which will leave us pointing to the empty array
-      path =. }: path
-    end.
-    NB. We can't get an accurate type for an empty path.  If the result is coming from
-    NB. a monad/dyad execution, the empty value may have changed type (don't know why).
-    if. #path do.
-      selatom =. path {:: fillmask frameselresult selresult
-      t =. t , LF,'Type=(',((2 ^. 3!:0 selatom) {:: jdatatypes),')'
-      if. -. endempty do.
-        t =. t , ', Value=',(":!.10 selatom)
-      end.
-    end.
-    disp =. disp , EXEGESISDATAPATH ; t,LF,LF
- 
-    NB. If this has rank higher than 2, explain the display
-    if. 2 < #rshape do.
-      if. 2 | #rshape do.
-        NB. Odd number of axes
-        t =. 'This array is displayed as a list of ', (":{.rshape) , ' ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ }.rshape) , '.'
-      else.
-        t =. 'This array is displayed as a ', ((":@{. , 'x' , ":@{:) 2{.rshape) , ' table of ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ 2 }.rshape) , '.'
-      end.
-      disp =. disp , EXEGESISDATAARRANGEMENT ; t,LF,'Boundaries above rank 2 are indicated by blue lines, with wider lines used for higher boundaries.',LF,LF
-    end.
-  end.
-  NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
-  if. 1 < #DOsize do.
-    if. 0=#winhwnd do.
-      disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can (1) right-click-and-drag the lower right corner to resize the window; (2) change the maximum size of all blocks on the Sizes menu; (3) right-click the data to open a separate window for exploring this value.',LF
-    elseif. exp=0 do.
-      disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to bring up the explorer window.',LF
-    elseif. do.
-      disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to destroy the explorer window.',LF
-    end.
-  end.
-  NB. Describe the options for putting the data onto the clipboard.
-  select. #DOshapes
-  case. 1 do.
-    disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard.',LF
-  case. 2 do.
-    disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard; right-click in the selection line to put the cell it selects ',(DOshapehasfill # '(before fill) '),'onto the clipboard.',LF
+  select. tooltipdetailx
+  case. 0 do. text =. ''
+  case. 1 do. text =. LF ,~ x statlineDOdatapos y
   case. do.
+    disp =. ,: EXEGESISTUTORIAL ; hoverDOdatapostutorial
+    NB. Start accumulating the display
+    if. 2 = 3!:0 DOranks do.
+      NB. This is either a noun or a monad/dyad that suppresses detail; verbs have rank stacks
+      t =. 'This is a ',((*#DOranks) # 'named '),'noun.'
+      if. nounhasdetail *. -. nounshowdetail do.
+        t =. ' The value shown is the result of a computation that does not depend on any names.  To see the details of this computation, click anywhere in the value.'
+      end.
+      t =. t,LF
+    else.
+      NB. Not a noun.
+      t =. exegesisverbdesc 0
+    end.
+    disp =. disp , EXEGESISDATASOURCE ; t , LF
+    if. sellevel <: #selections do.
+      NB. Display the shape of the result
+      rshape =. 0{::valueformat
+      disp =. disp , EXEGESISDATASHAPE ; 'This is ',(exegesisindefinite exegesisfmtcell rshape;''),'.',LF,LF
+
+      NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
+      NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
+      NB. top-left, which position is 0 for unboxed, but at a boxmargin for boxed values
+      selx =. valueformat yxtopathshape BOXMARGIN -~^:(3<#valueformat) (x{scrollpoints) + hoveryx
+      NB. Convert the isf to a path.
+      t =. 'You are hovering over the atom with path=' , (isftodisplayablepath selx),'.'
+      NB. Calculate the type and value of the selected atom
+      if. endempty =. _1 = {: > {: path =. {."1 selx do.
+        NB. The path ends on an empty.  Discard the last selection, which will leave us pointing to the empty array
+        path =. }: path
+      end.
+      NB. We can't get an accurate type for an empty path.  If the result is coming from
+      NB. a monad/dyad execution, the empty value may have changed type (don't know why).
+      if. #path do.
+        selatom =. path {:: fillmask frameselresult selresult
+        t =. t , LF,'Type=(',((2 ^. 3!:0 selatom) {:: jdatatypes),')'
+        if. -. endempty do.
+          t =. t , ', Value=',(":!.10 selatom)
+        end.
+      end.
+      disp =. disp , EXEGESISDATAPATH ; t,LF,LF
+ 
+      NB. If this has rank higher than 2, explain the display
+      if. 2 < #rshape do.
+        if. 2 | #rshape do.
+          NB. Odd number of axes
+          t =. 'This array is displayed as a list of ', (":{.rshape) , ' ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ }.rshape) , '.'
+        else.
+          t =. 'This array is displayed as a ', ((":@{. , 'x' , ":@{:) 2{.rshape) , ' table of ' , (; }: , ,.&(<' of ') _2 <@(' tables' ,~ ":@{. , 'x' , ":@{:)\ 2 }.rshape) , '.'
+        end.
+        disp =. disp , EXEGESISDATAARRANGEMENT ; t,LF,'Boundaries above rank 2 are indicated by blue lines, with wider lines used for higher boundaries.',LF,LF
+      end.
+    end.
+    NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
+    if. 1 < #DOsize do.
+      if. 0=#winhwnd do.
+        disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can (1) right-click-and-drag the lower right corner to resize the window; (2) change the maximum size of all blocks on the Sizes menu; (3) right-click the data to open a separate window for exploring this value.',LF
+      elseif. exp=0 do.
+        disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to bring up the explorer window.',LF
+      elseif. do.
+        disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to destroy the explorer window.',LF
+      end.
+    end.
+    NB. Describe the options for putting the data onto the clipboard.
+    select. #DOshapes
+    case. 1 do.
+      disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard.',LF
+    case. 2 do.
+      disp =. disp , EXEGESISDATACLIPINFO ; 'Right-click in the shape line to copy this result to the clipboard; right-click in the selection line to put the cell it selects ',(DOshapehasfill # '(before fill) '),'onto the clipboard.',LF
+    case. do.
+    end.
+    text =. exegesisgrammar disp
   end.
-  text =. exegesisgrammar disp
 else.
   NB. Hover in the scrollbars, ignore
   text =. ''
