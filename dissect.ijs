@@ -1190,7 +1190,8 @@ wdqchildxywh =: ([: wd 'qchildxywhx ' , ])`([: wd 'qchildxywh ' , ])@.IFQT
 wdsetfont =: ([: wd 'setfont ', [ , ' ' , ])`([: wd 'set ', [ , ' font ' , ])@.IFQT
 wdpmove =: ([: wd 'pmovex ' , ])`([: wd 'pmove ' , ])@.IFQT
 3 : '(glfontextent_jgl2_ =: glfont_jgl2_)^:0 (0)'^:(0 > 4!:0) <'glfontextent_jgl2_'  NB. defined in 8.03
-wdmbfont =:  ([: wd 'mbfont ' , ])`(([: wd 'mb font ' , ])`([: wd 'mb font ' , [ , ' ' , ])@.({. 0 = /: 1 4 7 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter JVERSION)) @. IFQT
+NB. JVERSION is not defined at startup script on J6, so use a null string for that
+wdmbfont =:  ([: wd 'mbfont ' , ]) ` (([: wd 'mb font ' , ])`([: wd 'mb font ' , [ , ' ' , ])@.({. 0 = /: 1 4 7 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter ". 'JVERSION')) @. IFQT
 
 NB. timer covers.  On 602 we have a single global, shared by all instances, indicating which locale the
 NB. timer is running for.  Kludge, but seemingly OK since only one locale can have focus.  Called
@@ -1343,7 +1344,6 @@ wd 'pn *Dissecting ' , usersentence
 setformconfig''
 
 wdsetfocus 'dissectisi'
-
 
 NB. Convert the logged values from high-speed-collecting form to analysis form (one box per result)
 coalescealllogs__resultroot 0
