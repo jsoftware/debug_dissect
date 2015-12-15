@@ -4061,13 +4061,13 @@ DATACOLORS =: (255 255 255 (0}) SHAPECOLORS)
 NB. Now spread out the data colors, providing the checkerboard
 NB. Make the dim one come first, so an empty cell displays a visible rectangle (which lets us pick it)
 NB. This is an nx2x3 table
-DATACOLORS =: <. DATACOLORS  *"1/ 1 1 1 ,: 0.88 0.83 0.88
+DATACOLORS =: <. DATACOLORS  *"1/ 1 1 1 ,: 0.75 0.75 0.75
 
 DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
 
 NB. The colors for each level of highlighting.  The first highlight contrasts with normal
 NB. data; thereafter we rely on the vivid colors to contrast, and we match each highlight with
-NB. its shape selector; but we reeduce the intensity to a max value to ensure contrast with the
+NB. its shape selector; but we reduce the intensity to a max value to ensure contrast with the
 NB. background.
 HIGHLIGHTCOLORS =:  <. (*    1 <. 110 % RGBTOLUMINANCE) (0 0 0 (0}) SHAPECOLORS)
 
