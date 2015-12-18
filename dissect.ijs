@@ -65,8 +65,18 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. b =: 5 5 $ 1 0 1 1 1 0 1 1 0 1 0 1 0 1 1 1 0 0 0 1 0 1 0
+NB. lifeprog =: 2 10 $ 0 0 0 1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0
+NB. (_2 ]\ 1 1 3 3) (lifeprog {~ ([: < (<1 1)&{ , +/@:,))@([ smoutput);.3 (0)&([ , [ ,~ [ ,. [ ,.~ ]) b
+NB.   display is out of sync - looks like first result was repeated.  Must box & unbox results
+NB. ((2 2$1 1 3 3) (((2 10$0 0 0 1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0) {~ [: < (<1 1)&{ , +/@:,);.3) 0&([ , [ ,~ [ ,. [ ,.~ ])) b
+NB.    fails with index error in highlight
+NB. (2 2$1 1 3 3) (((2 10$0 0 0 1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0) {~ [: < (<1 1)&{ , +/@:,);._3) 0&([ , [ ,~ [ ,. [ ,.~ ])) b
+NB.    selection in result fails in combinexysels
+NB. dissect 'a ((i. 5 5) ; ]);.3 b' [ c =: i. 5 5 [ b =: i. 3 1 [ a =: 2 2$1 1 3 3  fails
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
+NB. dissect '((i. 5 3) + +:)"1 i. 5 5'  NVV fork error - selecting twice in bottom of i. 5 3 fails
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
@@ -8970,8 +8980,8 @@ NB.   and locale is the current result, to be displayed eventually
 traverse =: endtraverse@:(4 : 0)
 hasrecursiveexpansion =: 0  NB. no expansion, unless we do it later
 nounhasdetail =: 0  NB. No detail, unless we suppress history later
-traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs here
-ylayo =. x traverse__yop TRAVNOUN
+traversedowncalcselect y  NB. To set globals only - there are no inputs here
+ylayo =. x traverse__yop y
 NB. If a noun operand failed, pull the plug and display only that result
 if. errorcode__yop > EOK do. ylayo return. end.  NB. If the noun failed, this node must have failed too
 NB. put this locale on the stack as the outermost monad/dyad execution
@@ -9083,10 +9093,10 @@ NB. The result is the DOL, up through the result of u
 traverse =: endtraverse@:(4 : 0)
 hasrecursiveexpansion =: 0  NB. no expansion, unless we do it later
 nounhasdetail =: 0  NB. No detail, unless we suppress history later
-traversedowncalcselect TRAVNOUN  NB. To set globals only - there are no inputs here
-ylayo =. x traverse__yop TRAVNOUN
+traversedowncalcselect y  NB. To set globals only - there are no inputs here
+ylayo =. x traverse__yop y
 if. errorcode__yop > EOK do. ylayo return. end.  NB. If an argument failed, this node will have failed also
-xlayo =. x traverse__xop TRAVNOUN
+xlayo =. x traverse__xop y
 NB. Same for x - but don't detect failure on x unless it actually started: u might have an error
 NB. in an interior noun which would abort u before x ever got a chance to run.
 NB.  BUT: it is vital that we NOT try to run u if there was an error in y.  In that case, u will never
@@ -12599,6 +12609,17 @@ if. partitionn e. 3 _3 do.
     r =. < (-maxvalid) {. or
     NB.?lintonly maxvalid =. ''   NB. avoids index error in next line
     selector =: (logticket {~ - >: maxvalid)&(0})&.> selector
+  elseif. (2 = #shapeofy) *. (1 < #or) do.
+    NB. We know that when y is a table, the first cell is run twice (first time to get the result-shape) EXCEPT
+    NB. when the result is boxed or the input is too narrow
+    NB. So here, when it looks like there was an error, discard the first result, and change selector accordingly
+    if. 32 ~: 3!:0 > ({. or) { logvalues do.   NB. discard first only if not boxed
+    NB. The optimization is invoked only if there is enough space for two movements plus: a cell (for ;._3)
+    NB.  or 1 (for ;.3); and if there is no reversal in any axis
+    if. (*./ 0 < 1 { canonx) *. (1 { shapeofy) >: +/ 2 1 * 1 (1})^:(3 = partitionn) 1 {"1 canonx do.
+      r =. < }. or
+      selector =: (logticket {~ - #or)&(0})&.> selector
+    end. end.
   end.
 end.
 r
@@ -14791,8 +14812,22 @@ runtests_base_ =: 0 : 0
 2 dissect '1 0 0 1 0 <;.2 ''abcde'''
 2 dissect '(1 0 1 0;1 0 1 1 0) +:;.1 i. 4 5'
 2 dissect '(1 0 1 0;1 0 1 1 0) +:"1;.1 i. 4 5'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 7'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 7'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 8'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 8'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 9'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 9'
 2 dissect '(3 4 ,: 2 3) <;.3 i. 10 10'
 2 dissect '(3 4 ,: 2 3) <;._3 i. 10 10'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 11'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 11'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 12'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 12'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 13'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 13'
+2 dissect '(3 4 ,: 2 3) <;.3 i. 10 14'
+2 dissect '(3 4 ,: 2 3) <;._3 i. 10 14'
 2 dissect '(3 4 ,: _2 3) <;.3 i. 10 10'
 2 dissect '(3 4 ,: _2 3) <;._3 i. 10 10'
 2 dissect '(3 6 ,: 2 3) <;.3 i. 10 10'
@@ -14803,8 +14838,24 @@ runtests_base_ =: 0 : 0
 2 dissect '(0 4 ,: 2 3) <;._3 i. 10 10'
 2 dissect '(0 0 ,: 2 3) <;.3 i. 10 10'
 2 dissect '(0 0 ,: 2 3) <;._3 i. 10 10'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 7'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 7'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 8'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 8'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 9'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 9'
 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 10'
 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 10'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 11'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 11'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 12'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 12'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 13'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 13'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 14'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 14'
+2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 15'
+2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 15'
 2 dissect '(3 4 ,: _2 3) +:;.3 i. 10 10'
 2 dissect '(3 4 ,: _2 3) +:;._3 i. 10 10'
 2 dissect '(3 ,: 2) <;.3 i. 10 10'
@@ -15239,6 +15290,8 @@ ctup = 8
 2 dissect 'testbivalenth_dissect_ 4 5'
 2 dissect '6 testbivalenth_dissect_ 4 5'
 2 dissect 'testmonadh__z 4 5' [ z =. <'dissect'
+2 dissect 'a ((i. 2 10) ]~ [:);.3 b' [ b =. i. 3 1 [ a =. 2 2$1 1 3 3
+2 dissect '((i. 5 3) crash9_dissect_@+ -)"1 i. 5 5'
 )
 
 testtacit =: testtacit2"0
