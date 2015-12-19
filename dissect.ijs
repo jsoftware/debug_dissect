@@ -14049,12 +14049,11 @@ auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop uops
 
 NB. Return the locales for propsel
 proplocales =: 3 : 0
-NB. Include u if we want non-nouns (including clone), or if it's a verb
+NB. Include u if we want non-nouns (i. e. clone), or if it's a verb
 <^:(0=L.)@".@>^:(0 <: y) (((y~:0)+.vvv),1 1,y=3) # ;: 'uop cop vop tokensource'
 )
 
 NB. Traversal up and down the tree.
-NB.
 NB. The result is the DOL, up through the result of u
 traverse =: endtraverse@:(4 : 0)
 titlestring =: 1 fulltitlestring 'fork'
@@ -14064,9 +14063,10 @@ if. vvv do.
   dolv =. joinlayoutsl x traverse__vop ((<displayshowstructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
   dolu =. joinlayoutsl x traverse__uop ((<displayshowstructmods#'\fork')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
 else.
-NB. nvv.  Traverse n as a noun; but keep sellevel so that highlighting is calculated correctly
+NB. nvv.  Traverse u as a noun; reset highlighting level for it, since it starts a new path
   dolv =. joinlayoutsl x traverse__vop ((<displayshowstructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
-  dolu =. joinlayoutsl NOLAYOUTS traverse__uop bnsellevel 0} TRAVNOUN
+  dolu =. joinlayoutsl NOLAYOUTS traverse__uop TRAVNOUN
+NB. obsolete   dolu =. joinlayoutsl NOLAYOUTS traverse__uop bnsellevel 0}^:0 TRAVNOUN
 end.
 NB. If u or v are stealth, we need to preserve the original rank-stack info associated with the inputs, and route that info to
 NB. the correct side.  We always need to preserve the heavy inputs
@@ -14090,7 +14090,8 @@ NB. the highlights go from u to v, and they are at the same sellevel (since u ha
 NB. But if uv is ][, then highlights from c (or below) might reach through this node and highlight a higher node - and those nodes may have
 NB. lower sellevels, so we need to make sure the lower selections are as they would have been for the omitted ][.  The way to do this is
 NB. to start the physreqs with the values that they would have had to start uv.
-1 inheritu (dolu,dolv) traverse__cop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE 0 _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
+NB. But for nvv, remove the highlights from u, since it starts from sellevel 0
+1 inheritu (dolu,dolv) traverse__cop travops TRAVOPSKEEPALL;(TRAVOPSPHYSCHOOSE (vvv { _1 0), _2);(uopval uop,vop);< selresultshape__uop ,&< selresultshape__vop
 )
 
 exegesisrankstack =: 3 : 0
