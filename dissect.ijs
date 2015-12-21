@@ -65,9 +65,7 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. Seems to be displaying twice again
-NB. i./ $0 fails
-NB. i.&.>/ $0  fails (error if inverse not defined)
+NB. Understand why earlyerror is required for i./$0 - what fails if not?
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
 NB. dissect '((i. 5 3) + +:)"1 i. 5 5'  NVV fork error - selecting twice in bottom of i. 5 3 fails
@@ -974,13 +972,15 @@ NB. x (1 to delete globals;the locale to run in), y is the sentence to execute
 sandbox =: 4 : 0
 NB.?lintonly x =. 0;'dissectobj'
 cocurrent 1{x
-NB. create list of names to delete: x,y,(possibly ones in dissect locale)
-NB. put y (the sentence to execute), list of names to delete, and DEFSTRING_dissect_ on the execution stack
-NB. delete x and y - but keeping value if y as result
-NB. run DEFSTRING - but keeping value of y as result
-NB. delete DEFSTRING etc. (optional) - but keeping value of y as result
+NB. Create sentence to define/delete names, and call it x.  We could simply do this all on the line that
+NB. executes y, but that clutters the debug display with a long sentence 
+x =. (quote (0{::x) # 'NOUNNAMES_dissect_ NOUNVALUES_dissect_ DEFSTRING_dissect_') , '(4!:55@[    DEFSTRING_dissect_ 0!:100@[ 4!:55)&;: ''x y'''
+NB. Starting value of y (the sentence to be executed) is stacked before x is executed
+NB. delete x and y
+NB. run DEFSTRING 
+NB. delete DEFSTRING etc. (optional)
 NB. execute y, and that gives the result
-". y (4!:55@] ] DEFSTRING_dissect_ ([ 0!:100)~ ((;: 'x y') ([ 4!:55)~ [)) (0{::x) # ;: 'NOUNNAMES_dissect_ NOUNVALUES_dissect_ DEFSTRING_dissect_'
+". y [ ". x
 )
 
 
@@ -4646,7 +4646,7 @@ NB. If we are not in a try block, allow display of error only at the place where
 NB. during sniff.  This handles the case where the user makes a selection after sniff, and then there is
 NB. no error detected at the point of error, and the enclosing conjunction shows its error.
 if. errorwasdisplayedhere +. errorlevel ~: ERRORLEVELNONE do.
-  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error';'no neutral') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,EINADVERSE) i. errorcode
+  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error';'no neutral'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,ENONEUTRAL,EINADVERSE) i. errorcode
 else.
   DOstatusstring =: ''
 end.
