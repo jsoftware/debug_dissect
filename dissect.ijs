@@ -65,15 +65,9 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. b =: 5 5 $ 1 0 1 1 1 0 1 1 0 1 0 1 0 1 1 1 0 0 0 1 0 1 0
-NB. lifeprog =: 2 10 $ 0 0 0 1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0
-NB. (_2 ]\ 1 1 3 3) (lifeprog {~ ([: < (<1 1)&{ , +/@:,))@([ smoutput);.3 (0)&([ , [ ,~ [ ,. [ ,.~ ]) b
-NB.   display is out of sync - looks like first result was repeated.  Must box & unbox results
-NB. ((2 2$1 1 3 3) (((2 10$0 0 0 1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0) {~ [: < (<1 1)&{ , +/@:,);.3) 0&([ , [ ,~ [ ,. [ ,.~ ])) b
-NB.    fails with index error in highlight
-NB. (2 2$1 1 3 3) (((2 10$0 0 0 1 0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0) {~ [: < (<1 1)&{ , +/@:,);._3) 0&([ , [ ,~ [ ,. [ ,.~ ])) b
-NB.    selection in result fails in combinexysels
-NB. dissect 'a ((i. 5 5) ; ]);.3 b' [ c =: i. 5 5 [ b =: i. 3 1 [ a =: 2 2$1 1 3 3  fails
+NB. Seems to be displaying twice again
+NB. i./ $0 fails
+NB. i.&.>/ $0  fails (error if inverse not defined)
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
 NB. dissect '((i. 5 3) + +:)"1 i. 5 5'  NVV fork error - selecting twice in bottom of i. 5 3 fails
@@ -1788,7 +1782,7 @@ NB. Set ishighlightnode for as many levels as there are selections (so clicking 
 prophighlightnode =: 'propselall'&((3 : 'if. y >: 0 do. ishighlightnode =: 1 end. <: y') traversedown 0:)
 
 NB. called after sniff to indicate which nodes can have an error display
-setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: -. errorcode e. ENOTERROR') traversedown 0:)
+setdisplayerror =: 'propselall'&((3 : 'errorwasdisplayedhere =: errorcode -.@e. ENOTERROR') traversedown 0:)
 
 NB. init SDT-display flag in all objects.  y is the value to set
 NB. Called in locale of the base of the tree
@@ -2376,8 +2370,8 @@ NB.  ABORTED=no cells ran, and error was detected EXEC=cells ran, but one failed
 NB.  Values EOK and below are terminals; they should not be replaced.  Values above EOK indicate
 NB.  incomplete results; the lower a value, the more precise it is, so we will replace higher values
 NB.  with a lower during inheritu.
-(errorcodenames =: ;:'EFILLERROR ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINADVERSE') =: _2 + i. 19
-EEARLYERROR =: ENOAGREE,EINVALIDOP,EINVALIDVERB
+(errorcodenames =: ;:'EFILLERROR ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINADVERSE ENONEUTRAL') =: _2 + i. 20
+EEARLYERROR =: ENOAGREE,EINVALIDOP,EINVALIDVERB,ENONEUTRAL
 NB. If there were results to display, we will create a fillmask for them.  The cases follow:
 EHASVALIDFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EFILLERROR
 EHASFILLMASK =: EHASVALIDFILLMASK   NB. there are results, and a fillmask
@@ -4652,7 +4646,7 @@ NB. If we are not in a try block, allow display of error only at the place where
 NB. during sniff.  This handles the case where the user makes a selection after sniff, and then there is
 NB. no error detected at the point of error, and the enclosing conjunction shows its error.
 if. errorwasdisplayedhere +. errorlevel ~: ERRORLEVELNONE do.
-  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,EINADVERSE) i. errorcode
+  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error';'no neutral') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,EINADVERSE) i. errorcode
 else.
   DOstatusstring =: ''
 end.
@@ -6771,7 +6765,7 @@ end.
 text , '  This error is reported as a ''length error'' in the J session.',LF
 )
 
-NB. If the error is a single word, it is the name of a verb that will analyze the error
+NB. If the error description is a single word, it is the name of a verb that will analyze the error
 errorlookup =: (LF&taketo ; LF&takeafter);._1 (0 : 0)
 ?agreement
 erroragree
@@ -6781,6 +6775,8 @@ The verb completed correctly on each cell, but the result-cells are of different
 This error is reported as 'domain error' in the J session.
 
 The result-cells that could not be assembled are shown below, with each result inside its own dashed box, so that you can see where the incompatibility arises.
+?no neutral
+When (u/ y) is executed with empty y, the result is a neutral (aka identity element) for u.  But this u has no neutral.
 ?invalid verb
 This combination was rejected before it was even executed on its arguments.
 
@@ -10615,12 +10611,21 @@ traverse =: endtraverse@:(4 : 0)
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. Get # items in operand
-if. (#inputselopshapes) *. (*#>selector) do. nitems =. {. $^:(0<L.) 0 {:: inputselopshapes else. nitems =. 0 end.
+if. (#inputselopshapes) *. (*#>selector) do.
+  if. (0 = #selresult) *. 0 = nitems =. {. $^:(0<L.) 0 {:: inputselopshapes do.
+    NB. We did try executing the verb (i. e. there is a selector) but there are no inputs and no outputs,
+    NB. it must be a domain error (no neutral)
+    changeerrormessagefrominterp 'no neutral'
+    ENONEUTRAL earlyerror x return.
+  end.
+else.
+  nitems =. 0
+end.
 NB. Selection is forced if there are 2 items and we allow forced selection
 forcedsel =. displayautoexpand2 *. nitems = 2
 NB. Expansion is called for if there is a forced selection OR if the user has clicked on our result, which we detect by
 NB. seeing our initialselection in the selections
-shouldexpand =: forcedsel +. sellevel < #selections
+shouldexpand =: (nitems > 0) *. forcedsel +. sellevel < #selections
 NB. Allow forced-select only if there is something to see
 if. (-. forcedsel) *. 1 < nitems do. initialselection =: <(<,0),SFOPEN end.
 NB. Run the expansion
@@ -14612,9 +14617,14 @@ runtests_base_ =: 0 : 0
 2 dissect '-&.> i. 3'
 2 dissect '-&.:> i. 3'
 2 dissect '+/ 1 2 3 4 5'
+2 dissect '+/ $0'
+2 dissect '+/ 1'
+2 dissect '+/ 1 2'
 2 dissect '(* -)/@> z' [ z =. <@i."0 (3 4 5 6)
 2 dissect '+/@> z' [ z =. <@i."0 (3 4 5 6)
 2 dissect '+/"1 z' [ z =. i. 4 3
+2 dissect '+/"1 z' [ z =. i. 4 1
+2 dissect '+/"1 z' [ z =. i. 4 0
 2 dissect 'i."0@[/ z' [ z =. 4 3 $ 2 3 4
 2 dissect '2([: +/ */) 4'
 2 dissect '2 3([: +/ */) 4 5 6'
@@ -14628,6 +14638,12 @@ runtests_base_ =: 0 : 0
 2 dissect '+&.>/ z ' [ z =. 1;3;2;'a';0;1
 2 dissect '+&.>/ z ' [ z =. $0
 2 dissect '+&.>/ z ' [ z =. 'a'
+2 dissect 'i./ $0'
+2 dissect 'i.&.>/ $0'
+2 dissect 'i./"1 i. 4 0'
+2 dissect 'i.&.>/"1 i. 4 0'
+2 dissect 'i./"1 i. 4 1'
+2 dissect 'i.&.>/"1 i. 4 1'
 '1 2 3 + y' 4 : '2 dissect x' 4
 2 dissect '  (,1) ((}."1~ <:@#@$) ,~"1 ] {~ ({:@$@[ <. <:@#@$@]) <@{."1 [) ,.0 '
 2 dissect '2 ([: |: ([ = [: +/ [: ([: |: ] #: [: i. */) 2 $~ ]) #"1 [: ([: |: ] #: [: i. */) 2 $~ ])4'
