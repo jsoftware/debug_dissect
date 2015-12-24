@@ -65,10 +65,19 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. Add better tutorial tooltips.  Should roll up all descriptions in, say, +/ i. 5?  But what about +//...?
+NB. ?work on Android, with wd 'activity'
+NB. dissect '(1+i. 3) (["0 1)/  i. 4 3'
+NB.   right argument is missing
+NB.   In initial display, ranks of " and ] are empty
+NB.   tooltip for " does not give the verb
+NB.     note display of dissect '(1+i. 3) (["0 1)  i. 4 3' is correct
+NB. dissect' (1+i. 3) (2&{.@]"0 1,.["0 1(<.@%,.|~)+/@}.@]"0 1) i. 4 3'
+NB.   3 agreement errors - should stop at first one
+
 NB. Understand why earlyerror is required for i./$0 - what fails if not?
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
-NB. dissect '((i. 5 3) + +:)"1 i. 5 5'  NVV fork error - selecting twice in bottom of i. 5 3 fails
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
@@ -141,7 +150,7 @@ configfilelevel =: 0
 tooltipctrl =: 0
 fontchoices =: defaultfonts
 tooltipdelayx =: 2 NB. tooltip delay
-tooltipdetailx =: (1 {"1 TOOLTIPDETAILCHOICES) i. <'verbose'    NB. tooltip detail level
+tooltipdetailx =: (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'    NB. tooltip detail level
 displayshowcompmods =: 0   NB. display full modified verb, not just modifier line
 displayshowstructmods =: 0   NB. display a line for @ @: & etc
 config_maxnoundisplaysizex =: 3 3
@@ -1034,7 +1043,7 @@ DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 NB. The tooltip size will be selected according to detail and expanded according to fontsize
-ISISIZEPERTTPOINT =: _2 ]\ 0 0   3 20   25 35   35 60   112 75
+ISISIZEPERTTPOINT =: _2 ]\ 0 0   3 20   25 35   35 60   150 120
 MINIMUMISISIZE =: 200 200     NB. minimum size for graphics - low to allow small screen
 TOOLTIPMAXPIXELS =: 900  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.6  NB. Max tooltip width, as frac of isigraph width
@@ -6041,7 +6050,7 @@ exegesisrankoverall =: (0 2$a:)"_
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-'The result of the verb:',LF,(defstring 0),CR
+,: EXEGESISDATASOURCE ; 'The result of the verb:',LF,(defstring 0),CR
 )
 
 NB. Get the locale of the verb containing the collection point
@@ -6122,9 +6131,12 @@ EXEGESISFRAMENOSHAPE verbose Frame
 EXEGESISFRAMEVALID verbose Frame
 EXEGESISFRAMESURROGATE verbose Frame
 EXEGESISFRAMENOFRAME verbose Frame
+EXEGESISSHAPEHEADER tutorial Description
 EXEGESISSHAPESELECTINGVERB laconic
 EXEGESISSHAPEFRAME laconic
 EXEGESISSHAPERESULT laconic
+EXEGESISDATAHEADER tutorial Description
+EXEGESISDATAFINALTUTORIAL tutorial
 EXEGESISDATASOURCE verbose
 EXEGESISDATASHAPE verbose
 EXEGESISDATAPATH laconic
@@ -6457,19 +6469,42 @@ NB. go back to the previous level
 findparentwithshapes =: ;&2
 NB. This definition is overridden for & and @
 
-hoverDOlabelposchartutorial =: 0 : 0
+hoverDOlabelposchartutorial =: (#~  LF&= <: (LF,LF)&E.) 0 : 0
 This is the name field for a named noun.  In verb blocks this will be the rank stack.
-)
-hoverDOlabelposranktutorial =: 0 : 0
-This is the rank stack.  At the bottom of the stack is the verb whose result is displayed in the data portion of the block. Other lines in the rank stack are modifiers that affect the execution of the verb by changing the cells it operates on.
 
-The numbers in each line indicate the rank(s) of the cells operated on by the modifier in that line.  Each rank is color-coded with the color of the selection level it uses.  This color matches the color of the frame of the modifier in the shape line.
+)
+hoverDOlabelposranktutorial =: (#~  LF&= <: (LF,LF)&E.) 0 : 0
+This is the rank stack.  At the bottom of the stack is the verb whose result is displayed in the data portion of the block.  
+Other lines in the rank stack are modifiers that affect the execution of the verb by changing the cells it operates on.
+
+
+The numbers at the right (and also the left, for dyads) of each line indicate the rank of the cells operated on by the verb/modifier shown in that line.  
+Each number is the lesser of the rank of the argument and the corresponding verb-rank.  
+If this value is shown in normal font, the entire argument was a single cell of the verb and has the indicated rank.  
+If this value is shown in bold italics, the argument was broken up into cells of the indicated rank, and the verb was executed on each cell separately.
+
+
+A modifier is assigned a new selection level if it produces more than one result-cell.  By repeatedly clicking in the data area you can select from successive levels.
+
+
+Each selection level has a color.  
+This color is used for all information for the level: (1) the rank here, (2) the color of the frame of the modifier in the shape line, 
+(3) the background color of a selected result-cell, 
+(4) the outline color used to show the argument cells that contributed to the selected result.
+
 
 For example, in the sentence
-(i.3) +"1"2 i. 3 4 3
-the rank stack for + will have 3 lines, one for each " modifier and one for the verb + .  The top line, with rank 2, relates to the overall verb +"1"2 .  The middle line, with rank 1, relates to the verb +"1.  The bottom line, with rank 0, relates to the verb + .  Selection is possible at each level.
 
-Hovering over a line of the rank stack will provide more information.  Hovering over the verb line will describe the overall operation of the block; hovering over a modifier line will describe that modifier.
+(i.3) +"1"2 i. 3 4 3
+
+the rank stack for + will have 3 lines, one for each " modifier and one for the verb + .  
+The top line (white), with rank 2, relates to the overall verb +"1"2 .  The middle line (green), with rank 1, relates to the verb +"1.  
+The bottom line (magenta), with rank 0, relates to the verb + .  Selection is possible at each level.
+
+
+Hovering over a line of the rank stack will provide more information.  
+Hovering over the verb line will describe the overall operation of the block; hovering over a modifier line will describe that modifier.
+
 )
 
 
@@ -6667,18 +6702,67 @@ end.
 0 0$0
 )
 
-hoverDOshapepostutorial =: 0 : 0
-This is the shape/selection line(s).  The first line gives the shape of the result; the second line, which is present only when a selection has been made inside the result, gives the path of the selection.
+hoverDOshapepostutorial =: (#~  LF&= <: (LF,LF)&E.) 0 : 0
+This is the shape line.  
+It gives the result-shape.  
+If you make a selection in the data area, a second line will appear to show which cell was selected.
 
-The result-shape comprises the frame and the shape of the result cells.  The shape of the result cells is shown in white against a dark-blue background.  If the result-cells have varying shapes, the string '(fill)' is appended to the shape to indicate that the result contains fills (which are shown by crosshatching in the data area).
 
-The frame, if any, is the part of the result-shape before the dark-blue result-cell shape.  The frame is color-coded to match the modifier that selects from it.
+The result-shape is the concatenation of the frame and the shape of the result cells.  
+If you ignore the coloring and simply read the numbers, that will tell you the shape of the data block.  
+
+
+The frame, if any, is the part of the result-shape before the dark-blue result-cell shape.  
+As you make selections in the data area, you will see the coloring of the frame change to indicate which portions of the frame were used at each selection level.
+
+
+The shape of the result cells (the last component of the result-shape) is shown in white against a dark-blue background.  
+If the result-cells have varying shapes, the string '(fill)' is appended to the shape to indicate that the result contains fills, which are shown by crosshatching in the data area.
+
 
 If the block is part of a compound using @, &, or &. there is no displayable result until a single result-cell has been selected.  Until that time the shape/selection lines are omitted.
 
 A result that is a single atom (with empty shape) is indicated by the word 'atom' in the result-cell shape.
 
+
 If the block includes modifiers that look inside the boxing structure, namely each, &.>, L:n, or S:n, entry into a level of boxing is indicated with '>' at the appropriate point.
+
+)
+hoverDOshapeposseltutorial =: (#~  LF&= <: (LF,LF)&E.) 0 : 0
+These are the shape/selection lines.  
+The first line gives the result-shape; the second line gives the path of the selection.
+
+
+The result-shape is the concatenation of the frame and the shape of the result cells.  
+If you ignore the coloring and simply read the numbers, that will tell you the shape of the data block.
+
+
+Each selection level has a color.  
+This color is used for all information for the level: (1) the rank in the rank stack, (2) the background color of the frame and selection here, 
+(3) the background color of a selected result-cell, 
+(4) the outline color used to show the argument cells that contributed to the selected result.
+
+
+The frame, if any, is the part of the result-shape before the dark-blue result-cell shape.
+As you make selections in the data area, you will see the coloring of the frame change to indicate which portions of the frame were used at each selection level.
+
+
+The shape of the result cells (the last component of the result-shape) is shown in white against a dark-blue background.
+It indicates the shape of the results of the last selection level.
+If the result-cells have varying shapes, the string '(fill)' is appended to the shape to indicate that the result contains fills (which are shown by crosshatching in the data area).
+
+
+The second line indicates the selections you have made.
+Each selection selects a single result-cell; the path to that cell is shown beneath the frame that it was selected from.
+
+
+If the block is part of a compound using @, &, or &. there is no displayable result until a single result-cell has been selected.  Until that time the shape/selection lines are omitted.
+
+A result that is a single atom (with empty shape) is indicated by the word 'atom' in the result-cell shape.
+
+
+If the block includes modifiers that look inside the boxing structure, namely each, &.>, L:n, or S:n, entry into a level of boxing is indicated with '>' at the appropriate point.
+
 )
 
 NB. default verbs for other hovering
@@ -6687,7 +6771,8 @@ select. tooltipdetailx
 case. 0 do. text =. ''
 case. 1 do. text =. LF ,~ x statlineDOshapepos y
 case. do.
-  tt =. ,: EXEGESISTUTORIAL ; hoverDOshapepostutorial
+  tt =. ,: EXEGESISTUTORIAL ; (1 < #DOshapes) {:: hoverDOshapepostutorial;hoverDOshapeposseltutorial
+  tt =. tt , EXEGESISSHAPEHEADER ; ''
   exp =. x
   if. 2 = 3!:0 displaylevrank do.
     tt =. tt , EXEGESISSHAPERESULT ; 'The shape of this noun.',LF
@@ -6959,10 +7044,38 @@ end.
 reflowtoscreensize text,LF
 )
 
-hoverDOdatapostutorial =: 0 : 0
-This is the data area, where the result of the verb is displayed.
+hoverDOdatapostutorial =: (#~  LF&= <: (LF,LF)&E.) 0 : 0
+This is the data area, where the result of the verb is displayed.  
+If the result contains multiple result-cells, left-clicking in the data area will select a single result-cell for further inspection.
 
-The maximum size of the data area can be set in the Sizes menu.  If the result does not fit, scrollbars are provided; in addition you can right-click in the data area to create a fullscreen explorer window that will show the result.
+
+Each selection level has a color, used for all information for the level: 
+(1) the rank in the rank stack, 
+(2) the background color in the shape/selection lines, 
+(3) the background color of a selected result-cell here, 
+(4) the outline color used to show the argument cells that contributed to the selected result.
+
+
+White is the color of the topmost selection level.  Until a selection has been made, the background of the result is white.  
+When you select a result-cell, that cell becomes active in the second selection level, which is green: 
+
+ * the background of the selected cell changes color
+
+ * the shape/selection lines show the frame of the selected level and the path to the selected cell
+
+ * the arguments to the computation of the result are outlined with the color of the level (the y argument is a solid outline, while x is dashed) 
+
+
+The most recent selection is always indicated with a heavy black outline.  
+A selection in the final executing verb does not change the background color of the selected cell, but it does highlight the arguments to its computation, 
+using the color of the next selection level.
+
+
+To keep the display compact, the screen space allocated to the data area is limited.  
+You may change the default maximum size in the Sizes menu.  
+You may also resize an individual data block by dragging the resizing handles at the lower-right of the data block.  
+Whenever the entire result does not fit in the data area, scrollbars are provided; in addition you can right-click in the data area to create a fullscreen explorer window that will show the result.
+
 )
 
 NB. y is table of path;shape
@@ -7008,6 +7121,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
   case. 1 do. text =. LF ,~ x statlineDOdatapos y
   case. do.
     disp =. ,: EXEGESISTUTORIAL ; hoverDOdatapostutorial
+    disp =. disp , EXEGESISDATAHEADER ; ''
     NB. Start accumulating the display
     if. 2 = 3!:0 DOranks do.
       NB. This is either a noun or a monad/dyad that suppresses detail; verbs have rank stacks
@@ -7015,12 +7129,11 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
       if. nounhasdetail *. -. nounshowdetail do.
         t =. ' The value shown is the result of a computation that does not depend on any names.  To see the details of this computation, click anywhere in the value.'
       end.
-      t =. t,LF
+      disp =. disp , EXEGESISDATASOURCE ; t,LF
     else.
       NB. Not a noun.
-      t =. exegesisverbdesc 0
+      disp =. disp , exegesisverbdesc 0
     end.
-    disp =. disp , EXEGESISDATASOURCE ; t , LF
     if. sellevel <: #selections do.
       NB. Display the shape of the result
       rshape =. 0{::valueformat
@@ -10622,7 +10735,7 @@ else.
   nitems =. 0
 end.
 NB. Selection is forced if there are 2 items and we allow forced selection
-forcedsel =. displayautoexpand2 *. nitems = 2
+forcedsel =: displayautoexpand2 *. nitems = 2
 NB. Expansion is called for if there is a forced selection OR if the user has clicked on our result, which we detect by
 NB. seeing our initialselection in the selections
 shouldexpand =: (nitems > 0) *. forcedsel +. sellevel < #selections
@@ -10654,16 +10767,37 @@ selindextoisf =: 4 : 0
 <(<,0),SFOPEN
 )
 
+NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
+exegesisverbdesc =: 3 : 0
+t =. 'This is the final result of a computation that required multiple steps.  '  NB. tutorial text
+r =. 'This block displays the overall result of the verb:',LF,(defstring 0),CR
+if. forcedsel do.
+  t =. ''
+  r =. r , 'Because there are only two items, the verb is displayed as if it were a dyad between the two items'
+elseif. shouldexpand do.
+  t =. t , 'The block feeding into this one shows each intermediate result.  '
+  t =. t , 'There the results are lined up with the first computed result on the right.  You can click on any result to see how it was computed.'
+  r =. r , 'The block feeding into this one shows all the intermediate results.  To remove this detail, click in the result of this block.'
+elseif. do.
+  t =. t , 'To see the computation of the intermediate results, click anywhere in this result.  '
+  t =. t , 'That will cause a new block, called an expansion block, to be created feeding into this one.  '
+  t =. t , 'The expansion block will show all the intermediate results, and you can look at them and see how they were computed.'
+end.
+(EXEGESISDATAFINALTUTORIAL ; t) ,: (EXEGESISDATASOURCE ; r)
+)
+
 NB. We treat this as an overall since it does only one thing
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
 if. datapresent do.
   t =. 'This block %al1%displays the final result of the verb:',LF,(defstring 0),CR
 
-  if. shouldexpand do.
+  if. forcedsel do.
+    t =. t , 'Because there are only two items, the verb is displayed as if it were a dyad between the two items',LF
+  elseif. shouldexpand do.
     t =. t , 'The block feeding into this one shows all the intermediate results.  To remove this detail, click in the result of this block.',LF
-  else.
-    t =. t , 'Click on the result to see the details of the calculation.',LF
+  elseif. do.
+    t =. t , 'Click on the result to see the intermediate results of the calculation.',LF
   end.
   res =. EXEGESISRANKOVERALLCOMPEND;t
 else.
@@ -10867,7 +11001,7 @@ end.
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each intermediate result in its own box.',LF
+EXEGESISDATASOURCE ; 'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each intermediate result in its own box.',LF
 )
 
 NB. *** traversal support ***
@@ -11612,7 +11746,7 @@ end.
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each successive power in its own box.',LF
+EXEGESISDATASOURCE ; 'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each successive power in its own box.',LF
 )
 
 
