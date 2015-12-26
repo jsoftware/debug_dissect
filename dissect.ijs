@@ -65,6 +65,8 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. dissect '+:`-:@.(2&|"0) 4 5'   in initial display, ranks of agenda verb are empty
+NB. dissect '+:^:(,3) i. 2 3'   wrong shape for result of power
 NB. Add better tutorial tooltips.
 NB.   position large tutorial at bottom so it doesn't overflow visible screen
 NB.   put in exegesis for all expansion blocks
@@ -1031,9 +1033,6 @@ NB.?lintonly nobj =. localedefault
 end.
 ntypeval
 )
-
-NB. Mac fails in glpixels if the read gets too close to the edge.
-SCROLLMARGIN =: 0 * (UNAME-:'Darwin') * 4 1
 
 NB. Values for scrolltype, which tells what the user is doing
 'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA' =: i. 4
@@ -6138,7 +6137,7 @@ EXEGESISSHAPESELECTINGVERB laconic
 EXEGESISSHAPEFRAME laconic
 EXEGESISSHAPERESULT laconic
 EXEGESISDATAHEADER tutorial Description
-EXEGESISDATATUTORIAL tutorial
+EXEGESISDATAVERBTUTORIAL tutorial
 EXEGESISDATASOURCE verbose
 EXEGESISDATASHAPE verbose
 EXEGESISDATAPATH laconic
@@ -7111,6 +7110,21 @@ symbol
 character, Unicode
 )
 
+NB. Name signifies 'compend found','multiple modifier lines'
+hoverDOdataposverbtutorialsimple =: 0 : 0
+To see details about the verb that produced this result, hover over the name of the verb in the rank stack above the shape line.
+
+)
+hoverDOdataposverbtutorialfinal =: 0 : 0
+This block shows the overall result of executing a modifier.  Hover over the name of the verb in the rank stack for instructions on how to explore the execution of the modifier.
+
+)
+
+hoverDOdataposverbtutorialcompound =: 0 : 0
+This is the result of a modified verb and is thus simultaneously the result of all the compounds that end with the execution of the verb.  Hover over the rank stack to see the verb and the compounds.  The verb is the last line of the rank stack.
+
+)
+
 hoverDOdatapos =: 4 : 0
 exp =. x
 hoveryx =. y
@@ -7134,14 +7148,16 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
       disp =. disp , EXEGESISDATASOURCE ; t,LF
     else.
       NB. Not a noun.
-      disp =. disp , exegesisverbdesc 0
-      NB. If there is additional tutorial information for any element in the stack, display the last one
-      NB. y into exegesisdatatutorial is 1 for the last block in the stack
-      tutor =. a: -.~ ((4 : '<@exegesisdatatutorial__y :: (a:"_) x')"0~  1 {.~ -@#) ((DLRCOMPEND;'') -.@e.~ 0 {"1 displaylevrank) # (1) {"1 displaylevrank
-      if. 1 < #tutor do.
-        tutor =. ({: tutor) ,< LF,LF,'This block contains multiple complex modifiers.  If you create the expansion block for this result, it will itself also be expandable. '
+      if. 1 +./@:< #@;:@> (<DLRCOMPEND) -.~ texts =. a: -.~ 0 {"1 displaylevrank do.
+        t =. hoverDOdataposverbtutorialfinal
+      elseif. 1 < #texts do.
+        t =. hoverDOdataposverbtutorialcompound
+      elseif. do.
+        t =. hoverDOdataposverbtutorialsimple
       end.
-      if. #tutor do. disp =. disp , EXEGESISDATATUTORIAL ; (;tutor) , LF,LF end.
+      NB. Insert tutorial information for the data area, depending on the complexity of the rank stack
+      disp =. disp , EXEGESISDATAVERBTUTORIAL ; t
+      disp =. disp , exegesisverbdesc 0
     end.
     if. sellevel <: #selections do.
       NB. Display the shape of the result
@@ -7329,8 +7345,7 @@ picklDOresizepos =: 4 : 0
 NB. Ignore resize in explorer.  The handle is not displayed, but the pick window is there
 if. exp do. '' return. end.
 NB. Read the pixels in the image
-NB. obsolete pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (3 2 { sd) - SCROLLMARGIN
-pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (|. glqwh'') - SCROLLMARGIN
+pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (|. glqwh'')
 'scrollingtype__COCREATOR scrollinglocale__COCREATOR pickscrollcurryx__COCREATOR' =: SCROLLTYPESIZEDATA;(coname'');(1 0 { sd)
 NB. There's a minimum size; but also don't try to resize width to smaller than the label.
 NB. Clear starting x position to get true width
@@ -7521,8 +7536,7 @@ glsel 'dissectisi'
 NB. Remember where the tooltip is to be drawn.  From now on we check for movement from this spot
 hoverinitloc =: cpos
 NB. Copy the pixels we are about to overwrite
-NB. obsolete 'ctly ctlx' =. (3 2 { 0 ". wdqchildxywh 'dissectisi') - SCROLLMARGIN
-'ctly ctlx' =. (|. glqwh '') - SCROLLMARGIN
+'ctlx ctly' =. glqwh ''
 'hovery hoverx' =. cpos
 'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT,TOOLTIPMARGIN;'') sizetext <string  NB. kludge
 NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset, above the cursor
@@ -7625,8 +7639,7 @@ NB. since it's big)
 NB.?lintonly pickscrollinfo =: 5 2 $ 0
 if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
   scrollingtype =: SCROLLTYPEIMAGE
-NB. obsolete   winsize =. (3 2 { sd) - SCROLLMARGIN   NB. y,x of control.  Mustn't read outside!
-  winsize =. (|. glqwh '') - SCROLLMARGIN   NB. y,x of control.  Mustn't read outside!
+  winsize =. |. glqwh ''  NB. y,x of control.  Mustn't read outside!
 NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
   picksentencepixels =: (, glqpixels) 1 0 3 2 { , picksentencerect =. ({. ,: winsize <. {:)&.(+/\) topbrect
   scrollblock =. -~/\ (0 (1}) {: picksentencerect) ,: winsize
@@ -9114,7 +9127,7 @@ if. hasrecursiveexpansion =: 1 = #ures =. (joinlayoutsl`<@.recursionhere ylayo) 
   displaylevrank =: ,: 'Result after all recursions';(coname'')
   ures =. ures ,< coname''
 else.
-  ures =. 1 1 inheritu ures  NB. Don't inherit stealth - we want to show a result
+  ures =. 0 1 inheritu ures  NB. Don't inherit stealth - we want to show a result
 end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
@@ -9131,15 +9144,24 @@ NB.?lintsaveglobals
 NB. Add on a description of the rank line if applicable.  It is, if this is a Final node
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
 'datapresent endflag linetext' =. y
 if. recursionhere do.
   if. linetext -: DLRCOMPEND do.
     NB. Result has not expanded
-    res =. ,: (EXEGESISRANKOVERALLCOMPEND) ; 'This is %al1%the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
+    t =. 'This is %al1%the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).'
+    if. tutor do.
+      t =. t , ' This will create a new block, called an expansion block, feeding into this one.'
+      t =. t , ' The expansion block will show the results from all levels of recursion, and you can select one to show the details of its computation.'
+    end.
   else.
     NB. Result has expanded
-    res =. ,: (EXEGESISRANKOVERALLCOMPEND) ; 'This is %al1%the final result of a recursive verb. The block feeding into this shows the results from each recursion.',LF
+    t =. 'This is %al1%the final result of a recursive verb. The expansion block feeding into this shows the results from each recursion.'
+    if. tutor do.
+      t =. t , ' To remove the expansion block, click in the result of this block.'
+    end.
   end.
+  res =. ,: (EXEGESISRANKOVERALLCOMPEND) ; t,LF
 else.
   res =. 0 2$a:
 end.
@@ -9246,23 +9268,7 @@ end.
 NB.?lintsaveglobals
 )
 
-NB. Add on a description of the rank line if applicable.  It is, if this is a Final node
-exegesisrankoverall =: 4 : 0
-appearstwice =. x
-'datapresent endflag linetext' =. y
-if. recursionhere do.
-  if. linetext -: '' do.
-    NB. Result has not expanded
-    res =. ,: (EXEGESISRANKOVERALLCOMPEND) ; 'This is %al1%the final result of a recursive verb. To see the results of all recursions, click on the result of a recursion (in a block labeled $:).',LF
-  else.
-    NB. Result has expanded
-    res =. ,: (EXEGESISRANKOVERALLCOMPEND) ; 'This is %al1%the final result of a recursive verb. The block feeding into this shows the results from each recursion.',LF
-  end.
-else.
-  res =. 0 2$a:
-end.
-res
-)
+exegesisrankoverall =: exegesisrankoverall_dissectmonad_ f.
 
 postselectionoverride =: postselectionoverride_dissectmonad_ f.
 
@@ -9341,7 +9347,12 @@ end.  NB. instantiate expansion if it is live
 
 NB. Add on a description of the rank line if applicable.  It is, if this is a Final node
 exegesisrankstack =: 3 : 0
-,: EXEGESISRANKSTACKEXPLAIN ; 'The contents of each box shows the result of one recursion, ordered in order of starting. Select one to see the inputs and computation that produced it.',LF,LF,'This rank stack also contains the last verb in the computation.',LF
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
+t =. 'The contents of each box shows the result of one recursion, in the order they were started. Select one to see the inputs and computation that produced it.',LF,LF,'This rank stack also contains the last verb in the computation.'
+if. tutor do.
+  t =. t , LF,LF,'The display is a snapshot of the calculation of the selected recursion.  The inputs to the computation and the results of recursive calls are the ones that contribute to the selected result.'
+end.
+,: EXEGESISRANKSTACKEXPLAIN ; t,LF
 )
 
 NB. Traversal support
@@ -10780,34 +10791,31 @@ selindextoisf =: 4 : 0
 <(<,0),SFOPEN
 )
 
-NB. Nilad.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
-exegesisdatatutorial =: 3 : 0
-t =. 'This is the final result of applying a verb between items of an array.  '
-if. forcedsel do.
-  t =. 'A verb was applied between items of an array; but there were only two items, so the verb is displayed as if it were a dyad between the two items.'
-elseif. shouldexpand do.
-  t =. t , 'The block feeding into this one shows each intermediate result.  '
-  t =. t , 'There the results are lined up with the first computed result on the right.  You can click on any result to see how it was computed.'
-elseif. do.
-  t =. t , 'To see the computation of the intermediate results, click anywhere in this result.  '
-  t =. t , 'That will cause a new block, called an expansion block, to be created feeding into this one.  '
-  t =. t , 'The expansion block will show all the intermediate results, and you can look at them and see how they were computed.'
-end.
-t
-)
-
 NB. We treat this as an overall since it does only one thing
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
 if. datapresent do.
   t =. 'This block %al1%displays the final result of the verb:',LF,(defstring 0),CR
-
+  if. tutor do.
+    t =. t , 'This verb applies a verb repeatedly between items of y.',LF
+  end.
   if. forcedsel do.
     t =. t , 'Because there are only two items, the verb is displayed as if it were a dyad between the two items',LF
   elseif. shouldexpand do.
-    t =. t , 'The block feeding into this one shows all the intermediate results.  To remove this detail, click in the result of this block.',LF
+    t =. t , 'The block feeding into this one is an expansion block showing all the intermediate results.  '
+    if. tutor do.
+      t =. t , 'There the results are lined up with the first computed result on the right.  You can click on any intermediate result to see how it was computed.  '
+    end.
+    t =. t , 'To remove the expansion block, click in the result of this block.',LF
   elseif. do.
-    t =. t , 'Click on the result to see the intermediate results of the calculation.',LF
+    if. tutor do.
+      t =. t , 'To see the computation of the intermediate results, click anywhere in this result.  '
+      t =. t , 'That will cause a new block, called an expansion block, to be created feeding into this one.  '
+      t =. t , 'The expansion block will show all the intermediate results, and you can look at them and see how they were computed.',LF
+    else.
+      t =. t , 'Click on the result to see an expansion block showing the intermediate results of the calculation.',LF
+    end.
   end.
   res =. EXEGESISRANKOVERALLCOMPEND;t
 else.
@@ -10992,28 +11000,25 @@ end.
 
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
 'datapresent endflag linetext' =. y
 if. DLRCOMPEND -: linetext do.
   NB. This is the 'end-of-computation' node.  Put out the description
   if. appearstwice do.  NB. start and end in same stack
-    t =. 'This block %al1%calculates and displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR
+    t =. 'This expansion block %al1%calculates and displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR
   else.
-    t =. 'This block %al1%displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation. The calculation of the result started in the block(s) marked with ',titlestring,' .',LF
+    t =. 'This expansion block %al1%displays all the intermediate results in the execution of the verb:',LF,(defstring 0),CR,'and shows the last verb in the computation. The calculation of the result started in the block(s) marked with ',titlestring,' .',LF
   end.
   t =. t , 'The results are displayed as a list of boxes, where the contents of a box contains one intermediate result. '
   t =. t , 'The order of results matches the order of items of y, which is the reverse of the executed order. In other words, the first result in the list is the final result of the verb. '
   t =. t , 'Select any result to see how it was calculated. Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. '
+  if. tutor do.
+    t =. t , LF,LF,'To remove this expansion block, click in the result of the Final block that it feeds into.  '
+  end.
   ,: (EXEGESISRANKOVERALLEXPLAIN,selectable+sellevel);t,LF,LF
 else.
   0 2$a:
 end.
-)
-
-NB. Nilad.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
-exegesisdatatutorial =: 3 : 0
-t =. 'This is an expansion block, created to show the details of applying a verb between items of an array.  '
-t =. t , 'Click on any result-cell to see how it was computed.  Click in the Final block, which is connected to the output of this block, to remove this expansion block.'
-t
 )
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
@@ -11329,7 +11334,7 @@ NB. we select according to which type (forward or inverse) will be displayed in 
 NB. Create the initialselection only if we are ready to use it, i. e. if we have selected down to a single value to expand.
 NB. We must not create an initialselection unless we are prepared to back it up with an expansion node - otherwise the
 NB. initialselection will pass on to a later block, creating chaos
-    if. (-. noexpansion) *. *./selopinfovalid do.
+    if. (-. noexpansion) *. (*./selopinfovalid)  *. (selectable <: sellevel < #selections) do.
       initialselection =: <(, 0:^:(=&_) |selectedpower);SFOPEN  NB. Make a list to match what's produced during selection
     end.
 
@@ -11407,42 +11412,14 @@ end.
 NB.?lintsaveglobals
 )
 
-NB. Nilad.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
-exegesisdatatutorial =: 3 : 0
-t =. 'This is the final result of applying a verb multiple times.  '
-if. *./ selopinfovalid do.
-  NB. Explanatory string if v produces an array
-  select. formatcode
-  case. 0;3;4 do.  NB. Early error; ;dyad m&v/u&n, does not go into rank stack; traverseu: vis1, this node not displayed
-    t =. ''
-  case. 1 do.  NB. Gerund
-    t =. 'dissect doesn''t analyze the gerund form of ^:, sorry.'
-  case. 2 do.  NB. ^:0 or ^:_1
-    t =. t , LF,LF,'Because ' , ((*#$vval){::'v';'each atom of v') , 'is ' , ((#. 0 _1 e. ,vval) {:: '';'_1';'0';'0 or _1') , ', details of calculating the result are not shown.'
-  case. 5 do.  NB. traverseu: noexpansion
-    if. #$vval do.
-      t =. t , LF,LF,'You have selected a result cell.  '
-      t =. t , 'If you click again in the same result-cell, a new block, called an expansion block, will be created feeding into this one.  '
-    else.
-      t =. t , LF,LF,'If you click in this result, a new block, called an expansion block, will be created feeding into this one.  '
-    end.
-    t =. t , 'The expansion block will show all the executions of the verb, and you can look at them and see how they were computed.'
-  case. 6 do.  NB. traverseu: skeletalu (unselected)
-    t =. t , LF,LF,'The selected power does not execute the verb at all.'
-  case.  do.   NB. traverseu, expansion or u created
-    t =. t , LF,LF,'The expansion block feeding into this one shows the powers that were calculated.  To remove the expansion block, click in the result of this block.  '
-    t =. t , 'To examine the computation of a power, click on its result in the expansion block.'
-  end.
-else.
-  t =. t , 'Multiple powers were calculated.  Before you can explore the computation of this result, you must click on one result-cell.'
-end.
-t
-)
-
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
 if. datapresent do.
   t =. 'The final result of the verb:',LF,(defstring 0),CR
+  if. tutor do.
+    t =. 'This is the final result of applying a verb multiple times.  '
+  end.
   if. #$vval do.
     astg =. LF,'The v operand of ^: produced ' , (exegesisindefinite exegesisfmtcell ($vval);''),'.',LF
     astg =. astg , 'The verb is applied to the argument',((valence=2)#'s'),' for each atom of that array, and the result-cells are assembled into the final result.',LF
@@ -11450,7 +11427,8 @@ if. datapresent do.
     astg =. ''
   end.
 
-  if. *./ selopinfovalid do.
+NB. obsolete   if. *./ selopinfovalid do.
+  if. #initialselection do.
     NB. Explanatory string if v produces an array
     select. formatcode
     case. 0;3;4 do.  NB. Early error; ;dyad m&v/u&n, does not go into rank stack; traverseu: vis1, this node not displayed
@@ -11460,16 +11438,23 @@ if. datapresent do.
       t =. t , LF,'Because ' , ((*#$vval){::'v';'each atom of v') , 'is ' , ((#. 0 _1 e. ,vval) {:: '';'_1';'0';'0 or _1') , ', details of calculating the result are not shown.',LF
       t =. t , astg
     case. 5 do.  NB. traverseu: noexpansion
-      if. #$vval do. astg =. astg , 'You have selected a result cell.',LF end.
-      t =. t , astg , 'Select the result again to see details of its computation.',LF
+      if. #$vval do. 
+        astg =. astg , 'You have selected a result-cell.  Click the result-cell again to see details of its computation.  '
+      else.
+        astg =. astg , 'Click in the result to see details of its computation.  '
+      end.
+      if. tutor do.
+        astg =. astg , 'This will create a new block, called an expansion block, feeding into this one.  There you can examine the calculation of the individual powers.'
+      end.
+      t =. t , astg , LF
     case. 6 do.  NB. traverseu: skeletalu (unselected)
       t =. t , astg , LF,'The selected power does not calculate u at all.',LF
     case.  do.   NB. traverseu, expansion or u created
-      t =. t , astg , LF,'The block feeding into this one shows the powers that were calculated. To remove the detail, click in the result of this block.',LF
+      t =. t , astg , LF,'The expansion block feeding into this one shows the powers that were calculated. To remove the expansion block, click in the result of this block.',LF
     end.
     type =. EXEGESISRANKOVERALLCOMPEND
   else.
-    t =. t , astg , LF,'Select a result-cell to see the powers that produced it.'
+    t =. t , astg , LF,'Multiple powers were calculated.  Before you can explore the computation of this result, you must click on one result-cell.'
     type =. EXEGESISRANKOVERALLNOOPS
   end.
 else.
@@ -11765,14 +11750,15 @@ end.
 )
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
 'datapresent endflag linetext' =. y
 if. DLRCOMPEND -: linetext do.
   tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
   NB. Display overall explanation only on the end-of-computation marker
   if. appearstwice do.  NB. start and end in same block
-    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'and displays the selected result. '
+    t =. 'This expansion block %al1%selects from the powers of',LF,(defstring 0),CR,'and displays the selected result. '
   else.
-    t =. 'This block %al1%selects from the powers of',LF,(defstring 0),CR,'%strt%and shows the last verb in the computation',tit,'.',LF,'%end%'
+    t =. 'This expansion block %al1%selects from the powers of',LF,(defstring 0),CR,'%strt%and shows the last verb in the computation',tit,'.',LF,'%end%'
   end.
   NB. Get the selection that has been inited or clicked
   sel1 =. > {. > isfensureselection isftorank2 sellevel { selections
@@ -11784,20 +11770,16 @@ if. DLRCOMPEND -: linetext do.
     if. selectedpower < 0 do.
       t =. t , 'Negative powers call for application of the inverse, which cannot be probed internally.  '
     end.
-    t =. t , 'Currently the selected power is ',(": sel1),'.  '
-    t =. t , 'Select any result to see how it was calculated.  Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. ',LF
+    t =. t , 'Select any result to see how it was calculated.  Selection of a result will open the selected box (indicated by the ''>'' in the selection line) and allow you to continue selections inside the box. '
+    t =. t , 'The currently selected power is ',(": sel1),'.  ',LF
+  end.
+  if. tutor do.
+    t =. t , LF,'To remove this expansion block, click in the result of the Final block it feeds into.  ',LF
   end.
   ,: EXEGESISRANKOVERALLCOMPEND;t
 else.
   0 2$a:
 end.
-)
-
-
-exegesisdatatutorial =: 3 : 0
-t =. 'This is an expansion block, created to show the details of applying a verb multiple times.  '
-t =. t , 'Click on any result-cell to see how it was computed.  Click in the Final block, which is connected to the output of this block, to remove this expansion block.'
-t
 )
 
 
@@ -12304,6 +12286,7 @@ end.
 
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
 'datapresent endflag linetext' =. y
 NB. This block is pointed to 3 times: u/. in the selector, 0 in the expansion, and /. at the start of computation
 if. DLRCOMPEND -: linetext do.
@@ -12324,9 +12307,13 @@ elseif. endflag do.
     end.
     if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
       if. selectable *. sellevel < #selections do.
-        t =. t , LF ,'The computation of the selected partition starts in the block(s) labeled ',cop,' and ends in the block feeding into this one.',LF
+        t =. t , LF ,'The computation of the selected partition starts in the block(s) labeled ',cop,' and ends in the expansion block feeding into this one.',LF
       else.
-        t =. t , LF,'To see the calculation of a single partition, select its result',LF
+        t =. t , LF,'To see the calculation of a single partition, select its result.'
+        if. tutor do.
+          t =. t , ' This will create a block, called an expansion block, feeding into this one.  The expansion block will show the calculation.'
+        end.
+        t =. t , LF
       end.
     end.
     res =. ,: (EXEGESISRANKOVERALLEXPLAIN,selectable+sellevel);t
@@ -12411,27 +12398,6 @@ cocurrent 'dissectobj'
 NB. *** \ ***
 
 'dissectpartitionadverb dissectpartition' primlocale '\'
-
-NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
-exegesisdatatutorial =: 3 : 0
-final =. y
-if. final do.
-  t =. 'This is the final result of applying a partitioning modifier.  '
-  if. (*./ selopinfovalid) *. (*#>selector) do.
-    if. selectable *. sellevel < #selections do.
-      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
-    else.
-      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
-    end.
-  else.
-    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
-    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
-  end.
-else.
-  t =. ''
-end.
-t
-)
 
 NB. The monadic valence u\ y:
 localebslashmonad_dissect_ =: startmonad ''
@@ -12547,27 +12513,6 @@ NB. *** \. ***
 
 'dissectpartitionadverb dissectpartition' primlocale '\.'
 
-NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
-exegesisdatatutorial =: 3 : 0
-final =. y
-if. final do.
-  t =. 'This is the final result of applying a partitioning modifier.  '
-  if. (*./ selopinfovalid) *. (*#>selector) do.
-    if. selectable *. sellevel < #selections do.
-      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
-    else.
-      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
-    end.
-  else.
-    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
-    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
-  end.
-else.
-  t =. ''
-end.
-t
-)
-
 
 NB. The monadic valence u\. y:
 startmonad >localebslashmonad
@@ -12658,27 +12603,6 @@ end.
 NB. *** /. ***
 
 'dissectfitok dissectirregularops dissectpartitionadverb dissectpartition' primlocale '/.'
-
-NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
-exegesisdatatutorial =: 3 : 0
-final =. y
-if. final do.
-  t =. 'This is the final result of applying a partitioning modifier.  '
-  if. (*./ selopinfovalid) *. (*#>selector) do.
-    if. selectable *. sellevel < #selections do.
-      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
-    else.
-      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
-    end.
-  else.
-    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
-    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
-  end.
-else.
-  t =. ''
-end.
-t
-)
 
 
 NB. The monadic valence u/. y:
@@ -12937,27 +12861,6 @@ end.
 )
 
 
-NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
-exegesisdatatutorial =: 3 : 0
-final =. y
-if. final do.
-  t =. 'This is the final result of applying a partitioning modifier.  '
-  if. (*./ selopinfovalid) *. (*#>selector) do.
-    if. selectable *. sellevel < #selections do.
-      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
-    else.
-      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
-    end.
-  else.
-    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
-    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
-  end.
-else.
-  t =. ''
-end.
-t
-)
-
 
 
 NB. The monadic valence u;. y:
@@ -13158,6 +13061,7 @@ end.
 
 exegesisrankoverall =: 4 : 0
 appearstwice =. x
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
 'datapresent endflag linetext' =. y
 tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
 if. -. datapresent do.
@@ -13166,7 +13070,7 @@ if. -. datapresent do.
 elseif. linetext -: DLRCOMPEND do.
   NB. This is the node for u.  There is data
   'type t' =. exegisisrankoverallcompend appearstwice;tit
-  t =. t , 'The gerund displayed here was selected by the Final block below.',LF
+  t =. t , 'The gerund displayed here was selected by the Final block that this block feeds into.',LF
   res =. ,: type;t
 elseif. -. endflag do.
   res =. 0 2$a:
@@ -13175,15 +13079,18 @@ elseif. linetext -: titlestring do.
   res =. ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the calculation of the selected gerund.',LF
 elseif. do.
   NB. The final node, with data
-  t =. 'This block %al1%displays the result of executing',LF,(defstring 0),CR,'The selection of executed verb comes in from the right.',LF
-  if. (errorcode__vop <: EOK) do.
-    if. *./ selopinfovalid do.
-      t =. t,LF,'The calculation for the selected result is shown ending in the block feeding into this one.',LF,'Computation starts in the block(s) labeled ',titlestring,' .',LF
-    else.
-      t =. t,LF,'Select a result-cell to see how it was calculated.',LF
+  t =. 'This block %al1%displays the result of executing',LF,(defstring 0),CR,'The selection of executed verb comes in from the right.'
+  if. *./ selopinfovalid do.
+    if. (errorcode__vop <: EOK) do.
+      t =. t,LF,'The calculation for the selected result is shown ending in the expansion block feeding into this one.',LF,'Computation starts in the block(s) labeled ',titlestring,' in the rank stack .'
+    end.
+  else.
+    t =. t,LF,'Select a result-cell to see how it was calculated.'
+    if. tutor do.
+      t =. t , ' That will create a new block, called an expansion block, feeding into this one.  The expansion block will show the computation.'
     end.
   end.
-  res =. ,: EXEGESISRANKOVERALLCOMPEND;t
+  res =. ,: EXEGESISRANKOVERALLCOMPEND;t,LF
 end.
 res
 )
