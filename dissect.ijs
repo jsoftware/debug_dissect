@@ -65,7 +65,9 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. Add better tutorial tooltips.  Should roll up all descriptions in, say, +/ i. 5?  But what about +//...?
+NB. Add better tutorial tooltips.
+NB.   position large tutorial at bottom so it doesn't overflow visible screen
+NB.   put in exegesis for all expansion blocks
 NB. ?work on Android, with wd 'activity'
 NB. dissect '(1+i. 3) (["0 1)/  i. 4 3'
 NB.   right argument is missing
@@ -1031,7 +1033,7 @@ ntypeval
 )
 
 NB. Mac fails in glpixels if the read gets too close to the edge.
-SCROLLMARGIN =: (UNAME-:'Darwin') * 4 1
+SCROLLMARGIN =: 0 * (UNAME-:'Darwin') * 4 1
 
 NB. Values for scrolltype, which tells what the user is doing
 'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA' =: i. 4
@@ -6050,7 +6052,7 @@ exegesisrankoverall =: (0 2$a:)"_
 
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-,: EXEGESISDATASOURCE ; 'The result of the verb:',LF,(defstring 0),CR
+,: EXEGESISDATASOURCE ; 'The data shown is the result of the verb:',LF,(defstring 0),CR
 )
 
 NB. Get the locale of the verb containing the collection point
@@ -6136,7 +6138,7 @@ EXEGESISSHAPESELECTINGVERB laconic
 EXEGESISSHAPEFRAME laconic
 EXEGESISSHAPERESULT laconic
 EXEGESISDATAHEADER tutorial Description
-EXEGESISDATAFINALTUTORIAL tutorial
+EXEGESISDATATUTORIAL tutorial
 EXEGESISDATASOURCE verbose
 EXEGESISDATASHAPE verbose
 EXEGESISDATAPATH laconic
@@ -7133,6 +7135,13 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     else.
       NB. Not a noun.
       disp =. disp , exegesisverbdesc 0
+      NB. If there is additional tutorial information for any element in the stack, display the last one
+      NB. y into exegesisdatatutorial is 1 for the last block in the stack
+      tutor =. a: -.~ ((4 : '<@exegesisdatatutorial__y :: (a:"_) x')"0~  1 {.~ -@#) ((DLRCOMPEND;'') -.@e.~ 0 {"1 displaylevrank) # (1) {"1 displaylevrank
+      if. 1 < #tutor do.
+        tutor =. ({: tutor) ,< LF,LF,'This block contains multiple complex modifiers.  If you create the expansion block for this result, it will itself also be expandable. '
+      end.
+      if. #tutor do. disp =. disp , EXEGESISDATATUTORIAL ; (;tutor) , LF,LF end.
     end.
     if. sellevel <: #selections do.
       NB. Display the shape of the result
@@ -7175,7 +7184,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     NB. If the window is explorable, but the user hasn't created an explorer window, tell him about that option
     if. 1 < #DOsize do.
       if. 0=#winhwnd do.
-        disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can (1) right-click-and-drag the lower right corner to resize the window; (2) change the maximum size of all blocks on the Sizes menu; (3) right-click the data to open a separate window for exploring this value.',LF
+        disp =. disp , EXEGESISDATAEXPLORABLE ; 'This value is larger than the largest allowed on the main display. You can (1) right-click-and-drag the handle in the lower right corner to resize the window; (2) change the maximum size of all blocks on the Sizes menu; (3) right-click the data to open a separate window for exploring this value.',LF
       elseif. exp=0 do.
         disp =. disp , EXEGESISDATAEXPLORABLE ; 'Right-click the data to bring up the explorer window.',LF
       elseif. do.
@@ -7320,7 +7329,8 @@ picklDOresizepos =: 4 : 0
 NB. Ignore resize in explorer.  The handle is not displayed, but the pick window is there
 if. exp do. '' return. end.
 NB. Read the pixels in the image
-pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (3 2 { sd) - SCROLLMARGIN
+NB. obsolete pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (3 2 { sd) - SCROLLMARGIN
+pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (|. glqwh'') - SCROLLMARGIN
 'scrollingtype__COCREATOR scrollinglocale__COCREATOR pickscrollcurryx__COCREATOR' =: SCROLLTYPESIZEDATA;(coname'');(1 0 { sd)
 NB. There's a minimum size; but also don't try to resize width to smaller than the label.
 NB. Clear starting x position to get true width
@@ -7498,7 +7508,8 @@ NB. Combine the blocks, with spaces between, and LF after each group
 
 NB. Get the max width from the screen info
 reflowtoscreensize =: 3 : 0
-(TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 2 { 0 ". wdqchildxywh 'dissectisi') reflowtooltip y
+NB. obsolete (TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 2 { 0 ". wdqchildxywh 'dissectisi') reflowtooltip y
+(TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 0 { glqwh '') reflowtooltip y
 )
 
 NB. y is cursor position;string
@@ -7510,7 +7521,8 @@ glsel 'dissectisi'
 NB. Remember where the tooltip is to be drawn.  From now on we check for movement from this spot
 hoverinitloc =: cpos
 NB. Copy the pixels we are about to overwrite
-'ctly ctlx' =. (3 2 { 0 ". wdqchildxywh 'dissectisi') - SCROLLMARGIN
+NB. obsolete 'ctly ctlx' =. (3 2 { 0 ". wdqchildxywh 'dissectisi') - SCROLLMARGIN
+'ctly ctlx' =. (|. glqwh '') - SCROLLMARGIN
 'hovery hoverx' =. cpos
 'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT,TOOLTIPMARGIN;'') sizetext <string  NB. kludge
 NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset, above the cursor
@@ -7521,7 +7533,7 @@ if. 0 > ttipy =. HOVEROFFSETY + hovery - ttiph do.
   ttipy =. hovery
   ttipx =. ttipx + HOVEROFFSETX >. CURSORXSIZE
 end.
-NB. If that's too far right, we back the x onto the screen (adn then right if offscreen), and drop the y to below the cursor
+NB. If that's too far right, we back the x onto the screen (and then right if offscreen), and drop the y to below the cursor
 NB. Get desired left position, but if that goes offscreen right, move left; then if offscreen left, move right
 if. ctlx < ttipx + ttipw do.
   ttipx =. 0 >. ctlx - ttipw  NB. back x onto the screen
@@ -7613,7 +7625,8 @@ NB. since it's big)
 NB.?lintonly pickscrollinfo =: 5 2 $ 0
 if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
   scrollingtype =: SCROLLTYPEIMAGE
-  winsize =. (3 2 { sd) - SCROLLMARGIN   NB. y,x of control.  Mustn't read outside!
+NB. obsolete   winsize =. (3 2 { sd) - SCROLLMARGIN   NB. y,x of control.  Mustn't read outside!
+  winsize =. (|. glqwh '') - SCROLLMARGIN   NB. y,x of control.  Mustn't read outside!
 NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
   picksentencepixels =: (, glqpixels) 1 0 3 2 { , picksentencerect =. ({. ,: winsize <. {:)&.(+/\) topbrect
   scrollblock =. -~/\ (0 (1}) {: picksentencerect) ,: winsize
@@ -10767,23 +10780,20 @@ selindextoisf =: 4 : 0
 <(<,0),SFOPEN
 )
 
-NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
-exegesisverbdesc =: 3 : 0
-t =. 'This is the final result of a computation that required multiple steps.  '  NB. tutorial text
-r =. 'This block displays the overall result of the verb:',LF,(defstring 0),CR
+NB. Nilad.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
+exegesisdatatutorial =: 3 : 0
+t =. 'This is the final result of applying a verb between items of an array.  '
 if. forcedsel do.
-  t =. ''
-  r =. r , 'Because there are only two items, the verb is displayed as if it were a dyad between the two items'
+  t =. 'A verb was applied between items of an array; but there were only two items, so the verb is displayed as if it were a dyad between the two items.'
 elseif. shouldexpand do.
   t =. t , 'The block feeding into this one shows each intermediate result.  '
   t =. t , 'There the results are lined up with the first computed result on the right.  You can click on any result to see how it was computed.'
-  r =. r , 'The block feeding into this one shows all the intermediate results.  To remove this detail, click in the result of this block.'
 elseif. do.
   t =. t , 'To see the computation of the intermediate results, click anywhere in this result.  '
   t =. t , 'That will cause a new block, called an expansion block, to be created feeding into this one.  '
   t =. t , 'The expansion block will show all the intermediate results, and you can look at them and see how they were computed.'
 end.
-(EXEGESISDATAFINALTUTORIAL ; t) ,: (EXEGESISDATASOURCE ; r)
+t
 )
 
 NB. We treat this as an overall since it does only one thing
@@ -10999,9 +11009,16 @@ else.
 end.
 )
 
+NB. Nilad.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
+exegesisdatatutorial =: 3 : 0
+t =. 'This is an expansion block, created to show the details of applying a verb between items of an array.  '
+t =. t , 'Click on any result-cell to see how it was computed.  Click in the Final block, which is connected to the output of this block, to remove this expansion block.'
+t
+)
+
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-EXEGESISDATASOURCE ; 'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each intermediate result in its own box.',LF
+EXEGESISDATASOURCE ; 'These are the intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each intermediate result in its own box.',LF
 )
 
 NB. *** traversal support ***
@@ -11390,6 +11407,38 @@ end.
 NB.?lintsaveglobals
 )
 
+NB. Nilad.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
+exegesisdatatutorial =: 3 : 0
+t =. 'This is the final result of applying a verb multiple times.  '
+if. *./ selopinfovalid do.
+  NB. Explanatory string if v produces an array
+  select. formatcode
+  case. 0;3;4 do.  NB. Early error; ;dyad m&v/u&n, does not go into rank stack; traverseu: vis1, this node not displayed
+    t =. ''
+  case. 1 do.  NB. Gerund
+    t =. 'dissect doesn''t analyze the gerund form of ^:, sorry.'
+  case. 2 do.  NB. ^:0 or ^:_1
+    t =. t , LF,LF,'Because ' , ((*#$vval){::'v';'each atom of v') , 'is ' , ((#. 0 _1 e. ,vval) {:: '';'_1';'0';'0 or _1') , ', details of calculating the result are not shown.'
+  case. 5 do.  NB. traverseu: noexpansion
+    if. #$vval do.
+      t =. t , LF,LF,'You have selected a result cell.  '
+      t =. t , 'If you click again in the same result-cell, a new block, called an expansion block, will be created feeding into this one.  '
+    else.
+      t =. t , LF,LF,'If you click in this result, a new block, called an expansion block, will be created feeding into this one.  '
+    end.
+    t =. t , 'The expansion block will show all the executions of the verb, and you can look at them and see how they were computed.'
+  case. 6 do.  NB. traverseu: skeletalu (unselected)
+    t =. t , LF,LF,'The selected power does not execute the verb at all.'
+  case.  do.   NB. traverseu, expansion or u created
+    t =. t , LF,LF,'The expansion block feeding into this one shows the powers that were calculated.  To remove the expansion block, click in the result of this block.  '
+    t =. t , 'To examine the computation of a power, click on its result in the expansion block.'
+  end.
+else.
+  t =. t , 'Multiple powers were calculated.  Before you can explore the computation of this result, you must click on one result-cell.'
+end.
+t
+)
+
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
 if. datapresent do.
@@ -11744,9 +11793,17 @@ else.
 end.
 )
 
+
+exegesisdatatutorial =: 3 : 0
+t =. 'This is an expansion block, created to show the details of applying a verb multiple times.  '
+t =. t , 'Click on any result-cell to see how it was computed.  Click in the Final block, which is connected to the output of this block, to remove this expansion block.'
+t
+)
+
+
 NB. Nilad.  Result is the string to use as the lead for describing the result of the executed verb
 exegesisverbdesc =: 3 : 0
-EXEGESISDATASOURCE ; 'The intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each successive power in its own box.',LF
+EXEGESISDATASOURCE ; 'These are the intermediate results of the computation of the verb:',LF,(defstring 0),CR,LF,'The results are displayed as a list of boxes with each successive power in its own box.',LF
 )
 
 
@@ -12232,6 +12289,7 @@ NB. there was one.
 x ,&< coname''
 )
 
+
 exegesisrankstack =: 3 : 0
 'appearstwice lastinblock datapresent' =. y
 select. appearstwice,lastinblock
@@ -12354,6 +12412,27 @@ NB. *** \ ***
 
 'dissectpartitionadverb dissectpartition' primlocale '\'
 
+NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
+exegesisdatatutorial =: 3 : 0
+final =. y
+if. final do.
+  t =. 'This is the final result of applying a partitioning modifier.  '
+  if. (*./ selopinfovalid) *. (*#>selector) do.
+    if. selectable *. sellevel < #selections do.
+      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
+    else.
+      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
+    end.
+  else.
+    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
+    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
+  end.
+else.
+  t =. ''
+end.
+t
+)
+
 NB. The monadic valence u\ y:
 localebslashmonad_dissect_ =: startmonad ''
 
@@ -12446,6 +12525,7 @@ else. calcselectedshapes 0
 end.
 )
 
+
 exegesispartitiondesc =: 3 : 0
 if. #inputselopshapes do.
   if. partitionx__xop < 0 do.
@@ -12466,6 +12546,28 @@ end.
 NB. *** \. ***
 
 'dissectpartitionadverb dissectpartition' primlocale '\.'
+
+NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
+exegesisdatatutorial =: 3 : 0
+final =. y
+if. final do.
+  t =. 'This is the final result of applying a partitioning modifier.  '
+  if. (*./ selopinfovalid) *. (*#>selector) do.
+    if. selectable *. sellevel < #selections do.
+      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
+    else.
+      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
+    end.
+  else.
+    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
+    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
+  end.
+else.
+  t =. ''
+end.
+t
+)
+
 
 NB. The monadic valence u\. y:
 startmonad >localebslashmonad
@@ -12556,6 +12658,28 @@ end.
 NB. *** /. ***
 
 'dissectfitok dissectirregularops dissectpartitionadverb dissectpartition' primlocale '/.'
+
+NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
+exegesisdatatutorial =: 3 : 0
+final =. y
+if. final do.
+  t =. 'This is the final result of applying a partitioning modifier.  '
+  if. (*./ selopinfovalid) *. (*#>selector) do.
+    if. selectable *. sellevel < #selections do.
+      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
+    else.
+      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
+    end.
+  else.
+    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
+    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
+  end.
+else.
+  t =. ''
+end.
+t
+)
+
 
 NB. The monadic valence u/. y:
 startmonad ''
@@ -12811,6 +12935,29 @@ else.
 (-valence) {.   a: , (<hlit)&{&.> {: selopshapes
 end.
 )
+
+
+NB. y is 1 in final block.  Result is the string to use in tutorial mode as the lead for describing the result of the executed verb
+exegesisdatatutorial =: 3 : 0
+final =. y
+if. final do.
+  t =. 'This is the final result of applying a partitioning modifier.  '
+  if. (*./ selopinfovalid) *. (*#>selector) do.
+    if. selectable *. sellevel < #selections do.
+      t =. t , 'You have selected a result-cell.  Its computation is shown ending in the block feeding into this one.'
+    else.
+      t =. t , 'There is only one partition.  Its computation is shown ending in the block feeding into this one.'
+    end.
+  else.
+    t =. t , 'To see the computation of a single partition, click in the result of this block.  '
+    t =. t , 'A new block, called an expansion block, will be created feeding into this block, and showing the computation of the selected result.'
+  end.
+else.
+  t =. ''
+end.
+t
+)
+
 
 
 NB. The monadic valence u;. y:
@@ -14205,7 +14352,6 @@ else.
 NB. nvv.  Traverse u as a noun; reset highlighting level for it, since it starts a new path
   dolv =. joinlayoutsl x traverse__vop ((<displayshowstructmods#'fork/')&((<_1 0)})`'') travops TRAVOPSKEEPLIGHT;TRAVOPSPHYSKEEP;(vopval selopinfovalid);< selopshapes
   dolu =. joinlayoutsl NOLAYOUTS traverse__uop TRAVNOUN
-NB. obsolete   dolu =. joinlayoutsl NOLAYOUTS traverse__uop bnsellevel 0}^:0 TRAVNOUN
 end.
 NB. If u or v are stealth, we need to preserve the original rank-stack info associated with the inputs, and route that info to
 NB. the correct side.  We always need to preserve the heavy inputs
