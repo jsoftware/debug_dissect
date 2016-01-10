@@ -1,4 +1,4 @@
-NB. Copyright (c) Henry H. Rich, 2012-2015.  All rights reserved.
+NB. Copyright (c) Henry H. Rich, 2012-2016.  All rights reserved.
 
 locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops fitok powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector adverb conjunction'
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
@@ -65,21 +65,26 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. dissect '3 ([`(i.@[)`])}"0 1 i. 4 5'   highlighting error at 2d level
+NB.   also, ranks switched on m} and i. 3  nodes
+NB. dissect' (1+i. 3) (2&{.@]"0 1,.["0 1(<.@%,.|~)+/@}.@]"0 1) i. 4 3'
+NB.   3 agreement errors - should stop at first one
 NB. dissect '+:`-:@.(2&|"0) 4 5'   in initial display, ranks of agenda verb are empty
-NB. dissect '+:^:(,3) i. 2 3'   wrong shape for result of power
+NB. dissect '(1+i. 3) (["0 1)/  i. 4 3'
+NB.   right argument is missing - this is not a matter of stealth, but of rank.  Don't delete ][ arg if it has a rank?
+NB.   In initial display, ranks of " and ] are empty   -- in lots of these
+NB.   tooltip for " does not give the verb
+NB.     note display of dissect '(1+i. 3) (["0 1)  i. 4 3' is correct
+NB.     dissect '4 5 6 ([ + +:@])"0 1 i. 3 3'
+NB.     dissect '4 5 6 ([ + +:@])"1 1 i. 3 3'
+NB.     dissect '(i. 3 4) ([ + +:@])"0 1 i. 3 3'  NB. weird
+NB.     dissect '(i. 3 4) (] + +:@])"0 1 i. 3 3'   in this there is no way to see where the length 4 came from
+
 NB. Add better tutorial tooltips.
 NB.   position large tutorial at bottom so it doesn't overflow visible screen
 NB.   put in exegesis for all expansion blocks
 NB. ?work on Android, with wd 'activity'
-NB. dissect '(1+i. 3) (["0 1)/  i. 4 3'
-NB.   right argument is missing
-NB.   In initial display, ranks of " and ] are empty
-NB.   tooltip for " does not give the verb
-NB.     note display of dissect '(1+i. 3) (["0 1)  i. 4 3' is correct
-NB. dissect' (1+i. 3) (2&{.@]"0 1,.["0 1(<.@%,.|~)+/@}.@]"0 1) i. 4 3'
-NB.   3 agreement errors - should stop at first one
 
-NB. Understand why earlyerror is required for i./$0 - what fails if not?
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
 NB.     going to leave the ^:1 in to show what happened
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
@@ -608,7 +613,7 @@ NB. Create a modifier node.  y is whatever is needed by the modifier
 NB. for normal nodes, (string form of the verb[;display form]);(token number)
 NB. if display form is not given, string form is not boxed
 NB. x is locale to create.
-NB. Result is result from create which is type;locale;token #)
+NB. Result is result from create which is (type;locale;token #)
 createmodifier =: 1 : 0
 :
 nobj =. conew >x
@@ -696,10 +701,24 @@ NB. and 'verb' for modifier executions
     pline
    
   case. 0;1 do.  NB. monad
+    NB. If the sentence is going to create a noun result, a monad/dyad must be followed by rpar, mark, or conj.
+    NB.  Anything else would fail or produce an adverb.  If we detect anything else, we fail, localizing the error
+    NB. to between the y operand and the following token
+    if. ((<:sdt) bwand (< 0 ,~ 3+pline) {:: stack) -.@e. mark,rpar,conj do.
+      etype =. 'Syntax error: execution of monad not at the end'
+      failmsg etype , LF , 'Error snippet: ' , ;:^:_1 (<: /:~ ; (< 2 ;~ 1 2 3 + pline) { stack) { ;: sentence  NB. Decr tok #s for leading mark in queue
+      return.
+    end.
     NB. Create a monad execution block for the operands, and put that on the stack
     stack =. ((subj i. 1){.stack),('dissectmonad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
 
   case. 2 do.  NB. dyad
+    NB. Verify followed by rpar/mask, as for monad exe
+    if. ((<:sdt) bwand (< 4 0) {:: stack) -.@e. mark,rpar,conj do.
+      etype =. 'Syntax error: execution of dyad not at the end'
+      failmsg etype , LF , 'Error snippet: ' , ;:^:_1 (<: /:~ ; (< 2 3 4;2) { stack) { ;: sentence  NB. Decr tok #s for leading mark in queue
+      return.
+    end.
     NB. Create a dyad execution block for the operands, and put that on the stack
     stack =. ((subj i. 1){.stack),('dissectdyad' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
 
@@ -710,15 +729,16 @@ NB. and 'verb' for modifier executions
     NB. Create a trident execution block for the operands, and put that on the stack
     stack =. ((subj i. 1){.stack),('dissectfork' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
 
-  case. 6 do.   NB. bident  A A, C VN, VN C, V V
+  case. 6 do.   NB. bident  A A, C VN, VN C, V V  and errors like N N, C C, etc
     NB.?lintonly exetypes =. 0 0 [ exeblock =. '';'';''
     if. bwand/ verb , exetypes do.  NB. V V
       stack =. ((subj i. 1){.stack),('dissecthook' 0 createmodifier exeblock),((>:subj i: 1)}. stack)
     elseif. (bwand/ adv , exetypes) +. (conj = +/ conj bwand exetypes) do. NB. A A, C VN, NV C
       NB. This becomes an adverb type.  The value is the exeblock, which will be executed later
-      stack =. ((subj i. 1){.stack),(adv;exeblock;$0),((>:subj i: 1)}. stack)
+      stack =. ((subj i. 1){.stack),(adv;exeblock;(< /:~ ; 2 {"1 exeblock)),((>:subj i: 1)}. stack)
     elseif. do.
-      failmsg 'Invalid sequence: ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj)
+      etype =. 'Syntax error: invalid sequence ' , ;:^:_1 ('Verb';'Adverb';'Conjunction';'Noun') {~ 1 i.~"1 * exetypes bwand/ (verb,adv,conj)
+      failmsg etype , LF , 'Error snippet: ' , ;:^:_1 (<: /:~ ; 2 {"1 exeblock) { ;: sentence  NB. Decr tok #s for leading mark in queue
       return.
     end.
 
@@ -726,7 +746,7 @@ NB. and 'verb' for modifier executions
     NB. See if we can analyze the assignment.  If so, add to the name table.
     NB. If the assignment is not a noun value, ignore it with a warning
     if. 0 = noun bwand 2 { exetypes do.
-      failmsg 'non-noun assignment not supported'
+      failmsg 'Undissectable sentence: non-noun assignment not supported'
       rname =. 0$a:
       return.
     NB. See if it's a simple assignment to a name
@@ -738,14 +758,14 @@ NB. and 'verb' for modifier executions
       NB.?lintonly op_dissectnoun_ =: '' [ rname =. <'dissectnoun'
       if.  2 = 3!:0 lvalue =. ". op__rname do.  NB.?lintonly [ lvalue =. ''
         if. '`' = {. lvalue do.
-          failmsg 'AR assignment to ' , lvalue , ' not supported'
+          failmsg 'Undissectable sentence: AR assignment to ' , lvalue , ' not supported'
           rname =. 0$a:
           return.
         else.
           rname =. ;: :: (a:$~0:) lvalue
         end.
       else.
-        failmsg 'Invalid assignment'
+        failmsg 'Undissectable sentence: invalid assignment'
         return.
       end.
     NB. If the assignment is to a variable name, we can do nothing with it
@@ -786,12 +806,12 @@ NB. and 'verb' for modifier executions
       NB.?lintmsgsoff
       tokensource__insideop =: tokensource__insideop , ; (<0 2;2) { stack
       NB.?lintmsgson
-    else.
-      NB. If the stackop is a modifier, we add the tokens into those for the modifier.  They will
-      NB. eventually be added into a locale
-      stack =. (< ; (<0 1 2;2) { stack) (<1 2)} stack
     end.
+    NB. Also remember the tokens in the exeblock.  If the word is a modifier, they will
+    NB. eventually be added into a locale.  In any case, they will be around in case of error
+    stack =. (< ; (<0 1 2;2) { stack) (<1 2)} stack
 
+    NB. Remove () from the stack
     stack =. (<<<0 2) { stack
 
     NB. If the stack did not have an executable combination, bring the next word onto the stack.
@@ -896,10 +916,10 @@ NB. and 'verb' for modifier executions
          NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
         ntypeval =. createverb qend;(#queue);glopart;gloc;objval;loc;(#defnames)
       case. 0+256 do.  NB. Special type: name previously assigned which in ignore assignment mode
-        failmsg 'The name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',(fromdebugger # ' when dissect is called from the debugger'),'.'
+        failmsg 'Undissectable sentence: the name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',(fromdebugger # ' when dissect is called from the debugger'),'.'
         return.
       case. do.
-        failmsg 'undefined name: ' , qend
+        failmsg 'Undissectable sentence: undefined name ' , qend
         return.
       end.
       
@@ -920,11 +940,11 @@ NB. and 'verb' for modifier executions
         case. 3 do.
           ntypeval =. (<sdt+verb) 0} createverb qend;(#queue)
         case. do.
-          failmsg 'invalid type for primitive'
+          failmsg 'Undissectable sentence: invalid type for primitive'
           return.
         end.
       catch.
-        failmsg 'Invalid word in sentence: ' , qend return.
+        failmsg 'Undissectable sentence: invalid word in sentence: ' , qend return.
       end.
       stack =. ntypeval,stack
     end.
@@ -933,7 +953,7 @@ NB. and 'verb' for modifier executions
 end.   NB. End of loop processing stack.  top of stack is a mark
 NB. verify that the sentence has a valid finish: 1 noun.
 if. 1 1 -.@-: * (noun,mark) bwand >(<1 2;0){stack do.
-  failmsg usermodifierencountered {:: 'Sentence did not produce a noun result';'Sentence does not seem to produce a noun result.  Dissect assumes that user modifiers produce verb results.'
+  failmsg usermodifierencountered {:: 'Undissectable sentence: sentence did not produce a noun result';'Undissectable sentence: sentence does not seem to produce a noun result.  Dissect assumes that user modifiers produce verb results.'
   return.
 end.
 
@@ -1018,10 +1038,13 @@ if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
   end.
   NB. We have guaranteed that every modifier line of modblock has been executed, but any tokens in the second
   NB. line of exeblock have not been assigned to any modifier.  These must be parentheses that wrapped the compound
-  NB. modifier.  We will assign them to the top-level modifier that we just created
+  NB. modifier.  We will assign them to the top-level modifier that we just created.
+  NB. We need to assign only the parentheses, i. e. not the tokens for the verb, since the verb will be added
+  NB. when the sentence is traversed
   topmod =. 1 {:: ntypeval
   NB.?lintmsgsoff
-  tokensource__topmod =: tokensource__topmod , (<1 2) {:: exeblock
+NB. obsolete   tokensource__topmod =: tokensource__topmod , (<1 2) {:: exeblock
+  tokensource__topmod =: tokensource__topmod , ((<1 2) {:: exeblock) -. 2 {:: ntypeval
   NB.?lintmsgson
 else.
   NB. Not sdt.  Look up the locale of the modifier, and execute it.  The executed modifier must correctly guess the
@@ -1031,6 +1054,8 @@ else.
   usermodifierencountered =: usermodifierencountered >. ifound = #dissectprimindex
 NB.?lintonly nobj =. localedefault
 end.
+NB. In case of parsing error, we collect the tokens contributing to this node
+ntypeval =. (< ; 2 {"1 exeblock) 2} ntypeval
 ntypeval
 )
 
@@ -2380,8 +2405,8 @@ NB.  ABORTED=no cells ran, and error was detected EXEC=cells ran, but one failed
 NB.  Values EOK and below are terminals; they should not be replaced.  Values above EOK indicate
 NB.  incomplete results; the lower a value, the more precise it is, so we will replace higher values
 NB.  with a lower during inheritu.
-(errorcodenames =: ;:'EFILLERROR ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINADVERSE ENONEUTRAL') =: _2 + i. 20
-EEARLYERROR =: ENOAGREE,EINVALIDOP,EINVALIDVERB,ENONEUTRAL
+(errorcodenames =: ;:'EFILLERROR ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINADVERSE') =: _2 + i. 19
+EEARLYERROR =: ENOAGREE,EINVALIDOP,EINVALIDVERB
 NB. If there were results to display, we will create a fillmask for them.  The cases follow:
 EHASVALIDFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EFILLERROR
 EHASFILLMASK =: EHASVALIDFILLMASK   NB. there are results, and a fillmask
@@ -2641,7 +2666,7 @@ NB. TEMP kludge!!  Error is not fatal, if we are in adverse or chasing a fill-ce
       assert. ((*/ frame) > #selx) +. (*/ frame) = #selx [ 'travdowncalcselect'
 NB. If the frame is valid, but we didn't get enough results, it means something died in this verb;
 NB. mark this verb as requiring detail and set the selector (if any) to select the failing item, which
-NB. will be the first item we did NOT create.  OR, it could mean that we are executing on a cells of fills, which
+NB. will be the first item we did NOT create.  OR, it could mean that we are executing on a cell of fills, which
 NB. might terminate with a error, which would be ignored.
 NB. See if all the cells executed
       if. (*/ frame) > #selx do.
@@ -2964,7 +2989,7 @@ NB. The ISF contains the frame and any SFOPENs called for by the resultlevel
 NB. Forced selections are replaced by empty frame
 NB. y is set if the previous node executed a fill-cell.  In that case, we will abort the search, returning the
 NB. scalar error result, if the current node had an error.  On the first call, y is 0.
-accumframe_dissect_ =: (0 3$a:)"_
+accumframe_dissect_ =: (0 5$a:)"_
 accumframe =: 3 : 0
 QP^:DEBDOvn'accumframe for ?defstring]0%>coname''''%selframe%unforcedselection''''%sellevel%selections%'
 QP^:DEBDOvn'#selopshapes selector errorcode '
@@ -2972,11 +2997,11 @@ NB. Keep taking frames as long as they are valid, i. e. as long as we have selec
 NB. selector that is not a rank-calculus probe.
 NB. We have to patch over the first node of monad/dyad, which looks like a noun and has no selops out;
 NB. the following verb will be OK
-if. y *. errorcode e. EFAILED do. 0 3$a:
-elseif. (*#vranks) *. (0 = #selopshapes) +. (selector -: a:) do. 0 3$a:  NB. keep frames as long as there is valid shape
+if. y *. errorcode e. EFAILED do. 0 5$a:
+elseif. (*#vranks) *. (0 = #selopshapes) +. (selector -: a:) do. 0 5$a:  NB. keep frames as long as there is valid shape
 elseif. do.
   resultinsidebox =. (<resultlevel) e. 0;1   NB. If this is L: or each, which always boxes results separately
-  (sellevel ; ((<(unforcedselection'') # selframe) , resultinsidebox # SFOPEN) ; (coname'') , maxcellresultshape ; fillrequired *. -. resultinsidebox) , accumframe__inheritedfrom 0 e. frame
+  (sellevel ; ((<(unforcedselection'') # selframe) , resultinsidebox # SFOPEN) ; (coname'') , ((selframe -&# frame) }. maxcellresultshape) ; fillrequired *. -. resultinsidebox) , accumframe__inheritedfrom 0 e. frame
 end.
 )
 
@@ -3331,8 +3356,15 @@ case. do.
   NB. expansion/each, and collection error are treated like regular selections, where we 
   tmodx =. selframe&#.&.> selectiontoticket sel1
 end.
-NB. Return the selected cell
-tmodx { :: ((<'?')"_) selresult
+NB. Return the selected cell.
+if. tmodx <:&# frame do.
+  tmodx { :: ((<'?')"_) selresult
+else.
+NB. selresult is collected using frame, while selection uses
+NB. selframe.  If selframe is longer than frame, we must select using frame first, and
+NB. then continue with rest of selframe inside the selected result
+  ((< (#frame) }. tmodx)&({ :: ('?'"_)))&.> (< (#frame) {. tmodx) { :: ((<'?')"_) selresult
+end.
 )
 
 NB. called in locale of an operand
@@ -4650,13 +4682,12 @@ NB. Make the left rank left-justified, the right rank right justified.  Align ea
 NB. vertically({."1 displaylevrank) ({."1@] ,. [ ,. }."1@])
   namedesc =. (<ALIGNCENTER) addalignmentgroup ,. (<ALIGNCENTER)&addalignmentgroup"1 (ALIGNCENTER,ALIGNLEFT) addalignmentrect rankrects
 end.
-
 NB. Account for error string, if any; 0 0 if none
 NB. If we are not in a try block, allow display of error only at the place where the error was detected
 NB. during sniff.  This handles the case where the user makes a selection after sniff, and then there is
 NB. no error detected at the point of error, and the enclosing conjunction shows its error.
 if. errorwasdisplayedhere +. errorlevel ~: ERRORLEVELNONE do.
-  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error';'no neutral'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,ENONEUTRAL,EINADVERSE) i. errorcode
+  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,EINADVERSE) i. errorcode
 else.
   DOstatusstring =: ''
 end.
@@ -4764,13 +4795,12 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
     DOshapes =: DOshapes , <, $&.> extractselectedcell__lastexecutednode''
   elseif. (<resultlevel__lastexecutednode) -.@e. 0;1 do.
     NB. If the unselected result filled, don't repeat the shape - it will be in the fill
-    DOshapes =: DOshapes , <, < maxcellresultshape__lastexecutednode
+    DOshapes =: DOshapes , <, < (_1 3) {:: af
   elseif. do.
     NB. But if the last node is a nonselecting dropdown (L: or each), we really have no idea of any shape
     NB. beyond the last node - they are incommensurate - so don't confuse things by showing one
     DOshapes =: DOshapes , <, <''
   end.
-
   NB. Convert each box to displayable, and install fill info.  No fill possible in the first selection
   NB. The first box of each box of DOshapes is selection, the rest are dropdown(s)
   NB. The fill info is (optional * if verb is applied to a cell of fills);(parenthesized shape of cellsize if fill added)
@@ -6844,11 +6874,11 @@ text =. text , 'The verb has right rank of ' , (": rr =. 1{vranks__agreeerrorloc
 text =. text , 'The left frame is ' , (": lf =. (-lr) }. ls),LF
 text =. text , 'The right frame is ' , (": rf =. (-rr) }. rs),LF
 if. lf =&# rf do.
-  text =. text , 'The frames must match.'
+  text =. text , 'The frames should match, but they don''t.'
 else.
-  text =. text , 'The frames must be identical, or one of the frames must be a prefix of the other.'
+  text =. text , 'The frames must be identical, or one must be a prefix of the other.'
 end.
-text , '  This error is reported as a ''length error'' in the J session.',LF
+text , '  This error is reported as a ''length error'' in the J session. The J session stops when it detects the first error; here we indicate all blocks with arguments that do not agree.',LF
 )
 
 NB. If the error description is a single word, it is the name of a verb that will analyze the error
@@ -9080,7 +9110,8 @@ if. recursionhere =: recursionencountered__COCREATOR do.
   uop =: 'dissectrecursionpoint' 1 createmodifier uop,yop
 end.
 NB.?lintonly uop =: <'dissectrecursionpoint'
-noun;(coname'');''
+NB. Collect input token #s in case of error
+noun;(coname'');(; 2 {"1 y)
 NB.?lintsaveglobals
 )
 
@@ -9127,7 +9158,7 @@ if. hasrecursiveexpansion =: 1 = #ures =. (joinlayoutsl`<@.recursionhere ylayo) 
   displaylevrank =: ,: 'Result after all recursions';(coname'')
   ures =. ures ,< coname''
 else.
-  ures =. 0 1 inheritu ures  NB. Don't inherit stealth - we want to show a result
+  ures =. 0 1 inheritu ures  NB. OK to inherit stealth for monad
 end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
@@ -9204,7 +9235,8 @@ end.
 NB. Clear the flag that is set if the x argument starts execution
 dyadxstarted =: 0
 NB.?lintonly uop =: <'dissectrecursionpoint'
-noun;(coname'');''
+NB. Collect input token in case of error
+noun;(coname'');(; 2 {"1 y)
 NB.?lintsaveglobals
 )
 
@@ -10684,7 +10716,7 @@ valence =: #y
 if. valence = 2 do.
   NB. m/ dyad is an error as a general verb
   if. noun bwand utype do.
-    failmsg 'In x u/ y, u must be a verb'
+    failmsg 'domain error: in x u/ y, u must be a verb'
   end.
 else.
   NB. m/ monad should be a gerund.  If we don't recognize the gerund, handle it as generic
@@ -10749,12 +10781,7 @@ traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. Get # items in operand
 if. (#inputselopshapes) *. (*#>selector) do.
-  if. (0 = #selresult) *. 0 = nitems =. {. $^:(0<L.) 0 {:: inputselopshapes do.
-    NB. We did try executing the verb (i. e. there is a selector) but there are no inputs and no outputs,
-    NB. it must be a domain error (no neutral)
-    changeerrormessagefrominterp 'no neutral'
-    ENONEUTRAL earlyerror x return.
-  end.
+  nitems =. {. $^:(0<L.) 0 {:: inputselopshapes
 else.
   nitems =. 0
 end.
@@ -10782,6 +10809,19 @@ end.
 
 resdol
 NB.?lintsaveglobals
+)
+
+NB. u/ is a failure point when applied to 0 results (no neutral)
+operationfailed =: 3 : 0
+if. 0 = {. $^:(0<L.) 0 {:: inputselopshapes do.
+  NB. We did try executing the verb (i. e. there is a selector) but there are no inputs and no outputs;
+  NB. it must be a domain error (no neutral).  That is a failure point, since u is never executed
+  changeerrormessagefrominterp 'no neutral'
+  1
+else.
+  NB. If there are items, u will be executed, so defer the failure until then
+  0
+end.
 )
 
 NB. x is the frame of the full expected result
@@ -12091,9 +12131,9 @@ NB. Check for invalid operands to ;., which would fail before execution of the v
 NB.?lintonly cop__uop =: ';.' [ vop__uop =: <'dissectverb' [ gops__uop =: 0$a:
 if. cop__uop -: ';.' do.
   partitionn =. >{.logvalues__vop__uop
-  if. '' -.@-: $partitionn do. failmsg 'In u;.n, n must be an atom'
-  elseif. partitionn -.@e. i: 3 do. failmsg 'In u;.n, n must be one of _3 _2 _1 0 1 2 3'
-  elseif. (partitionn e. _3 3) *. (0 ~: #gops__uop) do. failmsg 'Gerund u not supported for u;.3 and u;._3'
+  if. '' -.@-: $partitionn do. failmsg 'domain error: in u;.n, n must be an atom'
+  elseif. partitionn -.@e. i: 3 do. failmsg 'domain error: in u;.n, n must be one of _3 _2 _1 0 1 2 3'
+  elseif. (partitionn e. _3 3) *. (0 ~: #gops__uop) do. failmsg 'domain error: gerund u not supported for u;.3 and u;._3'
   end.
 end.
 
@@ -13758,7 +13798,7 @@ if. knownmn =: bwand/ sdt , > (<0 2;0) { y do.
   try.
     ". 'exeobj =. ' , defstg =. ; uvval =: 3 : 'if. 32 = 3!:0 y do. defstring__y 2 else. y end.'&.> (1) {"1 y
   catch.
-    failmsg 'Invalid operand to !:'
+    failmsg 'domain error: invalid operand to !:'
     return.
   end.
   tokennums =. ; 2 {"1 y
@@ -13920,7 +13960,7 @@ if. noun bwand (<0 0) {:: y do.
     NB. word or in parentheses, and we can get either from tokensource; if there are gaps we fill them in
     (nounvalue__uop{0,adv,conj);('(' , (defstring__uop 0) , ' : ' , (defstring__vop 2) , ')');(tokensource__uop,((<1 2){::y),([ + i.@>:@(-~))/ (<./ , >./) tokensource__vop)
   case. do.
-    failmsg 'Invalid m in m :n'
+    failmsg 'domain error: invalid m in m :n'
   end.
   return.
 else.
@@ -14208,7 +14248,8 @@ NB. Wait till here to add to object list so it doesn't show up twice
 newobj__COCREATOR coname''
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop *. resultissdt__cop
-verb;(coname'');''
+NB. Collect token #s in case of error
+verb;(coname'');(; 2 {"1 y)
 NB.?lintsaveglobals
 )
 
@@ -14338,7 +14379,8 @@ NB. Wait till here to add to object list so it doesn't show up twice
 newobj__COCREATOR coname''
 NB. Set resultissdt for modifier processing
 resultissdt =: resultissdt__uop *. resultissdt__vop
-verb;(coname'');''
+NB. Collect token #s in case of error
+verb;(coname'');(; 2 {"1 y)
 NB.?lintsaveglobals
 )
 
@@ -14730,7 +14772,7 @@ runtests_base_ =: 0 : 0
 2 dissect '(i. 3 2) +"1 i. 3 1'
 2 dissect '(i. 3 2) +"1 i. 1 1'
 2 dissect '2 3 +@]&> 5 6'
-2 dissect '2 3 +&:+: 4 5 6'   NB. must show sgreement error
+2 dissect '2 3 +&:+: 4 5 6'   NB. must show agreement error
 2 dissect '(i. 3 2) +@]"1 i. 1 1'
 2 dissect '(i. 3 2) +@["1 i. 1 1'
 2 dissect 'i.@(0&{) ''a'''
@@ -14798,8 +14840,8 @@ runtests_base_ =: 0 : 0
 2 dissect 'y =. 2 + 5'
 2 dissect 'zzz + 5 [ zzz =. 6'
 2 dissect '''a b c'' =. i. 3'
-'AR assignment to `a b c not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '''`a b c'' =. +`-`%'
-'AR assignment to `a b c not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '''`a b c'' =. +&+`-`%'
+'Undissectable sentence: AR assignment to `a b c not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '''`a b c'' =. +`-`%'
+'Undissectable sentence: AR assignment to `a b c not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '''`a b c'' =. +&+`-`%'
 2 dissect 'r + s [ (''r s t'') =. 0 1 2 [ a =. ''r'';''s'';''t'''
 2 dissect '-&.> i. 3'
 2 dissect '-&.:> i. 3'
@@ -14868,7 +14910,7 @@ runtests_base_ =: 0 : 0
 2 dissect '+/"1 i. 3 4'
 2 dissect '+/"1 i. 3 2'
 2 dissect '+/@,/"1 i. 3 2'
-'Invalid sequence: Noun Noun' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '3 ''a'''
+('Syntax error: invalid sequence Noun Noun',LF,'Error snippet: 3 ''a''') (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '3 ''a'''
 ('Usage: dissect ''sentence''',LF,LF,'Try   dissect ''0'' to see example screen') (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect ''
 'The sentence to be dissected must be a string.' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 5 6 7
 2 dissect '3 4 5&*"1 i. 5 3'
@@ -15149,10 +15191,10 @@ runtests_base_ =: 0 : 0
 2 dissect '<@i./."2 (0.5) (<1 1 1)} i. 2 3 4'
 dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<,'6'
 dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
-'non-noun assignment not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 'a =. /'
-'non-noun assignment not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 'c =. ;.'
+('Undissectable sentence: non-noun assignment not supported') (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 'a =. /'
+('Undissectable sentence: non-noun assignment not supported') (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 'c =. ;.'
 2 dissect 't =. 2 2 $ 5'
-'non-noun assignment not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+(a =. /) 3 4 5'
+('Undissectable sentence: non-noun assignment not supported') (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+(a =. /) 3 4 5'
 2 dissect '0$a:'
 2 dissect '5 (6 $~ 5 + ]) '''''
 2 dissect '5 (6 $~ 5 + ])"0 '''''
@@ -15196,8 +15238,8 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 1 [ wd 'clipcopy *' , '3 + 5'
 2 dissect ". :: 0: '2 3 + 4 5 6'
 2 dissect '<^:(0 > '''' $ ])"0 (1 _1 2)'
-'The name ''t'' was previously assigned in this sentence, but assignments are ignored.' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect 't + 2 * t =. 4'
-'The name ''t'' was previously assigned in this sentence, but assignments are ignored when dissect is called from the debugger.' (0 0 $ 13!:8@1:^:(-.@-:)) 14 dissect 't + 2 * t =. 4'
+'Undissectable sentence: the name ''t'' was previously assigned in this sentence, but assignments are ignored.' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect 't + 2 * t =. 4'
+'Undissectable sentence: the name ''t'' was previously assigned in this sentence, but assignments are ignored when dissect is called from the debugger.' (0 0 $ 13!:8@1:^:(-.@-:)) 14 dissect 't + 2 * t =. 4'
 a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect 'a =: 5' [ 'a b' =. 3 4
 a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 4
 (a,b) (] [ 3 4 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '''a b'' =: 5' [ 'a b' =. 3 4
@@ -15387,10 +15429,10 @@ ctup = 8
 2 dissect '2 +:`*:`%:\. i. 4'
 2 dissect '(<@:+:)`(<@:*:);.1 (1 3 1 4 5 1 6 7)'
 2 dissect '1 0 0 0 1 0 0 0 (<@:+:)`(<@:*:);.1 (1 3 1 4 5 1 6 7)'
-'In u;.n, n must be an atom' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(,0) i. 3 3'
-'In u;.n, n must be one of _3 _2 _1 0 1 2 3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(0.5) i. 3 3'
-'Gerund u not supported for u;.3 and u;._3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '+:`*:`%:;._3 i. 10 10'
-'In x u/ y, u must be a verb' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '3 4 +:`*:/ i. 6'
+'domain error: in u;.n, n must be an atom' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(,0) i. 3 3'
+'domain error: in u;.n, n must be one of _3 _2 _1 0 1 2 3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(0.5) i. 3 3'
+'domain error: gerund u not supported for u;.3 and u;._3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '+:`*:`%:;._3 i. 10 10'
+'domain error: in x u/ y, u must be a verb' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '3 4 +:`*:/ i. 6'
 2 dissect '+:`*:/ i. 5'
 2 dissect '+`*/ i. 5'
 2 dissect '+`(+ *)/ i. 4 5'
@@ -15496,6 +15538,8 @@ ctup = 8
 2 dissect 'testmonadh__z 4 5' [ z =. <'dissect'
 2 dissect 'a ((i. 2 10) ]~ [:);.3 b' [ b =. i. 3 1 [ a =. 2 2$1 1 3 3
 2 dissect '((i. 5 3) crash9_dissect_@+ -)"1 i. 5 5'
+2 dissect 'i./ 0$0'
+2 dissect '(i./ # [:) 0$0'
 )
 
 testtacit =: testtacit2"0
