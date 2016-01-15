@@ -65,24 +65,6 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. dissect '3 ([`(i.@[)`])}"0 1 i. 4 5'   highlighting error at 2d level
-NB.   also, ranks switched on m} and i. 3  nodes
-NB. dissect' (1+i. 3) (2&{.@]"0 1,.["0 1(<.@%,.|~)+/@}.@]"0 1) i. 4 3'
-NB.   3 agreement errors - should stop at first one
-NB. dissect '+:`-:@.(2&|"0) 4 5'   in initial display, ranks of agenda verb are empty
-NB. dissect '(1+i. 3) (["0 1)/  i. 4 3'
-NB.   right argument is missing - this is not a matter of stealth, but of rank.  Don't delete ][ arg if it has a rank?
-NB.   In initial display, ranks of " and ] are empty   -- in lots of these
-NB.   tooltip for " does not give the verb
-NB.     note display of dissect '(1+i. 3) (["0 1)  i. 4 3' is correct
-NB.     dissect '4 5 6 ([ + +:@])"0 1 i. 3 3'
-NB.     dissect '4 5 6 ([ + +:@])"1 1 i. 3 3'
-NB.     dissect '(i. 3 4) ([ + +:@])"0 1 i. 3 3'  NB. weird
-NB.     dissect '(i. 3 4) (] + +:@])"0 1 i. 3 3'   in this there is no way to see where the length 4 came from
-
-NB. Add better tutorial tooltips.
-NB.   position large tutorial at bottom so it doesn't overflow visible screen
-NB.   put in exegesis for all expansion blocks
 NB. ?work on Android, with wd 'activity'
 
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
@@ -691,7 +673,7 @@ NB. If the stack contains an executable combination, execute it
 NB. If part of the execution has unknown value, produce an unknown result, of type 'noun' for verb executions,
 NB. and 'verb' for modifier executions
   select.
-    NB.?lintonly stack =. (verb,verb,verb,noun);"0 1 '';''
+    NB.?lintonly stack =. (verb,verb,verb,noun,4$mark);"0 1 '';''
     if. (#PTpatterns) > pline =. 1 1 1 1 i.~ * PTpatterns bwand"1 ,>4 1{.stack do.
       exeblock =. (subj =. pline{PTsubj) # 4 {. stack  NB. the executable part
       exetypes =. > subj # , 4 1 {. stack   NB. the corresponding types
@@ -1043,7 +1025,6 @@ if. 32 = 3!:0 modblock =. (<1 1) {:: exeblock do.
   NB. when the sentence is traversed
   topmod =. 1 {:: ntypeval
   NB.?lintmsgsoff
-NB. obsolete   tokensource__topmod =: tokensource__topmod , (<1 2) {:: exeblock
   tokensource__topmod =: tokensource__topmod , ((<1 2) {:: exeblock) -. 2 {:: ntypeval
   NB.?lintmsgson
 else.
@@ -2492,7 +2473,7 @@ if. #vranks  do.  NB. forceinfinite overrides the observed verb ranks
   NB. Calculate the effective rank: the rank, but no larger than the actual rank of the argument.
   NB. If there is no argument shape, leave the ranks empty (will turn to space later)
   if. 0 = #inputselopshapes do. effranks =. (<'')"0 vranks
-  else. effranks =. vranks ((('!' #~ <) , ":@<.) #@($^:(0<L.)))&.> inputselopshapes
+  else. effranks =. <@;"1 vranks (#&'!'&.>@(* + (> |.))@(0 >. -~) ,. ":@<.&.>) #@($^:(0<L.))@> inputselopshapes
   end.
   rankhistory =: rankhistory , (;:^:_1^:(0<L.) titlestring) ; (coname'') , |. effranks
 end.
@@ -3433,7 +3414,9 @@ NB.   operand validity is 0 if operand shapes are invalid, 1 if valid, 2 if vali
 NB.  operand indexes to use is the list of valid operands whose shapes we will transfer to the result.  If omitted or a:, take all operand shapes
 NB.  operand shapes are the boxed shapes of the known operands.  Either empty (meaning unknown, because unselected) or one boxed value per operand.
 NB. Uses globals from travdowncalc: bnsellevel, rankhistory, selector, physreqandhighlights
-NB. If x is given it is a gerund that is used to modify the value of rankhistory that we use, used in compination with TRAVOPSKEEPINALL
+NB. If x is given it is a gerund that is used to modify the value of rankhistory that we use, used in combination with TRAVOPSKEEPINALL
+
+NB. Values used for rhsel below:
 TRAVOPSSTARTINHEAVY =: 0&(,&<)
 TRAVOPSKEEPINALL =: 1&(,&<)
 TRAVOPSKEEPINLIGHT =: 2&(,&<)
@@ -3441,6 +3424,7 @@ TRAVOPSSTARTHEAVY =: TRAVOPSSTARTINHEAVY a:
 TRAVOPSKEEPALL =: TRAVOPSKEEPINALL a:
 TRAVOPSKEEPLIGHT =: TRAVOPSKEEPINLIGHT a:
 
+NB. Values used for pphys below:
 TRAVOPSPHYSNEW =: 0
 TRAVOPSPHYSKEEP =: 1
 TRAVOPSPHYSCHOOSE =: ,   NB. choose the ops, 0=left, _2=right, _1=empty
@@ -3469,7 +3453,7 @@ if. #$pphys do.
   NB. pphys specified for each operand.  In case this is a change of valence, make sure we preserve the correct number of highlights (keeping y over x),
   NB. and fill the rest with empties
   opinfo =. pphys { physreqandhighlights , <EMPTYPRH
-elseif. 1 = pphys do.
+elseif. pphys = TRAVOPSPHYSKEEP do.
   NB. Preserve physreq: use the old values corresponding to operands we are keeping
   opinfo =. opx { physreqandhighlights
 elseif. do.
@@ -7553,7 +7537,6 @@ NB. Combine the blocks, with spaces between, and LF after each group
 
 NB. Get the max width from the screen info
 reflowtoscreensize =: 3 : 0
-NB. obsolete (TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 2 { 0 ". wdqchildxywh 'dissectisi') reflowtooltip y
 (TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 0 { glqwh '') reflowtooltip y
 )
 
@@ -8602,16 +8585,26 @@ proplocales =: 3 : 0
 (y = 3) # < tokensource
 )
 
+NB. index is (excess frame in off operand),(low 3 bits of dispstealth)
+NB. Result is new dispstealth: flag=0 if no off frame OR dispstealth is not 1 or 2
+dispsttbl =: 2 7 $ 0 1 2 3 4 5 6  0 9 10 3 4 5 6
+
 NB. Set globals, then initialize display for the verb
 traverse =: endtraverse@:(4 : 0)
 assert. 1 2 e.~ #x
 traversedowncalcselect y  NB. Just to set error globals
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
-NB. If no vranks, this verb must have failed to execute owing to upstream error.  Leave no levrank then
 displaylevrank =: rankhistory
-NB. Pass the DOLs through, but mark a dyadic stealthoperand for removal by deleting the layout locale
-if. (valence = 2) *. dispstealthoperand e. 1 2 5 6 do.
-  x =. a: (<0 ,~ <:3 bwand dispstealthoperand)} x
+NB. Set the dispstealth status for this node, if dyadic.  If a dyadic ][ has excess frame
+NB. on the suppressed side, we must mark it as non-stealth, because we need the node to be
+NB. displayed to show the action of the excess frame.  We use bit 3 of dispstealth to indicate
+NB. force-displayed stealth.
+if. valence = 2 do.
+  exsframe =. 3 2 '!!'&(+./@:E.)@;@:({"1)"0 _ rankhistory
+  dispstealthoperand =: ((7 bwand dispstealthoperand) <@({ , [) 0 , exsframe , 0 0 0 0) { dispsttbl
+NB. obsolete NB. Pass the DOLs through, but mark a dyadic stealthoperand for removal by deleting the layout locale
+NB. obsolete if. (valence = 2) *. dispstealthoperand e. 1 2 5 6 do.
+NB. obsolete   x =. a: (<0 ,~ <:3 bwand dispstealthoperand)} x
 end.
 x ,&< coname'' NB. no v, so no change to the DOLs
 )
@@ -9286,7 +9279,7 @@ if. hasrecursiveexpansion =: 1 = #ures =. (xlayo ,&(joinlayoutsl`<@.recursionher
   displaylevrank =: ,: 'Result after all recursions';(coname'')
   ures =. ures ,< coname''
 else.
-  ures =. 0 0 inheritu ures  NB. Don't inherit stealh - we want to show a result
+  ures =. 0 1 inheritu ures  NB. Don't inherit stealh - we want to show a result
 end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
@@ -11271,7 +11264,8 @@ else.
       NB. dyad with one or both stealth.  Create new rankhistory, where each column is chosen to be the
       NB. value selected by that stealthop, or empty if not stealth.  Delete lines that end up with no rank
       NB. This is copied from fork, except that we never generate highlights
-      rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 |."1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
+      NB. In stealthcode 1 = ] = y, 2 = [ = x, 0 = neither
+      rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
     end.
     NB. If the input y had no operands, we leave it that way.  Everything else doesn't matter.  We might have added
     NB. a default operand here and we shouldn't try to traverse.  If we change y, recalculate the initial assignments
@@ -11467,7 +11461,6 @@ if. datapresent do.
     astg =. ''
   end.
 
-NB. obsolete   if. *./ selopinfovalid do.
   if. #initialselection do.
     NB. Explanatory string if v produces an array
     select. formatcode
@@ -13438,19 +13431,13 @@ case. 2;3 do.
   if. 0 = +/ stealthcode =. 3 bwand |. stealth do.  NB. Convert to y x order to match rankhistory
     NB. Not stealth: keep heavies
     rankstackcode =. TRAVOPSSTARTHEAVY
-  elseif. valence = 1 do.
+  else.
     NB. monad with stealth; just keep all the original lines
     rankstackcode =. TRAVOPSKEEPALL
-  elseif. do.
-    rankstackcode =. TRAVOPSKEEPALL
-    NB. dyad with one or both stealth.  Create new rankhistory, where each column is chosen to be the
-    NB. value selected by that stealthop, or empty if not stealth.  Delete lines that end up with no rank
-    NB. This is copied from fork, except that we never generate highlights
-    rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 |."1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
   end.
   NB. If the input y had no operands, we leave it that way.  Everything else doesn't matter.
   NB. Otherwise, we recalculate y, and recalculate the inputselopshapes etc that we use below
-  if. #inputselopshapes do. dummytraversedowncalcselect y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
+  if. #inputselopshapes do. dummytraversedowncalcselect y =. travops rankstackcode;TRAVOPSPHYSKEEP;(uopval xylocs);< srs end.
 case. do.
   traversedowncalcselect y
   EINVALIDVERB earlyerror x return.
@@ -13603,19 +13590,17 @@ case. 3 do.
   if. 0 = +/ stealthcode =. 3 bwand |. stealth do.  NB. Convert to y x order to match rankhistory
     NB. Not stealth: keep heavies
     rankstackcode =. TRAVOPSSTARTHEAVY
-  elseif. valence = 1 do.
-    NB. monad with stealth; just keep all the original lines
-    rankstackcode =. TRAVOPSKEEPALL
-  elseif. do.
+  else.
     rankstackcode =. TRAVOPSKEEPALL
     NB. dyad with one or both stealth.  Create new rankhistory, where each column is chosen to be the
     NB. value selected by that stealthop, or empty if not stealth.  Delete lines that end up with no rank
     NB. This is copied from fork, except that we never generate highlights
-    rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 |."1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
+    NB. In stealthcode 1 = ] = y, 2 = [ = x, 0 = neither
+    rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $!.a:"1 (2) }."1 rankhistory  NB. $!.a: needed because rankhistory may be empty (we haven't traversed)
   end.
   NB. If the input y had no operands, we leave it that way.  Everything else doesn't matter.
   NB. Otherwise, we recalculate y, and recalculate the inputselopshapes etc that we use below
-  if. #inputselopshapes do. dummytraversedowncalcselect y =. travops rankstackcode;TRAVOPSPHYSNEW;(uopval xylocs);< srs end.
+  if. #inputselopshapes do. dummytraversedowncalcselect y =. travops rankstackcode;TRAVOPSPHYSKEEP;(uopval xylocs);< srs end.
 case. do.
   traversedowncalcselect y
   EINVALIDVERB earlyerror x return.
@@ -14313,7 +14298,8 @@ else.
   NB. Create a: y y or a: y x, then select using 0 ] [ to give the following selections:
   NB. nonstealth=a:  monad stealth=y   dyad ]=y   dyad [=x  (for dyads, each argument is selected separately)
   NB. Then discard rows that have nonatom in the title (so not heavy) and empty in both columns
-  rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) }: (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 |."1 (2) }."1 rankhistory
+  NB. In stealthcode 1 = ] = y, 2 = [ = x, 0 = neither
+  rankhistory =: (#~    0 1 1 -.@-:"1 ('';(,0);(,0)) ="1  $&.>@:((0 2 3)&{"1)) }: (2 {."1 rankhistory) ,. stealthcode {"1 a: ,. 2 $"1 (2) }."1 rankhistory
 end.
 NB. If we are showing structural tags, add one for this middle tine of fork
 if. displayshowstructmods do. rankhistory =: ('\fork/';coname'') , rankhistory end.
@@ -15631,4 +15617,98 @@ findnameloc_dissect_ 'tv__k__k',&< <,'b'
 alltests''
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
+)
+
+Note  'Overview of dissect'
+
+Operation follows this sequence:
+
+0. Initialization of environment
+1. Parsing; creation of sentences to execute and locales for analysis
+2. Execute the sentence
+3. Analyze the results
+4. Display the picture
+
+After the display, user interaction proceeds with
+5. Selection
+6. Expansion nodes
+7. Highlighting
+8. Hovering
+
+0. Initialization
+Each invocation of dissect runs in its own locale, which is an instance of 'dissect'.  Private names
+in the user's namespace are all collected, along with their values and the sentence to be executed,
+and passed into 'parsemain' for analysis.  Multiple active dissection do not interfere with each
+other except for a few globals that are deemed user-specific rather than dissection-specific, font size being
+an example.
+
+1. Parsing
+Parsing follows the J parsing rules.  Each word is given a locale, and given the locales of its arguments.
+All such locales have COCREATOR set to the dissect instance for the sentence.  When a monad or dyad execution
+in encountered, setvalence is called to select the valence for each primitive.
+
+After parsing, the sentence is represented in the parse tree made up of the locales and their interconnections.
+The entry point (defstring) creates the string form of the executed sentence (possibly omitting some assignments)
+and the entry point (exestring) creates a form that includes code to save every result as created by each verb.
+
+2. Execution
+The uninstrumented and instrumented versions are both executed to make sure the results agree.
+For the most part, results rather than inputs are saved, though in a few cases the inputs must also be saved to
+reconstruct the operation.  The actual executed verb is saved too, so we can get its ranks.  The results are
+saved in the name 'logvalues' in each primitive instance.  Each result is given a sequential
+result number (called the logticket) among all the results of the sentence; the sequence of result numbers suffices to establish
+the order of execution.
+
+3. Analysis
+The stored results are analyzed by a traversal through the parse tree.  This single traversal combines
+top-down and bottom-up aspects.  The input to the traversal of each node is the locales of the displayed
+arguments, and the selection information coming from downstream results; the result of the traversal is the
+locale in which the result of the node will be displayed.
+
+a. travdowncalcselect
+The first step of traversal is to figure out which result-cell(s) have been selected for display, and which logticket
+numbers correspond to inputs to those cells.  This involves looking at the user selections, the frames of the
+arguments, and the ranks of the verbs.  The special details of each primitive affect this computation, but the
+overall framework is in the verb (travdowncalcselect) which calls a number of sub-verbs that can be replaced in
+each primitive locale as needed.  travdowncalcselect sets a couple of dozen globals that are used for calculating the
+display and in specifying highlighting and selection for the arguments when they are traversed.
+
+b. traverse components
+After travdowncalcselect has figured out the results and inputs to the computation at a node, the nodes that
+contribute to it are traversed.  For example, consider u@v.  u@v has its own node, at which selections are allowed.
+After u@v has called travdowncalcselect, it traverses v, and then traverses u, passing in the result of v.  Each
+of these traversals can apply its own selections.
+
+c. joinlayouts
+The result of the traversal is a layout, which is just the locale number of a displayable result.  Creating a layout involves
+saving globals used for display (such as the rank and caption information), and saving the wiring information about how the
+nodes should be connected.  The node creates its layout when it has sufficient information.
+
+d. inheritu
+Not every primitive gets a display node.  For example, hooks/forks have no display node, and in u@v there are display nodes
+for u and v, but not for the composite verb; similarly for u"n.  Nevertheless the primitive IS an important entity, because it
+has a rank and can be a point of selection.  Thus, the display block of u is shared between u and u@v: the first click
+for selection is sent to u@v, and the next to u.  Any number of nodes can share a display block.
+
+The verb (inheritu) is used to combine the display of u into that of u@v.  It is called by any primitive that needs
+display-block sharing.
+
+e. error autoselection
+If a sentence has an error, there is an extra first traversal (without display) to find out where the error is.  If at any
+point a primitive produces too few results, an error is assumed, and a selection is performed as if the user had selected
+the error cell.
+
+4. Display
+At the end of traversal the final result will have a layout assigned.  At that point the display can be created.  This is
+done in two passes.  First, the locales in the display are traversed, and the information to be displayed is calculated and
+sized.  This establishes the screen dimensions of each node.  The nodes are then laid out on the screen so that the flow
+of information goes top to bottom.
+
+After the screen has been laid out, the wiring is inserted.  This uses a grid-based router (which could be improved to
+do less searching off the best path).  The procedure takes two passes.  In each, the networks, each comprising a source
+and multiple destinations, are routed one by one.  In the first pass, the routing penalizes invalid routes (where two lines
+lie on top of each other in the same direction), but does not forbid them.  If the layout requires an invalid route, the
+layout is expanded by adding space at the trouble point; these trial routes are repeated until a valid placement is
+found.  Then is the final pass the routing is performed to get the best possible route according to the esthetic rules.
+
 )
