@@ -1398,7 +1398,6 @@ NB. resultissdt__resultroot
 NB. Do the initial traversal, calculate the initial placement.
 placeddrawing =: calcplacement screensize
 NB. Set the starting scroll position, just below the sentence/link
-NB. obsolete scrolltlc =: 0 ,~ 2 + >./ (<a:;0) { sentencesizes  NB. y sizes of brects
 NB. We have to have a nominal y position so we can size the drawing.  We don't know
 NB. the actual x placement, though, until we have sized the drawing and centered the
 NB. title/sentence.
@@ -1457,7 +1456,6 @@ NB. Get the required size - mostly the isi, but must be wide enough for the sent
 NB. Minimum top height is max of (link height if any, title height + sentence height)
 NB. Minimum top width is (max of title/sentence width) + link width (if any) + 2 if there are links
 topminsize =. (>.`+/@[ , (2 + +)`>./@])/ |: |. sentencesizes
-NB. obsolete topminsize =. ((0 2 * 2 < #) + >./@:({."1) , +/@:({:"1)) sentencesizes
 NB. Remove the scrollpoint from the drawing size.  Here in automatic sizing we are handling
 NB. only the size needed to draw the picture in normal position.  If the user offsets the display, we
 NB. do not automatically change the window - he could have done that himself.  But we do make sure
@@ -4282,7 +4280,6 @@ if. #titlelines =. (1 {"1 dispoptions) #~ (0 {"1 dispoptions) = <'title' do.
 else.
   titlinfo =. (0$a:) ,&< (0$a:)
   titlrects =. 0 2 2$0
-NB. obsolete   titlcfms =. 0 $ ,: titlcfm [ titltxts =. 0$<'' [ titlrects =. 0 2 2$0 NB.?lintonly [ maxtitlewid =. 0
 end.
 
 NB. If there are links, size them too.  Create a table, empty if no links
@@ -4314,7 +4311,6 @@ NB. Process as a state machine.  Then use the stacks to fill in gaps in
 NB. the selection levels
 tokens =. ;: usentence
 assert. (-: i.@#) > {."1 toklevloc
-'toksellvl tokvisible' =. |: > 1 {"1 toklevloc
 
 NB. Get the length of each token (except the last) in the user's spacing
 tokulen =. 2 -~/\ (' ' +/\@:~: usentence) I. (>: |.!.0 +/\ ' '&(+/@:~:)@> tokens)
@@ -4331,40 +4327,17 @@ bigselx =. (+ i.@#) 2&(</\) > 1 {"1 toklevvisloc
 blanklevvisloc =. (addedblanks (<a:;0)} bigselx { toklevvisloc) , '';0;0;''
 NB. Interleave tokens and blanks; then remove lines for empty (=no blanks) or invisible
 utokspacelevvisloc =. (#~  (*@#@(0&{::) *. 2&{::)"1) ,/ toklevvisloc ,:"1 blanklevvisloc
-NB. obsolete addedlevel =. 2 _1:^:~:/\ toksellvl
-NB. obsolete QP'addedblanks addedlevel '
-NB. obsolete utokspacelevel =. (addedblanks ,. <"0 addedlevel) ({:@] ,~ (,/)@(,:"1~  }:)) tokens ,. <"0 toksellvl
-NB. obsolete NB. Remove invisible tokens.  Remove empty strings.
-NB. obsolete utokspacelevel =. (#~ *@#@>@:({."1)) (}: 2 # tokvisible) # utokspacelevel
-NB. obsolete NB. Get the size of the rectangles.
 rectsize =. (cfms =. satzcfm {~ (_2 + #satzcfm) <. > 1 {"1 utokspacelevvisloc) sizetext ,. txts =. 0 {"1 utokspacelevvisloc
 NB. Box them into sections that fit within the allowed part of the screen, one box per line
 scrwid =. <. MAXSENTENCEWIDTH * {: screensize
 boxhw =. , (((}.~) (, $:)~^:(*@#@[) <@{.~)   1 >. scrwid I.~ (+/\@:({:"1))) rectsize
 NB. Get the height of each line
 lh =. >./@:({."1)@> boxhw
-NB. obsolete NB. Get the start of each line, which are all the same.  The lines should be centered under the headers
-NB. obsolete NB. if any.  Add to whichever center-point is to the left
-NB. obsolete szyx =. 0   NB. left-justify if no titles, or titles shorter than sentence; top offset 0 if no titles
-NB. obsolete if. #titlrects do.
-NB. obsolete   maxtextwid =. >./ +/@:({:"1)@> boxhw
-NB. obsolete   szyx =. (+/ (<_1;a:;0) { titlrects)   NB. Get starting y - at end of last title rect
-NB. obsolete   if. maxtitlewid > maxtextwid do.
-NB. obsolete     NB. title is longer: just start the text over to the right
-NB. obsolete     szyx =. szyx , <. -: maxtitlewid - maxtextwid
-NB. obsolete   else.
-NB. obsolete     NB. text is longer: start it on the left, and add offset to each starting title rect
-NB. obsolete     szyx =. szyx , 0
-NB. obsolete     titlrects =. titlrects +"2 (2 _2) {. <. -: maxtextwid - maxtitlewid
-NB. obsolete   end. 
-NB. obsolete end.
 NB. Install starting yx, and move rects into horizontal position
-NB. obsolete rects =. ; (szyx +"1 (0) ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
 rects =. ; (0 ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
 
 NB. Get the max size for the string, and return the data for drawing
 rectinfo =. (>./ +/"2 rects);<cfms;txts;rects;< 3 {"1 utokspacelevvisloc
-NB. obsolete linkinfo ,~ (>./ +/"2 titlrects,rects);<(titlcfms,cfms);(titltxts,txts);(titlrects,rects)
 (((0 >. >./ +/"2 titlrects);<titlinfo,<titlrects),:rectinfo),linkinfo
 )
 
@@ -4405,11 +4378,11 @@ if. 'l' = x do.
     'cfms txts rects locs' =. (px,1) {:: topinfo
     for_r. rects (_1 findpickhits) yx do.
       'ix pyx' =. r
-      pickloc =. ix { locs
-      NB.?lintonly pickloc =. <'dissectobj'
-      disploc =. findinheritedtail__pickloc ''
+      disploc =. ix { locs
       NB.?lintonly disploc =. <'dissectobj'
-      if. #DOyx__disploc do.
+      if. disploc = <0 do.
+        drawtooltip yx ; 'Execution of the sentence did not execute this word'
+      elseif. #DOyx__disploc do.
         NB. Center the displayed block on the focus point of the screen
         NB. Get the position of center of block in the routing area
         blockcenter =. <. scrolltlc -~ DOyx__disploc (+ -:)&{. DOsize__disploc
@@ -4421,7 +4394,7 @@ if. 'l' = x do.
         NB. The focuspoint is in the bottom-middle of the onscreen part of the
         NB. screen area.  We have to use the parent/child info rather than
         NB. gl commands because gl doesn't know about screen placement
-        isiyxbr =. (+/\ (2 2) $ 0 ". wdqchildxywh 'dissectisi') +"1&:(|."1) 1 0 { ". wdqform ''
+        isiyxbr =. (+/\ (2 2) $ 0 ". wdqchildxywh 'dissectisi') +"1&:(|."1) 2 {. ". wdqform ''
         screensize =. 3 2 { ". wd 'qscreen'
         onscreenoffset =. 0 <. {. isiyxbr
         onscreensize =. (screensize <. {: isiyxbr) - (0 >. {. isiyxbr)
@@ -4429,8 +4402,8 @@ if. 'l' = x do.
         scrolltlc =: focuspoint - blockcenter
         NB. redraw the scrolled screen.  No retraversal needed
         dissect_dissectisi_paint 0
-      else.
-        drawtooltip yx ; 'This word did not create a display block'
+      elseif. do.
+        drawtooltip yx ; 'The current selections do not produce a display for this word'
       end.
     end.
   case. 2 do.
@@ -6068,17 +6041,7 @@ wires =. wires +"1 tlc,tlc,0
 NB. Initialize pick information.  For speed, there are two arrays: locpickrects, which is a brick of
 NB. yxhw for each object, and picklocs, which is a list of locales, one per pickrect.
 NB. Each displayed block is associated with a unique locale.  Links are associated with the form locale.
-NB. obsolete locpickrects =: ([: (2 2$0)"_`brect@.(*@#) (1;2)&{::)"1 topinfo
 picklocs =: ((#sentencesizes) # coname'') , dos
-NB. obsolete if. 1 < #topinfo do.
-NB. obsolete   NB. There are links.  Create a brect for them, associated with the form locale
-NB. obsolete   picklocs =: (coname''),dos
-NB. obsolete   locpickrects =: ,: brect (1 1;2) {:: topinfo
-NB. obsolete else.
-NB. obsolete   locpickrects =: 0 2 2 $ 0
-NB. obsolete   picklocs =: dos
-NB. obsolete end.
-NB. obsolete locpickrects =: locpickrects , yx ,:"1 ({."2) 3 : 'DOpicksize__y'"0 dos
 NB. Put in placeholders for the sentence brects.  These will be filled in when we
 NB. size the drawing
 locpickrects =: (((#sentencesizes),2 2)$0) , yx ,:"1 ({."2) 3 : 'DOpicksize__y'"0 dos
@@ -8687,9 +8650,6 @@ NB. force-displayed stealth.
 if. valence = 2 do.
   exsframe =. 3 2 '!!'&(+./@:E.)@;@:({"1)"0 _ rankhistory
   dispstealthoperand =: ((7 bwand dispstealthoperand) <@({ , [) 0 , exsframe , 0 0 0 0) { dispsttbl
-NB. obsolete NB. Pass the DOLs through, but mark a dyadic stealthoperand for removal by deleting the layout locale
-NB. obsolete if. (valence = 2) *. dispstealthoperand e. 1 2 5 6 do.
-NB. obsolete   x =. a: (<0 ,~ <:3 bwand dispstealthoperand)} x
 end.
 x ,&< coname'' NB. no v, so no change to the DOLs
 )
