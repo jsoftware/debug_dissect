@@ -65,6 +65,10 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. Data-area tooltip (& perhaps all) fall way off the end of the display
+NB. Have tooltip take into account the visible screen, not just the window
+NB. If user clicks twice with the same message, make it bigger
+
 NB. ?work on Android, with wd 'activity'
 
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
@@ -77,9 +81,7 @@ NB. Add rank-calculus for primitives with known behavior?
 
 NB. display:
 NB. Unicode?
-NB. create pickrects for displayed sentence, and handle clicks there.  But what would they do?  Highlight the rank stack while mouse held down?  Perhaps center display if bigger than screen?  
 NB. Highlight net on a click/hover of a wire
-NB. Revise sentence creation to point each symbol to the locale of its current selection level (and parens for hook/fork to the hook/fork)?
 
 NB. router:
 NB. Add single-jog to router options to avoid down-and-up turn
@@ -3958,6 +3960,53 @@ wires
 NB.?lintsaveglobals
 )
 
+NB. Route net using astar algorithm
+NB. y is board;occupancy;frontier;target
+NB.  frontier is table of position,direction,distsofar
+NB. Result is new board;occupancy;frontier;wires
+routeneta =: 3 : 0
+NB. Initialize board to high-value for empty cells, special value for target, 0 for frontier
+NB.   with special 'move type' to signal end-of-chain for backtracking
+
+NB. Calculate penalty for each cell moved to
+
+NB. Calculate minimum distance-to-target to frontier points
+
+NB. Split frontier into active and shelved based on best distance
+
+NB. Loop till both frontier portions are empty
+NB. Calculate each possible move along the active frontier
+
+NB. Apply any penalties associated with the move; create coded distance/move type where move type
+NB.  is in the low bits of the code
+
+NB. If there are duplicates on the active frontier, keep only the shortest distance
+
+NB. Fetch current distance to each point in the active frontier, and replace with frontier
+NB. distance if it is shorter.
+
+NB. If We hit the target, cull any point from shelved frontier that cannot beat the distance that hit
+
+NB. Calculate minimum distance-to-target in the active frontier
+
+NB. Delete any points from active frontier that can't beat the best hit distance
+
+NB. Find the new best minimum distance: minimum of active and shelved frontier
+
+NB. Activate shelved points if there are any to come to life
+
+NB. Shelve active points that have fallen off the pace
+
+NB. Keep the min distance on shelf accurate
+
+NB. End loop.
+
+NB. Backtrack from the target to create the wiring, using the move type to indicate what to emit
+
+NB. Express the wiring as a table of frontier cells.  Create the wiring/arc form from the frontier,
+NB.  and fill in the occupancy table
+)
+
 NB. Utility for scanned routedeblog
 NB. y is a tlbr, result is the boxes of routedeblog, culled to that window
 culldeblog =: 3 : 0
@@ -4360,6 +4409,24 @@ tlc =. x * 1 0
 cfms drawtext txts ,. <"2 tlc +"2 rects
 )
 
+NB. Get the extent of the region of the current window that is on the visible screen
+NB. Whichever window is active is used, and it is assumed that dissectisi has been glsel'd in it
+NB. Result is the xywh of the part of dissectisi that is on the physical screen
+NB. We use the smaller of the childsize and glqwh to limit the size, since they seem to differ
+NB. and it is fatal to read outside the glqwh size
+findonscreenyxhw =: 3 : 0
+NB. Get child xywh, convert to xyrb and clamp size to graphics size, add form position, convert to yxbr in screen space
+NB. The x may be negative eg, if control is offscreen left
+isiyxbr =. ((+ (glqwh'')&<.)/\ (2 2) $ 0 ". wdqchildxywh 'dissectisi') +"1&:(|."1) 2 {. ". wdqform ''
+NB. Get offset into dissectisi of the top-left visible point
+yxvisible =. 0 >. - {. isiyxbr
+NB. Get br visible point of dissectisi in screen space, subtract screen tr of visible to get visible size
+NB. Remove 100 pixels of height to account for taskbar (major kludge)
+onscreensize =.  ((0 0 >. _36 0 + 3 2 { ". wd 'qscreen') <. {: isiyxbr) - (0 >. {. isiyxbr)
+NB. Return offset,:size
+yxvisible ,: onscreensize
+)
+
 NB. Pick for display object, vectoring to the indicated type
 NB. x is ('l' or 'r') flag
 NB. y is main/explorer;(y,x relative to pickrect);formatted sysdata;index of pickrect
@@ -4381,7 +4448,7 @@ if. 'l' = x do.
       disploc =. ix { locs
       NB.?lintonly disploc =. <'dissectobj'
       if. disploc = <0 do.
-        drawtooltip yx ; 'Execution of the sentence did not execute this word'
+        drawttipwithemphasis yx ; 'Execution of the sentence did not execute this word'
       elseif. #DOyx__disploc do.
         NB. Center the displayed block on the focus point of the screen
         NB. Get the position of center of block in the routing area
@@ -4394,16 +4461,17 @@ if. 'l' = x do.
         NB. The focuspoint is in the bottom-middle of the onscreen part of the
         NB. screen area.  We have to use the parent/child info rather than
         NB. gl commands because gl doesn't know about screen placement
-        isiyxbr =. (+/\ (2 2) $ 0 ". wdqchildxywh 'dissectisi') +"1&:(|."1) 2 {. ". wdqform ''
-        screensize =. 3 2 { ". wd 'qscreen'
-        onscreenoffset =. 0 <. {. isiyxbr
-        onscreensize =. (screensize <. {: isiyxbr) - (0 >. {. isiyxbr)
-        focuspoint =. onscreenoffset -~ <. (- minfocusrise >. 0.25 0.5&*) onscreensize
+NB. obsolete         isiyxbr =. (+/\ (2 2) $ 0 ". wdqchildxywh 'dissectisi') +"1&:(|."1) 2 {. ". wdqform ''
+NB. obsolete         screensize =. 3 2 { ". wd 'qscreen'
+NB. obsolete         onscreenoffset =. 0 <. {. isiyxbr
+NB. obsolete         onscreensize =. (screensize <. {: isiyxbr) - (0 >. {. isiyxbr)
+NB. obsolete         focuspoint =. onscreenoffset -~ <. (- minfocusrise >. 0.25 0.5&*) onscreensize
+        focuspoint =. (+   <.@(- minfocusrise >. 0.25 0.5&*))/ findonscreenyxhw''
         scrolltlc =: focuspoint - blockcenter
         NB. redraw the scrolled screen.  No retraversal needed
         dissect_dissectisi_paint 0
       elseif. do.
-        drawtooltip yx ; 'The current selections do not produce a display for this word'
+        drawttipwithemphasis yx ; 'The current selections do not produce a display for this word'
       end.
     end.
   case. 2 do.
@@ -4415,7 +4483,7 @@ if. 'l' = x do.
       if. IFQT do.   NB.?lintonly browse_j_ =. 3 : 'y'
         browse_j_ ix {:: links
       else.
-        drawtooltip yx ; 'Links not supported in J6'
+        drawttipwithemphasis yx ; 'Links not supported in J6'
         hoversessmin =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
       end.
     end.
@@ -6183,8 +6251,8 @@ EXEGESISRANKSTACKPOWERSTART laconic Description
 EXEGESISRANKSTACKPARTITIONSTART laconic Description
 EXEGESISONELINEDESC laconic Verb
 EXEGESISVERBDESC laconic Verb
-EXEGESISVERBRANK laconic Verb
-EXEGESISVERBRUNDEBUG laconic Verb
+EXEGESISVERBRANK verbose Verb
+EXEGESISVERBRUNDEBUG verbose Verb
 EXEGESISFRAMEFILLSTART verbose Frame
 EXEGESISFRAMENUGATORY verbose Frame
 EXEGESISFRAMENONNOUN verbose Frame
@@ -6664,7 +6732,7 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
     NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
-    drawtooltip__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
+    drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
     hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
@@ -6688,7 +6756,7 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
     NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
-    drawtooltip__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
+    drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
     hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
@@ -6757,7 +6825,7 @@ elseif. #r =. (exp{DOshapepospickrects) (_1 findpickhits) y do.
   NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
   formloc =. exp { COCREATOR,coname''
   NB.?lintonly formloc =. <'dissect'
-  drawtooltip__formloc (pyx + (((exp,0 0);0 0;0) {:: DOshapepos) + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
+  drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOshapepos) + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
   hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
 end.
 0 0$0
@@ -7383,7 +7451,7 @@ NB. User tried to select, but we couldn't do it.  Give him a tooltip.
     NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
-    drawtooltip__formloc (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { PICKTOOLTIPMSGS
+    drawttipwithemphasis__formloc (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { PICKTOOLTIPMSGS
     hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
@@ -7588,9 +7656,24 @@ reflowtoscreensize =: 3 : 0
 (TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 0 { glqwh '') reflowtooltip y
 )
 
+NB. y is the text
+NB. drawtooltip, but increase the fontsize if the message is the same as from the previous click
+drawwithemphasishistory =: 0;''
+drawttipwithemphasis =: 3 : 0
+if. drawwithemphasishistory -: (seqclickno-1);1{y do.
+  ((, 2&*&.>)/ TOOLTIPFONT) drawtooltip y
+else.
+  drawtooltip y
+end.
+drawwithemphasishistory =: seqclickno;1{y
+)
+
 NB. y is cursor position;string
 NB. Draw a tooltip there after saving the pixels
+NB. For the dyad, x is the font;size to use
 drawtooltip =: 3 : 0
+TOOLTIPFONT drawtooltip y
+:
 'cpos string' =. y
 NB. There is a tooltip.  Display it.
 glsel 'dissectisi'
@@ -7599,21 +7682,29 @@ hoverinitloc =: cpos
 NB. Copy the pixels we are about to overwrite
 'ctlx ctly' =. glqwh ''
 'hovery hoverx' =. cpos
-'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT,TOOLTIPMARGIN;'') sizetext <string  NB. kludge
+'ttiph ttipw' =. (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;x,TOOLTIPMARGIN;'') sizetext <string  NB. kludge
+NB. Find the portion of the window that is currently visible.  We want the tooltip there
+'onscreent onscreenl onscreenb onscreenr' =. , +/\ findonscreenyxhw''
 NB. Position the tooltip to be on screen.  We try to put the bottom-left corner at the hover offset, above the cursor
 NB. Get desired top position; if it's off the top of the screen, switch to the right of the hover
 ttipx =. hoverx
-if. 0 > ttipy =. HOVEROFFSETY + hovery - ttiph do.
+if. onscreent > ttipy =. HOVEROFFSETY + hovery - ttiph do.
   NB. default too high: try to position to the right of the cursor
   ttipy =. hovery
   ttipx =. ttipx + HOVEROFFSETX >. CURSORXSIZE
 end.
 NB. If that's too far right, we back the x onto the screen (and then right if offscreen), and drop the y to below the cursor
 NB. Get desired left position, but if that goes offscreen right, move left; then if offscreen left, move right
-if. ctlx < ttipx + ttipw do.
+if. onscreenr < ttipx + ttipw do.
   ttipx =. 0 >. ctlx - ttipw  NB. back x onto the screen
   NB. If we were trying the right of the cursor position, it dodn't work, drop below cursor
   if. ttipy = hovery do. ttipy =. hovery + CURSORYSIZE end.
+else.
+  NB. The tooltip fits to the right of the cursor (i. e. ttipx is ok).
+  NB. If it runs off the bottom of the onscreen area, move it up till it fits
+  if. onscreenb < ttipy + ttiph do.
+    ttipy =. onscreent >. onscreenb - ttiph
+  end.
 end.
 
 NB. That's the topleft of the tooltip.  Now calculate the rectangle that we will use to save the pixels
@@ -7621,8 +7712,8 @@ NB. We have to save an extra pixel all the way around (seeming glrect error), an
 NB. that the rectangle is all onscreen, else QT will crash
 ttpyx =. 0 >. _1 + ttipy,ttipx
 ttphw =. (2 + ttiph,ttipw) <. (ctly,ctlx) - ttpyx
-tooltippixels =: glqpixels 1 0 3 2 { , tooltippixpos =: ttpyx,:ttphw
-(TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;TOOLTIPFONT,TOOLTIPMARGIN;'') drawtext string;2 2 $ ttipy,ttipx,ttiph,ttipw  NB. kludge
+tooltippixels =: (, glqpixels) 1 0 3 2 { ttpyx,ttphw
+(TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;x,TOOLTIPMARGIN;'') drawtext string;2 2 $ ttipy,ttipx,ttiph,ttipw  NB. kludge
 glpaint''
 NB.?lintsaveglobals
 )
@@ -7636,7 +7727,7 @@ if. 0 = 4!:0 <'tooltippixels' do.
   NB. if the tooltip has a minimum lifetime, delay until that lifetime has been exceeded (kludge).  Should be short
   if. 0.01 < reqddelay =. hoversessmin - 6!:1'' do. 6!:3 reqddelay end.
   glsel 'dissectisi'
-  glpixels (1 0 3 2 { , tooltippixpos) , tooltippixels
+  glpixels tooltippixels
   glpaint''
   4!:55 <'tooltippixels'
 end.
@@ -7650,10 +7741,15 @@ NB. in the locale of the main form
 NB. pick flags
 'PICKLB PICKRB PICKCTRL PICKSHIFT' =: |. 1 bwlsl~ i. 4
 
+NB. The sequential click number increments for every mouse-click.  We use it to detect when
+NB. the user clicks twice in the same place - we emphasize the message then
+seqclickno =: 1
+
 NB. mouse button, both left and right.  Return number of picks performed.
 NB. x is l or r, y is formatted sysdata
 dissect_dissectisi_mbdown =: 4 : 0
 hoverend''
+seqclickno =: >: seqclickno
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 for_r. pr =. locpickrects (1 findpickhits) 1 0 { y do.  NB. Return FIRST hit so sentence has priority over data blocks
   'l yx' =. r
@@ -8108,6 +8204,7 @@ NB. The only event is a click in the one defined region.  We are already in the 
 explorer_dissectisi_mbldown =: 3 : 0
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 hoverend''
+seqclickno__COCREATOR =: >: seqclickno__COCREATOR
 yx =. EXPLORERYX -~ 1 0 { sd =. 0 ". sysdata
 if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;sd;0 end.
 )
