@@ -14291,9 +14291,39 @@ end.
 NB.?lintonly uop =: vop =: <'dissectnoun'
 if. noun bwand (<0 0) {:: y do.
   NB. m : n - we must be able to resolve m at parse time.  Create an object of the appropriate type
-  if. ifinlocale__uop 'nounvalue' do.
+  if. (ifinlocale__uop 'nounvalue') *. (ifinlocale__vop 'nounvalue') do.
   else.
-    failmsg 'dissect restriction: in m :n, m must be a constant or a name'
+    failmsg 'dissect restriction: in m :n, m and n must be a constant or a name'
+  end.
+  select. 3!:0 nounvalue__vop 
+  case. 1;4;8;16 do.
+    if. 0 ~: #$nounvalue__vop do.
+      failmsg 'domain error: in m :n, numeric n must be an atom'
+    elseif. 0 ~: nounvalue__vop do.
+      failmsg 'domain error: in m :n, numeric n must be 0'
+    elseif. do.
+      failmsg 'dissect restriction: in m :n, numeric n is not supported'
+    end.
+    return.
+  case. 2;131072 do.
+    if. 2 <: #$nounvalue__vop do.
+      failmsg 'rank error: in m :n, literal n must be a table or list'
+      return.
+    end.
+  case. 32 do.
+    if. 1 <: #$nounvalue__vop do.
+      failmsg 'rank error: in m :n, boxed n must be an atom or a list'
+      return.
+    elseif. -. (#@$@> nounvalue__vop) *./@:e. 0 1 do.
+      failmsg 'rank error: in m :n, boxed n must have contents with rank < 2'
+      return.
+    elseif. 0 e. ((2 131072 e.~ 3!:0) +. (0 e. $))@> nounvalue__vop do.
+      failmsg 'domain error: in m :n, boxed n must contain strings'
+      return.
+    end.
+  case. do.
+    failmsg 'domain error: in m :n, n must be boxed, literal, or fixed-length numeric'
+    return.
   end.
   select. nounvalue__uop
   case. 3;4;13 do.
@@ -14302,7 +14332,7 @@ if. noun bwand (<0 0) {:: y do.
     create y
   case. 0 do.
     NB. 0 : n - define a noun - silly - just switch to n
-    noun;vop;tokensource__vop
+    noun;vop;tokensource__vop=:tokensource__uop,((<1 2){::y),tokensource__vop
   case. 1;2 do.
     NB. 1,2 : n - define an adverb/conj, which is then a generic modifier producing a verb
     NB. This is a kludge, because the m : n is not instrumented in the executed sentence.  We would need
@@ -15907,6 +15937,16 @@ ctup = 8
 2 dissect '1 >\ 3'
 2 dissect '1 >\ a:'
 2 dissect '1 ]"]\ a:'
+'dissect restriction: in m :n, numeric n is not supported' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : 0'
+'domain error: in m :n, numeric n must be an atom' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : 0 1'
+'domain error: in m :n, numeric n must be 0' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : 5'
+'domain error: in m :n, n must be boxed, literal, or fixed-length numeric' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : 2r2'
+'dissect restriction: in m :n, m and n must be a constant or a name' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : (0-0)'
+'rank error: in m :n, literal n must be a table or list' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. 2 2 2 $ 'a'
+'dissect restriction: in m :n, m and n must be a constant or a name' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '(0-0) : 0'
+'rank error: in m :n, boxed n must be an atom or a list' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. 2 2 $ <'a'
+'rank error: in m :n, boxed n must have contents with rank < 2' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <2 2 2 $ 'a'
+'domain error: in m :n, boxed n must contain strings' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <5
 )
 
 testtacit =: testtacit2"0
