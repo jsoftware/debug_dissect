@@ -1378,9 +1378,9 @@ NB.  gridsize is spacing between lines
 NB.  standoff is min distance between a block and a line
 NB.  penalties is penalty for a turn (in units of movement)
 QP^:DEBTIME'startrouter=?6!:1'''' '
-start   =. 6!:1''
+NB. obsolete start   =. 6!:1''
 routeresult =. dl ; routegrid dyxbr;<wirenets
-if. 0.4 < dur   =. start -~ 6!:1'' do. 'Routing time: %6.1f' printf dur end.
+NB. obsolete if. 0.4 < dur   =. start -~ 6!:1'' do. 'Routing time: %6.1f' printf dur end.
 NB. Now that we have traversed, replace the locale-names with the inheritedtail, so that we move to the locale
 NB. that is actually formatted for display
 sentenceinfo =. (<1 1) {:: topinfo
@@ -4427,8 +4427,6 @@ NB.   with special 'move type' to signal end-of-chain for backtracking
 NB. All the other endpoints, including the target itself, were marked as unreached when we started the
 NB. route, and we cannot have an interest in any that we have previously routed to
 routinggrid =: (routingzero + RMOVEEOC) (<"1 (3) {."1 shelfmsk # frontier)} routinggrid
-NB. obsolete NB. Mark the target as unreached
-NB. obsolete routinggrid =: (routingzero + RGRIDWINDOW) (<target)} routinggrid
 shelfmsk =. shelfmsk > frontmsk  NB. Don't shelve active points
 shelffrontier =. shelfmsk # frontier
 shelfmindist =. shelfmsk # fmindist
