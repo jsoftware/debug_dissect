@@ -77,18 +77,13 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB.   dissect'(> * -> *.) i:9'  slow
-NB.     Route through unoccupied areas by analyzing them as a unit
+NB. Add overlap penalty for inside center of turn
+NB. Do more to bring in startpoints that can avoid a crossing.  Many more, maybe
+NB. dissect '(($:@(<#[) , (=#[) , $:@(>#[)) ({~ ?@#)) ^: (1<#) a' [ a =. 20 ? 50    seems to go the wrong way to start; perhaps detours are incorrect
+NB.   target approx 130 108   frontier approx 108 88
 NB.   dissect'((* -> *) -> * -> *.) i:9'   slow & leaves gap, for no good reason
-NB.   dissect '(($:@(<#[) , (=#[) , $:@(>#[)) ({~ ?@#)) ^: (1<#) a' [ a =. 20 ? 50    slow;
-NB.     & routes in wrong order: far-left, middle, then far-right, then in between.  Find better order
-NB.   dissect '('' O'' {~ (] !~ [: i. >:) >/ [: i. [: >./ ] !~ [: i. >:) 8'    slow
-NB. problem is that when a lead route takes a turn, it activates every other possibility
-NB.  don't allow a different move to displace a move of equal payoff
-NB. time detour calc, & suppress for very short nets? 
-
-NB. Create moves all along an unobstructed straight run all at once, including penalties?
-NB.   see if changing frontier width helps
+NB. see if changing frontier width helps
+NB. Use global to accumulate frontier?  Saves copying, ecch 
 
 NB. ?work on Android, with wd 'activity'
 
@@ -103,18 +98,13 @@ NB. Add rank-calculus for primitives with known behavior?
 NB. display:
 NB. Unicode?
 NB. Highlight net on a click/hover of a wire?
-NB. Crossing penalty for routes?
-NB. Two speedups, interrelated:
-NB.  Create frontier points for an entire straight run, up to a penalty/blockage, in one go.  Perhaps can use whole-grid operations for these en bloc
-NB.  If B is as good as A, A suppresses left-turn (since B can pick it up just as well).  Refinements req'd, and left/right cases.
-NB.   The purpose is to avoid multiple recalculation of long straight runs.  If that can be handled, then not needed
 
 NB. dissect - 2d graphical single-sentence debugger
 
 NB. the call is:
 NB. [options] dissect [sentence]
 NB. where sentence is a string to be executed.  The sentence is parsed and modified so that every verb execution creates
-NB. looging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
+NB. logging information about its input and outputs.  Then the modified sentence is executed (in the same context as the original
 NB. dissect verb), and then the results are displayed in 2d form.  If sentence is omitted, the sentence from the last error is used.
 NB.
 NB. Options are (bitmask)[;(label options)] where
@@ -645,19 +635,43 @@ NB. bit 3 is 'debug', reserved for future use
 parsemain =: 3 : 0   NB. runs in object locale
 defnames =: }. y  NB. table of names
 'options loc sentence' =. {. y
+NB. Convert the options to keyword;value form.
+NB. We must do this first because destroy uses dispoptions, so dispoptions must be properly defined
+NB. before any failure is detected
+NB. If the options is unboxed, box it.
+if. 2 > #$ dispoptions =: boxopen options do.
+  NB. Options are a list or atom.  See if first one is numeric
+  if. 1 4 8 16 e.~ 3!:0 numopt =. {.!.0 > {. dispoptions do.
+    NB. Old numeric form.  Convert the number to a table of options.
+    transopt =. (2 2 2 2 #: numopt) # (;: 'fromdebugger noassignment returnobject sandbox') ,. <1
+    NB. Append the other options if there are any
+    if. 1 < #dispoptions do.
+      dispoptions =: transopt , ({."1 transopt) subkl _2 ]\^:(2 > #@$@]) 1 {:: dispoptions
+    else. dispoptions =: transopt
+    end.
+  else.
+    NB. List of options, but no numeric.  Convert to table
+    dispoptions =: _2 ]\ dispoptions
+  end.
+end.
+NB. Audit the options for validity
+if. #badopts =. ({."1 dispoptions) -. ;: 'fromdebugger noassignment returnobject sandbox check title link datasize parent' do.
+  failmsg 'Invalid options: ' , ;:^:_1 badopts return. 
+end.
+binopts =. dispoptions #~ ({."1 dispoptions) e. ;: 'fromdebugger noassignment returnobject sandbox'
+if. 1 e. emask =. ({:"1 binopts) -.@e. 0;1 do.
+  failmsg 'Invalid value for option: ' , ;:^:_1 emask # {."1 binopts return. 
+end.
+if. (<'all' qopt 'check') -.@e. ;:'all shape error no' do.
+  failmsg 'Invalid value for ''check'' option.' return. 
+end.
 NB. The numeric atom 2 is used by finddissectline to create a quiet return of an empty string
 if. 2 -: sentence do. '' return. end.
 if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
   failmsg 'The sentence to be dissected must be a string.' return. 
 end.
-'options do' =. 2 {. options
-'fromdebugger noassignment returnobject sandbox' =.  2 2 2 2 #: {.!.0 options
-returnobject_dissect_ =: * returnobject
-dispoptions =: ,:^:(2 > #@$) (0 2$a:)"_^:(2 > #@,) do  NB. If no second operand (empty or scalar created above), use an empty table
-if. 4 = comparisonlevel =: (;:'all shape error no') i. ((<'all') ,~ {:"1 dispoptions) {~ (<'check') i.~ {."1 dispoptions do.
-  failmsg 'Invalid value for ''check'' option.' return. 
-end.
-
+NB. The returnobject flag must be in dissect locale so that display can get to it
+returnobject_dissect_ =: qopt 'returnobject'
 
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 NB. Discard anything past the first LF, and remove CR
@@ -779,7 +793,7 @@ NB. and 'verb' for modifier executions
     end.
     NB. If the assignment is one we can handle, we will have one or more names.  In that case, create an
     NB. assignment block on the stack
-    stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock;noassignment),((>:subj i: 1)}. stack)
+    stack =. ((subj i. 1){.stack),('dissectassign' 0 createmodifier exeblock;qopt 'noassignment'),((>:subj i: 1)}. stack)
     NB. We would like to preserve the value of the unhandleable assignment, but we can't, because
     NB. We need an assignment node to account for the assignment tokens, and we can't get a value for the
     NB. modifier because it might be complex (a train).  If we try to push the assignment tokens into
@@ -802,7 +816,7 @@ NB. and 'verb' for modifier executions
     end.
 
     NB. Define the names, as nouns (J nameclass 0).
-    defnames =: (rname ,"0 1 ((0+256*noassignment);'')) , defnames
+    defnames =: (rname ,"0 1 ((0+256*qopt 'noassignment');'')) , defnames
 
   case. 8 do.  NB. ( x ) - but remember the token numbers of the parens
     if. (noun+verb) bwand 1 { exetypes do.
@@ -921,7 +935,7 @@ NB. and 'verb' for modifier executions
          NB. If the verb has a one-line definition, pass that into the definition for tooltip purposes
         ntypeval =. createverb qend;(#queue);glopart;gloc;objval;loc;(#defnames)
       case. 0+256 do.  NB. Special type: name previously assigned which in ignore assignment mode
-        failmsg 'Undissectable sentence: the name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',(fromdebugger # ' when dissect is called from the debugger'),'.'
+        failmsg 'Undissectable sentence: the name ''' , qend , ''' was previously assigned in this sentence, but assignments are ignored',((qopt 'fromdebugger') # ' when dissect is called from the debugger'),'.'
         return.
       case. do.
         failmsg 'Undissectable sentence: undefined name ' , qend
@@ -978,8 +992,8 @@ calcdispstealth__resultroot displayshowstealth # 1 2
 NB. Create the string to execute.  If we have to create a sandbox, do so
 NB. The raw sentence has the user's tokens, but the the invisible ones removed (for noassign sentences).
 vissentence =. ; (<: /:~ ; ((1;1)&{::"1 # 0&{"1) > gettokenlevels__resultroot '')&{&.;: usersentence
-execsentences_dissect_ =: vissentence ;^:(comparisonlevel<3) ,<exestring__resultroot''
-if. sandbox do.
+execsentences_dissect_ =: vissentence ;^:('no' -.@-: qopt 'check') ,<exestring__resultroot''
+if. qopt 'sandbox' do.
   NB. create the sandbox verb in the user's locale
   createsandbox defnames
   (('(' , ] , ';' , (quote >loc) , ') sandbox_dissect_ ' , quote@[)&.> '01' {.~ -@#) execsentences_dissect_
@@ -988,6 +1002,24 @@ else.
   execsentences_dissect_
 end.
 NB.?lintsaveglobals
+)
+
+NB. Tools to read options
+NB. x is list of keys, y is keyed list, result is y with x lines removed
+subkl =: -.@(e.~ {:"1) # ]
+
+NB. y is name of option, a string
+NB. Result is unboxed first matching value in dispoptions, or x if not found - default 0
+qopt =: 3 : 0
+0 qopt y
+:
+(({."1 dispoptions) i. <y) {:: ({:"1 dispoptions) , <x
+)
+
+NB. y is name of option, a string
+NB. Result is list of all matching boxes in dispoptions
+qoptb =: 3 : 0
+(({."1 dispoptions) = <y) # {:"1 dispoptions
 )
 
 NB. y is table of names
@@ -1088,6 +1120,12 @@ ttdlines =. ; ('menu fmtooltipdelay' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {.
 ttdetlines =. ; ('menu fmtooltipdetail' , [ , ' "' , ] , '";' , LF"_ )&.>/"1 (2) {."1 TOOLTIPDETAILCHOICES
 DISSECT=: ((,&LF&.> 'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0
 pc dissect;
+menupop "&File";
+menu fmclosethis "Close this window and descendants";
+menu fmclosefamily "Close this and all related windows";
+menu fmcloseallbutthis "Close windows unrelated to this";
+menu fmcloseall "Close all windows";
+menupopz;
 menupop "&Preferences";
 menupop "&Fonts";
 menu fmfontvalues "Select font for values...";
@@ -1150,6 +1188,12 @@ rem form end;
 
 DISSECT =: (((,&LF&.> 'rem prec;';'rem sizex;';'rem sizey;';'rem ttdlines;';'rem ttdetlines;') ,. preclines;sizexlines;sizeylines;ttdlines;ttdetlines) stringreplace 0 : 0) [^:IFQT DISSECT
 pc dissect;
+menupop "&File";
+menu fmclosethis "Close this window and descendants";
+menu fmclosefamily "Close this and all related windows";
+menu fmcloseallbutthis "Close windows unrelated to this";
+menu fmcloseall "Close all windows";
+menupopz;
 menupop "&Preferences";
 menupop "&Fonts";
 menu fmfontvalues "Select font for values...";
@@ -1334,9 +1378,9 @@ NB.  gridsize is spacing between lines
 NB.  standoff is min distance between a block and a line
 NB.  penalties is penalty for a turn (in units of movement)
 QP^:DEBTIME'startrouter=?6!:1'''' '
-NB.obsolete start   =. 6!:1''
+start   =. 6!:1''
 routeresult =. dl ; routegrid dyxbr;<wirenets
-NB.obsolete if. 0.4 < dur =. start -~ 6!:1'' do. 'Routing time: %6.1f' printf dur end.
+if. 0.4 < dur   =. start -~ 6!:1'' do. 'Routing time: %6.1f' printf dur end.
 NB. Now that we have traversed, replace the locale-names with the inheritedtail, so that we move to the locale
 NB. that is actually formatted for display
 sentenceinfo =. (<1 1) {:: topinfo
@@ -1345,24 +1389,51 @@ routeresult
 NB.?lintsaveglobals
 )
 
+mismatchmsg =: 0 : 0
+Dissect's result from running the sentence did not match the result from running the sentence in the J session.  There are 3 possible reasons:
+
+1. Your sentence is irreproducible, because it uses random numbers (the ? verb) or inconstant external data, or it has side effects.
+
+2. The J interpreter has a bug executing your code that does not show up when executing Dissect's sentence, which is slightly different.
+
+3. Dissect has a bug.
+
+Do you want Dissect to display its result anyway?
+)
 NB. y is the results from running the user's original sentence and our instrumented version.
 displaymain =: 3 : 0  NB. called in dissectinstance locale
 NB. Make sure the results are the same
 NB. If the sentence ran correctly for the user, make sure we get the same result.
 NB. If there is only one result, we don't compare (comparisonlevel must have suppressed uninstrumented execution)
 if. 1 < #y do.
-  select. comparisonlevel
-  case. 0 do.  NB. compare for equality (should it be intolerant?  Naah - there may be shortcuts)
+  select. 'all' qopt 'check'
+  case. 'all' do.  NB. compare for equality (should it be intolerant?  Naah - there may be shortcuts)
     equal =. -:/ y
-  case. 1 do.  NB. compare for equality of shape and type
+  case. 'shape' do.  NB. compare for equality of shape and type
     equal =. (-:&({.@(0&($,)) L:0) *. -:&($ L:0))/ y
-  case. do.  NB. must be 2 - compare for equality of failure
+  case. do.  NB. must be 'error' - compare for equality of failure
     equal =. =&(0 = #)&>/ y
   end.
   if. -. equal do.
 QP^:NOCLEANUP'y 13!:12$0 '
-    failmsg 'dissect error: dissected sentence has incorrect result'
-    return.
+    if. '' -: '' qopt 'check' do.
+      NB. If the user didn't specify a check, give him a chance to accept the mismatch
+      if. IFQT do.
+        continue =. 'yes' -: wd 'mb query mb_yes =mb_no "Dissect result mismatches J session" "',mismatchmsg,'"'
+      else.
+        continue =. 'YES' -: wd 'mb "Dissect result mismatches J session" "',mismatchmsg,'" mb_yesno'
+      end.
+      if. continue do.
+        NB. If the user wants to continue, modify the display options so that subdissections will inherit the choice
+        dispoptions =: dispoptions , 'check';'no'
+      else.
+        failmsg 'dissect error: dissected sentence has incorrect result'
+        return.
+      end.
+    else.
+      failmsg 'dissect error: dissected sentence has incorrect result'
+      return.
+    end.
   end.
 end.
 
@@ -1588,6 +1659,8 @@ if. NOCLEANUP *. -. x do. '' return. end.
 NB. Destroy all debug windows started here.  This saves the user the trouble of deleting them by hand
 for_o. debuglocs do. if. 1 = 18!:0 o do. destroy__o '' end. end.
 for_o. ~. objtable do. destroy__o '' end.
+NB. Remove this locale from its parent, if it has one
+if. a: ~: parentloc =. {. qoptb 'parent' do. debuglocs__parentloc =: debuglocs__parentloc -. coname'' end. 
 NB.?lintmsgson
 resultroot =: 0$a:
 if. #winhwnd do.
@@ -1645,6 +1718,35 @@ dissect_fmtooltipctrl_button =: 3 : 0
 
 dissect_close =: 1&destroy
 dissect_cancel =: dissect_close
+dissect_fmclosethis_button =: dissect_close
+
+NB. Close all windows related to this one
+dissect_fmclosefamily_button =: 3 : 0
+NB. find the parent.  Closing it will close all the children
+while. #parentloc =. qoptb 'parent' do.
+  NB.?lintonly parentloc =. <'dissect'
+  cocurrent {. parentloc
+end.
+dissect_close''
+)
+
+NB. Close windows unrelated to this one
+dissect_fmcloseallbutthis_button =: 3 : 0
+NB. Find the parent, and exempt it from the global close
+while. #parentloc =. qoptb 'parent' do.
+  NB.?lintonly parentloc =. <'dissect'
+  cocurrent {. parentloc
+end.
+dissect_fmcloseall_button coname''
+)
+NB. Close all, except any locales given in y (must be top-level locales)
+dissect_fmcloseall_button =: 3 : 0
+NB. Find all windows without parents.  Closing them will close all
+for_l. y -.~ (#~ 3 : '0 = #qoptb__y ''parent'''"0) (a: -.~ {."1 dissectionlist_dissect_) do.
+  dissect_close__l''  NB.?lintonly [ l =. <'dissect'
+end.
+i. 0 0
+)
 
 NB. We use dissect locale for fontsize, because it is shared between instances
 dissect_fmfontsize_button =: 4 : 0
@@ -3535,9 +3637,13 @@ MINBOXSPACING =: 3 * ROUTINGGRIDSIZE  NB. Number of pixels between boxes, minimu
 RGRIDDIST =: 8  NB. bits 0-3 hold move code
 RMOVEEOC =: 5   NB. special start-of-route indicator
 RGRIDWINDOW =: 5000*RGRIDDIST   NB. max routing distance including (possibly huge) penalties
-RFRONTIERRANGE =: 2*RGRIDDIST  NB. depth of frontier.  At 0, only the shortest candidates are on the frontier.
-ROUTINGMARGIN =: 4   NB. min number of wire spacings to leave around border.  Used to calc routing area
+RFRONTIERRANGE =: 1*RGRIDDIST  NB. depth of frontier.  At 0, only the shortest candidates are on the frontier.
+ROUTINGMARGIN =: 4   NB. min number of wire spacings to leave around border of grid.  Used to calc routing area
 NB. We need 1 for roundup of points, 1 that we use to mark the boundary for comp ease, 2 to allow 2 wires in
+TGTPROXFORROLLUP =: RGRIDDIST*10  NB. if the route is farther than this much from the target, we use full-grid analysis
+
+INITSHELFCT =: 10  NB. Number of nearest starting places to keep for initial shelf
+INITSHELFFRINGE =: RGRIDDIST*10  NB. Expand the initial shelf to include points within this distance of the top INITSHELFCT points
 
 NB. Place-and-route line drawer for dissect
 NB. Given a block placement and a set of interblock connections, we adjust the placement
@@ -3555,22 +3661,34 @@ gsctlbr1 =. <. yxtogrid gridblocks +"2 (2) #"0 (ROUTINGGRIDSIZE-WIRESTANDOFF),WI
 NB. Create the row;column vector for each block
 gscrowcolvec =. (+ i.)&.>/@(-~/\)"2 gsctlbr1
 NB. Initialize the routing zero distance.  This will be reduced for every run that is routed
-routingzero =: RGRIDWINDOW -~ (-RGRIDDIST) bwand _1 (33 b.) _1
+routingzero =: (2*RGRIDWINDOW) -~ (-RGRIDDIST) bwand _1 (33 b.) _1
 NB. Create the routing grid, with each block blocked off as negative
-routinggrid =: (rareasize,4) $ routingzero + RGRIDWINDOW
+routinggrid =: (4,rareasize) $ routingzero + RGRIDWINDOW
 for_b. gscrowcolvec do.
-  routinggrid =: _1 (<b)} routinggrid
+  routinggrid =: _1 (<a:;b)} routinggrid
 end.
-NB. Create the penalty table, all empty (it will be filled in as there are routes)
-penaltygrid =: (rareasize,2) $ 2 - 2
+NB. Create the penalty table, counting one unit for each move.  Other penalties will be added as routes create them
+penaltygrid =: (rareasize) $ RGRIDDIST
 NB. Initialize the penalty for adjacent to a block
 gscrowcolvec =. (<:@{. , ] , >:@{:)&.> gscrowcolvec
-for_b. (<"1 ({. , (0 _1&{)&.>@{:)"1 gscrowcolvec) , (<"1 ((0 _1&{)&.>@{. , {:)"1 gscrowcolvec) do.
-  penaltygrid =: (RPENALTYADJBLOCK*RGRIDDIST) b} penaltygrid 
-end.NB. Block off the border of the grid to ensure routing doesn't get out of hand
-routinggrid =: _1 (<<0 _1)} routinggrid
-routinggrid =: _1 (<a:;0 _1)} routinggrid
+if. RPENALTYADJBLOCK do.
+  for_b. (<"1 ({. , (0 _1&{)&.>@{:)"1 gscrowcolvec) , (<"1 ((0 _1&{)&.>@{. , {:)"1 gscrowcolvec) do.
+    penaltygrid =: (RGRIDDIST*>:RPENALTYADJBLOCK) b} penaltygrid   NB. include the one unit for movement
+  end.
+end.
+NB. Install a penalty at the corners, to try to keep routes off the corners without punishing every step along the way.
+NB. We can't do just the corners, because then the route can slip inside between the corner and the block.  But if we split
+NB. the blockage into two cells neighboring the outside corner, we catch it.
+penaltygrid =: (RGRIDDIST*>:RPENALTYOUTCORNER) (((,: |.) 1 _2;0 _1) (<@:({&.>) , <@:({&.>))"1/ gscrowcolvec)} penaltygrid
+penaltygrid =: ($routinggrid) ($,) penaltygrid
+ 
+NB. Block off the border of the grid to ensure routing doesn't get out of hand
+routinggrid =: _1 (<a:;<0 _1)} routinggrid
+routinggrid =: _1 (<a:;a:;0 _1)} routinggrid
 routingzero =: routingzero - RGRIDWINDOW  NB. fresh start for first route
+NB. Add a huge penalty for a move to the first (in the scan direction) cell of a blocked area.  This is used during
+NB. propagation of straight moves to prevent a run from crossing over a blocked area
+penaltygrid =: penaltygrid +"2 RGRIDWINDOW * (_2 ]\ _1 0 1 0 0 _1 0 1) (] > |.!.0)"1 _ ({.routinggrid) < 0
 gsctlbr1
 NB.?lintsaveglobals
 )
@@ -3580,9 +3698,14 @@ gridtoyx =: *&ROUTINGGRIDSIZE
 
 RPENALTYCROSS =: 3  NB. penalty for wire-crossing
 RPENALTYTURN =: 4   NB. penalty to assign to a turn
-RPENALTYJOG =: 5   NB. number of blocks of penalty to assign to a jog
-RPENALTYADJBLOCK =: 1    NB. Penalty for having a wire next to a block
+RPENALTYJOG =: 7   NB. number of blocks of penalty to assign to a jog
 RPENALTYADJWIRE =: 1    NB. Penalty for having a wire next to a wire
+NB. We want to keep routes from lying next to a block.  Unfortunately, adding a penalty to the cells next to
+NB. a block makes routing inefficient, because the route has to fight through the penalty zone, and all the
+NB. while it is off the top of the frontier and so never gets to extrapolate.  A better way to get the same result
+NB. is to penalize the corners only, so that the route gets a chance to extrapolate.
+RPENALTYADJBLOCK =: 0    NB. Penalty for having a wire next to a block
+RPENALTYOUTCORNER =: 4   NB. Penalty for points outside corners - the idea is to force runs to go around them
 NB. Routing schedule
 NB. This gives the (overlap penalty),(neighboring-wire penalty),(crossing penalty),(score crossing penalty) for a sequence of trial routes
 NB. We try these routes in order; after each one we add more space if there are crossings or overlaps.
@@ -3615,7 +3738,7 @@ for_r. routeschedule do.
 QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(routingzero + RGRIDWINDOW)) i. routinggrid
   NB. Route the nets. result is table of boxes, one row per net, holding
   NB.  (list of boxes each holding path of a routed run);(table of other wires) where the path of the routed run is
-  NB.  (table of row,col,dir,movetype of occupied cells)
+  NB.  (table of dir,row,col,movetype of occupied cells)
   if. #occupied =. (#~ RMOVEEOC ~: 3&{"1) 0 {:: route =. (ov,neigh,cross) routenets gridblocks;<nets do.
     NB. Get yx of places where spread is needed.  These are overlaps and crossings, which we figure out from the occupied cells.
     NB. The crossings of turn/jog over turn/jog are handled by creating synthetic 'occupations' at the bend corners.  We do that after routing
@@ -3624,15 +3747,15 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
     NB. we create a separate list of them and see if any of them show up in the occupied list
     omoves =. 3 {"1 occupied
     NB. Turn corners, marked in both directions.  Result is table per corner, one row in each direction
-    bjcorners =. (0 2 3$0)"_`(0 1 ,"1 0/~ 2&{."1 + blockturn (<"1@[ { ])~ _2&{."1)@.(*@#) occupied #~ omoves e. 1 2
+    bjcorners =. (0 2 3$0)"_`(0 1 ,"0 1/ 1 2&{"1 + blockturn (<"1@[ { ])~ 0 3&{"1)@.(*@#) occupied #~ omoves e. 1 2
     NB. Jog corners, marked in the direction of movement.  Result is table per corner, one row for each blocked cell
-    NB. Reshape result to table of y,x,dir
-    bjcorners =. ,/ bjcorners , (0 2 3$0)"_`(nswetons@:(2&{"1) ,."2 0~ 2&{."1 +"1 blockjog (<"1@[ { ])~ _2&{."1)@.(*@#) occupied #~ omoves e. 3 4
+    NB. Reshape result to table of dir,y,x
+    bjcorners =. ,/ bjcorners , (0 2 3$0)"_`(nswetons@:(0&{"1) ,."0 2 (1 2)&{"1 +"1 blockjog (<"1@[ { ])~ 0 3&{"1)@.(*@#) occupied #~ omoves e. 3 4
     NB. Convert occupation table to y,x,nsdir form (nsdir instead of nswedir)
-    occupied =.  /:~ (2&{."1 ,. nswetons@:(2&{"1)) occupied
-    bjolap =. (<0 2$0) , 0 1 <@((= {:"1) # ])"0 _ occupied (e. # [) bjcorners
+    occupied =.  /:~ (nswetons@:(0&{"1) ,. 1 2&{"1) occupied
+    bjolap =. (<0 2$0) , 0 1 <@((= {."1) # ])"0 _ occupied (e. # [) bjcorners
     NB. Look for consecutive identical points in the sorted list
-    'crosspts overlapsns overlapsew' =. gridtoyx&.> bjolap ,&.> ((<(<0);0 1)&{ <@#~ (2 -:&1 1 0@:=/\ ]) ,  (<(<0);2)&{ (< ,: *.)  2&(-:/\)) occupied
+    'crosspts overlapsns overlapsew' =. gridtoyx&.> bjolap ,&.> ((<(<0);1 2)&{ <@#~ (2 -:&0 1 1@:=/\ ]) ,  (<(<0);0)&{ (< ,: *.)  2&(-:/\)) occupied
     NB. Score the placement: 1 point for a crossing, a zillion for occupancy>1
     NB. Penalize crossings only on the first routes
     score =. 1 1000000 1000000 +/@:* #@> (scorecross #&.> crosspts);overlapsns;overlapsew
@@ -3695,11 +3818,11 @@ uglyturnforjogw =. 2 2 $ S,1 , N,2
 uglyturnforjoge =. 2 2 $ N,1 , S,2
 uglyturnforjog =: 4 1 #"2 uglyturnforjogn,uglyturnforjogs,uglyturnforjogw,:uglyturnforjoge
 
-NB. y is table of row,col,dir,movetype of occupied cells
+NB. y is table of dir,row,col,movetype of occupied cells
 NB. Result is table of graphics commands (wires or arcs)
 occtowires =: 3 : 0
 if. 0 = #y do. 0 4$0 return. end.
-yxvals =. 2 {."1 y
+yxvals =. 1 2 {"1 y
 movetype =. 3 {"1 y
 NB. For move type 0 (straight run), find the first and last+1 in a sequence and put a wire between them
 NB. The last movetype is always RMOVEEOC
@@ -3713,7 +3836,7 @@ if. #jogs =. (#~   3 4 e.~ 3&{"1) turnjogs do.
   turns =. (#~   1 2 e.~ 3&{"1) turnjogs
   NB. create the turns that would match the jogs.  For a left-jog, the ugly turn is a left-turn
   NB. whose direction is 90 degrees ccw of the jog; for a right-jog, a right-turn 90 degrees cw of the jog
-  uglyturns =. (2 {."1 jogs) ,. (_2 {."1 jogs) (<"1@[ { ]) uglyturnforjog
+  uglyturns =. 2 0 1 3 {"1 (1 2 {"1 jogs) ,. (0 3 {"1 jogs) (<"1@[ { ]) uglyturnforjog
   NB. Get the jog (if any) corresponding to each turn
   jogx =. uglyturns i. turns
   NB. Remove the turns that had a matching jog - keep the ones that didn't
@@ -3723,7 +3846,7 @@ if. #jogs =. (#~   3 4 e.~ 3&{"1) turnjogs do.
   jogs =. (2 + (<jogx;3) { jogs) (<jogx;3)} jogs
   turnjogs =. turns , jogs
 end.
-turnwires =. (($,)~ 4 (%~ , [) */@$) (gridtoyx@:(2&{."1) +"1 turnmoves (<"1@[ { ])~ _2&{."1) turnjogs
+turnwires =. (($,)~ 4 (%~ , [) */@$) (gridtoyx@:(1 2&{"1) +"1 turnmoves (<"1@[ { ])~ 0 3&{"1) turnjogs
 NB. Ignore RMOVEEOC, which ends each run
 straightwires , turnwires
 )
@@ -3929,14 +4052,15 @@ directdrawok =: 4 : 0
 NB. Create the angle of each wire
 angles =. angleranges I. 12 o. j.~/"1 yxdiff =. y -"1&:(2&{."1) x
 NB. See if the angle is in the OK range for the source face, and if the negative is in the OK range for the target face
-NB. But don't direct-draw any vertical or horizontal line, since they could overlap a routed line exactly
-angleok =. (-. 0 e."1 yxdiff) *. (angles e. (2{x) { facerange) *. angles e."0 1 (2 {"1 y) { revfacerange
+NB. But don't direct-draw any vertical or horizontal line longer than 3 grids, since they could overlap a
+NB. routed line exactly
+angleok =. (-. (0 e."1 yxdiff) *. ((gridtoyx 4) > +/"1 yxdiff)) *. (angles e. (2{x) { facerange) *. angles e."0 1 (2 {"1 y) { revfacerange
 NB. Allow the wire if no vertices in the box containing the wire's corners (adjusted inward a smidgen)
 NB. We move the wire away from the face by one gridunit more than the calculation used to move the corners.
 NB. Then we use those values as corners, and look to see whether the region is clear.  We allow direct routing if so.
 movedpoints =. <. yxtogrid (0 1&{"1 +"1 ((, |."1) (0 ,~ -WIRESTANDOFF) ,: (0 ,~ WIRESTANDOFF+ROUTINGGRIDSIZE)) {~ 2&{"1) x , y  NB. Note other comp produced end+1; so does this
 NB. Kludge - should create yx for each point and check just those
-interiorok =. 0 = (0 > {."1 routinggrid) +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoints
+interiorok =. 0 = (0 > {. routinggrid) +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoints
 angleok * interiorok
 )
 
@@ -3965,34 +4089,57 @@ trueroutend =. <. 2 {."1 y
 routend =. <. yxtogrid trueroutend + (ROUTINGGRIDSIZE-1) * 1 bwand faces =. 2 {"1 y
 NB. Attach the direction to each point.  For the destinations, this is the opposite of the face normal: face 0 (top) requires an entry
 NB. in direction 1 (south).  For the source, the initial direction is the same as the face normal
-routendface =. routend ,. faces bwxor 1 NB. gridy,gridx,direction (nswe) for each routing point
-NB. Order the points for routing.  From the centroid of the routed points outward
+routendface =. routend ,.~ faces bwxor (#faces) {.!.1 (0) NB. dir,gridy,gridx (nswe) for each routing point
+NB. Order the points for routing.  Shortest run first.  We have tried: closest to centroid of points; closest to cnetroid of the convex hull
 startroute =. {. routendface
 remroute =. }. routendface
-routeoccwires =. (routerun@;&:>/ (<"1 remroute ([ \: +/"1@:|@:(-"1)&:(2&{."1)) polygoncentroid remroute) , < ,: (0 0 1 bwxor startroute) , RMOVEEOC) ; ((gridtoyx routend) (-.@-:"1 # ,.) trueroutend)
+routbydist =. remroute ([ \: +/"1@:|@:(-"1)&:(1 2&{"1)) startroute
+NB. The routing points are generally on the display block and therefore start out as blocked (=_1).
+NB. To allow routing to them, we need to mark them as unrouted points for purposes of calculating
+NB. penaltyrollup.  We further need to mark the initial frontier as zero-length, but we do that
+NB. after we have culled the initial frontier.  It is OK to leave non-frontier points unblocked,
+NB. because no route can ever go to one, except when it is the target
+routinggrid =: (routingzero+RGRIDWINDOW) (<"1 routendface)} routinggrid
+if. TGTPROXFORROLLUP < RGRIDDIST * +/ | ({. routbydist) -&:(1 2&{"1) startroute do.
+  NB. We roll up the penalties back toward the 'starting' end of the grid (for North, that's the South end)
+  NB. But we install a large penalty at the start of every blockage, which will prevent runs from
+  NB. extending over the blockage
+  NB. The penaltygrid includes the cost of moving to the cell (1 unit), plus a full GRIDWINDOW penalty for the first
+  NB. cell (in the scan direction) of a blocked area.  Cells that are blocked later (by routes) are blocked by a hefty penalty
+  NB. in the penaltygrid and do not show here as 'blockages'
+  blockages =. routinggrid < 0
+  penaltyrollup =. (-. blockages) * ('+/\.','+/\','+/\."1',:'+/\"1') 128!:2"1 2 penaltygrid
+  NB. Prevent the blockage itself from affecting the subsequent run by installing a big negative rollback
+  NB. value, which pushes the blockage value above all filled cells
+  penaltyrollback =. penaltyrollup + blockages * -(-RGRIDDIST) bwand _1 (33 b.) _1
+else. penaltyrollback =. penaltyrollup =. $0
+end.
+routeoccwires =. ((penaltyrollup;penaltyrollback)&routerun@;&:>/ (<"1 routbydist) , < ,: startroute , RMOVEEOC) ; ((gridtoyx routend) (-.@-:"1 # ,.) trueroutend)
 
 NB. After the net is complete, install penalties for subsequent nets.  They shouldn't take effect until the net is finished
 NB. Install penalties near the routes.  Remove route ends
-routepos =. (#~ RMOVEEOC ~: (2&{"1)) 0 {:: routeoccwires
+routepos =. (#~ RMOVEEOC ~: (3&{"1)) 0 {:: routeoccwires
 NB. First, overlaps
-penpos =. <"1 (yx =. 2 {."1 routepos) ,. dir =. nswetons 2 {"1 routepos
+dir =. (0 {"1 routepos) bwxor/ 0 1
+yx =. 1 2 {"1 routepos
+penpos =. <"1 (<"1 dir) ,. <"0 yx
 penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
 NB. Adjacencies.  Add and subtract 1 from the crossing direction to find the place to add the penalty
-penpos =. <"1 yx ( ] ,.~"0 2 (+"1"1 2 {&((,: |."1) 2 2 $ 0 1 0 _1)) ) dir
+penpos =. <"1 (<"1 dir) ,. yx +&.> (0 e."1 dir) |."0 _ (_1 1;0)
 penaltygrid =: (penneigh + penpos { penaltygrid) penpos} penaltygrid
 NB. Crossing
-penpos =. <"1 yx ,. -. dir
+penpos =. <"1 (<"1 (2) bwxor dir) ,. <"0 yx
 penaltygrid =: (pencross + penpos { penaltygrid) penpos} penaltygrid
 NB. Also install overlap penalties for the inside corner of bends, and the bends in the same direction of a jog, to prevent
 NB. overlaps of bends & jogs
 move =. 3 {"1 routepos
 if. #turn =. routepos #~ move e. 1 2 do.
-penpos =. <"1 (2 {."1 turn) + (_2 {."1 turn) (<"1@[ { ]) blockturn
-penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
+  penpos =. <"1 a: ;"0 1 <"0 (1 2 {"1 turn) + (0 3 {"1 turn) (<"1@[ { ]) blockturn
+  penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
 end.
 if. #jog =. routepos #~ move e. 3 4 do.
-penpos =. <"1 ((2 {."1 jog) +"1 (_2 {."1 jog) (<"1@[ { ]) blockjog) ,."2 0 nswetons 2 {"1 jog
-penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
+  penpos =. <"1 (<"1 (0 {"1 jog) bwxor/ 0 1) ,."0 2 <"0 ((1 2 {"1 jog) +"1 (0 3 {"1 jog) (<"1@[ { ]) blockjog)
+  penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
 end.
 
 routeoccwires
@@ -4002,7 +4149,7 @@ NB.?lintsaveglobals
 NB. y is array of nswe (0=n, 1=s, 2=w, 3=e), result is array of ns (0=ns, 1=ew)
 nswetons =: _1&(33 b.)
 
-NB. 4x5x4, (nswedir) x (move types) x (row,col,dir,distance/move)
+NB. 4x5x4, (nswedir) x (move types) x (dir,row,col,distance/move)
 NB. This gives the amount to add to the frontier dir/dist to update it
 NB. The amount added to the distance includes the move-direction code to store into the grid
 NB. Order of moves is straight, turn left, turn right, jog left, jog right
@@ -4014,7 +4161,9 @@ NB. Moving w (2), subtract from x
 movesw =. 0 0 2 -"1~ _3 ]\ 0 _1 2  1 _1 1  _1 _1 0  1 _1 2 _1 _1 2
 NB. Moving e (3), add to x
 movese =. 0 0 3 -"1~ _3 ]\ 0 1 3  _1 1 0  1 1 1  _1 1 3  1 1 3
-movesbydir =: (movesn,movess,movesw,:movese) ,."2 (i.@# + RGRIDDIST&*) 1 2 2 # 1 + 0,RPENALTYTURN,RPENALTYJOG
+NB. reorder to dir,y,x,move.  The move penalty here does not include the one-unit cost for each move, which is
+NB. already factored in to penaltygrid
+movesbydir =: 2 0 1 3 {"1 (movesn,movess,movesw,:movese) ,."2 (i.@# + RGRIDDIST&*) 1 2 2 # 0,RPENALTYTURN,RPENALTYJOG
 
 NB. 4x6x3, (nswedir) x (directioncode) x (row,col,dir)
 NB. Gives the amount to add to the row,col,dir to get to the previous point in the route
@@ -4027,7 +4176,8 @@ backn =. 0 0 0 -"1~ _3 ]\ 1 0 0  1 _1 3   1 1 2   1 1 0   1 _1 0  0 0 0
 backs =. 0 0 1 -"1~ _3 ]\ _1 0 1  _1 1 2   _1 _1 3   _1 _1 1   _1 1 1  0 0 1
 backw =. 0 0 2 -"1~ _3 ]\ 0 1 2  1 1 0   _1 1 1   _1 1 2   1 1 2  0 0 2
 backe =. 0 0 3 -"1~ _3 ]\ 0 _1 3  _1 _1 1   1 _1 0   1 _1 3  _1 _1 3  0 0 3
-backmovesbydir =: backn,backs,backw,:backe
+NB. reorder to dir,y,x
+backmovesbydir =: 2 0 1 {"1 backn,backs,backw,:backe
 
 T =. 1+RPENALTYTURN
 J =. 1+RPENALTYJOG
@@ -4103,22 +4253,23 @@ tpw =. 0 2 1 |: tpnw,tpne,tpnn,:tpns
 NB. sourcedir=e.  target nswe behaves like ewsn for sourcedir=s.  The ordering of dy,dx must be reversed
 tpe =. 0 2 1 |: (tpsw),(tpse),tpsn,:tpss
 minposspenalty =: tpn,tps,tpw,:tpe
-NB. Create penalty, accessed by targetdir,ydist,xdist,sourcedir, ordered by sourceyx
+NB. Create penalty, accessed by targetdir,sourcedir,ydist,xdist, ordered by sourceyx
 NB. Since minposspenalty is indexed by target-source, we must mirror it in both axes
-penaltybytarget =: RGRIDDIST * (1 2 3 0) |: |."2 |."1 minposspenalty  NB. Remap from sourcedir,targetdir,ydist,xdist
+NB. reorder to dir,y,x
+penaltybytarget =: RGRIDDIST * (1 0 2 3) |: |."2 |."1 minposspenalty  NB. Remap from sourcedir,targetdir,ydist,xdist
 
-NB. x is target ypos,xpos,direction
-NB. y is table of ypos,xpos,direction,dist/move (ignored)
+NB. x is target dir,ypos,xpos
+NB. y is table of dir,ypos,xpos,dist/move (ignored)
 NB. Result is min distance to each point: the distance that can be achieved if there
 NB. are no penalties incurred except for turns.  This is shifted up into the dist
 NB. position of dist/move
 minroutingdist =: 4 : 0
 NB. Get distance, target-source
-stdist =. x -"1&:(2&{."1) y
+stdist =. x -"1&:(1 2&{"1) y
 NB. Classify distance into <_1,_1,0,1,>1
 NB. Lookup turn penalty, add to Manhattan distance.  Turn penalty is looked up as
 NB. source dir, target dir, dy class, dx class
-RGRIDDIST * (+/"1 | stdist) + ((2{"1 y),.(2{x),.(_4 _3 _2 _1 0 1 2 3 I. stdist)) (<"1@[ { ]) minposspenalty
+RGRIDDIST * (+/"1 | stdist) + ((0{"1 y),.(0{x),.(_4 _3 _2 _1 0 1 2 3 I. stdist)) (<"1@[ { ]) minposspenalty
 )
 
 NB. Audit the tables for consistency
@@ -4129,9 +4280,9 @@ NB. The goal is the origin, and we examine a 6x6 region around the origin, for e
 startpts =. 0 0 -.~ ,/ ,"0/~ 0 1 _1 2 _2 3 _3 4 _4 5 _5 6 _6
 for_s. ,/ startpts ,"1/ ,/ ,"0/~ i. 3 do.
   'y x sd td' =. s
-  newpos =. (y,x,sd,0) +"1 (_1 _1 _1,-RGRIDDIST) bwand"1 (sd) { movesbydir
-  newdist =. (3 {"1 newpos) + (0 0,td) minroutingdist newpos
-  if. (olddist =. (0 0,td) minroutingdist (,:y,x,sd,0)) ~: <./ newdist do.
+  newpos =. (sd,y,x,0) +"1 (_1 _1 _1,-RGRIDDIST) bwand"1 (sd) { movesbydir
+  newdist =. (3 {"1 newpos) + (td,0 0) minroutingdist newpos
+  if. (olddist =. (td,0 0) minroutingdist (,:sd,y,x,0)) ~: <./ newdist do.
     'Routing table error: yx=(%d,%d), sourcedir=%d, targetdir=%d; premove dist=%d, postmove:' printf y;x;sd;td;olddist
     for_n. newpos,.newdist do.
       'yx=(%d,%d), dir=%d, indist=%d, mindist=%d' printf n
@@ -4140,7 +4291,7 @@ for_s. ,/ startpts ,"1/ ,/ ,"0/~ i. 3 do.
   end.
 end.
 NB. Make sure that each forward-move creates the move-code that leads back to its cell
-if. *./ , fwdback =. ( 3&{. -:"1 backmovesbydir ((3 {. ]) + ({~ <@(2&{ , (<:RGRIDDIST) bwand {:)))"_ 1 movesbydir&(] +"1 ({~ 2&{)) )"1 ] 0 0 ,"1 (i.4),.0 do.
+if. *./ , fwdback =. ( 3&{. -:"1 backmovesbydir ((3 {. ]) + ({~ <@(0&{ , (<:RGRIDDIST) bwand {:)))"_ 1 movesbydir&(] +"1 ({~ 0&{)) )"1 ] 0 0 ,"1~ (i.4),.0 do.
   smoutput 'Routing tables are consistent'
 else.
   smoutput 'Error in fwd/back check:'
@@ -4149,7 +4300,7 @@ end.
 ''
 )
 
-NB. 4x2x2x4 indexed by (target dir,low/high side of target,penalties for low/high detours,source dir)
+NB. 4x2x4x2 indexed by (target dir,penalties for low/high detours,source dir,low/high side of target)
 NB. 
 NB. The table as shown here is created as (target dir,low/high side of target,source dir,penalties for low/high detours)
 NB.   and transposed below
@@ -4182,11 +4333,11 @@ NB. If target is East, interchange we & lh penalties from the West data
 detpene =. (<a:;1 0 2 3;1 0) { detpenw
 NB. Combine to form the horizontal penalties - applied as a result of vertical blockages
 NB. Reorder to 4x2x2x4 shape
-detourpenaltiesh =: 0 1 3 2 |: RGRIDDIST * detpenn , detpens , detpenw ,: detpene
+detourpenaltiesh =: 0 3 2 1 |: RGRIDDIST * detpenn , detpens , detpenw ,: detpene
 
 NB. The vertical penalties are applied as a result of horizontal blockages
 NB. They interchange nw & es, in both target & source directions, but keep low/high unchanged
-detourpenaltiesv =: (<2 3 0 1;a:;a:;2 3 0 1) { detourpenaltiesh
+detourpenaltiesv =: (<2 3 0 1;a:;2 3 0 1) { detourpenaltiesh
 
 NB. Route run using astar algorithm
 NB. y is target y,x,dir
@@ -4198,23 +4349,20 @@ NB.   routing are guaranteed to be RGRIDWINDOW higher than routingzero, so as no
 NB.   this route (occupied cells are less than 0)
 NB. Result is input frontier, new frontier, each ypos,xpos,direction,movecode
 NB. The global 'routinggrid' holds the routing info
-routerun =: 3 : 0
+routerun =: 4 : 0
+'penaltyrollup penaltyrollback' =. x
 'target origfrontier' =. y
 QP^:DEBROUTE'router input:target=?target '
 QP^:DEBROUTE'origfrontier '
 frontier =. 3 {."1 origfrontier
-NB. Initialize board to unoccupied for target, 0 for frontier
-NB.   with special 'move type' to signal end-of-chain for backtracking
-routinggrid =: (routingzero + RMOVEEOC) (<"1 frontier)} routinggrid
-routinggrid =: (routingzero + RGRIDWINDOW) (<target)} routinggrid
 NB. Precalculate min distance-to-target for each point in the routing grid
 NB. Will be addressed by sourcey,sourcex,sourcedir
-selkernel =. (2 { target) { penaltybytarget
+selkernel =. (0 { target) { penaltybytarget
 NB. Create a grid, with shape like routinggrid, with the kernel centered on the target position.
 NB. The first/last rows/columns are duplicated to get the target point in the proper position
-'rgh rgw' =. rgshape =. 2 {. $ routinggrid
-'tgy tgx tgdir' =. target
-minpengrid =. selkernel {~ <rgshape {.!._1&.> (tgy,tgx) (i.@] {.~ -@(+ -:@>:))&.> 2 {. $ selkernel
+'rgh rgw' =. rgshape =. _2 {. $ routinggrid
+'tgdir tgy tgx' =. target
+minpengrid =. selkernel {~"2 <rgshape {.!._1&.> (tgy,tgx) (i.@] {.~ -@(+ -:@>:))&.> _2 {. $ selkernel
 NB. Calculate the detours required around blocks that cover the target.  We only worry about blocks
 NB. that overlap the target, because the route tends to get stuck aiming for a position that is blocked off the target
 NB. Work on blocks that block east-west
@@ -4223,13 +4371,13 @@ NB. Starting at the target row, scan up & down: first clear cells following a ga
 NB. then total to leave the number of detours for each cell.  This gives two sections, one above (& including) the
 NB. target, one including & below.  Expand each of these to the full grid size by repeating the row for the
 NB. target
-NB. We take advantage of the fact that we have ceared occupancy in the target cell, in the target direction.
+NB. We take advantage of the fact that we have cleared occupancy in the target cell, in the target direction.
 NB. This will guarantee that we do not detect detours in the target cell
-blockages =. 0 > tgdir {"1 routinggrid
-detour =. (+/\@(*./\.)@((>:tgy)&{.) blockages) (([ ,"0 ((*"1 >&0)~ {.)) (, }:) ([ ,"0~ ((*"1 >&0)~ {:))~) +/\.@(*./\)@(tgy&}.) blockages
+blockages =. 0 > tgdir { routinggrid
+detour =. (+/\@(*./\.)@((>:tgy)&{.) blockages) (([ ,: ((*"1 >&0)~ {.)) (,"2  }:"2) ([ ,:~ ((*"1 >&0)~ {:))~) +/\.@(*./\)@(tgy&}.) blockages
 NB. Propagate that value left-to-right away from the target, to get #detours for west-east runs
-NB. This is a brick with two numbers at each cell: (# detours going North, # going South)
-detour =. (>./\."2 tgx {."2 detour) ,"2 (>./\"2 tgx }."2 detour)
+NB. This is a brick with two layers: (# detours going North, # going South)
+detour =. (>./\."1 tgx {."1 detour) ,"1 (>./\"1 tgx }."1 detour)
 NB. Combine them with the turn penalties for each direction and take the lower value, to give
 NB. the total # of turn-penalties at each position
 NB. (Note: this does not take into account a possible jog-move at the end of the block.  Probably not
@@ -4244,76 +4392,147 @@ NB. Each detour will count twice; but if 0, use a low-value to remove all penalt
 NB. Note: some of the penalties were calculated in the table as calling for detour-2; for those we should add back
 NB.  2 detours if detour is actually 1; but it's not worth doing, and anyway no crime to underestimate the possible distance.
 NB.  It tends to self-correct anyway, as such a run would turn immediately, to a position that has the correct value
-ewdetourpenalty =. <./"2 ((rgw {.!.1 tgx # 0) { tgdir { detourpenaltiesh) +"2 1"3 2 (2 * RGRIDDIST) * (-   500000 * 0&=) detour 
-
+ewdetourpenalty =. <./ ((<tgdir;a:;a:;rgw {.!.1 tgx # 0) { detourpenaltiesh) +"1"1 2 (2 * RGRIDDIST) * (-   500000 * 0&=) detour 
 NB. Repeat for detours for north-south runs.
-detour =. (+/\"1@:(*./\."1)@((>:tgx)&{."1) blockages) (([ ,"0 ((* >&0)~ {."1)) (,. }:"2) ([ ,"0~ ((* >&0)~ {:"1))~) +/\."1@(*./\"1)@(tgx&(}."1)) blockages
-detour =. (>./\. tgy {. detour) , (>./\ tgy }. detour)
-nsdetourpenalty =. <./"2 ((rgh {.!.1 tgy # 0) { tgdir { detourpenaltiesv) +"2 1"2 2 (2 * RGRIDDIST) * (-   500000 * 0&=) detour 
+detour =. (+/\"1@:(*./\."1)@((>:tgx)&{."1) blockages) (([ ,: ((* >&0)~ {."1)) (,"1 }:"1) ([ ,:~ ((* >&0)~ {:"1))~) +/\."1@(*./\"1)@(tgx&(}."1)) blockages
+detour =. (>./\."2 tgy {."2 detour) ,"2 (>./\"2 tgy }."2 detour)
+nsdetourpenalty =. <./ ((<tgdir;a:;a:;rgh {.!.1 tgy # 0) { detourpenaltiesv) +"1 2 (2 * RGRIDDIST) * (-   500000 * 0&=) detour 
 
 NB. The number of detours is the largest of the kernel and the ns and we detours
 minpengrid =. minpengrid >. ewdetourpenalty >. nsdetourpenalty
 NB. Add in the Manhattan distance from each gridpoint to the target
-minpengrid =. minpengrid +"1 0 +/&:(RGRIDDIST * |)&((- i.)/)/ target ,.&(2&{.) $routinggrid
+minpengrid =. minpengrid +"2 +/&:(RGRIDDIST * |)&((- i.)/)/ target ,.&(1 2&{) $routinggrid
 
 QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(routingzero + RGRIDWINDOW)) i. routinggrid
-NB. Calculate minimum distance-to-target to frontier points
-fmindist =. routingzero + frontier (<"1@[ { ])  minpengrid
-NB. Append distance-to-point to each frontier point.
+NB. Calculate minimum distance-to-target to frontier points.  Get minimum in tgtprox, which shows the distance-to-target
+NB. (0-origin, unbiased by routingzero)
+tgtprox =. <./ fmindist =. frontier (<"1@[ { ])  minpengrid
+NB. Append 0 distance-to-point to each frontier point.
 frontier =. frontier ,. routingzero
 
-NB. Split frontier into active and shelved based on best distance
-frontmsk =. fmindist <: cutoffdist =. RFRONTIERRANGE + (<: RGRIDDIST) bwor <./ fmindist
-shelffrontier =. (-. frontmsk) # frontier
-shelfmindist =. (-. frontmsk) # fmindist
-frontier =. frontmsk # frontier
+NB. Bias fmindist by routingzero, where it will stay
+fmindist =. routingzero + fmindist
 
+NB. Remove frontier points that are far away from the best
+NB. Leave 10 points on the shelf, if there are that many points
+NB. Split frontier into active and shelved based on best distance
+frontmsk =. fmindist <: cutoffdist =. routingzero + RFRONTIERRANGE + (<: RGRIDDIST) bwor tgtprox
+if. INITSHELFCT < #fmindist do.
+  shelfmsk =. fmindist <: INITSHELFFRINGE + INITSHELFCT ({ /:~) fmindist
+else.
+  shelfmsk =. 1   NB. If too few points, keep them all
+end.
+NB. Initialize board to 0 for frontier
+NB.   with special 'move type' to signal end-of-chain for backtracking
+NB. All the other endpoints, including the target itself, were marked as unreached when we started the
+NB. route, and we cannot have an interest in any that we have previously routed to
+routinggrid =: (routingzero + RMOVEEOC) (<"1 (3) {."1 shelfmsk # frontier)} routinggrid
+NB. obsolete NB. Mark the target as unreached
+NB. obsolete routinggrid =: (routingzero + RGRIDWINDOW) (<target)} routinggrid
+shelfmsk =. shelfmsk > frontmsk  NB. Don't shelve active points
+shelffrontier =. shelfmsk # frontier
+shelfmindist =. shelfmsk # fmindist
+frontier =. frontmsk # frontier
 NB. Init indicator of shelf points that have been activated already.  To save movement we
 NB. don't delete shelf points as soon as they are activated.  But any point with shelfmindist <:
 NB. shelfcutoffdist has been activated and should not be reactivated
 shelfcutoffdist =. cutoffdist
 shelfdeadct =. 0  NB. Count of points on shelf with mindist <: shelfcutoffdist
-
 NB. Init distance-to-target to 'not found'
 bestfinaldist =. _1
-
 NB. Loop till both frontier portions are empty
 while. do.
-  if. cutoffdist >: routingzero + RGRIDWINDOW do. failmsg 'route failed' return. end. 
+  if. cutoffdist >: routingzero + RGRIDWINDOW do. failmsg 'route exceeds length limit' return. end. 
   NB. Calculate each possible move along the active frontier.  Remove movetype bits first
   frontier =. ((-RGRIDDIST) bwand 3 {"1 frontier) (<a:;3)} frontier
-  frontier =. ,/ frontier +"1 (2 {"1 frontier) { movesbydir
+  frontier =. ,/ frontier +"1 (0 {"1 frontier) { movesbydir
 
   NB. Apply any penalties associated with the move; keep coded distance/move type where move type
   NB.  is in the low bits of the code
-  frontierx =. 3 {."1 frontier
-  frontierx =. (nswetons 2 {"1 frontierx) (<a:;2)} frontierx
-  frontier =. ((3 {"1 frontier) + frontierx (<"1@[ { ]) penaltygrid) (<a:;3)} frontier
+  frontier =. ((3 {"1 frontier) + (3 {."1 frontier) (<"1@[ { ]) penaltygrid) (<a:;3)} frontier
 
-  NB. If there are duplicates on the active frontier, keep only the shortest distance
-  frontier =. (((<0;0 1 2)&{ , <./@:({:"1))/.~   3&{."1) frontier
+  NB. Remove moves that are not improvements.  When we are exploring ahead, we spawn lots of
+  NB. moves simultaneously, and many of them are not improvements.  Before we check for duplicates,
+  NB. we discard what we can, since duplicate testing is expensive
 
-  NB. Fetch current distance to each point in the active frontier, and replace with frontier
-  NB. distance if it is shorter.  Remove points from frontier that could not move
-  if. #frontier =. frontier #~ ({:"1 frontier) <&((-RGRIDDIST)&bwand) (3 {."1 frontier) (<"1@[ { ]) routinggrid do.
-    frontx =. <"1 (3) {."1 frontier
-    routinggrid =: ({:"1 frontier) frontx} routinggrid
+    NB. If there are duplicates on the active frontier, keep only the shortest distance
+    frontier =. (((<0;0 1 2)&{ , <./@:({:"1))/.~   3&{."1) frontier
+  if. #frontier =. frontier #~ (3 {"1 frontier) <&((-RGRIDDIST)&bwand) (3 {."1 frontier) (<"1@[ { ]) routinggrid do.
 
-    NB. Calculate minimum distance-to-target in the active frontier
-    fmindist =. frontx { minpengrid
-    NB. See if we hit the target
-    hittarget =. 0 = fmindist {~ fminx =. (i. <./) fmindist
+    NB. Fetch current distance to each point in the active frontier, and replace with frontier
+    NB. distance if it is shorter.  Remove points from frontier that could not move
+    frontbx =. <"1 frontx =. 3 {."1 frontier
+    routinggrid =: ({:"1 frontier) frontbx} routinggrid
+
+    NB. Calculate minimum distance-to-target in the active frontier; see if we hit target
+    tgtprox =. <./ fmindist =. frontx (<"1@[ { ]) minpengrid
     NB. Add the distance to date to the min distance to target to get the min total distance
     NB. to target for each point.  From now on fmindist is the min final distance for frontier
     fmindist =. fmindist + 3 {"1 frontier
+    NB. To reduce # iterations, extend every frontier element by straight moves to the end of the grid
+    NB. This is expensive for large grids, so do it only occasionally
+    if. (*#penaltyrollup) *. (tgtprox > TGTPROXFORROLLUP) do.
+      NB. Limit the straight moves to positions that are best-possible moves.  It's not smart to
+      NB. extrapolate a move that can't be a winner, because it will just immediately be shelved.  If we
+      NB. wait, we will get a clear winner to extrapolate.  Rather than calculate the best-possible dist,
+      NB. we use the value derived from the cutoff before this move.  This means that steps that were
+      NB. penalized will not be extrapolated, which is a good thing
+      NB. cutoffdist has low 3 bits set to 111 & so will be > any equal frontier value
+      if. #topfrontier =. ((cutoffdist - RFRONTIERRANGE) > fmindist) # frontier do.
+        NB. For speed, we want to extrapolate as little as possible.  So we figure a start,end for each frontier point,
+        NB. stopping shortly after the target point if we are going toward it, or limited to a max distance if away;
+        NB. and combine them to get a
+        NB. rectangular region for propagation.  That region needs to be as small as possible
+        topdirns =. nswetons topdir =. 0 {"1 topfrontier
+        topstart =. 1 2 {"1 topfrontier
+        NB. The constant is EXTRAPOVERSHOOT
+        NB. We avoid }"0 1 which lacks IRS
+        NB. Point is OK if (going up) matches (end > start)
+        NB. Get coordinate of moving point for each extrap
+        floatpos =. topdirns {"0 1 topstart
+        NB. up=1 if floating coord is going in the positive direction
+        up =. topdir e. 1 3
+        NB. abovetgt=1 if floating coord is above the target (taking turn time into account)
+        abovetgt =. (floatpos + 1 * up) > floattgt =. topdirns { 1 2 { target
+        NB. If an up extrap is above the target, go for 100 units from floatpos; otherwise to target.  Here select the base
+        usefloatpos =. up = abovetgt
+        floatpos =. usefloatpos} floattgt ,: floatpos
+        NB. Select offset, and add to base
+        floatpos =. floatpos + (up ,. abovetgt) (<"1@[ { ]) _100 _5,:5 100
+        NB. Get coordinates to consider, in y and x
+        blocky =. ({."1 topstart) , (-. topdirns) # floatpos
+        blockx =. ({:"1 topstart) , (topdirns) # floatpos
+        NB. Get the extent (start,end+1) of the coordinates mentioned.  Clamp to within grid limits.
+        extblock =. 0 4 ,. -~/\ |: 0 >. (_2 {. $ routinggrid) <. ((<./ , >:@:(>./)) blocky) ,: ((<./ , >:@:(>./)) blockx)
+        NB. Back penalties back to beginning-of-line to put all points at equal level; then scan to
+        NB. find the smallest overhead; then restore penalties.  The penalty blocks are designed to reset the
+        NB. scan when a filled block is encountered.
+        NB. We do not replace the movetype in the propagated value.  This may leave a higher-than-needed movetype,
+        NB. but that's not a problem.  We do make sure below that if we change value, we force the movetype to 'straight'
+        rolledgrid =. (extblock ];.0 penaltyrollup) + ('<./\.','<./\','<./\."1',:'<./\"1')&((128!:2)"1 2) (extgrid =. extblock ];.0 routinggrid) - extblock ];.0 penaltyrollback
+        NB. Find the indexes of the cells that have an improvement.  The values in the window may be uninitialized from previous
+        NB. iterations & would show 'improvement' to a value out of range.  So we requires that the improvement be to a value
+        NB. inside the current gridwindow.
+        if. #newfx =. ($ #: I.@,) rolledgrid < extgrid <. routingzero + RGRIDWINDOW do.
+          NB. Fetch the distance-to-point for the improved points; convert them to move type 0 (=straight ahead)
+          frontier =. frontier , (newfx =. newfx +"1 {.extblock) ,. impval =. (-RGRIDDIST) bwand newfx (<"1@[ { ]) rolledgrid
+          NB. Store the new values
+          routinggrid =: impval (<"1 newfx)} routinggrid
+          NB. Restore tgtprox/fmindist for the new points
+          tgtprox =. <./ fmindist =. (3 {."1 frontier) (<"1@[ { ]) minpengrid
+          fmindist =. fmindist + 3 {"1 frontier
+        end.
+      end.
+    end.
+
     NB. If We hit the target, cull any point from shelved frontier that cannot beat the distance that hit
-    if. hittarget do.
+    if. tgtprox = 0 do.
       NB. The only way to have dist-to-target=0 is to hit it.  We just did that.
       NB. Purge shelved points that are now dead, to save carrying them around
       NB. (active points are purged below on every step).
       NB. Use dist in frontier, but discard the move-type part
       NB. We must also purge dead shelf points so that our count of them is accurate
-      bestfinaldist =. (-RGRIDDIST) bwand (<fminx,3) { frontier
+      bestfinaldist =. (-RGRIDDIST) bwand (<target) { routinggrid
       shelfmsk =. (shelfmindist < bestfinaldist) *. (shelfmindist > shelfcutoffdist)
       shelffrontier =. shelfmsk # shelffrontier
       shelfmindist =. shelfmsk # shelfmindist
@@ -4371,7 +4590,7 @@ NB. End loop.  Target has been hit
 
 NB. Backtrack from the target to create the wiring, using the move type to indicate what to emit
 NB. The last result, the end-of-route, will be repeated; remove it
-backchainpos =. (+    backmovesbydir (<"1@[ { ])~ 2&{ , (<: RGRIDDIST) bwand (<"1@[ { ])&routinggrid)^:a: target
+backchainpos =. (+    backmovesbydir (<"1@[ { ])~ 0&{ , (<: RGRIDDIST) bwand (<"1@[ { ])&routinggrid)^:a: target
 NB. Append the move type to each position
 backchain =. backchainpos ,. (<: RGRIDDIST) bwand backchainpos (<"1@[ { ]) routinggrid
 
@@ -4644,7 +4863,7 @@ NB. Reselect in case explorers were drawn
 wd 'psel ' , winhwnd
 glsel 'dissectisi'
 NB. If there is a title, size it
-if. #titlelines =. (1 {"1 dispoptions) #~ (0 {"1 dispoptions) = <'title' do.
+if. #titlelines =. qoptb 'title' do.
   titlsizetext =. TAB (0&".@taketo ; takeafter)&> titlelines
   titlcfms =. (#titlsizetext) $ ,: titlcfm
   NB. Add in fontsize adjustment
@@ -4665,7 +4884,7 @@ else.
 end.
 
 NB. If there are links, size them too.  Create a table, empty if no links
-if. #linklines =. (1 {"1 dispoptions) #~ (0 {"1 dispoptions) = <'link' do.
+if. #linklines =. qoptb 'link' do.
   linksizetextlink =.<;._2@:(,&TAB)@> linklines
   linkcfms =. (#linksizetextlink) $ ,: linkcfm
   NB. Add in fontsize adjustment
@@ -7326,11 +7545,11 @@ In m@.v, the execution of v must result in a numeric atom.
 
 This is reported as a 'domain error' in the J session.
 ?selector invalid
-In x { y or x m} y, a complementary selector is not atomic.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+In x m} y, a complementary selector is not a single atomic box.  The selectors are the atoms of >m in x m} y.
 
 This is reported as an 'index error' in the J session.
 ?selector rank
-In x { y or x m} y, a selector contains contents with rank > 1.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+In x { y or x m} y, the selectors have rank > 1.  The selectors are >x in x { y or >m in x m} y.
 
 This is reported as a 'rank error' in the J session
 ?selector level
@@ -9458,9 +9677,13 @@ if. verbstate = 1 do.
     NB. Name was resolved locally, as simplename.  Use default locale
     subloc =. verbloc
   end.
+  NB. Create the options to use for the sandbox.  Keep the options given by the user, except for title and link;
+  NB. clear fromdebugger and noassignment; set returnobject, sandbox, parent.
+  useopts =. (;: 'fromdebugger noassignment returnobject sandbox title link parent') subkl dispoptions
+  useopts =. useopts , (;: 'returnobject sandbox parent') ,. 1;1;COCREATOR
   NB. Run the sentence in a sandbox; save the locale, if there was no error.
   NB. If there was an error, give a message.
-  if. '' -: $ debugloc =. dissect (3 ; subloc ; txt) , argvbls do.
+  if. '' -: $ debugloc =. dissect (useopts ; subloc ; txt) , argvbls do.
     debuglocs__COCREATOR =: debuglocs__COCREATOR , debugloc
   else.
     wdinfo 'Error running dissect';debugloc
@@ -15703,7 +15926,7 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect '(2: +/\ ])/ 5 + i. 2 3'
 2 dissect '(] crash9_dissect_)&.>/ z' [ z =. 1;2 3;4 5 9
 2 dissect '2 1 4 +//.@:(*/) 3 _2 3 1'
-'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 't =. t + 2' [ t =. 0
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) (2;<'check';'all') dissect 't =. t + 2' [ t =. 0
 2 dissect '1 2 3 (}.@:+)^:3 i. 3'
 2 dissect '(,1)&+/. i. 2 3'
 2 dissect 'crash9_dissect_/. i. 3 4'
@@ -15813,7 +16036,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect 'i.@>@> z' [ z =. (<2 3);(,:2;3);<<"1]3 2 $2 5 2 3 2 4  NB. good testcase for selections and display of fill shapes
 2 dissect 'i."0"1(2 2 $ 1 4 1 8)'
 2 dissect '+: each 1;2;1'
-'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '?~ 100'
+'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) (2;<'check';'all') dissect '?~ 100'
 (2 ;< 'check';'shape') dissect '?~ 100'
 'dissect error: dissected sentence has incorrect result' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'shape') dissect '(100 ?@$ 3) { 5;''a'';<a:'
 (2 ;< 'check';'error') dissect '(100 ?@$ 3) { 5;''a'';<a:'
