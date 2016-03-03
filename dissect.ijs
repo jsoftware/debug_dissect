@@ -77,14 +77,6 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. Add overlap penalty for inside center of turn
-NB. Do more to bring in startpoints that can avoid a crossing.  Many more, maybe
-NB. dissect '(($:@(<#[) , (=#[) , $:@(>#[)) ({~ ?@#)) ^: (1<#) a' [ a =. 20 ? 50    seems to go the wrong way to start; perhaps detours are incorrect
-NB.   target approx 130 108   frontier approx 108 88
-NB.   dissect'((* -> *) -> * -> *.) i:9'   slow & leaves gap, for no good reason
-NB. see if changing frontier width helps
-NB. Use global to accumulate frontier?  Saves copying, ecch 
-
 NB. ?work on Android, with wd 'activity'
 
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
@@ -3794,8 +3786,8 @@ NB. The result is the table of vectors (y/x) to be drawn for the turn.  Each vec
 NB. gridpoint moved into
 NB. Direction 0: the route entered going north (this wire is in the opposite direction)
 turnsn0 =. 3 2 2 $ 0
-turnsn1 =. 2 ,:/\ _2 ]\ 0 0  2 0  ,ROUTINGGRIDSIZE, (-ROUTINGGRIDSIZE-2)   ,ROUTINGGRIDSIZE ,(-ROUTINGGRIDSIZE)
-turnsn2 =. 2 ,:/\ _2 ]\ 0 0  2 0  ,ROUTINGGRIDSIZE, (ROUTINGGRIDSIZE-2)   ,ROUTINGGRIDSIZE ,ROUTINGGRIDSIZE
+turnsn1 =. 2 ,:/\ _2 ]\ 0 0  1 0  ,ROUTINGGRIDSIZE, (-ROUTINGGRIDSIZE-1)   ,ROUTINGGRIDSIZE ,(-ROUTINGGRIDSIZE)
+turnsn2 =. 2 ,:/\ _2 ]\ 0 0  1 0  ,ROUTINGGRIDSIZE, (ROUTINGGRIDSIZE-1)   ,ROUTINGGRIDSIZE ,ROUTINGGRIDSIZE
 turnsn3 =. 2 ,:/\ _2 ]\ 0 0  2 0  ,(ROUTINGGRIDSIZE-2),ROUTINGGRIDSIZE   ,ROUTINGGRIDSIZE ,ROUTINGGRIDSIZE
 turnsn4 =. 2 ,:/\ _2 ]\ 0 0  2 0  ,(ROUTINGGRIDSIZE-2),(-ROUTINGGRIDSIZE)   ,ROUTINGGRIDSIZE ,(-ROUTINGGRIDSIZE)
 turnsn5 =. 2 ,:/\ _2 ]\ 0 0 2 2 4 4  ,ROUTINGGRIDSIZE,ROUTINGGRIDSIZE
@@ -4064,11 +4056,11 @@ interiorok =. 0 = (0 > {. routinggrid) +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) mov
 angleok * interiorok
 )
 
-NB. 4x3x2, indexed by (direction,movetype) returning yx offset to cell that needs to be blocked
+NB. 4x3x2, indexed by (direction,movetype) returning yx offset from the END of the turn to the cell that needs to be blocked
 NB. The arguments are the direction after the FORWARD route has been performed: so (viewed in the forward direction) the
-NB. first cell is when you come north out of a left turn; the cell to block is east of the beginning of the turn
+NB. first cell is when you come north out of a left turn (i. e. from west); the cell to block is west of the end of the turn
 'N S W E' =. _1 0 , 1 0 , 0 _1 ,: 0 1
-blockturn =: (4 1 2$0) ,. 4 2 2 $ S,S  , N,N , E,E  , W,W   
+blockturn =: (4 1 2$0) ,. 4 2 2 $ W,E  , E,W , S,N  , N,S   
 NB. 4x5x2x2, indexed by (direction,movetype) returning yx offsets to cells that need to be blocked in the direction of movement
 NB. First cell is left jog going north; block cells to east and south of the end of the jog
 blockjog =: (4 3 2 2$0) ,. 4 2 2 2 $ E,S , W,S , W,N , E,N , E,N , E,S , W,S , W,N
