@@ -77,6 +77,10 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. Make sure there are 3 routing channels between boxes
+NB. See if we need to go back to the old penalty around boxes
+NB. Highlight net on a click/hover of a wire
+
 NB. ?work on Android, with wd 'activity'
 
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
@@ -89,7 +93,6 @@ NB. Add rank-calculus for primitives with known behavior?
 
 NB. display:
 NB. Unicode?
-NB. Highlight net on a click/hover of a wire?
 
 NB. dissect - 2d graphical single-sentence debugger
 
@@ -269,7 +272,12 @@ case. 0 do.
     NB. Select sentence - but find the part between control words
     pref =. 8 u: (LF taketo&.|. ({.fs) {. ft)   NB. The line before the cursor, in UTF-8
     line =. pref , 8 u: LF taketo ({.fs) }. ft  NB. The whole line
-    words =. ;: line  NB. convert to words
+    try.
+      words =. ;: line  NB. convert to words
+    catch.
+      smoutput 'cannot dissect: ' , ((<:13!:11'') {:: 9!:8 '') , ' in sentence'
+      2 return.   NB. causes quiet return from parse
+    end.
     NB. For each word, calc number of nonblanks from begin line to end of word
     wordnb =. +/\ +/@:~:&' '@> words
     prefnb =. +/@:~:&' ' pref   NB. number of nonblanks in prefix
@@ -657,8 +665,10 @@ end.
 if. (<'all' qopt 'check') -.@e. ;:'all shape error no' do.
   failmsg 'Invalid value for ''check'' option.' return. 
 end.
+
 NB. The numeric atom 2 is used by finddissectline to create a quiet return of an empty string
 if. 2 -: sentence do. '' return. end.
+
 if. (2 ~: 3!:0 sentence) +. (1 < #$sentence) do.
   failmsg 'The sentence to be dissected must be a string.' return. 
 end.
@@ -842,8 +852,13 @@ NB. and 'verb' for modifier executions
     elseif. qendb e. ;:'() =. =:' do.
       stack =. ((qend;(#queue)) ;~ (lpar,rpar,2#asgn) {~  (;:'() =. =:') i. qendb) , stack
     NB. If self-defining term, create a noun block for it, mark as sdt.  String, number, a. a: _.
-    elseif. (qend e. ;:'a. a: _.') +. (-. '.:' e.~ {: qend) *. ({. qend) e. '''_0123456789' do.
-      stack =. stack ,~ (<sdt+noun) 0} createnoun qend;'';(#queue);<".qend
+    elseif. (qend e. ;:'a. a: _.') +. (':' ~: {: qend) *. ({. qend) e. '''_0123456789' do.
+      try.
+        stack =. stack ,~ (<sdt+noun) 0} createnoun qend;'';(#queue);<".qend
+      catch.
+        NB. Any error must be an ill-formed token
+        failmsg ((<:13!:11'') {:: 9!:8 '') , ': ' , qend
+      end.
     elseif. isname qend do.
       NB. Name.  Resolve the name to find part of speech.
       NB. split the name into (global part),(object locative).  If the name is absolute (ending in _),
@@ -3624,15 +3639,22 @@ cocurrent 'dissect'
 NB. ****************** place-and-route for wires ***********************
 
 ROUTINGGRIDSIZE =: 5   NB. number of pixels between routing channels
-WIRESTANDOFF =: 4  NB. min number of pixels between a wire and a block
-MINBOXSPACING =: 3 * ROUTINGGRIDSIZE  NB. Number of pixels between boxes, minimum
+
+yxtogrid =: %&ROUTINGGRIDSIZE
+gridtoyx =: *&ROUTINGGRIDSIZE
+
+WIRESTANDOFF =: 7  NB. min number of pixels between a wire and a block
+MINROUTINGCH =: 1   NB. Number of routing channels between boxes, minimum
+MINBOXSPACING =:(ROUTINGGRIDSIZE + >:MINROUTINGCH) + WIRESTANDOFF + WIRESTANDOFF  NB. Number of pixels between boxes, minimum
+NB. If we know that the low side of a block is always on a grid boundary, the second WIRESTANDOFF above can be rouned down
+NB. to a multiple of grids.  This is true for vertical positioning but not for horizontal, as things stand now
 RGRIDDIST =: 8  NB. bits 0-3 hold move code
 RMOVEEOC =: 5   NB. special start-of-route indicator
 RGRIDWINDOW =: 5000*RGRIDDIST   NB. max routing distance including (possibly huge) penalties
 RFRONTIERRANGE =: 1*RGRIDDIST  NB. depth of frontier.  At 0, only the shortest candidates are on the frontier.
-ROUTINGMARGIN =: 4   NB. min number of wire spacings to leave around border of grid.  Used to calc routing area
+ROUTINGMARGIN =: 4   NB. min number of gridpoints to leave around border of grid.  Used to calc routing area
 NB. We need 1 for roundup of points, 1 that we use to mark the boundary for comp ease, 2 to allow 2 wires in
-TGTPROXFORROLLUP =: RGRIDDIST*10  NB. if the route is farther than this much from the target, we use full-grid analysis
+TGTPROXFORROLLUP =: RGRIDDIST*10  NB. if the route is farther than this much from the target, we engage full-grid analysis
 
 INITSHELFCT =: 10  NB. Number of nearest starting places to keep for initial shelf
 INITSHELFFRINGE =: RGRIDDIST*10  NB. Expand the initial shelf to include points within this distance of the top INITSHELFCT points
@@ -3648,19 +3670,22 @@ NB. Result is gridblocks blocked areas in grid space
 initgrids =: 3 : 0
 gridblocks =. y
 rareasize =. <. yxtogrid (WIRESTANDOFF + ROUTINGGRIDSIZE * >: ROUTINGMARGIN) + >./ {:"2 gridblocks
-NB. Create top-left,:bottom-right+1 in grid units for each block
-gsctlbr1 =. <. yxtogrid gridblocks +"2 (2) #"0 (ROUTINGGRIDSIZE-WIRESTANDOFF),WIRESTANDOFF+ROUTINGGRIDSIZE
+NB. Create top-left,:bottom-right+1 in grid units for each block.  We block off any point that is less than a WIRESTANDOFF
+NB. away from the block.  On the low side, subtract WIRESTANDOFF and round up; on the top, add WIRESTANDOFF and round down
+gsctlbr1 =. <. yxtogrid gridblocks +"2 +/"2 (0 2,:1 3) { standoffbyface
 NB. Create the row;column vector for each block
 gscrowcolvec =. (+ i.)&.>/@(-~/\)"2 gsctlbr1
 NB. Initialize the routing zero distance.  This will be reduced for every run that is routed
 routingzero =: (2*RGRIDWINDOW) -~ (-RGRIDDIST) bwand _1 (33 b.) _1
-NB. Create the routing grid, with each block blocked off as negative
-routinggrid =: (4,rareasize) $ routingzero + RGRIDWINDOW
+NB. Create the blockage grid, a 1 where there is a blockage.  This name does not get
+NB. updated during the route, if areas get bocked off, but it serves its purpose of checking for
+NB. originakl blocks positioned inside a region
+blockedgrid =: rareasize $ 0
 for_b. gscrowcolvec do.
-  routinggrid =: _1 (<a:;b)} routinggrid
+  blockedgrid =: 1 (<b)} blockedgrid
 end.
 NB. Create the penalty table, counting one unit for each move.  Other penalties will be added as routes create them
-penaltygrid =: (rareasize) $ RGRIDDIST
+penaltygrid =: rareasize $ RGRIDDIST
 NB. Initialize the penalty for adjacent to a block
 gscrowcolvec =. (<:@{. , ] , >:@{:)&.> gscrowcolvec
 if. RPENALTYADJBLOCK do.
@@ -3671,24 +3696,21 @@ end.
 NB. Install a penalty at the corners, to try to keep routes off the corners without punishing every step along the way.
 NB. We can't do just the corners, because then the route can slip inside between the corner and the block.  But if we split
 NB. the blockage into two cells neighboring the outside corner, we catch it.
-penaltygrid =: (RGRIDDIST*>:RPENALTYOUTCORNER) (((,: |.) 1 _2;0 _1) (<@:({&.>) , <@:({&.>))"1/ gscrowcolvec)} penaltygrid
-penaltygrid =: ($routinggrid) ($,) penaltygrid
- 
+if. RPENALTYOUTCORNER do. penaltygrid =: (RGRIDDIST*>:RPENALTYOUTCORNER) (((,: |.) 1 _2;0 _1) (<@:({&.>) , <@:({&.>))"1/ gscrowcolvec)} penaltygrid end.
 NB. Block off the border of the grid to ensure routing doesn't get out of hand
-routinggrid =: _1 (<a:;<0 _1)} routinggrid
-routinggrid =: _1 (<a:;a:;0 _1)} routinggrid
+blockedgrid =: 1 (<<0 _1)} blockedgrid
+blockedgrid =: 1 (<a:;0 _1)} blockedgrid
 routingzero =: routingzero - RGRIDWINDOW  NB. fresh start for first route
-NB. Add a huge penalty for a move to the first (in the scan direction) cell of a blocked area.  This is used during
+routinggrid =: (4,$blockedgrid) ($,) blockedgrid { (routingzero + RGRIDWINDOW) , _1
+penaltygrid =: ($routinggrid) ($,) penaltygrid
+ NB. Add a huge penalty for a move to the first (in the scan direction) cell of a blocked area.  This is used during
 NB. propagation of straight moves to prevent a run from crossing over a blocked area
-penaltygrid =: penaltygrid +"2 RGRIDWINDOW * (_2 ]\ _1 0 1 0 0 _1 0 1) (] > |.!.0)"1 _ ({.routinggrid) < 0
+penaltygrid =: penaltygrid +"2 RGRIDWINDOW * (_2 ]\ _1 0 1 0 0 _1 0 1) (] > |.!.0)"1 _ blockedgrid
 gsctlbr1
 NB.?lintsaveglobals
 )
 
-yxtogrid =: %&ROUTINGGRIDSIZE
-gridtoyx =: *&ROUTINGGRIDSIZE
-
-RPENALTYCROSS =: 3  NB. penalty for wire-crossing
+RPENALTYCROSS =: 4  NB. penalty for wire-crossing
 RPENALTYTURN =: 4   NB. penalty to assign to a turn
 RPENALTYJOG =: 7   NB. number of blocks of penalty to assign to a jog
 RPENALTYADJWIRE =: 1    NB. Penalty for having a wire next to a wire
@@ -3697,7 +3719,8 @@ NB. a block makes routing inefficient, because the route has to fight through th
 NB. while it is off the top of the frontier and so never gets to extrapolate.  A better way to get the same result
 NB. is to penalize the corners only, so that the route gets a chance to extrapolate.
 RPENALTYADJBLOCK =: 0    NB. Penalty for having a wire next to a block
-RPENALTYOUTCORNER =: 4   NB. Penalty for points outside corners - the idea is to force runs to go around them
+RPENALTYOUTCORNER =: 0   NB. Penalty for points outside corners - the idea is to force runs to go around them
+
 NB. Routing schedule
 NB. This gives the (overlap penalty),(neighboring-wire penalty),(crossing penalty),(score crossing penalty) for a sequence of trial routes
 NB. We try these routes in order; after each one we add more space if there are crossings or overlaps.
@@ -3774,7 +3797,7 @@ NB. Not perfect.  Adjust the placement for the next try.
   NB.  has been performed
   gridblocks =. gridblocks +"1"2 1 gridtoyx (1 analform gridblocks) blockshift hspreadblockcol
 end.
-4!:55 ;:'routinggrid penaltygrid'  NB. remove the large globals
+4!:55 ;:'routinggrid penaltygrid blockedgrid'  NB. remove the large globals
 'bestgrids bestoccwires' =. bestroute
 bestgrids ; (,  occtowires)&.>~/ bestoccwires
 NB.?lintsaveglobals
@@ -3961,7 +3984,7 @@ NB. Sort nets to route shorter ones first.  This might reduce crossings?
   nets =. (/:   +/@(>./ - <./)@:(2&{."1)@>) nets
 end.
 
-NB. See which nets require routing
+NB. See which nets do not require routing, and draw them directly
 if. 1 e. ddrawmsk =. *./@:(0&~:)@({. directdrawok }.)@> nets do.
   wires =. ; ({. ,"1&:(}:"1) }.)&.> ddrawmsk # nets
 else. wires =. 0 4$0
@@ -4046,14 +4069,15 @@ angles =. angleranges I. 12 o. j.~/"1 yxdiff =. y -"1&:(2&{."1) x
 NB. See if the angle is in the OK range for the source face, and if the negative is in the OK range for the target face
 NB. But don't direct-draw any vertical or horizontal line longer than 3 grids, since they could overlap a
 NB. routed line exactly
-angleok =. (-. (0 e."1 yxdiff) *. ((gridtoyx 4) > +/"1 yxdiff)) *. (angles e. (2{x) { facerange) *. angles e."0 1 (2 {"1 y) { revfacerange
+angleok =. (-. (0 e."1 yxdiff) *. ((MINBOXSPACING + gridtoyx 1) > +/"1 yxdiff)) *. (angles e. (2{x) { facerange) *. angles e."0 1 (2 {"1 y) { revfacerange
 NB. Allow the wire if no vertices in the box containing the wire's corners (adjusted inward a smidgen)
 NB. We move the wire away from the face by one gridunit more than the calculation used to move the corners.
 NB. Then we use those values as corners, and look to see whether the region is clear.  We allow direct routing if so.
-movedpoints =. <. yxtogrid (0 1&{"1 +"1 ((, |."1) (0 ,~ -WIRESTANDOFF) ,: (0 ,~ WIRESTANDOFF+ROUTINGGRIDSIZE)) {~ 2&{"1) x , y  NB. Note other comp produced end+1; so does this
+NB. obsolete movedpoints =. <. yxtogrid (0 1&{"1 +"1 ((, |."1) (0 ,~ -WIRESTANDOFF) ,: (0 ,~ WIRESTANDOFF+ROUTINGGRIDSIZE)) {~ 2&{"1) x , y  NB. Note other comp produced end+1; so does this
+movedpoints =. <. yxtogrid (0 1&{"1 + standoffbyfaceplusone {~ 2&{"1) x , y
 NB. Kludge - should create yx for each point and check just those
-interiorok =. 0 = (0 > {. routinggrid) +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoints
-angleok * interiorok
+interiorblocked =.  blockedgrid +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoints
+angleok > interiorblocked
 )
 
 NB. 4x3x2, indexed by (direction,movetype) returning yx offset from the END of the turn to the cell that needs to be blocked
@@ -4065,6 +4089,12 @@ NB. 4x5x2x2, indexed by (direction,movetype) returning yx offsets to cells that 
 NB. First cell is left jog going north; block cells to east and south of the end of the jog
 blockjog =: (4 3 2 2$0) ,. 4 2 2 2 $ E,S , W,S , W,N , E,N , E,N , E,S , W,S , W,N
 
+NB. For each face, the amount to adjust a coordinate to move outward-perpendicular to the face to a gridpoint
+NB. at least a WIRESTANDOFF away.  This move will be followed by <.@yxtogrid.  For faces pointing down, we
+NB. move down by the standoff and then round up; for faces pointing up, we move up by the standoff and then round down
+standoffbyface =: _2 ]\  ((<:ROUTINGGRIDSIZE)-WIRESTANDOFF) ([,0 , ],0 , 0,[ , 0,]) WIRESTANDOFF
+standoffbyfaceplusone =: standoffbyface + _2 ]\ (-ROUTINGGRIDSIZE) ([,0 , ],0 , 0,[ , 0,]) ROUTINGGRIDSIZE  NB. One gridpoint more than the routing point
+
 NB. Route one net
 NB. x is list of penalty values
 NB. y is a net (table of y,x,face)
@@ -4075,10 +4105,12 @@ routenet =: 4 : 0
 'penov penneigh pencross' =. x
 NB. Create the routing positions of the source and dests.  Since we have placed the handle on a gridpoint
 NB. in the parallel-to-face direction, it can function as the true end-of-route in that direction.  The routing position, which must
-NB. be a gridpoint, is the closest gridpoint on the boundary or outside.  This will necessarily have
-NB. the same parallel coordinate as the true routeend, but the other coordinate may be adjusted.
+NB. be a gridpoint, is the closest gridpoint that is a WIRESTANDOFF away from the point.  This will necessarily have
+NB. the same parallel coordinate as the true routeend, but the other coordinate may be adjusted.  The point so created will
+NB. always be a point that was blocked off in the grids, but we will override that when we route the net, to allow routing to the point
 trueroutend =. <. 2 {."1 y
-routend =. <. yxtogrid trueroutend + (ROUTINGGRIDSIZE-1) * 1 bwand faces =. 2 {"1 y
+NB. obsolete routend =. <. yxtogrid trueroutend + (ROUTINGGRIDSIZE-1) * 1 bwand faces =. 2 {"1 y
+routend =. <. yxtogrid trueroutend + (faces =. 2 {"1 y) { standoffbyface
 NB. Attach the direction to each point.  For the destinations, this is the opposite of the face normal: face 0 (top) requires an entry
 NB. in direction 1 (south).  For the source, the initial direction is the same as the face normal
 routendface =. routend ,.~ faces bwxor (#faces) {.!.1 (0) NB. dir,gridy,gridx (nswe) for each routing point
@@ -4106,6 +4138,7 @@ if. TGTPROXFORROLLUP < RGRIDDIST * +/ | ({. routbydist) -&:(1 2&{"1) startroute 
   penaltyrollback =. penaltyrollup + blockages * -(-RGRIDDIST) bwand _1 (33 b.) _1
 else. penaltyrollback =. penaltyrollup =. $0
 end.
+NB. Do all the routes; create the wires to connect the block I/Os to the routing grid (discard any of 0 length)
 routeoccwires =. ((penaltyrollup;penaltyrollback)&routerun@;&:>/ (<"1 routbydist) , < ,: startroute , RMOVEEOC) ; ((gridtoyx routend) (-.@-:"1 # ,.) trueroutend)
 
 NB. After the net is complete, install penalties for subsequent nets.  They shouldn't take effect until the net is finished
@@ -4990,7 +5023,7 @@ if. 'l' = x do.
       disploc =. ix { locs
       NB.?lintonly disploc =. <'dissectobj'
       if. disploc = <0 do.
-        drawttipwithemphasis yx ; 'Execution of the sentence did not execute this word'
+        ('sentence';ix) drawttipwithemphasis yx ; 'Execution of the sentence did not execute this word'
       elseif. #DOyx__disploc do.
         NB. Center the displayed block on the focus point of the screen
         NB. Get the position of center of block in the routing area
@@ -5008,7 +5041,7 @@ if. 'l' = x do.
         NB. redraw the scrolled screen.  No retraversal needed
         dissect_dissectisi_paint 0
       elseif. do.
-        drawttipwithemphasis yx ; 'The current selections do not produce a display for this word'
+        ('sentence';ix) drawttipwithemphasis yx ; 'The current selections do not produce a display for this word'
       end.
     end.
   case. 2 do.
@@ -6156,7 +6189,7 @@ if. #rightlocs =. (parentlocales -. toplocs) (e. # [)~ a: -.~ 0 {"1 displayright
   'rlocs ryxhw' =. assemblelayout__rl''
   NB. Calculate the minimum right movement of the right operand so as to leave its output to the right
   NB. of the right edge f the overall result.  The join routine adds MINBOXSPACING to the calculated distance,
-  NB. so we make sure the output has a grid f space between the output and the input position
+  NB. so we make sure the output has a grid of space between the output and the input position
   minrmove =. ((ROUTINGGRIDSIZE-MINBOXSPACING) + +/ 1 {"1 thisyxhw) - (-: (<_1 1 1) { ryxhw)
   NB. Connect the right inputs, adjusted up to the top of the left, and with movement suppressed
   NB. Make sure we keep the left side, containing the final output, last
@@ -7257,7 +7290,7 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
     NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
-    drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
+    ('label';ix) drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
     hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
@@ -7281,7 +7314,7 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
     NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
-    drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
+    ('rlabel';ix) drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
     hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
@@ -7350,7 +7383,7 @@ elseif. #r =. (exp{DOshapepospickrects) (_1 findpickhits) y do.
   NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
   formloc =. exp { COCREATOR,coname''
   NB.?lintonly formloc =. <'dissect'
-  drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOshapepos) + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
+  ('shape';ix) drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOshapepos) + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
   hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
 end.
 0 0$0
@@ -7976,7 +8009,7 @@ NB. User tried to select, but we couldn't do it.  Give him a tooltip.
     NB. If we are in an explorer, stay here; but if on the main form, we have to switch to that locale
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
-    drawttipwithemphasis__formloc (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { PICKTOOLTIPMSGS
+    ('data';coname'') drawttipwithemphasis__formloc (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { PICKTOOLTIPMSGS
     hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
@@ -8181,16 +8214,19 @@ reflowtoscreensize =: 3 : 0
 (TOOLTIPMAXPIXELS <. <. TOOLTIPMAXFRAC * 0 { glqwh '') reflowtooltip y
 )
 
-NB. y is the text
-NB. drawtooltip, but increase the fontsize if the message is the same as from the previous click
-drawwithemphasishistory =: 0;''
-drawttipwithemphasis =: 3 : 0
-if. drawwithemphasishistory -: (seqclickno-1);1{y do.
+NB. y is position;text for a tooltip
+NB. x (optional) is anything
+NB. drawtooltip, but increase the fontsize if the message and x-value are the same as from the previous click
+drawwithemphasishistory =: 0;'';''   NB. click number;x-value;message
+drawttipwithemphasis =: 4 : 0
+'' drawttipwithemphasis y
+:
+if. drawwithemphasishistory -: (seqclickno-1);x;1{y do.
   ((, 2&*&.>)/ TOOLTIPFONT) drawtooltip y
 else.
   drawtooltip y
 end.
-drawwithemphasishistory =: seqclickno;1{y
+drawwithemphasishistory =: seqclickno;x;1{y
 )
 
 NB. y is cursor position;string
@@ -16268,6 +16304,7 @@ ctup = 8
 'rank error: in m :n, boxed n must be an atom or a list' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. 2 2 $ <'a'
 'rank error: in m :n, boxed n must have contents with rank < 2' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <2 2 2 $ 'a'
 'domain error: in m :n, boxed n must contain strings' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <5
+'ill-formed number: 1xcv' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '1xcv'
 )
 
 testtacit =: testtacit2"0
