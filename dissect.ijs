@@ -77,9 +77,8 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. Make sure there are 3 routing channels between boxes
-NB. See if we need to go back to the old penalty around boxes
 NB. Highlight net on a click/hover of a wire
+NB. Have a way to do selections from script, for testing
 
 NB. ?work on Android, with wd 'activity'
 
@@ -537,6 +536,7 @@ debuglocs =: 0$a:  NB. List of locales created by expanding tacit names from thi
 
 NB. Variables used to control hovering in this window
 hoverinitloc =: $0   NB. Init no hover active
+sentencehovertok =: $0  NB. token # we are hovering over, if any
 
 NB. Create the name we use to get to the instance - in this locale it points to itself
 COINSTANCE =: coname''
@@ -1602,6 +1602,8 @@ NB. y is 1 for an internal call that needs to refigure the placement
 dissect_dissectisi_paint =: 3 : 0
 NB. To avoid an error loop, terminate quietly if there is an error
 try.
+  NB. If we are highlighting a sentence, stop doing so
+  sentencehoverend''
   NB. Establish local J environment.  The user's environment was saved when we started
   NB. if we need to refigure the placement because of a change like selection or a display parameter, do so.
   if. 1 = {. y do. placeddrawing =: calcplacement screensize end.
@@ -1618,6 +1620,11 @@ try.
   end.
   NB. Once we have made initial display, go into autosizing mode, until user resizes
   autosizestate =: autosizestate <. 0
+
+  NB. If we are highlighting from the sentence, do so (it's possible, if the paint came from
+  NB. as external source while we were hovering)
+  sentencehoverdraw''
+
   glpaint''
   
   NB. Set the user-option buttons based on the display results
@@ -4073,7 +4080,6 @@ angleok =. (-. (0 e."1 yxdiff) *. ((MINBOXSPACING + gridtoyx 1) > +/"1 yxdiff)) 
 NB. Allow the wire if no vertices in the box containing the wire's corners (adjusted inward a smidgen)
 NB. We move the wire away from the face by one gridunit more than the calculation used to move the corners.
 NB. Then we use those values as corners, and look to see whether the region is clear.  We allow direct routing if so.
-NB. obsolete movedpoints =. <. yxtogrid (0 1&{"1 +"1 ((, |."1) (0 ,~ -WIRESTANDOFF) ,: (0 ,~ WIRESTANDOFF+ROUTINGGRIDSIZE)) {~ 2&{"1) x , y  NB. Note other comp produced end+1; so does this
 movedpoints =. <. yxtogrid (0 1&{"1 + standoffbyfaceplusone {~ 2&{"1) x , y
 NB. Kludge - should create yx for each point and check just those
 interiorblocked =.  blockedgrid +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoints
@@ -4109,7 +4115,6 @@ NB. be a gridpoint, is the closest gridpoint that is a WIRESTANDOFF away from th
 NB. the same parallel coordinate as the true routeend, but the other coordinate may be adjusted.  The point so created will
 NB. always be a point that was blocked off in the grids, but we will override that when we route the net, to allow routing to the point
 trueroutend =. <. 2 {."1 y
-NB. obsolete routend =. <. yxtogrid trueroutend + (ROUTINGGRIDSIZE-1) * 1 bwand faces =. 2 {"1 y
 routend =. <. yxtogrid trueroutend + (faces =. 2 {"1 y) { standoffbyface
 NB. Attach the direction to each point.  For the destinations, this is the opposite of the face normal: face 0 (top) requires an entry
 NB. in direction 1 (south).  For the source, the initial direction is the same as the face normal
@@ -4762,6 +4767,7 @@ SELECTIONBORDERSTYLE =: 0 0 0,HIGHLIGHTLINEWIDTH,PS_SOLID  NB. color,width of li
 
 
 WIRECOLOR =: 0 0 0   NB. Color of wires
+SENTENCEHIGHRECTPEN =: 255 128 255 3 
 
 BOXMARGIN =: 2 ($,) 3   NB. Space to leave around boxed results
 BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
@@ -4879,7 +4885,7 @@ NB. and any title and links
 NB. x is the sentence, in the user's spacing
 NB. y is a table of (token range);display level;tokenvisibility
 NB. Result is table of (brect for header data);< other stuff needed to draw the sentence.  Ending brects are hw
-NB. If there is more than one row, the second row is similar information for the links
+NB. First row is title (possibly empty), second row is sentence, third (if any) is links
 sizesentence =: 4 : 0
 usentence =. x
 NB. Reselect in case explorers were drawn
@@ -4947,10 +4953,8 @@ NB. Create token;level;visible;locale   for each token
 toklevvisloc =. tokens ,. (<"0@(1&{::) , 2&{)"1 toklevloc
 NB. Create blanks;level;visible;locale for each token, where level;locale comes from the token with higher sellevel
 addedblanks =. tokulen (' ' #~ (- #))&.> }: tokens  NB. blanks added to end of each token
-bigselx =. (+ i.@#) 2&(</\) > 1 {"1 toklevvisloc
-blanklevvisloc =. (addedblanks (<a:;0)} bigselx { toklevvisloc) , '';0;0;''
 NB. Interleave tokens and blanks; then remove lines for empty (=no blanks) or invisible
-utokspacelevvisloc =. (#~  (*@#@(0&{::) *. 2&{::)"1) ,/ toklevvisloc ,:"1 blanklevvisloc
+utokspacelevvisloc =. (#~  (*@#@(0&{::) *. 2&{::)"1) (({."1 toklevvisloc) ,&.> addedblanks , a:) (<a:;0)} toklevvisloc
 rectsize =. (cfms =. satzcfm {~ (_2 + #satzcfm) <. > 1 {"1 utokspacelevvisloc) sizetext ,. txts =. 0 {"1 utokspacelevvisloc
 NB. Box them into sections that fit within the allowed part of the screen, one box per line
 scrwid =. <. MAXSENTENCEWIDTH * {: screensize
@@ -5941,14 +5945,15 @@ end.
 NB. If this node is a suppressed stealth operand, remember the fact so we can give the user the option of showing it
 assert. stealthoperand__loc e. 0 1 2 4 5 6
 if. dispstealthoperand__loc e. 1 2 do. stealthopencountered__COCREATOR =: 1 end.
+NB. Init that we have not allocated this block.  We need this even for stealth verbs, since we may try to
+NB. display them if selected from the sentence display
+DOsize__loc =: ''
 NB. If stealth verb, there is no display; but because of inheritance and suppressed detail, we might have the stealthoperand flag
 NB. set in a locale that is creating a noun; we'd better create that.  We detect nouns, as usual, by absence of handles in
 if. (dispstealthoperand__loc e. 1 2 5 6) *. (*#dol) do.
   NB. Stealth operand vanishes, replaced by its selected input
   (, dispstealthoperand__loc { 0 _1 0 0 0 _1 0) { dol
 else.
-  NB. Init that we have not allocated this block
-  DOsize__loc =: ''
   displayxyinputs__loc =: dol
   if. #right do.
     displayrightinputs__loc =: 0&{::"1 right
@@ -8218,7 +8223,7 @@ NB. y is position;text for a tooltip
 NB. x (optional) is anything
 NB. drawtooltip, but increase the fontsize if the message and x-value are the same as from the previous click
 drawwithemphasishistory =: 0;'';''   NB. click number;x-value;message
-drawttipwithemphasis =: 4 : 0
+drawttipwithemphasis =: 3 : 0
 '' drawttipwithemphasis y
 :
 if. drawwithemphasishistory -: (seqclickno-1);x;1{y do.
@@ -8310,6 +8315,7 @@ NB. mouse button, both left and right.  Return number of picks performed.
 NB. x is l or r, y is formatted sysdata
 dissect_dissectisi_mbdown =: 4 : 0
 hoverend''
+sentencehovercheck 1 0 { y
 seqclickno =: >: seqclickno
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 for_r. pr =. locpickrects (1 findpickhits) 1 0 { y do.  NB. Return FIRST hit so sentence has priority over data blocks
@@ -8402,10 +8408,79 @@ case. SCROLLTYPESIZEDATA do.
   ('';RESIZERECTCOLOR) drawrect ,:`>.`<.`+`(-~)/ pickscrollinfo , pickscrollcurryx =: 1 0 { sd
   glpaint''
 case. do.
-  NB. mmove not for scrolling.  Set radius to use depending on whether a button is down
-  NB. If button down, use larger radius but don't allow a new tooltip to start
-  (0 1 ; sd) hoverstart 1 0 { sd
+  NB. mmove not for scrolling.  If mouse is in the sentence, perform the sentence-hover action to highlight the
+  NB. hovered-over block
+  if. -. sentencehovercheck 1 0 { sd do.
+    NB. Hover not in sentence. Set radius to use depending on whether a button is down
+    NB. If button down, use larger radius but don't allow a new tooltip to start
+    (0 1 ; sd) hoverstart 1 0 { sd
+  end.
 end.
+)
+
+NB. y is mouse position
+NB. We check to see if the mouse is over the sentence.  If so, start highlighting it
+NB. If not, stop highlighting it.  If the selected token changes, handle that correctly
+NB. Result is 1 if we are in the sentence
+sentencehovercheck =: 3 : 0
+sentencetok =. $0
+if. #pr =. locpickrects (1 findpickhits) y do.  NB. Return FIRST hit so sentence has priority over data blocks
+  'l yx' =. {. pr  NB. Get index and offset position
+  if. 1 = l do.
+    NB. In the sentence rectangle.  Find the matched token
+    'cfms txts rects locs' =. 1 1 {:: topinfo
+    if. #r =. rects (_1 findpickhits) yx do.
+      'ix pyx' =. {.r
+      if. (<0) ~: tokl =. ix { locs do.  NB.?lintonly tokl =. <'dissectobj'
+        NB. The locale exists, but it may not have been initialized for display.  In that
+        NB. case, don't highlight it in the sentence
+        if. #DOyx__tokl do. sentencetok =. ix end.
+      end.
+    end.
+  end.
+end.
+NB. If there is no change to the highlight, keep it as is
+if. sentencetok -.@-: sentencehovertok do.
+  NB. There is a change to the sentence highlight.  Remove the old one if any
+  sentencehoverend''
+  NB. Clear any active hover, so that it doesn't mess up our highlighting
+  hoverend''
+  NB. Draw the new highlight, if any
+  sentencehovertok =: sentencetok
+  sentencehoverdraw''
+end.
+#sentencehovertok
+)
+
+NB. sentencehovertok tells what token, if any, we are hovering over.  If we are, save the screen and draw
+NB. the highlight rectangles
+sentencehoverdraw =: 3 : 0
+if. #sentencehovertok do.
+  NB. Save the pixels from the screen
+  sentencehoverpixels =: (, glqpixels) 0 0 , |. (|. glqwh'')
+  NB. Get the rectangle for the sentence, and the locale of the selected block
+  srect =. (1 1;2;sentencehovertok) {:: topinfo
+  slocale =. <(1 1;3;sentencehovertok) {:: topinfo
+  NB. Draw the highlighting rectangles
+  NB.?lintonly slocale =. <'dissectobj'
+  ('';SENTENCEHIGHRECTPEN) drawrect srect + (1 { locpickrects) * 1 0
+  ('';SENTENCEHIGHRECTPEN) drawrect DOyx__slocale ,:&{. DOsize__slocale
+  glpaint''
+NB.?lintsaveglobals
+end.
+''
+)
+
+NB. If we are hovering over the sentence, restore the pixels and release them
+NB. DO NOT CLEAR hover status because we may be about to repaint and immediately highlight,
+NB. which we must be able to do with no mouse movement
+sentencehoverend =: 3 : 0
+if. #sentencehovertok do.
+  glpixels sentencehoverpixels
+  glpaint''
+  4!:55 <'sentencehoverpixels'  NB. Remove to save space
+end.
+''
 )
 
 NB. mouse release.  If we are scrolling, set the new offset and redraw
@@ -8454,10 +8529,12 @@ end.
 
 dissect_dissectisi_focuslost =: 3 : 0
 hoverend''
+sentencehoverend''
 )
 
 dissect_dissectisi_mbldbl =: 3 : 0
 hoverend''
+sentencehovercheck 1 0 { 0 ". sysdata
 select. {. lastscrollingtype
 case. SCROLLTYPEIMAGE do.
   NB. Put sizing back under automatic control
@@ -14896,9 +14973,9 @@ NB. The only thing special here is the highlighting.
 calcphysandhighlights =: 3 : 0
 assert. valence = #frames
 NB. Get shape of y operand
-yshape =. $^:(0<L.) 1 {:: selopshapes
+'xshape yshape' =. $^:(0<L.)&.> selopshapes
 sval =. >y
-selector =. sval {:: selvaluesd
+selector =. (xshape #. sval) {:: selvaluesd
 bsel =. ({.@> isfensureselection isftorank2 y) <@({.~ #)&.> frames
 NB. Create ISF for the left operand - just the chosen atom.  But if there is no frame, we highlight wrong if we try to highlight the atom,
 NB.  so suppress the highlight then
