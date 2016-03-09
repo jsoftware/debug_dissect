@@ -77,7 +77,6 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. Highlight net on a click/hover of a wire
 NB. Have a way to do selections from script, for testing
 
 NB. ?work on Android, with wd 'activity'
@@ -537,6 +536,7 @@ debuglocs =: 0$a:  NB. List of locales created by expanding tacit names from thi
 NB. Variables used to control hovering in this window
 hoverinitloc =: $0   NB. Init no hover active
 sentencehovertok =: $0  NB. token # we are hovering over, if any
+blockhoverloc =: 0$a:   NB. locale we are hovering over, if any
 
 NB. Create the name we use to get to the instance - in this locale it points to itself
 COINSTANCE =: coname''
@@ -1103,7 +1103,7 @@ ntypeval
 )
 
 NB. Values for scrolltype, which tells what the user is doing
-'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA' =: i. 4
+'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA SCROLLTYPEWIREHIGH' =: i. 5
 
 NB. Following lines must match the menus!
 MAXNOUNPCTCHOICES =: 10 20 30 40 50 60 70 80 90
@@ -3747,6 +3747,8 @@ NB.  gridblocks is a list of (topleft y,x,:bottomright+1 y,x)
 NB.  nets is a list of boxes, each containing one net, a table, as source,dest...
 NB.  each of source/dest is (# of gridblock),(# of face),fraction of edge displacement from center
 NB.   face # 0=top, 1=bot, 2=left, 3=right
+NB. Result is (block positions tlbr);<(wiring list)
+NB. Where wiring list is a list of boxes with the wires for one net (in accidental block order)
 routegrid =: 3 : 0
 'gridblocks nets' =. y
 NB. Calculate the routing area size.  Adjust blocks to leave a minimum top/left margin,
@@ -3761,7 +3763,10 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
   NB. Route the nets. result is table of boxes, one row per net, holding
   NB.  (list of boxes each holding path of a routed run);(table of other wires) where the path of the routed run is
   NB.  (table of dir,row,col,movetype of occupied cells)
-  if. #occupied =. (#~ RMOVEEOC ~: 3&{"1) 0 {:: route =. (ov,neigh,cross) routenets gridblocks;<nets do.
+  route =. (ov,neigh,cross) routenets gridblocks;<nets
+NB. obsolete   if. #occupied =. (#~ RMOVEEOC ~: 3&{"1) 0 {:: route do.
+  if. 0= #route do. score =. 0
+  elseif. #occupied =. (#~ RMOVEEOC ~: 3&{"1) ; {."1 route do.
     NB. Get yx of places where spread is needed.  These are overlaps and crossings, which we figure out from the occupied cells.
     NB. The crossings of turn/jog over turn/jog are handled by creating synthetic 'occupations' at the bend corners.  We do that after routing
     NB. each net, to create a penalty at each such point; and again here
@@ -3781,7 +3786,7 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
     NB. Score the placement: 1 point for a crossing, a zillion for occupancy>1
     NB. Penalize crossings only on the first routes
     score =. 1 1000000 1000000 +/@:* #@> (scorecross #&.> crosspts);overlapsns;overlapsew
-  else. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
+  elseif. do. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
   end.
   if. score < bestscore do.
     bestscore =. score
@@ -3806,7 +3811,8 @@ NB. Not perfect.  Adjust the placement for the next try.
 end.
 4!:55 ;:'routinggrid penaltygrid blockedgrid'  NB. remove the large globals
 'bestgrids bestoccwires' =. bestroute
-bestgrids ; (,  occtowires)&.>~/ bestoccwires
+NB. obsolete bestgrids ; (,  occtowires)&.>~/ bestoccwires
+bestgrids ;< (,  occtowires)&.>~/"1 bestoccwires
 NB.?lintsaveglobals
 )
 
@@ -3841,7 +3847,7 @@ uglyturnforjoge =. 2 2 $ N,1 , S,2
 uglyturnforjog =: 4 1 #"2 uglyturnforjogn,uglyturnforjogs,uglyturnforjogw,:uglyturnforjoge
 
 NB. y is table of dir,row,col,movetype of occupied cells
-NB. Result is table of graphics commands (wires or arcs)
+NB. Result is table of wires
 occtowires =: 3 : 0
 if. 0 = #y do. 0 4$0 return. end.
 yxvals =. 1 2 {"1 y
@@ -3993,18 +3999,21 @@ end.
 
 NB. See which nets do not require routing, and draw them directly
 if. 1 e. ddrawmsk =. *./@:(0&~:)@({. directdrawok }.)@> nets do.
-  wires =. ; ({. ,"1&:(}:"1) }.)&.> ddrawmsk # nets
-else. wires =. 0 4$0
+NB. obsolete   wires =. ; ({. ,"1&:(}:"1) }.)&.> ddrawmsk # nets
+NB. obsolete else. wires =. 0 4$0
+  routes =. (<0 4$0) ,. ({. ,"1&:(}:"1) }.)&.> ddrawmsk # nets
+else. routes =. 0 2$a:
 end.
 NB. Route the nets that need routing
 if. 0 e. ddrawmsk do.
-  routes =. x&routenet@> (-. ddrawmsk) # nets
-  occcells =. ; {."1 routes
-  wires =. wires , ; {:"1 routes
-else. occcells =. 0 4$0
+  routes =. routes , x&routenet@> (-. ddrawmsk) # nets
+NB. obsolete   occcells =. ; {."1 routes
+NB. obsolete   wires =. wires , ; {:"1 routes
+NB. obsolete else. occcells =. 0 4$0
 end.
 NB. Return
-occcells;wires
+NB. obsolete occcells;wires
+routes
 NB.?lintsaveglobals
 )
 
@@ -4767,7 +4776,8 @@ SELECTIONBORDERSTYLE =: 0 0 0,HIGHLIGHTLINEWIDTH,PS_SOLID  NB. color,width of li
 
 
 WIRECOLOR =: 0 0 0   NB. Color of wires
-SENTENCEHIGHRECTPEN =: 255 128 255 3 
+WIREHIGHCOLOR =: 255 100 255  NB. Highilight color for nets, blocks, & sentence words
+SENTENCEHIGHRECTPEN =: WIREHIGHCOLOR , 3 
 
 BOXMARGIN =: 2 ($,) 3   NB. Space to leave around boxed results
 BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
@@ -6213,7 +6223,7 @@ NB. ********** draw DOs
 cocurrent 'dissect'
 
 NB. x is pen color,width[,style]
-NB. y is table of yx.:yx
+NB. y is table of yx,:yx
 drawline =: 4 : 0
 if. DEBGRAF do.
   'Lines: color=%j, width=%j, style=%j, xywh=%j' printf (3{.x);(3{x);(4}.x); }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
@@ -6671,7 +6681,7 @@ NB. ****************** drawing the placement **********************
 NB. called in the locale of the form
 
 NB. Size the placed layout, and convert wires to lines;arcs
-NB. y is locales;table of yx (tlc of each block);wires as table of y x y x type, type = 0 for wire, 1 for arc
+NB. y is locales;table of yx (tlc of each block);wires as boxed list, each containing table of y x y x for wires
 NB. x is the scroll amount (starting position in screen space of top-left corner of the drawing)
 NB. result is size reqd yx;locales;yx;(lines as n 2 2 yx start,:end);(arcs as n 2 2 yx center,:corner)
 NB. side effects: pick info created
@@ -6681,7 +6691,8 @@ tlc =. x
 'dos dotl wires' =. 3 {. y
 NB. Apply scroll offset
 dotl =. dotl +"1 tlc
-wires =. wires +"1 tlc,tlc
+NB. obsolete wires =. wires +"1 tlc,tlc
+wires =. +"1&(tlc,tlc)&.> wires 
 NB. Initialize pick information.  For speed, there are two arrays: locpickrects, which is a brick of
 NB. yxhw for each object, and picklocs, which is a list of locales, one per pickrect.
 NB. Each displayed block is associated with a unique locale.  Links are associated with the form locale.
@@ -6690,8 +6701,9 @@ NB. Put in placeholders for the sentence brects.  These will be filled in when w
 NB. size the drawing
 locpickrects =: (((#topinfo),2 2)$0) , dotl ,:"1 ({."2) 3 : 'DOpicksize__y'"0 dos
 NB. Get the max size drawn, and set the control to just big enough to hold it
-maxsize =. >./ (+/"2 locpickrects) , 2 2 $ >./ wires
-maxsize;dos;dotl;wires
+NB. obsolete maxsize =. >./ (+/"2 locpickrects) , 2 2 $ >./ wires
+maxsize =. >./ (+/"2 locpickrects) , 2 2 $ >./ ; wires
+maxsize;dos;dotl;<wires
 NB.?lintsaveglobals
 )
 
@@ -6714,8 +6726,20 @@ glclipreset''
 glrgb WIRECOLOR
 glpen 1,PS_SOLID
 if. #wires do.
-  gllines 1 0 3 2 {"1 wires
+NB. obsolete  gllines 1 0 3 2 {"1 wires
+  gllines 1 0 3 2 {"1 ; wires
 end.
+
+NB. Set up information for wire highlighting
+wirehighwires =: wires
+NB. For each net, the mouse-movement required before the net is revisited
+wirehighdisttocross =: ($wires) # 0
+NB. (disttocheck;odosincecheck)
+NB. disttocheck is he minimum in wirehighdisttocross; we don't need to evaluate anything until going this far
+NB. odosincecheck is the negative of the total distance we have traveled since last check
+wirehighdisttocheck =: _1 0
+NB. The last mouse position evaluated
+wirehighmousepos =: _1000 _1000
 
 NB. Show the sentence, with the user's spacing, highlighting according to selection level
 locpickrects drawsentence&(2&{.) topinfo
@@ -8344,6 +8368,12 @@ case. SCROLLTYPESCROLLBAR do.
   4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 case. SCROLLTYPESIZEDATA do.
   4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
+case. SCROLLTYPEWIREHIGH do.
+  NB. Undo the highlighting, then release highlight pixels
+  NB. End of wire highlighting.  Restore the original pixels
+  glpixels pickpixels
+  glpaint''
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
 case. do.
 end.
 NB. After clearing saved info, revert to idle state
@@ -8356,22 +8386,86 @@ if. y do. lastscrollingtype =: SCROLLTYPENONE end.
 dissect_dissectisi_mbldown =: 3 : 0
 NB. In case a button sequence was interrupted, clear button state
 dissect_dissectisi_mblreset 1
-NB. If the user left-clicked outside a pickrect, that is the start of a scroll operation.
+NB. If the user left-clicked outside a pickrect, that is the start of a highlight or scroll operation.
 NB. Remember the clicked position, and the pixels in the screen (we use the presence of
 NB. the screen buffer as an indicator of scroll-in-progress, and delete it when we're done,
 NB. since it's big)
 NB.?lintonly pickscrollinfo =: 5 2 $ 0
 if. 0 = 'l' dissect_dissectisi_mbdown sd =. 0 ". sysdata do.
-  scrollingtype =: SCROLLTYPEIMAGE
+  NB. We will start some kind of scroll/highlight.  Save the pixels
   winsize =. |. glqwh ''  NB. y,x of control.  Mustn't read outside!
 NB. Read the pixels in the sentence, and from the end of the sentence area to the bottom of the screen
   picksentencepixels =: (, glqpixels) 1 0 3 2 { , picksentencerect =. ({. ,: winsize <. {:)&.(+/\) topbrect
   scrollblock =. -~/\ (0 (1}) {: picksentencerect) ,: winsize
   pickpixels =: (, glqpixels) , |."1 scrollblock
-  pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
+
+  NB. See which operation it is: wire highlighting or scroll
+  if. #nettohighlight =. wirehighcheck 1 0 { sd do.
+    scrollingtype =: SCROLLTYPEWIREHIGH
+    NB. Draw the selected net in highlight color
+    glclipreset''
+    glrgb WIREHIGHCOLOR
+    glpen 3,PS_SOLID
+    gllines 1 0 3 2 {"1 nettohighlight
+    glpaint''
+  else.
+    scrollingtype =: SCROLLTYPEIMAGE
+    pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
+  end.
 NB.?lintsaveglobals
 end.
 ''
+)
+
+NB. y is mouse position.  Result is net to highlight (table of x y x y x wires), or empty if
+NB. nothing to highlight
+wirehighcheck =: 3 : 0
+NB. See how far the mouse has moved
+mdist =. +/ | wirehighmousepos - y
+NB. Remember new mouse position for next time
+wirehighmousepos =: y
+NB. See if we need to refigure anything
+if. 0 >: wirehighdisttocheck =: wirehighdisttocheck - mdist do.
+  NB. See how far each block is away from recalculation
+  NB. 1{mdist has the negative of the accumulated movement since last check.
+  NB. See which nets need checking
+  if. #chknetsx =. 0 I.@:>: wirehighdisttocross =: wirehighdisttocross + {: wirehighdisttocheck do.
+    NB. Recalculate any blocks that might be 0 or below
+    wirehighdisttocross =: (newdists =. chknetsx y&wirehighcheckdist@>@{ wirehighwires) chknetsx} wirehighdisttocross
+    NB. Take the net, if any, with the smallest distance
+    if. 0 >: newdists {~ minx =. (i. <./) newdists do.
+      highnet =. wirehighwires {::~ chknetsx {~ minx
+    else.
+      highnet =. ''
+    end.
+  else. highnet =. ''
+  end.
+  NB. Refigure the distance till next check
+  wirehighdisttocheck =: 2 {. <./ wirehighdisttocross
+  NB. Return the net to draw, if any
+  highnet
+else.
+''
+end.
+)
+
+WIREHIGHPROX =: 3   NB. Highlight within this distance from a wire
+NB. x is mouse position
+NB. y is table of wires
+NB. Result is the distance from the wire to the mouse.  If positive,
+NB. we can delay that much movement before reevaluating
+NB. If <: 0, indicates proximity, the lower the closer
+wirehighcheckdist =: 4 : 0
+NB. Get dist of each endpoint from the cursor; get min dist in each direction
+disttowirebbox =. +/"1 (<./"2@:| * =/"2@:*) transwires =. ((($,)~ 2 2 ,~ #) y) -"1 x
+NB. Get min dist of all wires; if > min, result is dist to min
+if. WIREHIGHPROX < minbbox =. <./ disttowirebbox do. minbbox - WIREHIGHPROX return. end.
+NB. Some wire is near the cursor.  Calculate the perpendicular distance to cursor
+proxwires =. (proxwirex =. WIREHIGHPROX I.@:>: disttowirebbox) { transwires
+proxdist =. <. -: (-/ . * proxwires) % +/"1&.:*: -/"2 proxwires
+NB. Min dist is the result
+disttowirebbox =. proxdist proxwirex} disttowirebbox
+(<./ disttowirebbox) - WIREHIGHPROX
 )
 
 dissect_dissectisi_mbrdown =: 3 : 0
@@ -8407,8 +8501,15 @@ case. SCROLLTYPESIZEDATA do.
   NB. pickscrollinfo is table of yx: tl of data,min,max,startsize,startcursor
   ('';RESIZERECTCOLOR) drawrect ,:`>.`<.`+`(-~)/ pickscrollinfo , pickscrollcurryx =: 1 0 { sd
   glpaint''
+case. SCROLLTYPEWIREHIGH do.
+  NB. If we move during wire highlighting, keep updating the odometers (to spread load), but
+  NB. take no other action
+  wirehighcheck 1 0 { sd
 case. do.
-  NB. mmove not for scrolling.  If mouse is in the sentence, perform the sentence-hover action to highlight the
+  NB. mmove not for scrolling.
+  NB. Update the wire-scrolling odometer
+  wirehighcheck 1 0 { sd
+  NB. If mouse is in the sentence, perform the sentence-hover action to highlight the
   NB. hovered-over block
   if. -. sentencehovercheck 1 0 { sd do.
     NB. Hover not in sentence. Set radius to use depending on whether a button is down
@@ -8419,11 +8520,12 @@ end.
 )
 
 NB. y is mouse position
-NB. We check to see if the mouse is over the sentence.  If so, start highlighting it
+NB. We check to see if the mouse is over the sentence or a block.  If so, start highlighting it
 NB. If not, stop highlighting it.  If the selected token changes, handle that correctly
 NB. Result is 1 if we are in the sentence
 sentencehovercheck =: 3 : 0
 sentencetok =. $0
+blockhloc =. 0$a:
 if. #pr =. locpickrects (1 findpickhits) y do.  NB. Return FIRST hit so sentence has priority over data blocks
   'l yx' =. {. pr  NB. Get index and offset position
   if. 1 = l do.
@@ -8437,16 +8539,20 @@ if. #pr =. locpickrects (1 findpickhits) y do.  NB. Return FIRST hit so sentence
         if. #DOyx__tokl do. sentencetok =. ix end.
       end.
     end.
+  elseif. l >: #topinfo do.
+    NB. Over a block.  Save the locale of the displayed entity
+    blockhloc =. l { picklocs
   end.
 end.
 NB. If there is no change to the highlight, keep it as is
-if. sentencetok -.@-: sentencehovertok do.
+if. (sentencetok -.@-: sentencehovertok) +. (blockhoverloc -.@-: blockhloc) do.
   NB. There is a change to the sentence highlight.  Remove the old one if any
   sentencehoverend''
   NB. Clear any active hover, so that it doesn't mess up our highlighting
   hoverend''
   NB. Draw the new highlight, if any
   sentencehovertok =: sentencetok
+  blockhoverloc =: blockhloc
   sentencehoverdraw''
 end.
 #sentencehovertok
@@ -8455,16 +8561,22 @@ end.
 NB. sentencehovertok tells what token, if any, we are hovering over.  If we are, save the screen and draw
 NB. the highlight rectangles
 sentencehoverdraw =: 3 : 0
-if. #sentencehovertok do.
+if. sentencehovertok +.&# blockhoverloc do.
   NB. Save the pixels from the screen
   sentencehoverpixels =: (, glqpixels) 0 0 , |. (|. glqwh'')
-  NB. Get the rectangle for the sentence, and the locale of the selected block
-  srect =. (1 1;2;sentencehovertok) {:: topinfo
-  slocale =. <(1 1;3;sentencehovertok) {:: topinfo
-  NB. Draw the highlighting rectangles
+  NB. Get the locale to be displayed.  We know there must be one.
+  NB. For sentence hover, highlight the blocks too
+  if. 0 = #slocale =. blockhoverloc do.
+    slocale =. <(1 1;3;sentencehovertok) {:: topinfo
+    ('';SENTENCEHIGHRECTPEN) drawrect DOyx__slocale ,:&{. DOsize__slocale
+  end.
   NB.?lintonly slocale =. <'dissectobj'
-  ('';SENTENCEHIGHRECTPEN) drawrect srect + (1 { locpickrects) * 1 0
-  ('';SENTENCEHIGHRECTPEN) drawrect DOyx__slocale ,:&{. DOsize__slocale
+  NB. Get all the sentence rectangles that display in the same locale as the one being hovered over.
+  NB. This is a good way to show how multiple verbs can end in the same block
+NB. obsolete   srect =. (1 1;2;sentencehovertok) {:: topinfo
+  srect =. > (slocale = (1 1;3) {:: topinfo) # (1 1;2) {:: topinfo
+  NB. Draw the highlighting rectangles
+  ('';SENTENCEHIGHRECTPEN) drawrect srect +"2 (1 { locpickrects) * 1 0
   glpaint''
 NB.?lintsaveglobals
 end.
@@ -8472,13 +8584,15 @@ end.
 )
 
 NB. If we are hovering over the sentence, restore the pixels and release them
-NB. DO NOT CLEAR hover status because we may be about to repaint and immediately highlight,
-NB. which we must be able to do with no mouse movement
+NB. DO NOT CLEAR sentence-hover status because we may be about to repaint and immediately highlight,
+NB. which we must be able to do with no mouse movement; but DO clear the block-hover locale, because
+NB. we may have redrawn the screen & the hovered-over block may have moved
 sentencehoverend =: 3 : 0
-if. #sentencehovertok do.
+if. sentencehovertok +.&# blockhoverloc do.
   glpixels sentencehoverpixels
   glpaint''
   4!:55 <'sentencehoverpixels'  NB. Remove to save space
+  blockhoverloc =: 0$a:
 end.
 ''
 )
@@ -8496,6 +8610,7 @@ NB. Use the last-drawn position as the new position.  If it hasn't changed from 
     scrolltlc =: <. scrolltlc + pickscrollcurryx - pickscrollstartyx
     dissect_dissectisi_paint 0  NB. no need to recalc placement
   end.
+case. SCROLLTYPEWIREHIGH do.
 case. SCROLLTYPESCROLLBAR do.
 case. SCROLLTYPESIZEDATA do.
   NB. Save current info in case of doubleclick
