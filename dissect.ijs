@@ -77,6 +77,7 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. Think more about grayed-out words in the sentence
 NB. Have a way to do selections from script, for testing
 
 NB. ?work on Android, with wd 'activity'
@@ -1359,6 +1360,7 @@ NB. Sets globals   topinfo (top drawing info)
 NB. This must be called whenever a display parameter changes, to resize the sentence and drawing.
 NB. y is the screensize yx
 calcplacement =: 3 : 0
+NB.?lintonly satzcfm =: 4 3$a:
 NB. Get the size of the sentence and links.  Remember the layout of the sentence
 topinfo =: usersentence sizesentence gettokenlevels__resultroot ''
 NB. Check the current screensize, and calculate the box sizes in pixels
@@ -1388,13 +1390,17 @@ QP^:DEBTIME'startrouter=?6!:1'''' '
 NB. obsolete start   =. 6!:1''
 routeresult =. dl ; routegrid dyxbr;<wirenets
 NB. obsolete if. 0.4 < dur   =. start -~ 6!:1'' do. 'Routing time: %6.1f' printf dur end.
-NB. Now that we have traversed, replace the locale-names with the inheritedtail, so that we move to the locale
+NB. Now that we have traversed, replace the locale-names with the inheritedtail, so that selection in the sentence moves to the locale
 NB. that is actually formatted for display
 sentenceinfo =. (<1 1) {:: topinfo
-topinfo =: (<((3 :'findinheritedtail__y :: ((<0)"_)$0')"0&.> 3 { sentenceinfo) 3} sentenceinfo) (<1 1)} topinfo
+topinfo =: (<sentenceinfo =. (<locs =. ((3 :'findinheritedtail__y :: ((<0)"_)$0')"0 (3) {:: sentenceinfo)) 3} sentenceinfo) (<1 1)} topinfo
+NB. Gray out any words of the sentence that do not have a valid display block
+ndl =. 3 : 'if. y = <0 do. 1 else. 0 = #DOsize__y end.'"0 locs
+topinfo =: (< (< satzcfm (<"1@[ { ])~ ndl ,.~ 0 {:: sentenceinfo) 0} sentenceinfo) (<1 1)} topinfo
 routeresult
 NB.?lintsaveglobals
 )
+
 
 mismatchmsg =: 0 : 0
 Dissect's result from running the sentence did not match the result from running the sentence in the J session.  There are 3 possible reasons:
@@ -1528,6 +1534,7 @@ NB. On QT, resize event, which will call paint
 NB.The initial paint event will draw the screen
 NB.?lintsaveglobals
 )
+
 
 NB. y is 0 for normal traversal, or 1 for error traversal.  We initialize and traverse
 NB. Called in instance locale
@@ -1980,8 +1987,8 @@ NB. Result is table of (token number(s));(selection level, visibility);(display 
 NB. Called in locale at the base of the tree
 gettokenlevels =: 'propseltokens'&((3 : '(displaysellevel,tokensvisible);coname$0') traversedown (3 : ('<;y';':';'<,:x,y')))
 
-NB. Set DOyx in each locale.  Used to detect undisplayed locales
-setDOyxs =: 'propselall'&((3 : 'DOyx =: y') traversedown 0:)
+NB. Set DOyx and DOsize in each locale.  Used to detect undisplayed locales
+setDOyxs =: 'propselall'&((3 : 'DOsize =: DOyx =: y') traversedown 0:)
 
 NB. common routines used by the object locales.  Objects are subclasses of dissectobj
 
@@ -3765,7 +3772,7 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
   NB.  (table of dir,row,col,movetype of occupied cells)
   route =. (ov,neigh,cross) routenets gridblocks;<nets
 NB. obsolete   if. #occupied =. (#~ RMOVEEOC ~: 3&{"1) 0 {:: route do.
-  if. 0= #route do. score =. 0
+  if. 0= #route do. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
   elseif. #occupied =. (#~ RMOVEEOC ~: 3&{"1) ; {."1 route do.
     NB. Get yx of places where spread is needed.  These are overlaps and crossings, which we figure out from the occupied cells.
     NB. The crossings of turn/jog over turn/jog are handled by creating synthetic 'occupations' at the bend corners.  We do that after routing
@@ -4684,8 +4691,9 @@ ISTATUSFONT =: FONTIMSG
 ISTATUSFONTSIZE =: 2
 ISTATUSMARGIN =: 1
 NB. for the user's sentence
-SATZCOLOR =: 240 240 240
+SATZCOLOR =: 248 248 248
 SATZTEXTCOLOR =: 0 0 0
+SATZTEXTDISABCOLOR =: 192 192 192
 SATZFONT =: FONTNUM
 SATZFONTSIZE =: 0
 SATZMARGIN =: 1
@@ -4776,7 +4784,7 @@ SELECTIONBORDERSTYLE =: 0 0 0,HIGHLIGHTLINEWIDTH,PS_SOLID  NB. color,width of li
 
 
 WIRECOLOR =: 0 0 0   NB. Color of wires
-WIREHIGHCOLOR =: 255 100 255  NB. Highilight color for nets, blocks, & sentence words
+WIREHIGHCOLOR =: 255 100 255  NB. Highlight color for nets, blocks, & sentence words
 SENTENCEHIGHRECTPEN =: WIREHIGHCOLOR , 3 
 
 BOXMARGIN =: 2 ($,) 3   NB. Space to leave around boxed results
@@ -4809,8 +4817,10 @@ cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (({. ,. (('';' bold i
 
 RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;(RESULTSHAPEFONT modfontsize RESULTSHAPEFONTSIZE),<RESULTSHAPEMARGIN
 
-NB. For the displayed sentence
-satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR (0}) SHAPETEXTCOLORS)) ,"1 (SATZFONT modfontsize SATZFONTSIZE),<SATZMARGIN
+NB. For the displayed sentence.  This is (n,2)$ indexed by (selection level),(disabled)
+satzcfm =: ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTCOLOR"1 SHAPETEXTCOLORS)) ,"1 (SATZFONT modfontsize SATZFONTSIZE),<SATZMARGIN
+satzcfm =: satzcfm ,:"1 ((SATZCOLOR (0}) SHAPECOLORS) ;"1 (SATZTEXTDISABCOLOR"1 SHAPETEXTCOLORS)) ,"1 (SATZFONT modfontsize SATZFONTSIZE),<SATZMARGIN
+
 
 NB. For titles
 titlcfm =: TITLCOLOR;TITLTEXTCOLOR;(TITLFONT modfontsize TITLFONTSIZE),<TITLMARGIN
@@ -4893,7 +4903,7 @@ NB. ************** drawing the sentence *****************
 NB. Draw the user's top info: the sentence including highlighting,
 NB. and any title and links
 NB. x is the sentence, in the user's spacing
-NB. y is a table of (token range);display level;tokenvisibility
+NB. y is a table of (token number(s));(selection level, visibility);(display locale)
 NB. Result is table of (brect for header data);< other stuff needed to draw the sentence.  Ending brects are hw
 NB. First row is title (possibly empty), second row is sentence, third (if any) is links
 sizesentence =: 4 : 0
@@ -4945,13 +4955,9 @@ NB. Create table of token#;(level,visibility);locale.  Decrement token # to acco
 NB. This also deletes any boxes of y that contain 0 token numbers - these will have been added for
 NB. emulation purposes, for example vi@:u to handle &.
 toklevloc =. /:~ ; <@(<:@,@>@{. ;"0 1 }.)"1 > y
-NB. Any missing #s should be parentheses.  Assign them the level of the lowest inside token.
-NB. Assign level of _1 for (, _2 for ), and start with a stack of high-value for selection level.
-NB. Process as a state machine.  Then use the stacks to fill in gaps in
-NB. the selection levels
-tokens =. ;: usentence
 assert. (-: i.@#) > {."1 toklevloc
 
+tokens =. ;: usentence
 NB. Get the length of each token (except the last) in the user's spacing
 tokulen =. 2 -~/\ (' ' +/\@:~: usentence) I. (>: |.!.0 +/\ ' '&(+/@:~:)@> tokens)
 
@@ -4965,7 +4971,9 @@ NB. Create blanks;level;visible;locale for each token, where level;locale comes 
 addedblanks =. tokulen (' ' #~ (- #))&.> }: tokens  NB. blanks added to end of each token
 NB. Interleave tokens and blanks; then remove lines for empty (=no blanks) or invisible
 utokspacelevvisloc =. (#~  (*@#@(0&{::) *. 2&{::)"1) (({."1 toklevvisloc) ,&.> addedblanks , a:) (<a:;0)} toklevvisloc
-rectsize =. (cfms =. satzcfm {~ (_2 + #satzcfm) <. > 1 {"1 utokspacelevvisloc) sizetext ,. txts =. 0 {"1 utokspacelevvisloc
+NB. Calculate cfms to use.
+cfms =. satzcfm {~ <0 ;~ cfmsx =. (_2 + #satzcfm) <. > 1 {"1 utokspacelevvisloc
+rectsize =. cfms sizetext ,. txts =. 0 {"1 utokspacelevvisloc
 NB. Box them into sections that fit within the allowed part of the screen, one box per line
 scrwid =. <. MAXSENTENCEWIDTH * {: screensize
 boxhw =. , (((}.~) (, $:)~^:(*@#@[) <@{.~)   1 >. scrwid I.~ (+/\@:({:"1))) rectsize
@@ -4975,11 +4983,12 @@ NB. Install starting yx, and move rects into horizontal position
 rects =. ; (0 ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
 
 NB. Get the max size for the string, and return the data for drawing
-rectinfo =. (>./ +/"2 rects);<cfms;txts;rects;< 3 {"1 utokspacelevvisloc
+NB. We return the index to the cfm, since we select the color later
+rectinfo =. (>./ +/"2 rects);<cfmsx;txts;rects;< 3 {"1 utokspacelevvisloc
 (((0 >. >./ +/"2 titlrects);<titlinfo,<titlrects),:rectinfo),linkinfo
 )
 
-NB. Draw the sentence.  y is the first line of the result of sizesentence (the sentence info)
+NB. Draw the sentence.  y is the first two lines of the result of sizesentence (the title/sentence info)
 NB. x is the brect for the region
 drawsentence =: 4 : 0"2 1
 tlc =. x * 1 0
@@ -5037,7 +5046,7 @@ if. 'l' = x do.
       disploc =. ix { locs
       NB.?lintonly disploc =. <'dissectobj'
       if. disploc = <0 do.
-        ('sentence';ix) drawttipwithemphasis yx ; 'Execution of the sentence did not execute this word'
+        ('sentence';ix) drawttipwithemphasis yx ; 'The current selections do not produce a display for this word'
       elseif. #DOyx__disploc do.
         NB. Center the displayed block on the focus point of the screen
         NB. Get the position of center of block in the routing area
@@ -8354,35 +8363,6 @@ end.
 NB.?lintsaveglobals
 )
 
-NB. init left-click status to 'idle'
-NB. Before a left click, or after a mouse-up or double-click, we clear the scrolling state
-NB. to protect against lost events.
-NB. y indicates what we are clearing:
-NB. 0=clear mouse-down  info, leave mouse-up for double-click
-NB. 1=clear everything
-dissect_dissectisi_mblreset =: 3 : 0
-select. scrollingtype
-case. SCROLLTYPEIMAGE do.
-  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
-case. SCROLLTYPESCROLLBAR do.
-  4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
-case. SCROLLTYPESIZEDATA do.
-  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
-case. SCROLLTYPEWIREHIGH do.
-  NB. Undo the highlighting, then release highlight pixels
-  NB. End of wire highlighting.  Restore the original pixels
-  glpixels pickpixels
-  glpaint''
-  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
-case. do.
-end.
-NB. After clearing saved info, revert to idle state
-scrollingtype =: SCROLLTYPENONE
-NB. if not mouse-up, clear the mouse-up info
-if. y do. lastscrollingtype =: SCROLLTYPENONE end.
-''
-)
-
 dissect_dissectisi_mbldown =: 3 : 0
 NB. In case a button sequence was interrupted, clear button state
 dissect_dissectisi_mblreset 1
@@ -8411,9 +8391,39 @@ NB. Read the pixels in the sentence, and from the end of the sentence area to th
   else.
     scrollingtype =: SCROLLTYPEIMAGE
     pickscrollcurryx =: pickscrollstartyx =: 1 0 { sd
+    NB.?lintsaveglobals
   end.
-NB.?lintsaveglobals
 end.
+''
+)
+
+
+NB. init left-click status to 'idle'
+NB. Before a left click, or after a mouse-up or double-click, we clear the scrolling state
+NB. to protect against lost events.
+NB. y indicates what we are clearing:
+NB. 0=clear mouse-down  info, leave mouse-up for double-click
+NB. 1=clear everything
+dissect_dissectisi_mblreset =: 3 : 0
+select. scrollingtype
+case. SCROLLTYPEIMAGE do.
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
+case. SCROLLTYPESCROLLBAR do.
+  4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
+case. SCROLLTYPESIZEDATA do.
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
+case. SCROLLTYPEWIREHIGH do.
+  NB. Undo the highlighting, then release highlight pixels
+  NB. End of wire highlighting.  Restore the original pixels
+  glpixels pickpixels
+  glpaint''
+  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
+case. do.
+end.
+NB. After clearing saved info, revert to idle state
+scrollingtype =: SCROLLTYPENONE
+NB. if not mouse-up, clear the mouse-up info
+if. y do. lastscrollingtype =: SCROLLTYPENONE end.
 ''
 )
 
@@ -8568,9 +8578,9 @@ if. sentencehovertok +.&# blockhoverloc do.
   NB. For sentence hover, highlight the blocks too
   if. 0 = #slocale =. blockhoverloc do.
     slocale =. <(1 1;3;sentencehovertok) {:: topinfo
+    NB.?lintonly slocale =. <'dissectobj'
     ('';SENTENCEHIGHRECTPEN) drawrect DOyx__slocale ,:&{. DOsize__slocale
   end.
-  NB.?lintonly slocale =. <'dissectobj'
   NB. Get all the sentence rectangles that display in the same locale as the one being hovered over.
   NB. This is a good way to show how multiple verbs can end in the same block
 NB. obsolete   srect =. (1 1;2;sentencehovertok) {:: topinfo
