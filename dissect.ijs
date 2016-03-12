@@ -77,7 +77,12 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
+NB. Must add both other penalties when taking a turn
+NB. Adj penalties can cause a long route where a spread would help.  But where to localize the spread?
 NB. Think more about grayed-out words in the sentence
+NB. Now we penalize all points near a turn, and it causes routes to flee the turn.  Need to penalize only within the turn
+NB.   dissect '2 (^.@] ^@(] +/ . * %.) 1: ,. [) 3'   bad route when ][ etc
+NB.   dissect '2 4 (^.@] ^@(] +/ . * %.) 1: ,. [) 3 4'  bad route when ][ etc
 NB. Have a way to do selections from script, for testing
 
 NB. ?work on Android, with wd 'activity'
@@ -3745,7 +3750,7 @@ NB. In the early routes we spread out when there is a crossing; but after a few 
 NB. are probably unavoidable, so we stop reacting
 routeschedule =: (RGRIDDIST * ".);._2 (0 : 0)
 0 ,RPENALTYADJWIRE ,RPENALTYCROSS, 1
-3 ,RPENALTYADJWIRE ,RPENALTYCROSS, 0
+15 ,RPENALTYADJWIRE ,RPENALTYCROSS, 0
 500 ,RPENALTYADJWIRE ,RPENALTYCROSS, 0
 )
 
@@ -3763,62 +3768,67 @@ NB. and create the routing area to leave a right/bottom margin
 gridblocks =. gridblocks +"1 ([: <. 0 >. ROUTINGMARGIN&-)&.(%&ROUTINGGRIDSIZE) (<./ {."2 gridblocks) - WIRESTANDOFF
 NB. We will perform the trial place-and-route, saving all the results so we can choose the one we like best
 bestscore =. _  NB.?lintonly [ bestroute =: 2$a:
-for_r. routeschedule do.
-  'ov neigh cross scorecross' =. r
+NB. The routing level selects the penalties to use.
+NB. For the early routes, we don't penalize overlaps.  This allows each route to find its natural best
+NB. spot.  If that leaves overlaps, we spread the array and try again.
+NB. If spreading the array doesn't reduce the number of overlaps, we add a modest penalty for overlaps and see if
+NB. that is enough incentive to avoid them, and continue expanding as long as there is improvement.
+NB. Finally, if there are still overlaps, we slap on a punitive penalty and do a final route, accepting what results
+routelevel =. 0
+whilst. do.
+  'ov neigh cross scorecross' =. routelevel { routeschedule
   gsctlbr1 =. initgrids gridblocks
 QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(routingzero + RGRIDWINDOW)) i. routinggrid
   NB. Route the nets. result is table of boxes, one row per net, holding
   NB.  (list of boxes each holding path of a routed run);(table of other wires) where the path of the routed run is
   NB.  (table of dir,row,col,movetype of occupied cells)
   route =. (ov,neigh,cross) routenets gridblocks;<nets
-NB. obsolete   if. #occupied =. (#~ RMOVEEOC ~: 3&{"1) 0 {:: route do.
   if. 0= #route do. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
-  elseif. #occupied =. (#~ RMOVEEOC ~: 3&{"1) ; {."1 route do.
+  NB. Coalesce routes, but first append the net number to each route
+  elseif. #occupied =. ; (,.&.> i.@#) {."1 route do.
     NB. Get yx of places where spread is needed.  These are overlaps and crossings, which we figure out from the occupied cells.
     NB. The crossings of turn/jog over turn/jog are handled by creating synthetic 'occupations' at the bend corners.  We do that after routing
     NB. each net, to create a penalty at each such point; and again here
     NB. Since these synthetic points should not signal crossings but only overlaps (indeed, the points for a corner cross themselves),
     NB. we create a separate list of them and see if any of them show up in the occupied list
-    omoves =. 3 {"1 occupied
-    NB. Turn corners, marked in both directions.  Result is table per corner, one row in each direction
-    bjcorners =. (0 2 3$0)"_`(0 1 ,"0 1/ 1 2&{"1 + blockturn (<"1@[ { ])~ 0 3&{"1)@.(*@#) occupied #~ omoves e. 1 2
-    NB. Jog corners, marked in the direction of movement.  Result is table per corner, one row for each blocked cell
-    NB. Reshape result to table of dir,y,x
-    bjcorners =. ,/ bjcorners , (0 2 3$0)"_`(nswetons@:(0&{"1) ,."0 2 (1 2)&{"1 +"1 blockjog (<"1@[ { ])~ 0 3&{"1)@.(*@#) occupied #~ omoves e. 3 4
+    NB. Both ends of a turn/jog, i. e. the turn and the preceding cell, are marked perp to the routing direction.  But only once.
+    occupied =. occupied , 2 0 0 0 0 bwxor"1 (~. (, >:) (3 {"1 occupied) I.@:e. 1 2 3 4) { occupied
     NB. Convert occupation table to y,x,nsdir form (nsdir instead of nswedir)
-    occupied =.  /:~ (nswetons@:(0&{"1) ,. 1 2&{"1) occupied
-    bjolap =. (<0 2$0) , 0 1 <@((= {."1) # ])"0 _ occupied (e. # [) bjcorners
+    occupied =. /:~ (nswetons@:(0&{"1) ,. 1 2 4&{"1) occupied
     NB. Look for consecutive identical points in the sorted list
-    'crosspts overlapsns overlapsew' =. gridtoyx&.> bjolap ,&.> ((<(<0);1 2)&{ <@#~ (2 -:&0 1 1@:=/\ ]) ,  (<(<0);0)&{ (< ,: *.)  2&(-:/\)) occupied
+    'crosspts overlapsns overlapsew' =. gridtoyx&.> ((<(<0);1 2)&{ <@#~ (2 -:&0 1 1 0@:=/\ ]) ,  (<(<0);0)&{ (< ,: *.)  2&((-:&}: *. ~:&{:)/\)) occupied
     NB. Score the placement: 1 point for a crossing, a zillion for occupancy>1
     NB. Penalize crossings only on the first routes
     score =. 1 1000000 1000000 +/@:* #@> (scorecross #&.> crosspts);overlapsns;overlapsew
   elseif. do. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
   end.
+  NB. If we saved an overlap from the previous placement and there are still overlaps, stay at this routing level.  If not, move to the next level
+  if. noadjneeded =. score >: 1000000 >. bestscore - 500000  do. routelevel =. >: routelevel end.
   if. score < bestscore do.
     bestscore =. score
     bestroute =. ({."2 gridblocks);<route
   end.
 NB. If the placement is perfect, or we have gotten the max occupancy OK and have tried enough, stop looking
 NB. MAXTRIALROUTES is the 3 here
-  if. (score = 0) +. (r_index = <:#routeschedule) do. break. end.
-NB. Not perfect.  Adjust the placement for the next try.
-  NB. Convert block positions to form used for vertical analysis
-  vblockparms =. 0 analform gridblocks
-  NB. Associate each needed spread with the block below it
-  NB. This produces y,x,block
-  vspreadblockcol =. ((>:&0@] # ,.) vblockparms&blocknoforpoint) crosspts,overlapsew
-  hspreadblockcol =. ((>:&0@] # ,.) (1 analform gridblocks)&blocknoforpoint) crosspts,overlapsns
-  NB. Move the start and end+1 of the blocks the requested amount
-  gridblocks =. gridblocks +"1"2 1 gridtoyx vblockparms blockshift vspreadblockcol
-  NB. Repeat for horizontal.  The spreads were calculated before the vertical moves and associated
-  NB.  with blocks then; we use those moves, but calculate dependencies after the vertical move
-  NB.  has been performed
-  gridblocks =. gridblocks +"1"2 1 gridtoyx (1 analform gridblocks) blockshift hspreadblockcol
+  if. (score = 0) +. (routelevel = #routeschedule) do. break. end.
+  if. -. noadjneeded do.
+    NB. Not perfect, but we want to try to improve it.  Adjust the placement for the next try.
+    NB. Convert block positions to form used for vertical analysis
+    vblockparms =. 0 analform gridblocks
+    NB. Associate each needed spread with the block below it
+    NB. This produces y,x,block
+    vspreadblockcol =. ((>:&0@] # ,.) vblockparms&blocknoforpoint) crosspts,overlapsew
+    hspreadblockcol =. ((>:&0@] # ,.) (1 analform gridblocks)&blocknoforpoint) crosspts,overlapsns
+    NB. Move the start and end+1 of the blocks the requested amount
+    gridblocks =. gridblocks +"1"2 1 gridtoyx vblockparms blockshift vspreadblockcol
+    NB. Repeat for horizontal.  The spreads were calculated before the vertical moves and associated
+    NB.  with blocks then; we use those moves, but calculate dependencies after the vertical move
+    NB.  has been performed
+    gridblocks =. gridblocks +"1"2 1 gridtoyx (1 analform gridblocks) blockshift hspreadblockcol
+  end.
 end.
 4!:55 ;:'routinggrid penaltygrid blockedgrid'  NB. remove the large globals
 'bestgrids bestoccwires' =. bestroute
-NB. obsolete bestgrids ; (,  occtowires)&.>~/ bestoccwires
 bestgrids ;< (,  occtowires)&.>~/"1 bestoccwires
 NB.?lintsaveglobals
 )
@@ -3831,8 +3841,8 @@ NB. Direction 0: the route entered going north (this wire is in the opposite dir
 turnsn0 =. 3 2 2 $ 0
 turnsn1 =. 2 ,:/\ _2 ]\ 0 0  1 0  ,ROUTINGGRIDSIZE, (-ROUTINGGRIDSIZE-1)   ,ROUTINGGRIDSIZE ,(-ROUTINGGRIDSIZE)
 turnsn2 =. 2 ,:/\ _2 ]\ 0 0  1 0  ,ROUTINGGRIDSIZE, (ROUTINGGRIDSIZE-1)   ,ROUTINGGRIDSIZE ,ROUTINGGRIDSIZE
-turnsn3 =. 2 ,:/\ _2 ]\ 0 0  2 0  ,(ROUTINGGRIDSIZE-2),ROUTINGGRIDSIZE   ,ROUTINGGRIDSIZE ,ROUTINGGRIDSIZE
-turnsn4 =. 2 ,:/\ _2 ]\ 0 0  2 0  ,(ROUTINGGRIDSIZE-2),(-ROUTINGGRIDSIZE)   ,ROUTINGGRIDSIZE ,(-ROUTINGGRIDSIZE)
+turnsn3 =. 2 ,:/\ _2 ]\ 0 0  0 0  ,(ROUTINGGRIDSIZE-0),ROUTINGGRIDSIZE   ,ROUTINGGRIDSIZE ,ROUTINGGRIDSIZE
+turnsn4 =. 2 ,:/\ _2 ]\ 0 0  0 0  ,(ROUTINGGRIDSIZE-0),(-ROUTINGGRIDSIZE)   ,ROUTINGGRIDSIZE ,(-ROUTINGGRIDSIZE)
 turnsn5 =. 2 ,:/\ _2 ]\ 0 0 2 2 4 4  ,ROUTINGGRIDSIZE,ROUTINGGRIDSIZE
 turnsn6 =. 2 ,:/\ _2 ]\ 0 0 2 _2 4 _4  ,ROUTINGGRIDSIZE,(-ROUTINGGRIDSIZE)
 
@@ -4006,20 +4016,14 @@ end.
 
 NB. See which nets do not require routing, and draw them directly
 if. 1 e. ddrawmsk =. *./@:(0&~:)@({. directdrawok }.)@> nets do.
-NB. obsolete   wires =. ; ({. ,"1&:(}:"1) }.)&.> ddrawmsk # nets
-NB. obsolete else. wires =. 0 4$0
   routes =. (<0 4$0) ,. ({. ,"1&:(}:"1) }.)&.> ddrawmsk # nets
 else. routes =. 0 2$a:
 end.
 NB. Route the nets that need routing
 if. 0 e. ddrawmsk do.
   routes =. routes , x&routenet@> (-. ddrawmsk) # nets
-NB. obsolete   occcells =. ; {."1 routes
-NB. obsolete   wires =. wires , ; {:"1 routes
-NB. obsolete else. occcells =. 0 4$0
 end.
 NB. Return
-NB. obsolete occcells;wires
 routes
 NB.?lintsaveglobals
 )
@@ -4102,15 +4106,15 @@ interiorblocked =.  blockedgrid +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoint
 angleok > interiorblocked
 )
 
-NB. 4x3x2, indexed by (direction,movetype) returning yx offset from the END of the turn to the cell that needs to be blocked
-NB. The arguments are the direction after the FORWARD route has been performed: so (viewed in the forward direction) the
-NB. first cell is when you come north out of a left turn (i. e. from west); the cell to block is west of the end of the turn
+NB. obsolete NB. 4x3x2, indexed by (direction,movetype) returning yx offset from the END of the turn to the cell that needs to be blocked
+NB. obsolete NB. The arguments are the direction after the FORWARD route has been performed: so (viewed in the forward direction) the
+NB. obsolete NB. first cell is when you come north out of a left turn (i. e. from west); the cell to block is west of the end of the turn
 'N S W E' =. _1 0 , 1 0 , 0 _1 ,: 0 1
-blockturn =: (4 1 2$0) ,. 4 2 2 $ W,E  , E,W , S,N  , N,S   
-NB. 4x5x2x2, indexed by (direction,movetype) returning yx offsets to cells that need to be blocked in the direction of movement
-NB. First cell is left jog going north; block cells to east and south of the end of the jog
-blockjog =: (4 3 2 2$0) ,. 4 2 2 2 $ E,S , W,S , W,N , E,N , E,N , E,S , W,S , W,N
-
+NB. obsolete blockturn =: (4 1 2$0) ,. 4 2 2 $ W,E  , E,W , S,N  , N,S   
+NB. obsolete NB. 4x5x2x2, indexed by (direction,movetype) returning yx offsets to cells that need to be blocked in the direction of movement
+NB. obsolete NB. First cell is left jog going north; block cells to east and south of the end of the jog
+NB. obsolete blockjog =: (4 3 2 2$0) ,. 4 2 2 2 $ E,S , W,S , W,N , E,N , E,N , E,S , W,S , W,N
+NB. obsolete 
 NB. For each face, the amount to adjust a coordinate to move outward-perpendicular to the face to a gridpoint
 NB. at least a WIRESTANDOFF away.  This move will be followed by <.@yxtogrid.  For faces pointing down, we
 NB. move down by the standoff and then round up; for faces pointing up, we move up by the standoff and then round down
@@ -4164,29 +4168,34 @@ routeoccwires =. ((penaltyrollup;penaltyrollback)&routerun@;&:>/ (<"1 routbydist
 
 NB. After the net is complete, install penalties for subsequent nets.  They shouldn't take effect until the net is finished
 NB. Install penalties near the routes.  Remove route ends
-routepos =. (#~ RMOVEEOC ~: (3&{"1)) 0 {:: routeoccwires
+routepos =. (#~ RMOVEEOC ~: (3&{"1)) allroutes =. 0 {:: routeoccwires
 NB. First, overlaps
 dir =. (0 {"1 routepos) bwxor/ 0 1
 yx =. 1 2 {"1 routepos
-penpos =. <"1 (<"1 dir) ,. <"0 yx
-penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
+penpos =. dir ,: yx   NB. 2xnx2: 2 dirs ,: y,x
+NB. Also install overlap penalties for the crossing points of bends/jogs
+if. #turnx =. , (,. >:) (3 {"1 allroutes) I.@:e. 1 2 3 4 do.
+  penpos =. penpos ,. bjends =. (((<turnx;0) { allroutes) bwxor/ 2 3) ,: ((<turnx;1 2) { allroutes)
+else. bjends =. $0
+end.
+penposb =. <"1 ((,.~ <"1)~ <"0)/ penpos
+penaltygrid =: (penov + penposb { penaltygrid) penposb} penaltygrid
 NB. Adjacencies.  Add and subtract 1 from the crossing direction to find the place to add the penalty
-penpos =. <"1 (<"1 dir) ,. yx +&.> (0 e."1 dir) |."0 _ (_1 1;0)
-penaltygrid =: (penneigh + penpos { penaltygrid) penpos} penaltygrid
-NB. Crossing
+NB. Include the penalty on the crossing direction of bends/jogs too
+penposb =. <"1 (<"1@[ ,. (+&.>  (_1 1;0) |."0 _~  0&(e."1))~)/ penpos
+penaltygrid =: (penneigh + penposb { penaltygrid) penposb} penaltygrid
+NB. Corners of a bend/jog count as a crossing + 2 neighbors too (in both directions), so the route doesn't avoid a crossing penalty by going through it;
+NB.  and then we throw in a jog penalty too, because routes crossing over a bend are really confusing
+NB. This probably overpenalizes the outer corner, but we really would rather leave that open, and it's easier to
+NB. calculate both corners
+if. #bjends do.
+  NB. convert y0,x0 ,: y1,x1 to y0,x1 ,: y1,x0
+  penposb =. <"1 a: ;"1 <"0 (_2) ({."1 ,. |.@:({:"1))\ {: bjends
+  penaltygrid =: (((RGRIDDIST*RPENALTYJOG)+pencross+2*penneigh) + penposb { penaltygrid) penposb} penaltygrid
+end.
+NB. Crossing.
 penpos =. <"1 (<"1 (2) bwxor dir) ,. <"0 yx
 penaltygrid =: (pencross + penpos { penaltygrid) penpos} penaltygrid
-NB. Also install overlap penalties for the inside corner of bends, and the bends in the same direction of a jog, to prevent
-NB. overlaps of bends & jogs
-move =. 3 {"1 routepos
-if. #turn =. routepos #~ move e. 1 2 do.
-  penpos =. <"1 a: ;"0 1 <"0 (1 2 {"1 turn) + (0 3 {"1 turn) (<"1@[ { ]) blockturn
-  penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
-end.
-if. #jog =. routepos #~ move e. 3 4 do.
-  penpos =. <"1 (<"1 (0 {"1 jog) bwxor/ 0 1) ,."0 2 <"0 ((1 2 {"1 jog) +"1 (0 3 {"1 jog) (<"1@[ { ]) blockjog)
-  penaltygrid =: (penov + penpos { penaltygrid) penpos} penaltygrid
-end.
 
 routeoccwires
 NB.?lintsaveglobals
@@ -6700,7 +6709,6 @@ tlc =. x
 'dos dotl wires' =. 3 {. y
 NB. Apply scroll offset
 dotl =. dotl +"1 tlc
-NB. obsolete wires =. wires +"1 tlc,tlc
 wires =. +"1&(tlc,tlc)&.> wires 
 NB. Initialize pick information.  For speed, there are two arrays: locpickrects, which is a brick of
 NB. yxhw for each object, and picklocs, which is a list of locales, one per pickrect.
@@ -6710,7 +6718,6 @@ NB. Put in placeholders for the sentence brects.  These will be filled in when w
 NB. size the drawing
 locpickrects =: (((#topinfo),2 2)$0) , dotl ,:"1 ({."2) 3 : 'DOpicksize__y'"0 dos
 NB. Get the max size drawn, and set the control to just big enough to hold it
-NB. obsolete maxsize =. >./ (+/"2 locpickrects) , 2 2 $ >./ wires
 maxsize =. >./ (+/"2 locpickrects) , 2 2 $ >./ ; wires
 maxsize;dos;dotl;<wires
 NB.?lintsaveglobals
@@ -6735,7 +6742,6 @@ glclipreset''
 glrgb WIRECOLOR
 glpen 1,PS_SOLID
 if. #wires do.
-NB. obsolete  gllines 1 0 3 2 {"1 wires
   gllines 1 0 3 2 {"1 ; wires
 end.
 
@@ -8583,7 +8589,6 @@ if. sentencehovertok +.&# blockhoverloc do.
   end.
   NB. Get all the sentence rectangles that display in the same locale as the one being hovered over.
   NB. This is a good way to show how multiple verbs can end in the same block
-NB. obsolete   srect =. (1 1;2;sentencehovertok) {:: topinfo
   srect =. > (slocale = (1 1;3) {:: topinfo) # (1 1;2) {:: topinfo
   NB. Draw the highlighting rectangles
   ('';SENTENCEHIGHRECTPEN) drawrect srect +"2 (1 { locpickrects) * 1 0
@@ -13366,10 +13371,10 @@ NB. There is only one argument, and we create selections for from selection to e
 NB. y is the current selection in isf form
 NB. result is new value to use for selopshapes
 calcselectedshapes =: 3 : 0
-NB. Keep the rank of selopshapes, but use the size from the selection
+NB. Keep the rank of selopshapes (but if atom, change to singleton list), but use the size from the selection
 NB. If selopshapes is a map, we have to get the right part
 if. 1 = L. selopshapes do.
-  (>: {. > y) (0} ,)&.> selopshapes
+  (>: {. > y) (, }.)&.> selopshapes
 else.
   (>: {. > y) {.&.> selopshapes
 end.
@@ -13495,7 +13500,7 @@ calcselectedshapes =: 3 : 0
 NB. Keep the rank of selopshapes, but use the size from the selection
 NB. If selopshapes is a map, we have to get the right part
 if. 1 = L. selopshapes do.
-  (itemctiny - {. > y) (0} ,)&.> selopshapes
+  (itemctiny - {. > y) (, }.)&.> selopshapes
 else.
   ({. > y) }.&.> selopshapes
 end.
@@ -13532,7 +13537,7 @@ end.
 NB. The shape of x is immaterial since u is always invoked as a monad
 NB. If selopshapes is a map, we have to get the right part
 if. 1 = L. {: selopshapes do.
-  a: , (itemctiny - ps) (0} ,)&.> {: selopshapes
+  a: , (itemctiny - ps) (, }.)&.> {: selopshapes
 else.
   a: , (<<<({.>y) + i. ps)&{&.> {: selopshapes
 end.
