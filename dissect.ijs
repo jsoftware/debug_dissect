@@ -77,7 +77,16 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. Must add both other penalties when taking a turn
+NB. dissect '(+ - (1 : ''`u'') `:6)1j1'  fails
+NB. dissect '(+ - 1 : ''`u'' `:6)1j1'
+NB. Put type of value into highlight line
+NB. Fiddle with routing schedule:
+NB.   no adjpenalty when overlappenalty=0
+NB.   spread by 1 extra first time
+NB.   see why increasing crosspenalty made it selected
+NB. Have a marker for expandable blocks
+NB. 
+NB. Must add both other penalties when taking a turn? - no
 NB. Adj penalties can cause a long route where a spread would help.  But where to localize the spread?
 NB. Think more about grayed-out words in the sentence
 NB. Now we penalize all points near a turn, and it causes routes to flee the turn.  Need to penalize only within the turn
@@ -88,7 +97,7 @@ NB. Have a way to do selections from script, for testing
 NB. ?work on Android, with wd 'activity'
 
 NB. (1) 3&+&2 (5 6 7)  shows ^: in the stack.  Change the 1 and see duplicates too - if details enabled
-NB.     going to leave the ^:1 in to show what happened
+NB.     going to leave the ^:1 in to show what happened.  Change ^: in stack to (^:)?
 NB. fit value needs to be evaluated in its locale to get the value right (needed by /.) - if nonsdt, should come in on the right
 NB. Enforce a recursion limit to help debug stack error - if original failed w/stack error?
 NB. support u . v y
@@ -2528,10 +2537,16 @@ NB. These are overridden as needed by individual modifiers.  The versions here w
 NB. get the rank to use for this verb.
 NB. Result is the rank to use for the verb's valence, or $0 if we don't know
 getverbrank =: 3 : 0
-if. ifdefined 'verbex' do.
+select. 4!:0 <'verbex'
+case. 3 do.
+  NB. Verb - get ranks
   (valence { 0 1 _2) {. verbex b. 0
-else.
+case. _1;_2 do.
+  NB. undefined - probably not excecuted owing to error, or it's a noun - give empty ranks
   $0
+case. do.
+  NB. Other types happen only if a modifier returns a non-verb
+  failmsg 'dissect restriction: an explicit modifier must return a verb'
 end.
 )
 
@@ -2720,7 +2735,7 @@ NB. If this is a noun, it could be a terminal, in which case what we do doesn't 
 NB. have to treat it as a verb of infinite rank.  We will detect that by the absence of verbex, and use the one (required) value of the noun
 NB. Extract the components of selopinfo
   if. 0 = #vranks do.
-    NB. No ranks, must be a noun.  Since nouns appearing in u&v (ex: =&(i."0) are executed twice, so in that case
+    NB. No ranks, must be a noun or invalid verb.  Since nouns appearing in u&v (ex: =&(i."0) are executed twice, so in that case
     NB. discard all but the first one.
     if. 1 < #logvalues do. logvalues =: 1 {. logvalues end.
     NB. If there are NO logvalues, there must have been an error creating the verb - some invalid form like +@2
@@ -16522,6 +16537,8 @@ ctup = 8
 'rank error: in m :n, boxed n must have contents with rank < 2' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <2 2 2 $ 'a'
 'domain error: in m :n, boxed n must contain strings' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <5
 'ill-formed number: 1xcv' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '1xcv'
+(2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
+'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
 )
 
 testtacit =: testtacit2"0
