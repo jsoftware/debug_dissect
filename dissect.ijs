@@ -2463,6 +2463,17 @@ NB. The error-level record is (locale, single-level-boxed);type;(locale where th
 errorlevel =: 0 3$a:
 )
 
+NB. fillmask - this has the shape of the open of frame $ result, and gives status for each atom thereof.  This status is the selection
+NB.  level of this node (in the upper bits), and validity information in the lower bits.  The validity is
+NB.  0=normal 1=fill 3=first unexecuted cell (presumably error, but that may depend on what happened elsewhere) 2=later unexecd cell
+NB.  error is calculated per result cell & propagated to atoms; fill is calculated per atom.  fillmask is valid only for nouns, or if the
+NB.  unselected result has a frame with multiple cells, and is undefined otherwise
+'FILLMASKNORMAL FILLMASKFILL FILLMASKUNEXECD FILLMASKERROR' =: i. 4
+FILLMASKNOCOLLECT =: 4
+FILLMASKCHECKER =: 1 bwlsl FILLMASKNOCOLLECT
+FILLMASKEXTRAAXES =: 1 bwlsl FILLMASKCHECKER
+FILLMASKSELLEVEL =: 1 bwlsl FILLMASKEXTRAAXES
+
 cocurrent 'dissectobj'
 ERRORLEVELNONE =: 0   NB. must be 0
 ERRORLEVELFILL =: 1
@@ -2589,16 +2600,6 @@ NB.  with the state after going through the local selection.  The operand shape 
 NB.   the verb, so is valid even when there is no selector.  List of boxes, one per operand.
 NB. selopinfovalid - set if there is no frame, or if there is a local selection.  List, one per operand.  This indicates that a single operand cell
 NB.   has been selected, and can therefore be used by a subsequent v verb.
-NB. fillmask - this has the shape of the open of frame $ result, and gives status for each atom thereof.  This status is the selection
-NB.  level of this node (in the upper bits), and validity information in the lower bits.  The validity is
-NB.  0=normal 1=fill 3=first unexecuted cell (presumably error, but that may depend on what happened elsewhere) 2=later unexecd cell
-NB.  error is calculated per result cell & propagated to atoms; fill is calculated per atom.  fillmask is valid only for nouns, or if the
-NB.  unselected result has a frame with multiple cells, and is undefined otherwise
-'FILLMASKNORMAL FILLMASKFILL FILLMASKUNEXECD FILLMASKERROR' =: i. 4
-FILLMASKNOCOLLECT =: 4
-FILLMASKCHECKER =: 1 bwlsl FILLMASKNOCOLLECT
-FILLMASKEXTRAAXES =: 1 bwlsl FILLMASKCHECKER
-FILLMASKSELLEVEL =: 1 bwlsl FILLMASKEXTRAAXES
 NB. errorlevel - a derivative of *#errorlevel__COCREATOR at the time this is parsed; 0 = nothing, 1 = fill-cell, 2 = adverse.
 NB.  When it comes time to display error info, we don't use the result failure type for anything except
 NB.  top-level errors
@@ -4767,7 +4768,8 @@ NB. Make the dim one come first, so an empty cell displays a visible rectangle (
 NB. This is an nx2x3 table
 DATACOLORS =: <. DATACOLORS  *"1/ 1 1 1 ,: 0.75 0.75 0.75
 
-DATATEXTCOLORS =: 0 0 0"1 DATACOLORS
+NB. The text colors are selected from the data type: 0=normal, 1=string
+DATATEXTCOLORS =: _3 ]\ 0 0 0   0 96 0
 
 NB. The colors for each level of highlighting.  The first highlight contrasts with normal
 NB. data; thereafter we rely on the vivid colors to contrast, and we match each highlight with
@@ -4822,7 +4824,7 @@ verbcfm =: verbcfm , < (SHAPECOLORS ;"1 SHAPETEXTCOLORS) ,"1 (SHAPEFONT modfonts
 verbcfm =: verbcfm , < STATUSCOLOR;STATUSTEXTCOLOR;(STATUSFONT modfontsize STATUSFONTSIZE),<STATUSMARGIN
 verbcfm =: verbcfm , < ISTATUSCOLOR;ISTATUSTEXTCOLOR;(ISTATUSFONT modfontsize ISTATUSFONTSIZE),<ISTATUSMARGIN
 
-cfmdata =: ,/ ,/ (DATACOLORS ;"1 DATATEXTCOLORS) ,"1"2 1"2 (({. ,. (('';' bold italic') (,~ ":)&.> {:)) DATAFONT modfontsize DATAFONTSIZE) ,. <DATAMARGIN
+cfmdata =: ,/ ,/ (DATACOLORS ;"1 (0 0 0)) ,"1"2 1"2 (({. ,. (('';' bold italic') (,~ ":)&.> {:)) DATAFONT modfontsize DATAFONTSIZE) ,. <DATAMARGIN
 
 RESULTSHAPECFM =: RESULTSHAPECOLOR;RESULTSHAPETEXTCOLOR;(RESULTSHAPEFONT modfontsize RESULTSHAPEFONTSIZE),<RESULTSHAPEMARGIN
 
@@ -4846,6 +4848,13 @@ fontsforclassrankverb =: (((<VERBFONT,0){y),'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLO
 fontsforclassrankshape =: (((<SHAPEFONT,0){y),.(<''),.SHAPEMARGIN ;"_ 1 COLORSFORCLASSSHAPE) ,"1 0 ((<SHAPEFONT,1){y)
 
 TOOLTIPFONT =: FONTTTIP { y
+
+NB. x is data type (0=normal 1=string etc.)
+NB. y is fillmask codes
+NB. result is the values to use for drawtext: the selected background color, with stippling added; the data color; the font etc.
+NB. the stippling value is the checkerboard part of the fillmask.  It is appended to the selected background color
+textinfofromtypefillmask =: (( ({:"1 ,"1 0~ (> {."1 cfmdata) {~ {."1)@] ;"1 (DATATEXTCOLORS {~ [)) ,"1 (2 }."1 cfmdata) {~ {."1@]) (0,FILLMASKCHECKER)&#:
+
 NB.?lintsaveglobals
 ''
 )
@@ -6569,10 +6578,11 @@ NB. y is fillmask codes
 NB. result is the value to use for drawtext, with stippling added to the rect color
 rectcolorfromfillmask =: (<:FILLMASKNOCOLLECT)&bwand@] ,~&.> ({~      [: < 0 ;~ (- <. 2 ^. FILLMASKCHECKER)&bwlsl)
 
-NB. x is text-color info, a la cfmdata
-NB. y is fillmask codes
-NB. result is the value to use for drawtext: the selected color, with stippling added
-textinfofromfillmask =: ({:"1@] ((,~&.> 0&{"1) 0}"0 1 ]) ({~ {."1))    (0,FILLMASKCHECKER)&#:
+NB. obsolete NB. x is text-color info, a la cfmdata
+NB. obsolete NB. y is fillmask codes
+NB. obsolete NB. result is the value to use for drawtext: the selected color, with stippling added
+NB. obsolete textinfofromfillmask =: ({:"1@] ((,~&.> 0&{"1) 0}"0 1 ]) ({~ {."1))    (0,FILLMASKCHECKER)&#:
+NB. obsolete 
 
 NB. y is fillmask code
 NB. result is 1 if the fillmask is data or plain fill; 0 if error or unexecd
@@ -6672,7 +6682,7 @@ if. -. a: e. onscreenbdys =. onscreenmskext #&.> yxpositions do.
      if. emptydata do.
        (emptycfm rectcolorfromfillmask (<:#emptycfm) colorlimitsellevel sel) drawrect"0 2 rects
      else.
-       (cfmdata textinfofromfillmask sel) drawtext"1 ((fillmaskisvaliddata sel) dataxlate@(# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
+       ((2 131072 e.~ 3!:0 usedd) textinfofromtypefillmask sel) drawtext"1 ((fillmaskisvaliddata sel) dataxlate@(# ":!.displayprecision)&.> usedd) (,<)"0 2 rects
      end.
   end.
   
