@@ -53,6 +53,9 @@ alltests__ =: 3 : 0
 stime =. 6!:1''
 dly =: 30   NB. Time to recover from tests?
 config_displayautoexpand2_dissect_ =: 0
+displayshowcompmods_dissect_ =: 0
+config_displayshowfillcalc_dissect_ =: 0
+config_displayshowstealth_dissect_ =: 0
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 'Time after step 0: %4.1f sec' printf stime -~ 6!:1''
 6!:3 dly
@@ -77,8 +80,11 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. dissect '(+ - (1 : ''`u'') `:6)1j1'  fails
-NB. dissect '(+ - 1 : ''`u'' `:6)1j1'
+NB. dissect '(2 2,:1 1) <;.3 i. 5 5'  once you expand ;.3, there's no way back
+NB. dissect '<;.1 (1 0 1 2 3 0 1 2)' same
+NB. dissect (1 1 1,:1 1 1) <;.3 i. 3 3'  fails
+NB. dissect '<:@> :: (#@>)"0 (1;2;''a'';3'  crashed
+NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
 NB. Fiddle with routing schedule:
 NB.   no adjpenalty when overlappenalty=0
@@ -2483,6 +2489,9 @@ FILLMASKCHECKER =: 1 bwlsl FILLMASKNOCOLLECT
 FILLMASKEXTRAAXES =: 1 bwlsl FILLMASKCHECKER
 FILLMASKSELLEVEL =: 1 bwlsl FILLMASKEXTRAAXES
 
+NB. Values for expansionstate
+'UNEXPANDABLE EXPANDABLE EXPANDED' =: i. 3
+
 cocurrent 'dissectobj'
 ERRORLEVELNONE =: 0   NB. must be 0
 ERRORLEVELFILL =: 1
@@ -2627,6 +2636,7 @@ NB.  If the string form is instead 0, it means that this rankhistory is a 'heavy
 NB. resultlevel - indicates boxing of result: '' = none, normal; 0 = result replaces ops in hierarchy (L:); 1 = box is added (&.> or expansion); 2=collection error
 NB. nvalidresults - the number of valid selresults when we started this node.  We have to calculate this here, because inheritance of an error cell into a higher result may add a selresult, and we need
 NB.  to make sure we don't try to select one beyond THAT cell.
+
 dummytraversedowncalcselect =: 3 : 0   NB. used to set the essential variables needed by travops
 if. 3 = #y do.
   'sellevel rankhistory selopinfo' =: y
@@ -2657,7 +2667,7 @@ errorlevel =: geterrorlevel''
 opselin =: 0 2$a:  NB. initialize opselin to empty (=no selection)
 vranks =: getverbrank selopshapes
 NB. Non-atomic sellevel is a flag indicating that the nominal rank is to be ignored, because the verb runs at infinite rank
-NB. (used in ^:_1 because u has a rank, but u^:_1 always has infinite rank)
+NB. (used in ^:_1 because u has a rank, but u^:_1 always has infinite rank; also in @.)
 if. #$sellevel do.
   vranks =: _:"0 vranks
   sellevel =: {. sellevel
@@ -2671,6 +2681,7 @@ if. #vranks  do.  NB. forceinfinite overrides the observed verb ranks
   rankhistory =: rankhistory , (;:^:_1^:(0<L.) titlestring) ; (coname'') , |. effranks
 end.
 selectable =: 0  NB. Init unselectable unless we set otherwise
+expansionstate =: UNEXPANDABLE
 selx =. a:  NB. In case we don't set it, we need this to pick up 'all logvalues' for display purposes
 NB. If a compound is bypassed for display (for example, u@:v where u fails, holding some data), we may display
 NB. u rather than u@:v.  But then, selection will leave out the u@:v locale.  So, each locale keeps the
@@ -3268,7 +3279,7 @@ NB. 1{x is 1 (default 1) to copy dispstealthoperand from u.  This is used so tha
 NB. nothing since v has already been outed, as a stealth.  But if u@v is a collector that loops back, we have to make sure
 NB. it displays, so we leave the ] in
 NB. 2{x is 1 (default 0) if this node is an expansion, and should preserve its data even if there is no data from the higher level
-DISPINFO =: ;: 'displaylevrank dispstealthoperand'
+DISPINFO =: ;: 'expansionstate displaylevrank dispstealthoperand'
 inheritu =: 3 : 0
 0 1 inheritu y
 :
@@ -3765,8 +3776,9 @@ NB. on later tries we penalize it heavily
 NB. In the early routes we spread out when there is a crossing; but after a few spreads the crossings
 NB. are probably unavoidable, so we stop reacting
 routeschedule =: (RGRIDDIST * ".);._2 (0 : 0)
-0 ,RPENALTYADJWIRE ,RPENALTYCROSS, 1
-15 ,RPENALTYADJWIRE ,RPENALTYCROSS, 0
+0 ,0 ,0, 1
+1 ,0 ,0, 1
+3 ,RPENALTYADJWIRE ,RPENALTYCROSS, 1
 500 ,RPENALTYADJWIRE ,RPENALTYCROSS, 0
 )
 
@@ -3783,7 +3795,7 @@ NB. Calculate the routing area size.  Adjust blocks to leave a minimum top/left 
 NB. and create the routing area to leave a right/bottom margin
 gridblocks =. gridblocks +"1 ([: <. 0 >. ROUTINGMARGIN&-)&.(%&ROUTINGGRIDSIZE) (<./ {."2 gridblocks) - WIRESTANDOFF
 NB. We will perform the trial place-and-route, saving all the results so we can choose the one we like best
-bestscore =. _  NB.?lintonly [ bestroute =: 2$a:
+prevscore =. bestscore =. _  NB.?lintonly [ bestroute =: 2$a:
 NB. The routing level selects the penalties to use.
 NB. For the early routes, we don't penalize overlaps.  This allows each route to find its natural best
 NB. spot.  If that leaves overlaps, we spread the array and try again.
@@ -3791,6 +3803,8 @@ NB. If spreading the array doesn't reduce the number of overlaps, we add a modes
 NB. that is enough incentive to avoid them, and continue expanding as long as there is improvement.
 NB. Finally, if there are still overlaps, we slap on a punitive penalty and do a final route, accepting what results
 routelevel =. 0
+firsttimeatlevel =. 1
+NB. obsolete disproute   =. _
 whilst. do.
   'ov neigh cross scorecross' =. routelevel { routeschedule
   gsctlbr1 =. initgrids gridblocks
@@ -3799,6 +3813,7 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
   NB.  (list of boxes each holding path of a routed run);(table of other wires) where the path of the routed run is
   NB.  (table of dir,row,col,movetype of occupied cells)
   route =. (ov,neigh,cross) routenets gridblocks;<nets
+
   if. 0= #route do. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
   NB. Coalesce routes, but first append the net number to each route
   elseif. #occupied =. ; (,.&.> i.@#) {."1 route do.
@@ -3818,23 +3833,32 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
     score =. 1 1000000 1000000 +/@:* #@> (scorecross #&.> crosspts);overlapsns;overlapsew
   elseif. do. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
   end.
-  NB. If we saved an overlap from the previous placement and there are still overlaps, stay at this routing level.  If not, move to the next level
-  if. noadjneeded =. score >: 1000000 >. bestscore - 500000  do. routelevel =. >: routelevel end.
+  NB. If this is a new routing level, and there were overlaps at the previous level, we must
+  NB. expand going to the new level.  If this is the same level, expand only if there is an improvement in overlaps
+  adjneeded =. firsttimeatlevel { (score < 1000000 >. bestscore - 500000) , (prevscore >: 1000000)
+NB. obsolete if. 0 = disproute =. <: disproute do. ({."2 gridblocks) ;< (,  occtowires)&.>~/"1 route return. end.
   if. score < bestscore do.
     bestscore =. score
     bestroute =. ({."2 gridblocks);<route
   end.
-NB. If the placement is perfect, or we have gotten the max occupancy OK and have tried enough, stop looking
-NB. MAXTRIALROUTES is the 3 here
+NB. obsolete QP'score prevscore bestscore adjneeded firsttimeatlevel '
+  NB. Get routing level to use for the next route
+  NB. Advance the routing schedule if we do not adjust the placement - we must be
+  NB. just trying the new routing weights.  But also advance if we are running with
+  NB. no overlap penalty - the routes will continue to overlap if we don't penalize overlaps
+  routelevel =. routelevel + firsttimeatlevel =. (-. adjneeded) +. ov = 0
+NB. If the placement is perfect, or we have gone through all the routing schedule, stop looking
   if. (score = 0) +. (routelevel = #routeschedule) do. break. end.
-  if. -. noadjneeded do.
+  if. adjneeded do.
     NB. Not perfect, but we want to try to improve it.  Adjust the placement for the next try.
     NB. Convert block positions to form used for vertical analysis
     vblockparms =. 0 analform gridblocks
     NB. Associate each needed spread with the block below it
     NB. This produces y,x,block
-    vspreadblockcol =. ((>:&0@] # ,.) vblockparms&blocknoforpoint) crosspts,overlapsew
-    hspreadblockcol =. ((>:&0@] # ,.) (1 analform gridblocks)&blocknoforpoint) crosspts,overlapsns
+    NB. First time through, count each overlap twice, because a blockage probably results from a turn,
+    NB. which needs two routing channels
+    vspreadblockcol =. ((>:&0@] # ,.) vblockparms&blocknoforpoint) crosspts,(>:ov=0) # overlapsew
+    hspreadblockcol =. ((>:&0@] # ,.) (1 analform gridblocks)&blocknoforpoint) crosspts,(>:ov=0) # overlapsns
     NB. Move the start and end+1 of the blocks the requested amount
     gridblocks =. gridblocks +"1"2 1 gridtoyx vblockparms blockshift vspreadblockcol
     NB. Repeat for horizontal.  The spreads were calculated before the vertical moves and associated
@@ -3842,6 +3866,7 @@ NB. MAXTRIALROUTES is the 3 here
     NB.  has been performed
     gridblocks =. gridblocks +"1"2 1 gridtoyx (1 analform gridblocks) blockshift hspreadblockcol
   end.
+  prevscore =. score
 end.
 4!:55 ;:'routinggrid penaltygrid blockedgrid'  NB. remove the large globals
 'bestgrids bestoccwires' =. bestroute
@@ -4183,35 +4208,38 @@ NB. Do all the routes; create the wires to connect the block I/Os to the routing
 routeoccwires =. ((penaltyrollup;penaltyrollback)&routerun@;&:>/ (<"1 routbydist) , < ,: startroute , RMOVEEOC) ; ((gridtoyx routend) (-.@-:"1 # ,.) trueroutend)
 
 NB. After the net is complete, install penalties for subsequent nets.  They shouldn't take effect until the net is finished
-NB. Install penalties near the routes.  Remove route ends
-routepos =. (#~ RMOVEEOC ~: (3&{"1)) allroutes =. 0 {:: routeoccwires
-NB. First, overlaps
-dir =. (0 {"1 routepos) bwxor/ 0 1
-yx =. 1 2 {"1 routepos
-penpos =. dir ,: yx   NB. 2xnx2: 2 dirs ,: y,x
-NB. Also install overlap penalties for the crossing points of bends/jogs
-if. #turnx =. , (,. >:) (3 {"1 allroutes) I.@:e. 1 2 3 4 do.
-  penpos =. penpos ,. bjends =. (((<turnx;0) { allroutes) bwxor/ 2 3) ,: ((<turnx;1 2) { allroutes)
-else. bjends =. $0
+NB. If we have no overlap penalty, other penalties hardly matter, so skip them all for a little speed
+if. penov do.
+  NB. Install penalties near the routes.  Remove route ends
+  routepos =. (#~ RMOVEEOC ~: (3&{"1)) allroutes =. 0 {:: routeoccwires
+  NB. First, overlaps
+  dir =. (0 {"1 routepos) bwxor/ 0 1
+  yx =. 1 2 {"1 routepos
+  penpos =. dir ,: yx   NB. 2xnx2: 2 dirs ,: y,x
+  NB. Also install overlap penalties for the crossing points of bends/jogs
+  if. #turnx =. , (,. >:) (3 {"1 allroutes) I.@:e. 1 2 3 4 do.
+    penpos =. penpos ,. bjends =. (((<turnx;0) { allroutes) bwxor/ 2 3) ,: ((<turnx;1 2) { allroutes)
+  else. bjends =. $0
+  end.
+  penposb =. <"1 ((,.~ <"1)~ <"0)/ penpos
+  penaltygrid =: (penov + penposb { penaltygrid) penposb} penaltygrid
+  NB. Adjacencies.  Add and subtract 1 from the crossing direction to find the place to add the penalty
+  NB. Include the penalty on the crossing direction of bends/jogs too
+  penposb =. <"1 (<"1@[ ,. (+&.>  (_1 1;0) |."0 _~  0&(e."1))~)/ penpos
+  penaltygrid =: (penneigh + penposb { penaltygrid) penposb} penaltygrid
+  NB. Corners of a bend/jog count as a crossing + 2 neighbors too (in both directions), so the route doesn't avoid a crossing penalty by going through it;
+  NB.  and then we throw in a jog penalty too, because routes crossing over a bend are really confusing
+  NB. This probably overpenalizes the outer corner, but we really would rather leave that open, and it's easier to
+  NB. calculate both corners
+  if. #bjends do.
+    NB. convert y0,x0 ,: y1,x1 to y0,x1 ,: y1,x0
+    penposb =. <"1 a: ;"1 <"0 (_2) ({."1 ,. |.@:({:"1))\ {: bjends
+    penaltygrid =: (((RGRIDDIST*RPENALTYJOG)+pencross+2*penneigh) + penposb { penaltygrid) penposb} penaltygrid
+  end.
+  NB. Crossing.
+  penpos =. <"1 (<"1 (2) bwxor dir) ,. <"0 yx
+  penaltygrid =: (pencross + penpos { penaltygrid) penpos} penaltygrid
 end.
-penposb =. <"1 ((,.~ <"1)~ <"0)/ penpos
-penaltygrid =: (penov + penposb { penaltygrid) penposb} penaltygrid
-NB. Adjacencies.  Add and subtract 1 from the crossing direction to find the place to add the penalty
-NB. Include the penalty on the crossing direction of bends/jogs too
-penposb =. <"1 (<"1@[ ,. (+&.>  (_1 1;0) |."0 _~  0&(e."1))~)/ penpos
-penaltygrid =: (penneigh + penposb { penaltygrid) penposb} penaltygrid
-NB. Corners of a bend/jog count as a crossing + 2 neighbors too (in both directions), so the route doesn't avoid a crossing penalty by going through it;
-NB.  and then we throw in a jog penalty too, because routes crossing over a bend are really confusing
-NB. This probably overpenalizes the outer corner, but we really would rather leave that open, and it's easier to
-NB. calculate both corners
-if. #bjends do.
-  NB. convert y0,x0 ,: y1,x1 to y0,x1 ,: y1,x0
-  penposb =. <"1 a: ;"1 <"0 (_2) ({."1 ,. |.@:({:"1))\ {: bjends
-  penaltygrid =: (((RGRIDDIST*RPENALTYJOG)+pencross+2*penneigh) + penposb { penaltygrid) penposb} penaltygrid
-end.
-NB. Crossing.
-penpos =. <"1 (<"1 (2) bwxor dir) ,. <"0 yx
-penaltygrid =: (pencross + penpos { penaltygrid) penpos} penaltygrid
 
 routeoccwires
 NB.?lintsaveglobals
@@ -4694,9 +4722,15 @@ dataxlate =: ((1 22 2 25 16 23 3 21 4 5 6 { a.) (16+i. 11)} a.) {~ a. i. ]
 NB. for the verb-name cell
 VERBCOLOR =: 114 30 30
 VERBTEXTCOLOR =: 255 255 255
+VERBCOLOREXPANDABLE =: VERBCOLOR
+VERBTEXTCOLOREXPANDABLE =: VERBTEXTCOLOR
+VERBCOLOREXPANDED =: 160 30 60
+VERBTEXTCOLOREXPANDED =: 240 255 240
 VERBFONT =: FONTCHAR
 VERBFONTSIZE =: 0
 VERBMARGIN =: 1
+VERBMARGINEXPANDABLE =: 7   NB. Includes half of the pensize
+VERBPENEXPANDABLE =: 224 255 255,4,PS_DOT
 NB. for noun body, top level
 NOUNCOLOR =: 200 200 255
 NOUNTEXTCOLOR =: 0 0 0
@@ -4858,10 +4892,12 @@ NB. For assignments
 assigncfm =: ASSIGNCOLOR;ASSIGNTEXTCOLOR;(ASSIGNFONT modfontsize ASSIGNFONTSIZE),<ASSIGNMARGIN
 
 NB. Calculate for each class in the rank and selection
-NB. font pen margin tcolor bcolor
-fontsforclassrankverb =: (((<VERBFONT,0){y),'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR) ,"1 0 <.&.-:@>:&.> ((<VERBFONT,1){::y) * 1 1.6
+NB. First line is for lines before the last; next lines are for the last line, depending on expansionstate
+NB. font pen margin tcolor bcolor size
+fontsforclassrankverb =: (((<VERBFONT,0){y),'';VERBMARGIN;VERBTEXTCOLOR;VERBCOLOR) ,"1 0 <.&.-:@>:&.> ((<VERBFONT,1){::y) * 1 , (>:EXPANDED) # 1.6
+fontsforclassrankverb =: (VERBPENEXPANDABLE;VERBMARGINEXPANDABLE;VERBTEXTCOLOREXPANDABLE;VERBCOLOREXPANDABLE) (<(>:EXPANDABLE);1 2 3 4)} fontsforclassrankverb
+fontsforclassrankverb =: (VERBTEXTCOLOREXPANDED;VERBCOLOREXPANDED) (<(>:EXPANDED);3 4)} fontsforclassrankverb
 fontsforclassrankshape =: (((<SHAPEFONT,0){y),.(<''),.SHAPEMARGIN ;"_ 1 COLORSFORCLASSSHAPE) ,"1 0 ((<SHAPEFONT,1){y)
-
 TOOLTIPFONT =: FONTTTIP { y
 
 NB. x is data type (0=normal 1=string etc.)
@@ -5393,14 +5429,14 @@ NB. Remove lines with no display symbol
   ranklines =. ([: {.^:(0=#) ":)&.> 2 }."1 nonemptylevrank
   NB. Create the level,decoration for each rank label: the selection level, followed by a value, for each rank box, set if
   NB. the rank box contains ! indicating that the rank affected the result
-  ranklevels =. (3 : 'sellevel__y'"0 DOranklocales) ,"0 ((FONTDECORATIONSIZE*3)+FONTDECORATIONBOLD+FONTDECORATIONITALIC) * '!' = {.@> ranklines NB. table for each locale, 1 row per rank, y[x] order
+  ranklevels =. (3 : '{. sellevel__y'"0 DOranklocales) ,"0 ((FONTDECORATIONSIZE*3)+FONTDECORATIONBOLD+FONTDECORATIONITALIC) * '!' = {.@> ranklines NB. table for each locale, 1 row per rank, y[x] order
   NB. Interleave rank and verb to produce [x,]v,y.  Remove the ! flag from the rank
   DOranks =: (-.&'!'&.> ranklines) (}.@[ , ] , {.@[)"1 0 verblines
   NB. Create the font class for [x,]v,y
   fontclass =. (-{:$DOranks) {.!.FONTCLASSSHAPE FONTCLASSRANKVERB,FONTCLASSSHAPE
-  NB. Create the size,decoration for the verb cells: normal size except large in the last; no decoration
-  NB. Interleavel size,decor with sellevel,decor to produce a table per row of display, each row a size,decor, [x,]v,y order
-  fontseldecor =. ranklevels ((}.@[ , ]) , {.@[)"2 1 ((,:1 0) {.~ -#ranklevels)
+  NB. Create the size,decoration for the verb cells: normal size except in the last (then large, and possibly expandable); no decoration
+  NB. Interleave size,decor with sellevel,decor to produce a table per row of display, each row a size,decor, [x,]v,y order
+  fontseldecor =. ranklevels ((}.@[ , ]) , {.@[)"2 1 ((,: (>:expansionstate),0) {.~ -#ranklevels)
   NB. Calculate the font for each box
   DOrankcfm =: fontclass cfmforclass"0 1"1 2 fontseldecor
   NB. Size the characters for each box
@@ -6294,7 +6330,11 @@ if. DEBGRAF do.
   'Rectangles: color=%j, pencolor=%j, xywh=%j' printf (2{.x), < }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
 end.
 if. 1 < #x do.
-  (([: glpen PS_SOLID ,~ {:) [ glrgb@}:) 1 {:: x
+  NB. Pen given, with width. Adjust the box to move the border to be inside the box.  Qt draws the border centered outside the box
+  y =. y +"2 (1 _2) * <. -: (1;3) {:: x
+  glrgb (1;<<0 1 2) {:: x
+  glpen 2 {.!.PS_SOLID (1;<<<0 1 2) {:: x
+NB. obsolete  (([: glpen PS_SOLID ,~ {:) [ glrgb@}:) 1 {:: x
 else.
 NB. No color, no pen
   (([: glpen (0,PS_NULL)"_) [ glrgb) irgb
@@ -6344,7 +6384,7 @@ NB. Result is an empty list
 drawtext =: 4 : 0"1
 'vc tc tf ts mg' =. 5 {. x
 NB. Draw the rectangles
-(<vc) drawrect > 1 {"1 y
+(boxopen vc) drawrect > 1 {"1 y
 if. DEBGRAF do.
   'Text: colors=%j/%j, font=%j%j, xy=(%j,%j), text=%j' printf vc;tc;tf;ts; (<"0 |. (2 ($,) mg) + {. 1 {:: y) , (0 { y)
 end.
@@ -10219,7 +10259,7 @@ if. hasrecursiveexpansion =: 1 = #ures =. (xlayo ,&(joinlayoutsl`<@.recursionher
   displaylevrank =: ,: 'Result after all recursions';(coname'')
   ures =. ures ,< coname''
 else.
-  ures =. 0 1 inheritu ures  NB. Don't inherit stealh - we want to show a result
+  ures =. 0 1 inheritu ures  NB. Don't inherit stealth - we want to show a result
 end.
 NB. Remove the entry from the stack
 executingmonaddyad__COCREATOR =: }. executingmonaddyad__COCREATOR
@@ -11724,7 +11764,10 @@ NB. Expansion is called for if there is a forced selection OR if the user has cl
 NB. seeing our initialselection in the selections
 shouldexpand =: (nitems > 0) *. forcedsel +. sellevel < #selections
 NB. Allow forced-select only if there is something to see
-if. (-. forcedsel) *. 1 < nitems do. initialselection =: <(<,0),SFOPEN end.
+if. (-. forcedsel) *. 1 < nitems do.
+  initialselection =: <(<,0),SFOPEN
+  expansionstate =: EXPANDABLE
+end.
 NB. Run the expansion
 resdol =. x traverse__uop forcedsel;shouldexpand;< travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
 if. forcedsel do.
@@ -11734,6 +11777,7 @@ elseif. shouldexpand do.
   resdol =. (joinlayoutsl resdol) ,&< coname''
   displaylevrank =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
   physreqandhighlights__inheritroot =: NOPHYSREQ
+  expansionstate =: EXPANDED
 elseif. do.
   NB. No expansion node created, display this result as a simple result
   resdol =. x ,&< coname''
@@ -12310,6 +12354,7 @@ NB. We must not create an initialselection unless we are prepared to back it up 
 NB. initialselection will pass on to a later block, creating chaos
     if. (-. noexpansion) *. (*./selopinfovalid)  *. (selectable <: sellevel < #selections) do.
       initialselection =: <(, 0:^:(=&_) |selectedpower);SFOPEN  NB. Make a list to match what's produced during selection
+      expansionstate =: EXPANDABLE
     end.
 
 NB. Run the expansion node for u^: (as a v-type node); pass in the analysis of v.  The result is either
@@ -12353,6 +12398,7 @@ NB. expansion: realize it as a v-type result
   NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
         physreqandhighlights__inheritroot =: NOPHYSREQ
         resdol =. resdol ,&< coname''
+        expansionstate =: EXPANDED
       case. 3 do.
   NB. Expansion node executed with u attached, or just u by itself
         resdol =. joinlayoutsl expdol
@@ -12362,6 +12408,7 @@ NB. expansion: realize it as a v-type result
   NB. u^:v.  But there shouldn't be any highlights anyway!  They come from the expansion.  So we just turn them off here
         physreqandhighlights__inheritroot =: NOPHYSREQ
         resdol =. resdol ,&< coname''
+        expansionstate =: EXPANDED
     end.
     
   end.
@@ -13072,6 +13119,7 @@ end.
 
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
+expansionstate =: (#: selectable , sellevel < #selections) { UNEXPANDABLE, UNEXPANDABLE, EXPANDABLE, EXPANDED
 NB. If the partition is dyadic, it will need the VALUE of x.  We will extract that
 NB. now.  We need the value of x after applying any selection given here.
 if. 1 < #x do.
@@ -13227,9 +13275,11 @@ if. (*./ selopinfovalid) *. (*#>selector) do.
     NB. a single selection that we are showing for courtesy), remove the light lines
     rankhistory =: ((#~  (<DLRCOMPEND) = 0&{"1) rankhistory) ,  (<MAXFINALDEFSTRINGLENGTH defstring 0) 0} {: rankhistory
   end.
+  expansionstate =: EXPANDED
 else.
   NB. If we do not display u, we have to keep the rank stack to display here, because that's the only chance we'll get
   rankhistory =: (< MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
+  expansionstate =: EXPANDABLE
 end.
 NB. Create a display for this node, as if it were a u-type verb.  This display will be inherited into the selector.
 NB. We initialize the rank stack, and it is that that will give the label for this display.
@@ -13996,6 +14046,7 @@ NB.?lintonly vval =: 0
 if. (errorcode__vop > EOK) +. -. *./ selopinfovalid do.
   vselect =. <EMPTYPRH   NB. Indic no v highlight
   rankhistory =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
+  expansionstate =: (#. selectable , sellevel < #selections) { UNEXPANDABLE, UNEXPANDABLE, EXPANDABLE, EXPANDED
 elseif. do.
   NB. v ran, and there is only one choice for the selection.  We will be able to display u
   NB. Get the actual result of v.  We know v collected successfully
@@ -14025,6 +14076,7 @@ elseif. do.
   vselect =. < (2 1 $ vselect) , <0
   NB. Since we have used the rankhistory in the detail node, don't repeat it on the summary
   rankhistory =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
+  expansionstate =: EXPANDED
 end.
 
 NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
@@ -14161,6 +14213,7 @@ if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 if. blockismarkable =: blockismarked do.
   NB. This node is marked for expansion.  u and v must both have run.
   NB. Traverse them both and realize them, and make them the input to this block
+  expansionstate =: EXPANDED
   dol =. joinlayoutsl x traverse__vop (<'::')&((<_1 0)})`'' travops (TRAVOPSKEEPALL);TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
   NB. Indicate error level before running u
   adderrorlevel ERRORLEVELADVERSE
@@ -14174,17 +14227,18 @@ if. blockismarkable =: blockismarked do.
   physreqandhighlights__inheritroot =: NOPHYSREQ
   NB. Create this block - with an invisible wire to u
   displaylevrank =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
-   dol ,&< coname''
+  dol ,&< coname''
 elseif. (0 = *./ selopinfovalid) +. (0 = $>selector) do.
   NB. Multiple results were selected.  We don't know what to traverse.  Realize this node, labeled as
   NB. u ::v
   displaylevrank =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
-   x ,&< coname''  NB. no need to inherit, since not markable
+  x ,&< coname''  NB. no need to inherit, since not markable
 elseif. do.
   NB. A single result was selected; traverse and inherit it
   NB. Remember whether u failed.  If it did, this node is markable.
   if. blockismarkable =: {. selvaluesd do.
-    NB. u failed, display v
+    NB. u failed, display v, but indicate that u is waiting in the wings
+    expansionstate =: EXPANDABLE
     1 inheritu x traverse__vop (<'::')&((<_1 0)})`'' travops (TRAVOPSKEEPALL);TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
   else.
     NB. u succeeded.
@@ -16224,6 +16278,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '>:@>:&.>*: i. 3'
 2 dissect '*:@:(* +:)@+:^:2 i. 5'
 2 dissect '(0 >. <:)^:a: 5'
+2 dissect '1 (0 >. -~)^:a: 5'
 2 dissect '(-:`(>:@(3&*))`1: @. (1&= + 2&|))^:a: 9'
 2 dissect '>:^:-: i. 3'
 2 dissect '>:^:crash9_dissect_ 9'
