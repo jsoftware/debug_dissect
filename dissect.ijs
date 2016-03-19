@@ -80,17 +80,10 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 NB. TODO
-NB. dissect '(2 2,:1 1) <;.3 i. 5 5'  once you expand ;.3, there's no way back
-NB. dissect '<;.1 (1 0 1 2 3 0 1 2)' same
 NB. dissect (1 1 1,:1 1 1) <;.3 i. 3 3'  fails
 NB. dissect '<:@> :: (#@>)"0 (1;2;''a'';3'  crashed
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
-NB. Fiddle with routing schedule:
-NB.   no adjpenalty when overlappenalty=0
-NB.   spread by 1 extra first time
-NB.   see why increasing crosspenalty made it selected
-NB. Have a marker for expandable blocks
 NB. 
 NB. Must add both other penalties when taking a turn? - no
 NB. Adj penalties can cause a long route where a spread would help.  But where to localize the spread?
@@ -2293,7 +2286,8 @@ if. newsel -.@-:&(sellevel&{.) selections do. scrollpoints =: 0 2$0 end.
 NB. If we encounter the highlight node, change it so we know we touched it
 endhighlightnode =: +: endhighlightnode
 selections =: newsel
-NB. Return the selection value to be passed down to next level
+NB. Return the selection value to be passed down to next level.  But do not propagate the
+NB. one-shot value, which is used as an initialselection to control expansion on/off when there is not actual initialselection to pass on
 y
 )
 NB.propsel0 =: 'propselstopatnoun'&((3 : 'y [ selections =: selectiontodisplay y') traversedown 0:)
@@ -4147,15 +4141,7 @@ interiorblocked =.  blockedgrid +./@:,;.0~ ({. (<. ,: >:@:|@:-)"1 }.) movedpoint
 angleok > interiorblocked
 )
 
-NB. obsolete NB. 4x3x2, indexed by (direction,movetype) returning yx offset from the END of the turn to the cell that needs to be blocked
-NB. obsolete NB. The arguments are the direction after the FORWARD route has been performed: so (viewed in the forward direction) the
-NB. obsolete NB. first cell is when you come north out of a left turn (i. e. from west); the cell to block is west of the end of the turn
 'N S W E' =. _1 0 , 1 0 , 0 _1 ,: 0 1
-NB. obsolete blockturn =: (4 1 2$0) ,. 4 2 2 $ W,E  , E,W , S,N  , N,S   
-NB. obsolete NB. 4x5x2x2, indexed by (direction,movetype) returning yx offsets to cells that need to be blocked in the direction of movement
-NB. obsolete NB. First cell is left jog going north; block cells to east and south of the end of the jog
-NB. obsolete blockjog =: (4 3 2 2$0) ,. 4 2 2 2 $ E,S , W,S , W,N , E,N , E,N , E,S , W,S , W,N
-NB. obsolete 
 NB. For each face, the amount to adjust a coordinate to move outward-perpendicular to the face to a gridpoint
 NB. at least a WIRESTANDOFF away.  This move will be followed by <.@yxtogrid.  For faces pointing down, we
 NB. move down by the standoff and then round up; for faces pointing up, we move up by the standoff and then round down
@@ -6334,7 +6320,6 @@ if. 1 < #x do.
   y =. y +"2 (1 _2) * <. -: (1;3) {:: x
   glrgb (1;<<0 1 2) {:: x
   glpen 2 {.!.PS_SOLID (1;<<<0 1 2) {:: x
-NB. obsolete  (([: glpen PS_SOLID ,~ {:) [ glrgb@}:) 1 {:: x
 else.
 NB. No color, no pen
   (([: glpen (0,PS_NULL)"_) [ glrgb) irgb
@@ -6632,12 +6617,6 @@ NB. x is text-color info, a la cfmdata
 NB. y is fillmask codes
 NB. result is the value to use for drawtext, with stippling added to the rect color
 rectcolorfromfillmask =: (<:FILLMASKNOCOLLECT)&bwand@] ,~&.> ({~      [: < 0 ;~ (- <. 2 ^. FILLMASKCHECKER)&bwlsl)
-
-NB. obsolete NB. x is text-color info, a la cfmdata
-NB. obsolete NB. y is fillmask codes
-NB. obsolete NB. result is the value to use for drawtext: the selected color, with stippling added
-NB. obsolete textinfofromfillmask =: ({:"1@] ((,~&.> 0&{"1) 0}"0 1 ]) ({~ {."1))    (0,FILLMASKCHECKER)&#:
-NB. obsolete 
 
 NB. y is fillmask code
 NB. result is 1 if the fillmask is data or plain fill; 0 if error or unexecd
@@ -7676,6 +7655,10 @@ This is reported as a 'domain error' in the J session.
 In m@.v, the execution of v must result in a numeric atom.
 
 This is reported as a 'domain error' in the J session.
+?selection too long
+In x u;.3 y, x specifies more axes than y has.
+
+This is reported as a 'length error' in the J session.
 ?selector invalid
 In x m} y, a complementary selector is not a single atomic box.  The selectors are the atoms of >m in x m} y.
 
@@ -7689,7 +7672,7 @@ In x { y or x m} y, a selector has boxing level higher than 3.  The selectors ar
 
 This is reported as a 'domain error' in the J session.
 ?selector too long
-In x { y or x m} y, a selector specifies more axes than the rank of y.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
+In x { y or x m} y, a selector specifies more axes than y has.  The selectors are the atoms of x in x { y or the atoms of m in x m} y.
 
 This is reported as a 'length error' in the J session.
 ?xm agreement
@@ -8923,7 +8906,7 @@ else.
     elseif. sellevel >: #selections do. selectionfound =. ,<localf   NB. should never be >
     elseif. localf -.@-: sellevel {:: selections do. selectionfound =. ,<localf
     elseif. (sellevel = <:#selections) *. (*#initialselection) do. selectionfound =. ({: selections) , usinginitialselection =. initialselection
-    elseif. sellevel < <:#selections do. selectionfound =. 0$a:   NB. remove expansion
+    elseif. sellevel < <:#selections do. selectionfound =. 0$a:   NB. remove expansion if reclick on expanded selection
     end.
   end.
   NB. Get the list of remaining frame - but remove it if empty, if we diminished it (if we didn't diminish it, leave it
@@ -13046,6 +13029,183 @@ else.
 end.
 )
 
+
+NB. **** m@.vn ****
+
+localeatdot =. 'dissectextendv' primlocale '@.'
+
+create =: 3 : 0
+'uop cop vop' =: 1 {"1 y
+NB.?lintonly uop =: <'dissectobj'
+NB. Switch to general verb if v is a noun, or if u is not a noun, or if u is not understood as a gerund
+if. (* noun bwand (<2 0) {:: y) +. 0 = #ulocales =: querygerund__uop '' do.
+  if. 0 = noun bwand (<0 0) {:: y do.
+    failmsg 'domain error: verb@.v'
+  end.
+  changeobjtypeto localedefault
+  create y
+  return.
+end.
+NB. It is m@.v with m a gerund.  ulocales is the list of locales in the gerund
+create_dissectobj_ f. (<1 2) { y
+NB. Register this object so we can clean up at end
+newobj__COCREATOR coname''
+NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
+NB. Ignore ]@ etc.
+NB. Set resultissdt for modifier processing
+resultissdt =: resultissdt__uop *. resultissdt__vop
+verb;(coname'');tokensource
+NB.?lintsaveglobals
+)
+
+NB. Set the valence used for executing this verb, and propagate to descendants
+setvalence =: 3 : 0
+valence =: #y
+vop =: setvalence__vop y
+NB.?lintonly vop =: <'dissectverb'
+uop =: setvalence__uop y
+NB.?lintonly uop =: <'dissectverb'
+resultissdt =: resultissdt__uop *. resultissdt__vop
+if. IFQT do. nuvocpage =: 'atdot' end.
+coname''
+NB.?lintsaveglobals
+)
+
+NB. return string form of operands, not including instrumentation
+defstring =: 3 : 0@]
+enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
+)
+
+NB. return string form of operands, including instrumentation
+exestring =: 3 : 0
+initloggingtable ''
+auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') , ' @. (' , (exestring__vop '') , ')))'
+)
+
+NB. Return the locales for propsel.
+proplocales =: 3 : 0
+<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3), 1) # ;: 'uop tokensource vop'
+)
+
+NB. Traversal up and down the tree.
+NB. The result is the DOL, up through the result of u
+traverse =: endtraverse@:(4 : 0)
+titlestring =: 0 fulltitlestring cop  NB. make this show up on rank stack
+traversedowncalcselect y
+if. errorcode e. EEARLYERROR do. earlyerror x return. end.
+vlayo =. joinlayoutsl x traverse__vop seloperands =. travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
+NB. Create the layout for v
+
+NB. If v didn't run, there is really nothing we can do about u; just display the final result.  If v failed because it didn't select, there
+NB. is hope for a later traversal.  If there is no selection, we don't know which u to display, so just display then final result then too
+NB.?lintonly vval =: 0
+if. (errorcode__vop > EOK) +. -. *./ selopinfovalid do.
+  vselect =. <EMPTYPRH   NB. Indic no v highlight
+  rankhistory =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
+  expansionstate =: (#. selectable , sellevel < #selections) { UNEXPANDABLE, UNEXPANDABLE, EXPANDABLE, EXPANDED
+elseif. do.
+  NB. v ran, and there is only one choice for the selection.  We will be able to display u
+  NB. Get the actual result of v.  We know v collected successfully
+  NB. See which u-verb was selected.  This uses user data & so must be checked
+  try.
+    selectedop =. ulocales {~ fillmask__vop frameselresult__vop selresult__vop
+  catch.
+    changeerrormessagefrominterp 'invalid v value'
+    EINVALIDOP earlyerror x ;< vlayo ,&<"1 0 < (2 1 $ <0 0$0) , <0 return.
+  end.
+  NB. The selection must be a scalar.
+  if. ($0) -.@-: $selectedop do.
+    changeerrormessagefrominterp 'non-atomic v'
+    EINVALIDOP earlyerror x ;< vlayo ,&<"1 0 < (2 1 $ <0 0$0) , <0 return.
+  end.
+  NB.?lintonly selectedop =. <'dissectverb'
+  NB. Insert an end-of-computation marker for the expansion
+  seloperands =. ,&(DLRCOMPEND ; (coname'')) applyintree 1 seloperands
+  NB. Traverse the selected operand and allocate a layout for it.  This result of u will become the input to the display
+  NB. of this node, replacing the original x
+  x =. joinlayoutsl x traverse__selectedop seloperands
+  NB. Since we have replaced the inputs to this node, the highlighting may have the wrong valence.  But there should
+  NB. be no highlights from this node anyway, so suppress them
+  physreqandhighlights__inheritroot =: NOPHYSREQ
+  vselect =. {.!.(<0 0$0) sellevel }. selections  NB. use the selection for v highlight
+  NB. Turn it into a highlight record
+  vselect =. < (2 1 $ vselect) , <0
+  NB. Since we have used the rankhistory in the detail node, don't repeat it on the summary
+  rankhistory =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
+  expansionstate =: EXPANDED
+end.
+
+NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
+displaylevrank =: rankhistory
+NB. Bring v in as a third input to the result, wherever it came from.
+NB. The v result (coming in from the right) is placed in a third box of
+NB. the result (present only when there is a right-hand operand).  This box contains
+NB. a table of dol;highlights
+x ; (coname '') ; < vlayo ,&<"1 0 vselect
+NB.?lintsaveglobals
+)
+
+exegesisrankstack =: 3 : 0
+'appearstwice lastinblock datapresent' =. y
+select. appearstwice,lastinblock
+case. 1 0 do.  NB. All computation in this block
+   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the calculation of the selected gerund.',LF
+case. 0 0 do.  NB. Computation ends in another block
+   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the calculation of the selected gerund.',LF
+case. do.
+   0 2$a:  NB. leave it for the overall text
+end.
+)
+
+exegesisrankoverall =: 4 : 0
+appearstwice =. x
+tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
+'datapresent endflag linetext' =. y
+tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
+if. -. datapresent do.
+  NB. No data.  Must not be the expansion
+  res =. ,: exegisisrankoverallnodisp appearstwice;tit
+elseif. linetext -: DLRCOMPEND do.
+  NB. This is the node for u.  There is data
+  'type t' =. exegisisrankoverallcompend appearstwice;tit
+  t =. t , 'The gerund displayed here was selected by the Final block that this block feeds into.',LF
+  res =. ,: type;t
+elseif. -. endflag do.
+  res =. 0 2$a:
+elseif. linetext -: titlestring do.
+  NB. Start of computation
+  res =. ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the calculation of the selected gerund.',LF
+elseif. do.
+  NB. The final node, with data
+  t =. 'This block %al1%displays the result of executing',LF,(defstring 0),CR,'The selection of executed verb comes in from the right.'
+  if. *./ selopinfovalid do.
+    if. (errorcode__vop <: EOK) do.
+      t =. t,LF,'The calculation for the selected result is shown ending in the expansion block feeding into this one.',LF,'Computation starts in the block(s) labeled ',titlestring,' in the rank stack .'
+    end.
+  else.
+    t =. t,LF,'Select a result-cell to see how it was calculated.'
+    if. tutor do.
+      t =. t , ' That will create a new block, called an expansion block, feeding into this one.  The expansion block will show the computation.'
+    end.
+  end.
+  res =. ,: EXEGESISRANKOVERALLCOMPEND;t,LF
+end.
+res
+)
+
+NB. Called when we have passed through this block without performing a selection.  If this block is already selected,
+NB. that means we have an expansion, and we should remove it.
+NB. Also used by partitioning code
+postselectionoverride =: 3 : 0
+if. selectable *. sellevel < #selections do.
+  makeselection 0$a:
+  PICKTOOLTIPMSGOK
+else. PICKTOOLTIPMSGNOORIDE
+end.
+)
+
+
+
 NB. **** partitions ****
 NB. A partition such as u/. is represented internally as u/.S where S is an adverb locale included simply
 NB. for the purpose of selecting from the result, in case the arguments have a rank that cause the partition to
@@ -13119,7 +13279,6 @@ end.
 
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
-expansionstate =: (#: selectable , sellevel < #selections) { UNEXPANDABLE, UNEXPANDABLE, EXPANDABLE, EXPANDED
 NB. If the partition is dyadic, it will need the VALUE of x.  We will extract that
 NB. now.  We need the value of x after applying any selection given here.
 if. 1 < #x do.
@@ -13184,6 +13343,7 @@ selopshapes _1}~ < yhlight (}:@$@[ , (}.~ {:@$)~)`(<"1@[ { ])@.(1<L.@]) _1 {:: s
 
 
 NB. adverb partitions \ \. /.
+NB. Note: this locale is inherited by conjunction partitions to get exegesis & postselection
 cocurrent 'dissectpartitionadverb'
 coinsert 'dissectpartition'  NB. for lint
 
@@ -13277,9 +13437,12 @@ if. (*./ selopinfovalid) *. (*#>selector) do.
   end.
   expansionstate =: EXPANDED
 else.
+  NB. We don't display u, either because there is not a single result-cell selected from the selection node, or the user
+  NB. has not clicked on a result-cell here
+  NB. If the next click will select a result here, indicate the node is expandable
+  if. sellevel = #selections do. expansionstate =: EXPANDABLE end.
   NB. If we do not display u, we have to keep the rank stack to display here, because that's the only chance we'll get
   rankhistory =: (< MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
-  expansionstate =: EXPANDABLE
 end.
 NB. Create a display for this node, as if it were a u-type verb.  This display will be inherited into the selector.
 NB. We initialize the rank stack, and it is that that will give the label for this display.
@@ -13354,17 +13517,11 @@ NB. When a single result of /. is selected, it creates an expansion.  There can 
 NB. no further selection in this block.  If the same result is reselected, we remove the expansion
 NB. Called when we have passed through this block without performing a selection.  If this block is already selected,
 NB. that means we have an expansion, and we should remove it
-postselectionoverride =: 3 : 0
-if. selectable *. sellevel < #selections do.
-  makeselection 0$a:
-  PICKTOOLTIPMSGOK
-else. PICKTOOLTIPMSGNOORIDE
-end.
-)
+postselectionoverride =: postselectionoverride__localeatdot f.
 
 NB. conjunction partitions ;.
 cocurrent 'dissectpartitionconjunction'
-coinsert 'dissectpartition'  NB. for lint
+coinsert 'dissectpartitionadverb'  NB. to pick up exegesis & postselectoverride
 
 create =: 3 : 0
 NB. handle the operands specific to the conjunction, and then transfer to the adverb code
@@ -13412,9 +13569,6 @@ titlestring =: 0 fulltitlestring cop,":partitionn =: >{.logvalues__vop
 x traverse_dissectpartitionadverb_ f. y
 )
 
-exegesisrankstack =: exegesisrankstack_dissectpartitionadverb_ f.
-exegesisrankoverall =: exegesisrankoverall_dissectpartitionadverb_ f.
-
 NB. ************** The individual partitioning modifiers *****************
 cocurrent 'dissectobj'
 
@@ -13423,7 +13577,7 @@ NB. *** \ ***
 'dissectpartitionadverb dissectpartition' primlocale '\'
 
 NB. The monadic valence u\ y:
-localebslashmonad_dissect_ =: startmonad ''
+localebslashmonad =. startmonad ''
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
 NB. y is natural frame(s) of the executed verb
@@ -13460,7 +13614,7 @@ exegesispartitiondesc =: 3 : 0
 'operates on prefixes of y of increasing length' 
 )
 
-localebslashdyad_dissect_ =: startdyad ''
+localebslashdyad =. startdyad ''
 NB. The dyad x u\ y:
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
@@ -13803,7 +13957,13 @@ case. do.   NB. 3 or _3
     NB. Trailing axes of ;.3 are included in the partitioning, so extend them by assuming a 'take everything'.
     NB. We can't just omit them from canonx and leave them in the frame, because then the selection would be
     NB. longer than canonx
+    NB. If canonx is longer than the shapeofy, it's an error that will be caught during execution.
+    NB. Here we just limit canonx to the length of shapeofy, to avoid internal error
     canonx =: canonx ,. (0 >. (#shapeofy) - ({:$canonx)) #"0 (0 _)
+    if.  (#shapeofy) < {:@$ canonx do.
+      canonx =: (#shapeofy) {."1 canonx
+      changeerrormessagefrominterp 'selection too long'
+    end.
     usedyshape =: ({:@$ canonx) {. shapeofy   NB. Now always same as shapeofy
     canonx =: ({. canonx) ,: (usedyshape<|)`(,:  usedyshape * *)} {: canonx
     NB. Calculate the number of start positions: ceiling of (length of axis/movement vector) for 3,
@@ -13973,179 +14133,6 @@ end.
 )
 
 NB. the rest handled in the common locale
-
-NB. **** m@.vn ****
-
-'dissectextendv' primlocale '@.'
-
-create =: 3 : 0
-'uop cop vop' =: 1 {"1 y
-NB.?lintonly uop =: <'dissectobj'
-NB. Switch to general verb if v is a noun, or if u is not a noun, or if u is not understood as a gerund
-if. (* noun bwand (<2 0) {:: y) +. 0 = #ulocales =: querygerund__uop '' do.
-  if. 0 = noun bwand (<0 0) {:: y do.
-    failmsg 'domain error: verb@.v'
-  end.
-  changeobjtypeto localedefault
-  create y
-  return.
-end.
-NB. It is m@.v with m a gerund.  ulocales is the list of locales in the gerund
-create_dissectobj_ f. (<1 2) { y
-NB. Register this object so we can clean up at end
-newobj__COCREATOR coname''
-NB.?lintonly uop =: vop =: <'dissectverb' [ cop =: ''
-NB. Ignore ]@ etc.
-NB. Set resultissdt for modifier processing
-resultissdt =: resultissdt__uop *. resultissdt__vop
-verb;(coname'');tokensource
-NB.?lintsaveglobals
-)
-
-NB. Set the valence used for executing this verb, and propagate to descendants
-setvalence =: 3 : 0
-valence =: #y
-vop =: setvalence__vop y
-NB.?lintonly vop =: <'dissectverb'
-uop =: setvalence__uop y
-NB.?lintonly uop =: <'dissectverb'
-resultissdt =: resultissdt__uop *. resultissdt__vop
-if. IFQT do. nuvocpage =: 'atdot' end.
-coname''
-NB.?lintsaveglobals
-)
-
-NB. return string form of operands, not including instrumentation
-defstring =: 3 : 0@]
-enparen^:(y=3) (defstring__uop 2) jd cop jd (defstring__vop 3)
-)
-
-NB. return string form of operands, including instrumentation
-exestring =: 3 : 0
-initloggingtable ''
-auditstg '(' , (logstring '') , '@(' , (verblogstring '') , (exestring__uop '') , ' @. (' , (exestring__vop '') , ')))'
-)
-
-NB. Return the locales for propsel.
-proplocales =: 3 : 0
-<^:(0=L.)@".@>^:(0 <: y) (1 , (y=3), 1) # ;: 'uop tokensource vop'
-)
-
-NB. Traversal up and down the tree.
-NB. The result is the DOL, up through the result of u
-traverse =: endtraverse@:(4 : 0)
-titlestring =: 0 fulltitlestring cop  NB. make this show up on rank stack
-traversedowncalcselect y
-if. errorcode e. EEARLYERROR do. earlyerror x return. end.
-vlayo =. joinlayoutsl x traverse__vop seloperands =. travops TRAVOPSKEEPALL;TRAVOPSPHYSKEEP;(vopval selopinfovalid);<selopshapes
-NB. Create the layout for v
-
-NB. If v didn't run, there is really nothing we can do about u; just display the final result.  If v failed because it didn't select, there
-NB. is hope for a later traversal.  If there is no selection, we don't know which u to display, so just display then final result then too
-NB.?lintonly vval =: 0
-if. (errorcode__vop > EOK) +. -. *./ selopinfovalid do.
-  vselect =. <EMPTYPRH   NB. Indic no v highlight
-  rankhistory =: (<MAXSTACKDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
-  expansionstate =: (#. selectable , sellevel < #selections) { UNEXPANDABLE, UNEXPANDABLE, EXPANDABLE, EXPANDED
-elseif. do.
-  NB. v ran, and there is only one choice for the selection.  We will be able to display u
-  NB. Get the actual result of v.  We know v collected successfully
-  NB. See which u-verb was selected.  This uses user data & so must be checked
-  try.
-    selectedop =. ulocales {~ fillmask__vop frameselresult__vop selresult__vop
-  catch.
-    changeerrormessagefrominterp 'invalid v value'
-    EINVALIDOP earlyerror x ;< vlayo ,&<"1 0 < (2 1 $ <0 0$0) , <0 return.
-  end.
-  NB. The selection must be a scalar.
-  if. ($0) -.@-: $selectedop do.
-    changeerrormessagefrominterp 'non-atomic v'
-    EINVALIDOP earlyerror x ;< vlayo ,&<"1 0 < (2 1 $ <0 0$0) , <0 return.
-  end.
-  NB.?lintonly selectedop =. <'dissectverb'
-  NB. Insert an end-of-computation marker for the expansion
-  seloperands =. ,&(DLRCOMPEND ; (coname'')) applyintree 1 seloperands
-  NB. Traverse the selected operand and allocate a layout for it.  This result of u will become the input to the display
-  NB. of this node, replacing the original x
-  x =. joinlayoutsl x traverse__selectedop seloperands
-  NB. Since we have replaced the inputs to this node, the highlighting may have the wrong valence.  But there should
-  NB. be no highlights from this node anyway, so suppress them
-  physreqandhighlights__inheritroot =: NOPHYSREQ
-  vselect =. {.!.(<0 0$0) sellevel }. selections  NB. use the selection for v highlight
-  NB. Turn it into a highlight record
-  vselect =. < (2 1 $ vselect) , <0
-  NB. Since we have used the rankhistory in the detail node, don't repeat it on the summary
-  rankhistory =: (<'Final ' , MAXFINALDEFSTRINGLENGTH defstring 0) (<_1 0)} rankhistory
-  expansionstate =: EXPANDED
-end.
-
-NB. Label the display.  Note that x may have changed number of operands, but we have the right one here
-displaylevrank =: rankhistory
-NB. Bring v in as a third input to the result, wherever it came from.
-NB. The v result (coming in from the right) is placed in a third box of
-NB. the result (present only when there is a right-hand operand).  This box contains
-NB. a table of dol;highlights
-x ; (coname '') ; < vlayo ,&<"1 0 vselect
-NB.?lintsaveglobals
-)
-
-exegesisrankstack =: 3 : 0
-'appearstwice lastinblock datapresent' =. y
-select. appearstwice,lastinblock
-case. 1 0 do.  NB. All computation in this block
-   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%shows the calculation of the selected gerund.',LF
-case. 0 0 do.  NB. Computation ends in another block
-   ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the calculation of the selected gerund.',LF
-case. do.
-   0 2$a:  NB. leave it for the overall text
-end.
-)
-
-exegesisrankoverall =: 4 : 0
-appearstwice =. x
-tutor =. tooltipdetailx = (1 {"1 TOOLTIPDETAILCHOICES) i. <'tutorial'
-'datapresent endflag linetext' =. y
-tit =. (*#titlestring) # ', which started in the block(s) marked with ',titlestring
-if. -. datapresent do.
-  NB. No data.  Must not be the expansion
-  res =. ,: exegisisrankoverallnodisp appearstwice;tit
-elseif. linetext -: DLRCOMPEND do.
-  NB. This is the node for u.  There is data
-  'type t' =. exegisisrankoverallcompend appearstwice;tit
-  t =. t , 'The gerund displayed here was selected by the Final block that this block feeds into.',LF
-  res =. ,: type;t
-elseif. -. endflag do.
-  res =. 0 2$a:
-elseif. linetext -: titlestring do.
-  NB. Start of computation
-  res =. ,: EXEGESISRANKSTACKEXPLAIN;'This block %al1%starts the calculation of the selected gerund.',LF
-elseif. do.
-  NB. The final node, with data
-  t =. 'This block %al1%displays the result of executing',LF,(defstring 0),CR,'The selection of executed verb comes in from the right.'
-  if. *./ selopinfovalid do.
-    if. (errorcode__vop <: EOK) do.
-      t =. t,LF,'The calculation for the selected result is shown ending in the expansion block feeding into this one.',LF,'Computation starts in the block(s) labeled ',titlestring,' in the rank stack .'
-    end.
-  else.
-    t =. t,LF,'Select a result-cell to see how it was calculated.'
-    if. tutor do.
-      t =. t , ' That will create a new block, called an expansion block, feeding into this one.  The expansion block will show the computation.'
-    end.
-  end.
-  res =. ,: EXEGESISRANKOVERALLCOMPEND;t,LF
-end.
-res
-)
-
-NB. Called when we have passed through this block without performing a selection.  If this block is already selected,
-NB. that means we have an expansion, and we should remove it
-postselectionoverride =: 3 : 0
-if. selectable *. sellevel < #selections do.
-  makeselection 0$a:
-  PICKTOOLTIPMSGOK
-else. PICKTOOLTIPMSGNOORIDE
-end.
-)
 
 NB. **** :: ****
 
