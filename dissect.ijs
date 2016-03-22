@@ -41,6 +41,8 @@ DEBTIME_dissect_ =: 0  NB. Show elapsed times
 DEBROUTETABLES_dissect_ =: 0  NB. Audit routing tables for consistency
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
+PR_dissect_ =: printf   NB. So this code will lint with printf undefined
+VB_dissect_ =: vbsprintf
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~2+errorcode) , '')'''
 
 0 : 0
@@ -49,6 +51,7 @@ alltests''
 testsandbox_base_ 1
 (3 ;< 'check';'no') testsandbox 2
 )
+
 alltests__ =: 3 : 0
 stime =. 6!:1''
 dly =: 30   NB. Time to recover from tests?
@@ -57,40 +60,39 @@ displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 0
 config_displayshowstealth_dissect_ =: 0
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-'Time after step 0: %4.1f sec' printf stime -~ 6!:1''
+'Time after step 0: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayautoexpand2_dissect_ =: 1
 0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-'Time after step 1: %4.1f sec' printf stime -~ 6!:1''
+'Time after step 1: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayautoexpand2_dissect_ =: 0
 displayshowcompmods_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-'Time after step 2: %4.1f sec' printf stime -~ 6!:1''
+'Time after step 2: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
-'Time after step 3: %4.1f sec' printf stime -~ 6!:1''
+'Time after step 3: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayshowfillcalc_dissect_ =: 0
 config_displayshowstealth_dissect_ =: 1
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-'Time after step 4: %4.1f sec' printf stime -~ 6!:1''
+'Time after step 4: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 config_displayshowstealth_dissect_ =: 0
 )
+
+
 NB. TODO
-NB. dissect (1 1 1,:1 1 1) <;.3 i. 3 3'  fails
-NB. dissect '<:@> :: (#@>)"0 (1;2;''a'';3'  crashed
+NB. Check invalid types for all operands of supported verbs/modifiers
+NB.
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
 NB. 
 NB. Must add both other penalties when taking a turn? - no
 NB. Adj penalties can cause a long route where a spread would help.  But where to localize the spread?
 NB. Think more about grayed-out words in the sentence
-NB. Now we penalize all points near a turn, and it causes routes to flee the turn.  Need to penalize only within the turn
-NB.   dissect '2 (^.@] ^@(] +/ . * %.) 1: ,. [) 3'   bad route when ][ etc
-NB.   dissect '2 4 (^.@] ^@(] +/ . * %.) 1: ,. [) 3 4'  bad route when ][ etc
 NB. Have a way to do selections from script, for testing
 
 NB. ?work on Android, with wd 'activity'
@@ -152,7 +154,6 @@ defaultfonts =: (<"0 (12 12 14 8 10)) ,.~ ((;:'Darwin') i. <UNAME) { ".;._2 (0 :
 '"Courier"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Mac version
 '"Courier New"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Version for all others
 )
-
 
 NB. lines beginning config_ are names that are initialized in the instance from the globals here
 NB. the others are global, shared among running dissections
@@ -1402,7 +1403,7 @@ NB.  penalties is penalty for a turn (in units of movement)
 QP^:DEBTIME'startrouter=?6!:1'''' '
 NB. obsolete start   =. 6!:1''
 routeresult =. dl ; routegrid dyxbr;<wirenets
-NB. obsolete if. 0.4 < dur   =. start -~ 6!:1'' do. 'Routing time: %6.1f' printf dur end.
+NB. obsolete if. 0.4 < dur   =. start -~ 6!:1'' do. 'Routing time: %6.1f' PR dur end.
 NB. Now that we have traversed, replace the locale-names with the inheritedtail, so that selection in the sentence moves to the locale
 NB. that is actually formatted for display
 sentenceinfo =. (<1 1) {:: topinfo
@@ -1864,7 +1865,9 @@ try.
   NB. See if labs are installed
   require 'labs/labs'
   NB. Run our lab - will give message of not found
+  NB.?lintmsgsoff
   lab_jlab_ y
+  NB.?lintmsgson
 catch.
   wdinfo 'Labs Addon Required';'To get the J Labs, use Package Manager and select labs/labs'
 end.
@@ -4368,9 +4371,9 @@ for_s. ,/ startpts ,"1/ ,/ ,"0/~ i. 3 do.
   newpos =. (sd,y,x,0) +"1 (_1 _1 _1,-RGRIDDIST) bwand"1 (sd) { movesbydir
   newdist =. (3 {"1 newpos) + (td,0 0) minroutingdist newpos
   if. (olddist =. (td,0 0) minroutingdist (,:sd,y,x,0)) ~: <./ newdist do.
-    'Routing table error: yx=(%d,%d), sourcedir=%d, targetdir=%d; premove dist=%d, postmove:' printf y;x;sd;td;olddist
+    'Routing table error: yx=(%d,%d), sourcedir=%d, targetdir=%d; premove dist=%d, postmove:' PR y;x;sd;td;olddist
     for_n. newpos,.newdist do.
-      'yx=(%d,%d), dir=%d, indist=%d, mindist=%d' printf n
+      'yx=(%d,%d), dir=%d, indist=%d, mindist=%d' PR n
     end.
     break.
   end.
@@ -6290,7 +6293,7 @@ NB. x is pen color,width[,style]
 NB. y is table of yx,:yx
 drawline =: 4 : 0
 if. DEBGRAF do.
-  'Lines: color=%j, width=%j, style=%j, xywh=%j' printf (3{.x);(3{x);(4}.x); }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
+  'Lines: color=%j, width=%j, style=%j, xywh=%j' PR (3{.x);(3{x);(4}.x); }: ; '((%j,%j)-(%j,%j)),' VB ,"2 |."1 y
 end.
 glrgb 3 {. x
 glpen 2 {.!.PS_SOLID 3 }. x
@@ -6313,7 +6316,7 @@ drawrect =: 4 : 0
 if. 0 e. $y do. return. end.
 irgb =. 3 {. ic =. > {. x
 if. DEBGRAF do.
-  'Rectangles: color=%j, pencolor=%j, xywh=%j' printf (2{.x), < }: ; '((%j,%j)-(%j,%j)),' vbsprintf ,"2 |."1 y
+  'Rectangles: color=%j, pencolor=%j, xywh=%j' PR (2{.x), < }: ; '((%j,%j)-(%j,%j)),' VB ,"2 |."1 y
 end.
 if. 1 < #x do.
   NB. Pen given, with width. Adjust the box to move the border to be inside the box.  Qt draws the border centered outside the box
@@ -6371,7 +6374,7 @@ drawtext =: 4 : 0"1
 NB. Draw the rectangles
 (boxopen vc) drawrect > 1 {"1 y
 if. DEBGRAF do.
-  'Text: colors=%j/%j, font=%j%j, xy=(%j,%j), text=%j' printf vc;tc;tf;ts; (<"0 |. (2 ($,) mg) + {. 1 {:: y) , (0 { y)
+  'Text: colors=%j/%j, font=%j%j, xy=(%j,%j), text=%j' PR vc;tc;tf;ts; (<"0 |. (2 ($,) mg) + {. 1 {:: y) , (0 { y)
 end.
 NB. Select font & color
 glrgb tc
@@ -6395,7 +6398,7 @@ NB. Result is the hw of the box needed
 sizetext =: 4 : 0"1
 'vc tc tf ts mg' =. 5 {. x
 if. DEBGRAF do.
-  'Sizetext: colors=%j/%j, font=%j%j, text=%j' printf vc;tc;tf;ts; (0 { y)
+  'Sizetext: colors=%j/%j, font=%j%j, text=%j' PR vc;tc;tf;ts; (0 { y)
 end.
 glfontextent tf , ": ts
 if. 5 < #x do.
@@ -6647,7 +6650,7 @@ NB. of the empty was accounted for when the block was created
 NB.  If there are subDOLs, adjust the rects to leave a box margin
 boxyx =. dataorigin
 if. DEBOBJ do.
-  'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' printf (<"0 |. y),xsizes;ysizes
+  'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' PR (<"0 |. y),xsizes;ysizes
 end.
 if. emptydata =. 0 e. $ usedd =. data do.
   NB. The noun is empty.  Display it as empties, with shape up to the first 0 in the nounshape
@@ -6772,9 +6775,7 @@ NB. y is locales;yx;(lines as n,4 yx start,end)
 drawplacement =: 3 : 0
 glclear''
 'dos yx wires' =. y
-if. DEBOBJ do.
-  qprintf'DOL?y '
-end.
+if. DEBOBJ do. QP 'DOL?y ' end.
 NB. draw the objects
 for_d. dos do.  NB.?lintonly d =. <'dissectobj'
   drawDO__d d_index{yx
@@ -16581,6 +16582,7 @@ ctup = 8
 'ill-formed number: 1xcv' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '1xcv'
 (2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
 'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
+2 dissect '(1 1 1,:1 1 1) <;.3 i. 3 3'
 )
 
 testtacit =: testtacit2"0
