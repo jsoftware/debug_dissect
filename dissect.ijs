@@ -86,6 +86,7 @@ config_displayshowstealth_dissect_ =: 0
 
 NB. TODO
 NB. Check invalid types for all operands of supported verbs/modifiers
+NB. dissect '''a'' 3&;.1 i. 5' fails
 NB.
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
@@ -2595,16 +2596,17 @@ NB.  ABORTED=no cells ran, and error was detected EXEC=cells ran, but one failed
 NB.  Values EOK and below are terminals; they should not be replaced.  Values above EOK indicate
 NB.  incomplete results; the lower a value, the more precise it is, so we will replace higher values
 NB.  with a lower during inheritu.
-(errorcodenames =: ;:'EFILLERROR ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINADVERSE') =: _2 + i. 19
-EEARLYERROR =: ENOAGREE,EINVALIDOP,EINVALIDVERB
+(errorcodenames =: ;:'EFILLERROR ENOUN EOK ENOAGREE EFRAMINGABORT EFRAMINGEXEC EABORTED EEXEC EFRAMING ENOEXECD EUNEXECD ENOOPS ENOSEL EINVALIDOP EINVALIDVERB EINVALIDMODOP ENOAGREEMASK EINVALIDOPMASK EINVALIDVERBMASK EINVALIDMODOPMASK EINADVERSE') =: _2 + i. 21
+EEARLYERROR =: ENOAGREE,EINVALIDOP,EINVALIDVERB,EINVALIDMODOP
+EEARLYMASK =: ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EINVALIDMODOPMASK
 NB. If there were results to display, we will create a fillmask for them.  The cases follow:
-EHASVALIDFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EFILLERROR
+EHASVALIDFILLMASK =: ENOUN,EOK,EEXEC,EFRAMING,EUNEXECD,EFRAMINGEXEC,EEARLYMASK,EFILLERROR
 EHASFILLMASK =: EHASVALIDFILLMASK   NB. there are results, and a fillmask
-EFAILED =: EEARLYERROR,EABORTED,EEXEC,EFRAMING,ENOEXECD,EUNEXECD,EFRAMINGABORT,EFRAMINGEXEC,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK  NB. incomplete execution
+EFAILED =: EEARLYERROR,EABORTED,EEXEC,EFRAMING,ENOEXECD,EUNEXECD,EFRAMINGABORT,EFRAMINGEXEC,EEARLYMASK  NB. incomplete execution
 EALLFRAMING =: EFRAMING,EFRAMINGABORT,EFRAMINGEXEC   NB. framing error, with or without others
-EGENERR =: EEARLYERROR,EFRAMINGABORT,EFRAMINGEXEC,EABORTED,EEXEC,EFRAMING,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK
-EPROPERR =: ENOEXECD,EUNEXECD
-ESHOULDINHERIT =: ENOUN,EOK,EEARLYERROR,EFRAMINGABORT,EFRAMINGEXEC,EABORTED,EEXEC,EFRAMING,ENOEXECD,EUNEXECD,ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK  NB. This node adds to the knowledge of u@v
+EGENERR =: EEARLYERROR,EFRAMINGABORT,EFRAMINGEXEC,EABORTED,EEXEC,EFRAMING,EEARLYMASK
+EPROPERR =: ENOEXECD,EUNEXECD,EINVALIDVERB
+ESHOULDINHERIT =: ENOUN,EOK,EEARLYERROR,EFRAMINGABORT,EFRAMINGEXEC,EABORTED,EEXEC,EFRAMING,ENOEXECD,EUNEXECD,EEARLYMASK  NB. This node adds to the knowledge of u@v
 ENOTERROR =: ENOUN,EOK,ENOEXECD,EUNEXECD,ENOOPS,ENOSEL
 NB. selresult - the result of applying the selection to the result of the verb.  This is the selection based on the INPUT to
 NB.   this verb, not including any local selector, which is used for subnodes (the local selector is used for selector and selopinfo)
@@ -2712,9 +2714,21 @@ NB. locale of the noun when the recursion starts.
 NB. selector and selop already set, keep them
     NB. Since nouns appearing in u&v (ex: =&(i."0) are executed twice, so in that case
     NB. discard all but the first one.
-    if. 1 < #logvalues do. logvalues =: 1 {. logvalues end.
-    'selframe frame arglevel resultlevel selresult' =: ($0);($0);($0);($0);<logvalues
-    errorcode =: (*#logvalues) { ENOEXECD,ENOUN
+    if. 1 < #logvalues do.
+      NB. Since nouns appearing in u&v (ex: =&(i."0) are executed twice, so in that case
+      NB. discard all but the first one.
+      logvalues =: 1 {. logvalues
+    end.
+    if. *#".'valence' do.
+      NB. Valence expected - it must be a verb (or compound producing a verb)
+      NB. If there are NO logvalues, there must have been an error creating the verb - some invalid form like +@2
+      NB. There were no verb ranks, but we are treating this as a failing verb; so add a line to rankhistory for it
+       rankhistory =: rankhistory , (;:^:_1^:(0<L.) titlestring) ; coname''
+      'selopinfovalid selframe frame frames arglevel resultlevel errorcode selresult' =: (0:"0 physreqandhighlights);($0);($0);a:;($0);($0);EINVALIDVERB;<(0$a:)
+    else.
+      'selframe frame arglevel resultlevel selresult' =: ($0);($0);($0);($0);<logvalues
+      errorcode =: (*#logvalues) { ENOEXECD,ENOUN
+    end.
   else.
     if. *#>selector do.
       assert. 2 = {: $ > selector [ 'malformed selection'
@@ -3333,7 +3347,7 @@ elseif. errorcode__loc e. EGENERR do.  NB. all errors but NOEXECD,UNEXECD
     NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
     NB. If the failure was an early error, keep the early error but note that we now have a mask
     if. errorcode__loc e. EEARLYERROR do.
-      errorcode =: (ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK) {~ (ENOAGREE,EINVALIDOP,EINVALIDVERB) i. errorcode__loc
+      errorcode =: (ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EINVALIDMODOPMASK) {~ (ENOAGREE,EINVALIDOP,EINVALIDVERB,EINVALIDMODOP) i. errorcode__loc
     else.
       errorcode =: (#.(errorcode__loc e. EALLFRAMING) , errorcode e. EHASVALIDFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC  NB. Inherit the error indic
     end.
@@ -5439,7 +5453,7 @@ NB. If we are not in a try block, allow display of error only at the place where
 NB. during sniff.  This handles the case where the user makes a selection after sniff, and then there is
 NB. no error detected at the point of error, and the enclosing conjunction shows its error.
 if. errorwasdisplayedhere +. errorlevel ~: ERRORLEVELNONE do.
-  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 1 1)#'';'agreement';'framing';'invalid verb';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EFILLERROR,EINADVERSE) i. errorcode
+  DOstatusstring =: ((((#ENOTERROR) , 2 3 2 2 1 1)#'';'agreement';'framing';'invalid verb';'invalid operand';'0 for fill result';'recoverable error'),errorlevel { errormessagefrominterp;'error on fill-cell';'recoverable error') {::~ (ENOTERROR,ENOAGREE,ENOAGREEMASK,EFRAMING,EFRAMINGABORT,EFRAMINGEXEC,EINVALIDVERB,EINVALIDVERBMASK,EINVALIDMODOP,EINVALIDMODOPMASK,EFILLERROR,EINADVERSE) i. errorcode
 else.
   DOstatusstring =: ''
 end.
@@ -7638,6 +7652,10 @@ This error is reported as 'domain error' in the J session.
 The result-cells that could not be assembled are shown below, with each result inside its own dashed box, so that you can see where the incompatibility arises.
 ?no neutral
 When (u/ y) is executed with empty y, the result is a neutral (aka identity element) for u.  But this u has no neutral.
+?invalid operand
+An operand to a modifier is invalid.  The derived verb was not executed.
+
+This is reported as a 'domain error' in the J session.
 ?invalid verb
 This combination was rejected before it was even executed on its arguments.
 
@@ -12266,7 +12284,7 @@ if. errorcode__vop e. EFAILED do.
   errorcode =: EINVALIDVERB
 elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do.
   if. (0 < L. vval) *. ((1 < L. vval) +. -. ('';,0) e.~ $&.> vval) do. errorcode =: EINVALIDVERB
-  elseif. 2 ~: isinteger > vval do. errorcode =: EINVALIDVERB
+  elseif. 2 ~: isinteger > vval do. errorcode =: EINVALIDMODOP
   end.
 end.
 if. errorcode e. EEARLYERROR do. earlyerror ux ;< vlayo ,&<"1 0 < (2 1 $ <0 0$0) , <0 return. end.
@@ -16583,6 +16601,9 @@ ctup = 8
 (2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
 'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
 2 dissect '(1 1 1,:1 1 1) <;.3 i. 3 3'
+2 dissect '''a'' 3;.1 i. 5'
+2 dissect '5@.] 0'
+2 dissect '5`6@.] 0'
 )
 
 testtacit =: testtacit2"0
