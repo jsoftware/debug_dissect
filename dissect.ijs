@@ -38,6 +38,7 @@ DEBPICK_dissect_ =: 0  NB. display pick progress
 DEBEXEGESIS_dissect_ =: 0  NB. display exegetic creation
 DEBMOUSE_dissect_ =: 0   NB. display mouse events
 DEBTIME_dissect_ =: 0  NB. Show elapsed times
+DEBSCROLL_dissect_ =: 0  NB. Show scroll status
 DEBROUTETABLES_dissect_ =: 0  NB. Audit routing tables for consistency
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
@@ -85,9 +86,6 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
-NB. Check invalid types for all operands of supported verbs/modifiers
-NB. dissect '''a'' 3&;.1 i. 5' fails
-NB.
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
 NB. 
@@ -154,6 +152,10 @@ JWIKIURL =: 'http://code.jsoftware.com/wiki/'
 defaultfonts =: (<"0 (12 12 14 8 10)) ,.~ ((;:'Darwin') i. <UNAME) { ".;._2 (0 : 0)
 '"Courier"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Mac version
 '"Courier New"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Version for all others
+)
+
+debscroll =: 3 : 0
+QP '6!:1$0 y >coname$0 scrollingtype__COINSTANCE >scrollinglocale__COINSTANCE '
 )
 
 NB. lines beginning config_ are names that are initialized in the instance from the globals here
@@ -1543,7 +1545,11 @@ NB. We MUST resize before pshow, to get initial size right, because pre-J8.04
 NB. releases called _resize immediately on pshow, rather than as a queued event
 sizedrawingandform autosizestate =: 1
 wd 'pshow'
-NB. On J6, we will get an immediate paint event.
+NB. On J6, we will get an immediate event, but it might be a mouse-move.
+NB. Make sure we have enough variables defined to make mouse-move harmless until
+NB. the drawing is made
+wirehighdisttocheck =: _ 0   NB. Normally defined in drawplacement
+wirehighmousepos =: _1000 _1000
 NB. On QT, resize event, which will call paint
 0 0$0
 NB.The initial paint event will draw the screen
@@ -1993,7 +1999,7 @@ initnounshowdetail =: 'propselall'&((3 : 'y [ nounshowdetail =: y +. -. resultis
 NB.On the way down, we set dispstealthoperand: y is 1 2 to remove those codes from stealth, making ][ displayable
 NB. Called in locale of the base of the tree
 calcdispstealth =: 'propselall'&((3 : 'y [ dispstealthoperand =: {. stealthoperand -. y') traversedown 0:)
-
+ctest =: 0: traversedown 0:
 NB. Decide whether inputs to niladic verbs should be displayed.
 NB. Normally not, but after " (ex: 2:"0) we may want to see them.  Result of each node is passed to its descendants; the input is saved as the status for this node to use
 NB. Called in locale of the base of the tree
@@ -3815,7 +3821,6 @@ NB. that is enough incentive to avoid them, and continue expanding as long as th
 NB. Finally, if there are still overlaps, we slap on a punitive penalty and do a final route, accepting what results
 routelevel =. 0
 firsttimeatlevel =. 1
-NB. obsolete disproute   =. _
 whilst. do.
   'ov neigh cross scorecross' =. routelevel { routeschedule
   gsctlbr1 =. initgrids gridblocks
@@ -3847,12 +3852,10 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
   NB. If this is a new routing level, and there were overlaps at the previous level, we must
   NB. expand going to the new level.  If this is the same level, expand only if there is an improvement in overlaps
   adjneeded =. firsttimeatlevel { (score < 1000000 >. bestscore - 500000) , (prevscore >: 1000000)
-NB. obsolete if. 0 = disproute =. <: disproute do. ({."2 gridblocks) ;< (,  occtowires)&.>~/"1 route return. end.
   if. score < bestscore do.
     bestscore =. score
     bestroute =. ({."2 gridblocks);<route
   end.
-NB. obsolete QP'score prevscore bestscore adjneeded firsttimeatlevel '
   NB. Get routing level to use for the next route
   NB. Advance the routing schedule if we do not adjust the placement - we must be
   NB. just trying the new routing weights.  But also advance if we are running with
@@ -4848,7 +4851,8 @@ SELECTIONBORDERSTYLE =: 0 0 0,HIGHLIGHTLINEWIDTH,PS_SOLID  NB. color,width of li
 
 WIRECOLOR =: 0 0 0   NB. Color of wires
 WIREHIGHCOLOR =: 255 100 255  NB. Highlight color for nets, blocks, & sentence words
-SENTENCEHIGHRECTPEN =: WIREHIGHCOLOR , 3 
+SENTENCEHIGHRECTHIGHWIDTH =: 3
+SENTENCEHIGHRECTPEN =: WIREHIGHCOLOR , SENTENCEHIGHRECTHIGHWIDTH 
 
 BOXMARGIN =: 2 ($,) 3   NB. Space to leave around boxed results
 BOXLINEWIDTH =: 2 ($,) 1  NB. Width of lines making boxes
@@ -5105,6 +5109,7 @@ NB. This version, which is defined in dissect locale, is used for pickrects that
 NB. have a DO, but are tied to the display instance.  Those are always links.  They are
 NB. processed in the locale of the display instance, but come here.
 pickDO =: 4 : 0
+debscroll^:DEBSCROLL 'pickDO';x;<y 
 QP^:DEBPICK 'coname'''' y '
 'exp yx sd px' =. y
 NB. Only left-click in the top area is honored
@@ -6809,7 +6814,7 @@ wirehighwires =: wires
 NB. For each net, the mouse-movement required before the net is revisited
 wirehighdisttocross =: ($wires) # 0
 NB. (disttocheck;odosincecheck)
-NB. disttocheck is he minimum in wirehighdisttocross; we don't need to evaluate anything until going this far
+NB. disttocheck is the minimum in wirehighdisttocross; we don't need to evaluate anything until going this far
 NB. odosincecheck is the negative of the total distance we have traveled since last check
 wirehighdisttocheck =: _1 0
 NB. The last mouse position evaluated
@@ -7394,7 +7399,7 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
     ('label';ix) drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
-    hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
+    hoversessmin__COINSTANCE =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
 0 0$0
@@ -7418,7 +7423,7 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
     ('rlabel';ix) drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOlabelpos) + exp { DOyx + (<ix,0) {"_1 DOlabelpospickrects) ; msgtext
-    hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
+    hoversessmin__COINSTANCE =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
 0 0$0
@@ -7487,7 +7492,7 @@ elseif. #r =. (exp{DOshapepospickrects) (_1 findpickhits) y do.
   formloc =. exp { COCREATOR,coname''
   NB.?lintonly formloc =. <'dissect'
   ('shape';ix) drawttipwithemphasis__formloc (pyx + (((exp,0 0);0 0;0) {:: DOshapepos) + exp { DOyx + (<ix,0) {"_1 DOshapepospickrects) ; msg
-  hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
+  hoversessmin__COINSTANCE =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
 end.
 0 0$0
 )
@@ -8090,8 +8095,8 @@ NB. Classify the click as +-creep, +-page, or click in traveler
   NB. which locale is scrolling (for main view); which axis is scrolling; starting clickpos (on the entire isigraph control) for that axis;
   NB. start/trav/end limits for that axis (on the entire isigraph control)
       dwo =. sclickx { exp { DOyx + 0 {"2 DOdatapos  NB. Data Window Offset in selected window
-      'scrollingtype__COCREATOR scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit' =: SCROLLTYPESCROLLBAR;(coname'');sclickx;spt;(clickpos+dwo);(dwo+0 _1 { scrollbarsections);(end -~ {:>bindlist)
-  NB.?lintonly scrollinglocale__COCREATOR =: <'dissectobj'
+      'scrollingtype__COINSTANCE scrollinglocale__COINSTANCE scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit' =: SCROLLTYPESCROLLBAR;(coname'');sclickx;spt;(clickpos+dwo);(dwo+0 _1 { scrollbarsections);(end -~ {:>bindlist)
+  NB.?lintonly scrollinglocale__COINSTANCE =: <'dissectobj'
   NB.?lintsaveglobals
   NB.?lintonly case. do. newspt =. 0
   end.
@@ -8121,7 +8126,7 @@ NB. User tried to select, but we couldn't do it.  Give him a tooltip.
     formloc =. exp { COCREATOR,coname''
     NB.?lintonly formloc =. <'dissect'
     ('data';coname'') drawttipwithemphasis__formloc (y + exp { DOyx + 0 {"2 DOdatapos) ; selres { PICKTOOLTIPMSGS
-    hoversessmin__COCREATOR =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
+    hoversessmin__COINSTANCE =: FORCEDTOOLTIPMINVISTIME + 6!:1''  NB. Only one tooltip at a time, so OK to put in instance locale
   end.
 end.
 )
@@ -8142,15 +8147,15 @@ picklDOresizepos =: 4 : 0
 NB. Ignore resize in explorer.  The handle is not displayed, but the pick window is there
 if. exp do. '' return. end.
 NB. Read the pixels in the image
-pickpixels__COCREATOR =: (, glqpixels) 0 0 , |. screensize =. (|. glqwh'')
-'scrollingtype__COCREATOR scrollinglocale__COCREATOR pickscrollcurryx__COCREATOR' =: SCROLLTYPESIZEDATA;(coname'');(1 0 { sd)
+pickpixels__COINSTANCE =: (, glqpixels) 0 0 , |. screensize =. (|. glqwh'')
+'scrollingtype__COINSTANCE scrollinglocale__COINSTANCE pickscrollcurryx__COINSTANCE' =: SCROLLTYPESIZEDATA;(coname'');(1 0 { sd)
 NB. There's a minimum size; but also don't try to resize width to smaller than the label.
 NB. Clear starting x position to get true width
 minsize =. MINRESIZABLE >. 0 , (<1 1) { topsize =. brect 0 (<a:;0 1)} (brect DOlabelpos) ,: (brect DOshapepos)
 NB. The maximum size is the size of the data, but also limited by screen size.  Remove top header from allowed size
 maxsize =. (extractDOLsize valueformat) <. <. RESIZEMAXFRAC * screensize - ((<1 0) { topsize),0
 NB. pickscrollinfo is table of yx: tl of data,min,max,startsize,startcursor
-pickscrollinfo__COCREATOR =: ((exp { DOyx) + (<exp,0) {  DOdatapos) , minsize , maxsize , ((<exp;,1) { DOdatapos) , pickscrollcurryx
+pickscrollinfo__COINSTANCE =: ((exp { DOyx) + (<exp,0) {  DOdatapos) , minsize , maxsize , ((<exp;,1) { DOdatapos) , pickscrollcurryx
 ''
 )
 
@@ -8243,7 +8248,7 @@ NB. Nilad.  Ask the owner for a tooltip and display it if there is one
 NB. This runs in the hovering locale, either the main form or an explorer
 hoverdo =: 3 : 0
 if. #hoverinitloc do.   NB. should always be there, but we might get a late timer event
-NB.?lintonly hoverinitloc__COCREATOR =: 0 0
+NB.?lintonly hoverinitloc__COINSTANCE =: 0 0
   NB. Get the locale of the object.  If we are on an explorer, it's just that; if on the main, we have to
   NB. look for the pickrect
   if. hoverisexp do.
@@ -8436,7 +8441,8 @@ end.
 NB.?lintsaveglobals
 )
 
-dissect_dissectisi_mbldown =: 3 : 0
+dissect_dissectisi_mbldown =: 3 : 0  NB. Always in form locale
+debscroll^:DEBSCROLL 'dmbldown';<y 
 NB. In case a button sequence was interrupted, clear button state
 dissect_dissectisi_mblreset 1
 NB. If the user left-clicked outside a pickrect, that is the start of a highlight or scroll operation.
@@ -8477,14 +8483,14 @@ NB. to protect against lost events.
 NB. y indicates what we are clearing:
 NB. 0=clear mouse-down  info, leave mouse-up for double-click
 NB. 1=clear everything
-dissect_dissectisi_mblreset =: 3 : 0
+dissect_dissectisi_mblreset =: 3 : 0   NB. always in form locale
 select. scrollingtype
 case. SCROLLTYPEIMAGE do.
   4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
 case. SCROLLTYPESCROLLBAR do.
   4!:55 ;: 'scrollinglocale scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 case. SCROLLTYPESIZEDATA do.
-  4!:55 ;: 'pickpixels picksentencepixels'  NB. release memory
+  4!:55 ;: 'pickpixels picksentencepixels pickscrollcurryx'  NB. release memory
 case. SCROLLTYPEWIREHIGH do.
   NB. Undo the highlighting, then release highlight pixels
   NB. End of wire highlighting.  Restore the original pixels
@@ -8561,7 +8567,8 @@ startdebuginfo =: 0$a:
 
 NB. mouse movement.  If we are scrolling, drag the pixels along
 NB. If we are dragging a scrollbar, vector to the object locale to handle that
-dissect_dissectisi_mmove =: 3 : 0
+dissect_dissectisi_mmove =: 3 : 0   NB. always in form locale
+debscroll^:DEBSCROLL 'dmmove';<y 
 QP^:DEBMOUSE'mainmmove:hwnd=?winhwnd wd''qhwndp'' sysdata '
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 sd =. 0 ". sysdata
@@ -8645,8 +8652,12 @@ NB. sentencehovertok tells what token, if any, we are hovering over.  If we are,
 NB. the highlight rectangles
 sentencehoverdraw =: 3 : 0
 if. sentencehovertok +.&# blockhoverloc do.
-  NB. Save the pixels from the screen
-  sentencehoverpixels =: (, glqpixels) 0 0 , |. (|. glqwh'')
+  NB. Save the pixels from the screen, in two blocks: the sentence, and the rest of the screen
+  winsize =. |. glqwh ''  NB. y,x of control.  Mustn't read outside!
+  picksentencerect =. ((0 >. {.) ,: winsize <. {:)&.(+/\) (_1 2 * <. -: >: SENTENCEHIGHRECTHIGHWIDTH) + topbrect
+  sentencehoverpixelss =: (, glqpixels) 1 0 3 2 { , picksentencerect
+  scrollblock =. -~/\ (0 (1}) {: picksentencerect) ,: winsize
+  sentencehoverpixelsb =: (, glqpixels) , |."1 scrollblock
   NB. Get the locale to be displayed.  We know there must be one.
   NB. For sentence hover, highlight the blocks too
   if. 0 = #slocale =. blockhoverloc do.
@@ -8670,10 +8681,16 @@ NB. DO NOT CLEAR sentence-hover status because we may be about to repaint and im
 NB. which we must be able to do with no mouse movement; but DO clear the block-hover locale, because
 NB. we may have redrawn the screen & the hovered-over block may have moved
 sentencehoverend =: 3 : 0
-if. sentencehovertok +.&# blockhoverloc do.
-  glpixels sentencehoverpixels
+if. #sentencehovertok +.&# blockhoverloc do.
+  NB. Restore the unhighlighted sentence; restore the object only if we were
+  NB. hovering over the sentence.  If we were hovering over the object, we may have scrolled,
+  NB. and the original pixels are obsolete
+  if. #sentencehovertok do.
+    glpixels sentencehoverpixelsb
+  end.
+  glpixels sentencehoverpixelss
   glpaint''
-  4!:55 <'sentencehoverpixels'  NB. Remove to save space
+  4!:55 <'sentencehoverpixelsb sentencehoverpixelss'  NB. Remove to save space
   blockhoverloc =: 0$a:
 end.
 ''
@@ -8681,7 +8698,8 @@ end.
 
 NB. mouse release.  If we are scrolling, set the new offset and redraw
 NB. If we are dragging a scrollbar, vector to the object locale to finish that
-dissect_dissectisi_mblup =: 3 : 0
+dissect_dissectisi_mblup =: 3 : 0   NB. always in form locale
+debscroll^:DEBSCROLL 'dmblup';<y 
 NB. On mouse-up, save the scrolling type for use if there is a doubleclick
 lastscrollingtype =: scrollingtype
 hoverend''
@@ -9038,9 +9056,10 @@ NB. ** explorer mouse events **
 
 NB. The only event is a click in the one defined region.  We are already in the object locale
 explorer_dissectisi_mbldown =: 3 : 0
+debscroll^:DEBSCROLL 'embldown';<y 
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 hoverend''
-seqclickno__COCREATOR =: >: seqclickno__COCREATOR
+seqclickno__COINSTANCE =: >: seqclickno__COINSTANCE
 yx =. EXPLORERYX -~ 1 0 { sd =. 0 ". sysdata
 if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;sd;0 end.
 )
@@ -9049,13 +9068,14 @@ if. *./ yx < {:DOsize do. 'l' pickDO 1;yx;sd;0 end.
 NB. mouse movement.
 NB. If we are dragging a scrollbar, vector to the object locale to handle that
 explorer_dissectisi_mmove =: 3 : 0
+debscroll^:DEBSCROLL 'emmove';<y 
 QP^:DEBMOUSE'expmmove:hwnd=?winhwnd wd''qhwndp'' sysdata '
 NB.?lintonly sysdata =. '100 100 100 100 100 100 100 100 100 100 100 100'
 sd =. 0 ". sysdata
 if. scrollingtype = SCROLLTYPESCROLLBAR do.
 NB. Perform the scroll, on this explorer window.  If the scroll was started in a different locale,
 NB. abort it.
-  if. scrollinglocale__COCREATOR -: coname'' do.
+  if. scrollinglocale__COINSTANCE -: coname'' do.
     1 scrollmmove 1 0 { sd
   else.
     explorer_dissectisi_mblup''
@@ -9070,10 +9090,11 @@ end.
 NB. mouse release.  If we are scrolling, set the new offset and redraw
 NB. If we are dragging a scrollbar, vector to the object locale to finish that
 explorer_dissectisi_mblup =: 3 : 0
+debscroll^:DEBSCROLL 'emblup';<y 
 if. scrollingtype = SCROLLTYPESCROLLBAR do.
-  4!:55 ;: 'scrollinglocale__COCREATOR scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
+  4!:55 ;: 'scrollinglocale__COINSTANCE scrollingaxis scrollingorigscrollpt scrollingorigclick scrollinglimits scrollptlimit'  NB. indicate end-of-scrollbar
 end.
-scrollingtype =: SCROLLTYPENONE
+scrollingtype__COINSTANCE =: SCROLLTYPENONE
 )
 
 explorer_dissectisi_focuslost =: 3 : 0
@@ -9085,8 +9106,8 @@ explorer_dissectisi_mbrdown =: explorer_close
 
 NB. Pass char events as if pressed in main form
 explorer_dissectisi_char =: 3 : 0
-sysdata__COCREATOR =: sysdata  NB.?lintonly =. 'abc'
-dissect_dissectisi_char__COCREATOR''
+sysdata__COINSTANCE =: sysdata  NB.?lintonly =. 'abc'
+dissect_dissectisi_char__COINSTANCE''
 )
 
 NB. ********************** end of explorer ***************
@@ -9376,10 +9397,10 @@ NB. Since labeled nouns are never SDTs, ignore a click on the name
 NB. Nouns are either primitives or SDTs.  Clicking on the shape will expand an SDT if possible.  Once expanded,
 NB. the display becomes a verb, ad cannot be collapsed.
 picklDOshapepos =: 4 : 0
-NB.?lintonly 'nounhasdetail nounshowdetail COCREATOR' =: 0;0;< <'dissectobj'
+NB.?lintonly 'nounhasdetail nounshowdetail COINSTANCE' =: 0;0;< <'dissectobj'
 if. nounhasdetail > nounshowdetail do.
   nounshowdetail =: 1
-  dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
+  dissect_dissectisi_paint__COINSTANCE 1  NB. display the updated selection
 end.
 0 0$0
 )
@@ -9389,7 +9410,7 @@ NB. If the display of a noun's detail is suppressed, and it has detail, any clic
 NB.?lintonly 'nounhasdetail nounshowdetail COCREATOR' =: 0;0;< <'dissectobj'
 if. nounhasdetail > nounshowdetail do.
   nounshowdetail =: 1
-  dissect_dissectisi_paint__COCREATOR 1  NB. display the updated selection
+  dissect_dissectisi_paint__COINSTANCE 1  NB. display the updated selection
 else.
 NB. If the noun is displaying detail, treat a click in the data area same as for a verb result
   x picklDOdatapos_dissectobj_ f. y
@@ -16640,7 +16661,6 @@ testbivalenth =: 3 : 0
 :
 x * *: i. #y
 )
-
 
 testsandbox_base_ =: 3 : 0
 1 testsandbox y
