@@ -86,6 +86,7 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
+NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
 NB. 
@@ -142,6 +143,7 @@ copath ''
 NB. The verb z458095869 returns a table of defined local names.  It is a table of (name;(type from 4!:0);(5!:5 form of name))
 z458095869 =: (([ ,. <"0@] ,. (".@[`(rankinv_dissect_@[)`(rankinv_dissect_@[)`(rankinv_dissect_@[))@.]&.>) (4!:0)) @ ((<'z458095869') -.~ 4!:1@i.@4:)
 
+IFJA_z_ =: {. 0 ,~ ". 'IFJA_z_'  NB. gl2 expects it
 require 'strings gl2'
 cocurrent 'dissect'
 coinsert 'jgl2'
@@ -1304,6 +1306,9 @@ wdpmove =: ([: wd 'pmovex ' , ])`([: wd 'pmove ' , ])@.IFQT
 3 : '(glfontextent_jgl2_ =: glfont_jgl2_)^:0 (0)'^:(0 > 4!:0) <'glfontextent_jgl2_'  NB. defined in 8.03
 NB. JVERSION is not defined at startup script on J6, so use a null string for that
 wdmbfont =:  ([: wd 'mbfont ' , ]) ` (([: wd 'mb font ' , ])`([: wd 'mb font ' , [ , ' ' , ])@.({. 0 = /: 1 4 7 ,:  _3 {. , 0&".;._2 '.' ,~ 's' -.~ '/' taketo 'Qt IDE:' takeafter ". 'JVERSION')) @. IFQT
+JEVERSION =: _3 {. , 0&".;._2 '.' ,~ 's' -.~ LF taketo 'Library:' takeafter ". 'JVERSION'
+NB. return 1 if JE version is at least y
+JEversionatleast =: 3 : '0 = {. /: y ,: JEVERSION'
 
 NB. timer covers.  On 602 we have a single global, shared by all instances, indicating which locale the
 NB. timer is running for.  Kludge, but seemingly OK since only one locale can have focus.  Called
@@ -3149,7 +3154,7 @@ elseif. do.
   case. 1;2 do.
     tickettonatural ($x) $!.(<' ') y
   case. do.
-  'cs fill fillreqd' =. checkframing y  NB. result cell size, fill atom (empty if unframable)
+    'cs fill fillreqd' =. checkframing y  NB. result cell size, fill atom (empty if unframable)
     NB. This is where we add fill as required
     <"0@(cs&{.)@>`>@.(#fill) tickettonatural ((-#cs) }. $x) $!.(<cs $ {.!.' ' fill) y
   end.
@@ -13695,21 +13700,31 @@ end.
 NB. The shape of x is immaterial since u is always invoked as a monad
 NB. If selopshapes is a map, we have to get the right part
 if. 1 = L. {: selopshapes do.
-  if. 0 = #yshape =. _1 {:: selopshapes do.
-    NB. If x is > 1 for atomic y, the fill-cell is an atom instead of a 1-item list
-    a: , < 1 #~ partitionx__xop <: 1
-  else.
-    a: , < ps 0} yshape
+  if. JEversionatleast 8 4 15 do.
+  NB. Result is a list of (ps) items of y
+  a: , < ps , }. _1 {:: selopshapes
+  else.   NB. obsolete, eventually
+    if. 0 = #yshape =. _1 {:: selopshapes do.
+     NB. If x is > 1 for atomic y, the fill-cell is an atom instead of a 1-item list
+     a: , < 1 #~ partitionx__xop <: 1
+    else.
+     a: , < ps 0} yshape
+    end.
   end.
 else.
   NB. Boxed operand; must get the actual shape of the selected part
   if. (({.>y) + ps) >: # yshape =. _1 {:: selopshapes do.
     NB. If there is not enough real data for an item, create a cell of fills
-    if. 0 = #$yshape do.
-    NB. If x is > 1 for atomic y, the fill-cell is an atom instead of a 1-item list
+    if. JEversionatleast 8 4 15 do.
+    NB. Result is a list of (ps) items of y, filled with empties (shape of contents = ,0)
+    a: , < (ps , }. yshape) $ <,0
+    else.   NB. obsolete, eventually
+     if. 0 = #$yshape do.
+      NB. If x is > 1 for atomic y, the fill-cell is an atom instead of a 1-item list
       a: , < (1 #~ partitionx__xop <: 1) $ <,0
-    else.
+     else.
       a: , < (ps 0} $yshape) $ <,0
+     end.
     end.
   else.
     NB. Normal case, select from the actual operand
