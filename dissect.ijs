@@ -40,6 +40,8 @@ DEBMOUSE_dissect_ =: 0   NB. display mouse events
 DEBTIME_dissect_ =: 0  NB. Show elapsed times
 DEBSCROLL_dissect_ =: 0  NB. Show scroll status
 DEBROUTETABLES_dissect_ =: 0  NB. Audit routing tables for consistency
+DEBSENTENCELOG_dissect_ =: 0  NB. Write sentence to file
+SENTENCELOGFILE_dissect_ =: <'C:/J8/dissectlog.txt'
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 PR_dissect_ =: printf   NB. So this code will lint with printf undefined
@@ -47,38 +49,43 @@ VB_dissect_ =: vbsprintf
 edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~2+errorcode) , '')'''
 
 0 : 0
-alltests''
+alltests_dissect_''
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 testsandbox_base_ 1
 (3 ;< 'check';'no') testsandbox 2
 )
 
-alltests__ =: 3 : 0
+alltests_dissect_ =: 3 : 0
 stime =. 6!:1''
-dly =: 30   NB. Time to recover from tests?
+dly =: 10   NB. Time to recover from tests?
 config_displayautoexpand2_dissect_ =: 0
 displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 0
 config_displayshowstealth_dissect_ =: 0
+('Step 0:',LF) 1!:2 SENTENCELOGFILE_dissect_
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 'Time after step 0: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayautoexpand2_dissect_ =: 1
+('Step 1:',LF) 1!:2 SENTENCELOGFILE_dissect_
 0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 'Time after step 1: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayautoexpand2_dissect_ =: 0
 displayshowcompmods_dissect_ =: 1
+('Step 2:',LF) 1!:2 SENTENCELOGFILE_dissect_
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 'Time after step 2: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 1
+('Step 3:',LF) 1!:2 SENTENCELOGFILE_dissect_
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
 'Time after step 3: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayshowfillcalc_dissect_ =: 0
 config_displayshowstealth_dissect_ =: 1
+('Step 4:',LF) 1!:2 SENTENCELOGFILE_dissect_
 0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
 'Time after step 4: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 config_displayshowstealth_dissect_ =: 0
@@ -86,6 +93,9 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
+NB. ];.0"0 i. 2   fails
+NB. create large box; hover for tooltip; right-click for explorer.  Tooltip on
+NB.   main messes up the explorer, changing its size & refreshing pixels to it
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
@@ -698,6 +708,7 @@ returnobject_dissect_ =: qopt 'returnobject'
 NB. Break the input into words.  If there is an error, fail.  Discard any comment
 NB. Discard anything past the first LF, and remove CR
 sentence =. CR -.~ ({.~ i.&LF) sentence
+if. DEBSENTENCELOG do. (sentence,LF) 1!:3 SENTENCELOGFILE end.
 try. queue =. ;: sentence catch. queue =. 0$a: end.
 NB. If the last word is a comment, delete it
 if. #queue do.  NB. following fails on no words
@@ -3834,7 +3845,6 @@ QP^:DEBROUTE'(<a:;a:;0){drg ' [ drg =. '*ST ' {~ (_1,(routingzero + RMOVEEOC),(r
   NB.  (list of boxes each holding path of a routed run);(table of other wires) where the path of the routed run is
   NB.  (table of dir,row,col,movetype of occupied cells)
   route =. (ov,neigh,cross) routenets gridblocks;<nets
-
   if. 0= #route do. score =. 0  NB.?lintonly  [ 'crosspts overlapsns overlapsew' =. 3 0 3$0
   NB. Coalesce routes, but first append the net number to each route
   elseif. #occupied =. ; (,.&.> i.@#) {."1 route do.
@@ -4073,7 +4083,6 @@ NB. sign-dependent amount which should be good enough for screen resolutions
 NB. Sort nets to route shorter ones first.  This might reduce crossings?
   nets =. (/:   +/@(>./ - <./)@:(2&{."1)@>) nets
 end.
-
 NB. See which nets do not require routing, and draw them directly
 if. 1 e. ddrawmsk =. *./@:(0&~:)@({. directdrawok }.)@> nets do.
   routes =. (<0 4$0) ,. ({. ,"1&:(}:"1) }.)&.> ddrawmsk # nets
@@ -5062,11 +5071,10 @@ NB. Get the height of each line
 lh =. >./@:({."1)@> boxhw
 NB. Install starting yx, and move rects into horizontal position
 rects =. ; (0 ,.~ |.!.0 +/\ lh) (] ,:~"1 (+"1    (0) ,. [: |.!.0 +/\@:({:"1)))&.:>"1 0 boxhw
-
 NB. Get the max size for the string, and return the data for drawing
 NB. We return the index to the cfm, since we select the color later
 rectinfo =. (>./ +/"2 rects);<cfmsx;txts;rects;< 3 {"1 utokspacelevvisloc
-(((0 >. >./ +/"2 titlrects);<titlinfo,<titlrects),:rectinfo),linkinfo
+(((<. 0 >. >./ +/"2 titlrects);<titlinfo,<titlrects),:rectinfo),linkinfo
 )
 
 NB. Draw the sentence.  y is the first two lines of the result of sizesentence (the title/sentence info)
@@ -6544,7 +6552,7 @@ NB. Convert from style;(level;rect) to style;level;rect
   hlights =. ; <@({. ,. >@{:)"1 hlights
   if. # hlights do.
     QP^:DEBHLIGHT2'drawhighlights:defstring=?defstring]0 hlights valueformat  valueformat(hlighttotlbr)2&{"1]hlights '
-    mesh =. ((boxyx + 2 2 $ 1 _1 1 _1) +"2 |:"2) valueformat hlighttotlbr 2&{"1 hlights
+    mesh =. ((boxyx + 2 2 $ 1 _1 1 _1) +"2 |:"2) valueformat  hlighttotlbr 2&{"1 hlights
     if. +./ meshvalid =. INVALIDRECT -.@:-:"2 mesh do. NB. create top,bottom,:left,right, adjust for rectangle origin
 NB. Expand the cliprect to allow for the width of the highlight, which is centered on the edge of the rectangle
 NB. and therefore projects outside
@@ -7193,6 +7201,7 @@ sz =. extractDOLsize y
 )
 
 cocurrent 'dissectdisplaytwo'
+coinsert 'dissectobj'  NB. Needed for lint
 NB. This locale is used for nodes that fall back to displaying just two results if the whole result won't fit.
 NB. ex: u/, u^:
 
@@ -8394,7 +8403,8 @@ NB. We have to save an extra pixel all the way around (seeming glrect error), an
 NB. that the rectangle is all onscreen, else QT will crash
 ttpyx =. 0 >. _1 + ttipy,ttipx
 ttphw =. (2 + ttiph,ttipw) <. (ctly,ctlx) - ttpyx
-tooltippixels =: (, glqpixels) 1 0 3 2 { ttpyx,ttphw
+tooltippixels__COINSTANCE =: (, glqpixels) 1 0 3 2 { ttpyx,ttphw
+tooltiplocale__COINSTANCE =: coname''  NB. Remember the locale that the tooltip was drawn in
 (TOOLTIPCOLOR;TOOLTIPTEXTCOLOR;x,TOOLTIPMARGIN;'') drawtext string;2 2 $ ttipy,ttipx,ttiph,ttipw  NB. kludge
 glpaint''
 NB.?lintsaveglobals
@@ -8405,13 +8415,15 @@ hoverend =: 3 : 0
 hoverinitloc =: $0
 NB.?lintonly wdtimer =: wd
 wdtimer 0
-if. 0 = 4!:0 <'tooltippixels' do.
+if. 0 = 4!:0 <'tooltippixels__COINSTANCE' do.
   NB. if the tooltip has a minimum lifetime, delay until that lifetime has been exceeded (kludge).  Should be short
   if. 0.01 < reqddelay =. hoversessmin - 6!:1'' do. 6!:3 reqddelay end.
+  NB. select the screen the pixels were drawn in
+  wd 'psel ' , winhwnd__tooltiplocale__COINSTANCE
   glsel 'dissectisi'
-  glpixels tooltippixels
+  glpixels tooltippixels__COINSTANCE
   glpaint''
-  4!:55 <'tooltippixels'
+  4!:55 <'tooltippixels__COINSTANCE'
 end.
 )
 
@@ -9106,6 +9118,7 @@ explorer_dissectisi_focuslost =: 3 : 0
 hoverend''
 )
 
+
 NB. right-click in explorer - delete the explorer window
 explorer_dissectisi_mbrdown =: explorer_close
 
@@ -9412,7 +9425,7 @@ end.
 
 picklDOdatapos =: 4 : 0
 NB. If the display of a noun's detail is suppressed, and it has detail, any click on it will turn on the detail
-NB.?lintonly 'nounhasdetail nounshowdetail COCREATOR' =: 0;0;< <'dissectobj'
+NB.?lintonly 'nounhasdetail nounshowdetail COINSTANCE' =: 0;0;< <'dissectobj'
 if. nounhasdetail > nounshowdetail do.
   nounshowdetail =: 1
   dissect_dissectisi_paint__COINSTANCE 1  NB. display the updated selection
@@ -14029,7 +14042,8 @@ case. do.   NB. 3 or _3
 end.
 NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
 NB. call to u.  So make that the frame.
-ny ; ny ; (($0);ny) ; a: , a:
+NB. If this is a dyad, add an empty frame for x
+ny ; ny ; (($0);^:(1<#y) <ny) ; a: , a:
 NB.?lintsaveglobals
 )
 
@@ -15827,6 +15841,7 @@ runtests_base_ =: 0 : 0
 2 dissect '+@{. ''a'''
 2 dissect '0 +&+ ''a'''
 2 dissect '0 +&+ ''ab'''
+2 dissect '0 +&+&> ''a'';''b'''
 2 dissect '0 +&:+ ''a'''
 2 dissect '''a''+&+ 0'
 2 dissect '''ab''+&+ 0'
@@ -16640,6 +16655,7 @@ ctup = 8
 2 dissect '''a'' 3;.1 i. 5'
 2 dissect '5@.] 0'
 2 dissect '5`6@.] 0'
+2 dissect '];.0"1 i. 2 5'
 )
 
 testtacit =: testtacit2"0
