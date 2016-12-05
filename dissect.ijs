@@ -93,9 +93,7 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
-NB. ];.0"0 i. 2   fails
-NB. create large box; hover for tooltip; right-click for explorer.  Tooltip on
-NB.   main messes up the explorer, changing its size & refreshing pixels to it
+NB. Use #/. in a sentence; hover over it; tooltip is not descriptive
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
@@ -7297,8 +7295,14 @@ A modifier is assigned a new selection level if it produces more than one result
 
 
 Each selection level has a color.  
-This color is used for all information for the level: (1) the rank here, (2) the color of the frame of the modifier in the shape line, 
+This color is used for all information for the level:
+
+(1) the rank here,
+
+(2) the color of the frame of the modifier in the shape line, 
+
 (3) the background color of a selected result-cell, 
+
 (4) the outline color used to show the argument cells that contributed to the selected result.
 
 
@@ -7526,7 +7530,7 @@ As you make selections in the data area, you will see the coloring of the frame 
 
 
 The shape of the result cells (the last component of the result-shape) is shown in white against a dark-blue background.  
-If the result-cells have varying shapes, the string '(fill)' is appended to the shape to indicate that the result contains fills, which are shown by crosshatching in the data area.
+If the result-cells have varying shapes, the filled shape, enclosed in parentheses, is appended to the result-shape to indicate that the result contains fills, which are shown by crosshatching in the data area.
 
 
 If the block is part of a compound using @, &, or &. there is no displayable result until a single result-cell has been selected.  Until that time the shape/selection lines are omitted.
@@ -7547,8 +7551,14 @@ If you ignore the coloring and simply read the numbers, that will tell you the s
 
 
 Each selection level has a color.  
-This color is used for all information for the level: (1) the rank in the rank stack, (2) the background color of the frame and selection here, 
+This color is used for all information for the level: 
+
+(1) the rank in the rank stack, 
+
+(2) the background color of the frame and selection here, 
+
 (3) the background color of a selected result-cell, 
+
 (4) the outline color used to show the argument cells that contributed to the selected result.
 
 
@@ -7558,7 +7568,7 @@ As you make selections in the data area, you will see the coloring of the frame 
 
 The shape of the result cells (the last component of the result-shape) is shown in white against a dark-blue background.
 It indicates the shape of the results of the last selection level.
-If the result-cells have varying shapes, the string '(fill)' is appended to the shape to indicate that the result contains fills (which are shown by crosshatching in the data area).
+If the result-cells have varying shapes, the filled shape, enclosed in parentheses, is appended to the result-shape to indicate that the result contains fills (which are shown by crosshatching in the data area).
 
 
 The second line indicates the selections you have made.
@@ -7867,9 +7877,13 @@ If the result contains multiple result-cells, left-clicking in the data area wil
 
 
 Each selection level has a color, used for all information for the level: 
+
 (1) the rank in the rank stack, 
+
 (2) the background color in the shape/selection lines, 
+
 (3) the background color of a selected result-cell here, 
+
 (4) the outline color used to show the argument cells that contributed to the selected result.
 
 
