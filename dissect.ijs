@@ -1,4 +1,4 @@
-NB. Copyright (c) Henry H. Rich, 2012-2016.  All rights reserved.
+NB. Copyright (c) Henry H. Rich, 2012-2017.  All rights reserved.
 
 locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops fitok powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector adverb conjunction'
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
@@ -93,6 +93,7 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
+NB. u :. v doesn't allow getting into u with right-click
 NB. Use #/. in a sentence; hover over it; tooltip is not descriptive
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
@@ -6819,7 +6820,6 @@ glpen 1,PS_SOLID
 if. #wires do.
   gllines 1 0 3 2 {"1 ; wires
 end.
-
 NB. Set up information for wire highlighting
 wirehighwires =: wires
 NB. For each net, the mouse-movement required before the net is revisited
@@ -14079,7 +14079,7 @@ if. partitionn e. 3 _3 do.
     r =. < (-maxvalid) {. or
     NB.?lintonly maxvalid =. ''   NB. avoids index error in next line
     selector =: (logticket {~ - >: maxvalid)&(0})&.> selector
-  elseif. (2 = #shapeofy) *. (1 < #or) do.
+  elseif. (2 = #".'shapeofy') *. (1 < #or) do.  NB. If the verb never executed, shapeofy is not defined; fail this test then
     NB. We know that when y is a table, the first cell is run twice (first time to get the result-shape) EXCEPT
     NB. when the result is boxed or the input is too narrow
     NB. So here, when it looks like there was an error, discard the first result, and change selector accordingly
@@ -16670,6 +16670,7 @@ ctup = 8
 2 dissect '5@.] 0'
 2 dissect '5`6@.] 0'
 2 dissect '];.0"1 i. 2 5'
+2 dissect '(2 2$3) ((<1 1)&{);._3&.(2 0 1&|:) i. 7 10 3'
 )
 
 testtacit =: testtacit2"0
