@@ -620,7 +620,7 @@ COCREATOR__nobj =: x
 create__nobj y
 )
 
-NB. Create a noun node.  y is (string form of the verb[;display form]);(token number)
+NB. Create a noun node.  y is (string form of the verb[;display form]);(token number);value
 NB. if display form is not given, string form is not boxed
 NB. x is locale to use for COCREATOR (if omitted, we must be calling from the main instance, just use its name)
 NB. Result is result from create which is type;locale;token #)
@@ -10708,8 +10708,17 @@ NB. If cop is '[:', this is a capped fork and we display it that way
 NB. We may come here through & (which may be through &.), but only for monad, so in that case we leave the & unchanged, holding monad &[:];
 NB.  but we remove the . if any for exestring (no need to bother for defstring, since that is handled by dual)
 create =: 3 : 0
+NB. For u@n, replace n with n"_ which is its equivalent.  The conjunction-name is a signal to " to suppress the "_ for display
+if. nilad =: ((,'@') -: (<1 1){::y) *. * noun bwand (<2 0){::y do.
+  rank =. COCREATOR createnoun ('_');'';($0);_
+  y =. y 2}~ localerank 1 createmodifier (2{y) ,  (conj;'@';($0)) ,: rank
+end.
 if. 0 = bwand/ verb , > (<0 2;0) { y do.
-  failmsg 'domain error: operands to ',((<1 1){::y),' must be verbs'
+  if. ':' e. (<1 1){::y do.
+    failmsg 'domain error: operands to ',((<1 1){::y),' must be verbs'
+  else.
+    failmsg 'domain error: left operand to ',((<1 1){::y),' must be a verb'
+  end.
 end.
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -10744,16 +10753,16 @@ if. IFQT do.
     if. ':' e. cop do. nuvocpage =: nuvocpage , 'co' end.
   end.
 end.
-NB. Return the dispoperands from v
+NB. Return the locale of this compound
 coname''
 NB.?lintsaveglobals
 )
 
 NB. 1 if this verb may not have infinite rank, or if this node displays already
 shownilad =: 3 : 0
-NB. For @, treat it like @>, which is like "0, always displaying
+NB. For @, treat it like @>, which is like "0, always displaying (unless it's @n)
 NB. for @:, pass y on through
-y +. -. ':' e. cop
+y +. -. (nilad +. ':' e. cop)
 )
 
 NB. return string form of operands, not including instrumentation
@@ -10936,6 +10945,7 @@ NB. The monad is just like @@:, so we just point to that locale.  This also appl
 NB. behaves like a monad
 if. 1 = #y do.
   changeobjtypeto localeat
+  nilad =: 0   NB. used by localeat
   NB. kludge if this locale is dual, replace the dual in the path to preserve display hooks
   if. '.' e. cop do. insertoverride localedual end.
   NB. leave the . in the conjunction for titlestring purposes - it will be removed before use
@@ -11304,7 +11314,7 @@ end.
 )
 
 NB. **** u"n u"v m"n m"v****
-NB. We also come through here for u&n m&v, with the primitive changed to '&'
+NB. We also come through here for u&n m&v, with the primitive changed to '&'; & for @n and :: n, with the primitive changed
 localerank_dissect_ =: primlocale '"'
 
 create =: 3 : 0
@@ -11312,7 +11322,7 @@ NB. Save the operands - locales of the verbs, and string form of the conj
 'uop cop vop' =: 1 {"1 y
 NB. Handle m"nv as a general verb, except when it's m"_ which we handle as a nilad
 if. noun bwand (<0 0) {:: y do.
-  if. _ -: ". ". 'op__vop' do.
+  if. *./ (, *@#) _ = ". ". 'op__vop' do.
     nilad =: 1  NB. Mark nilads as allowing display
   else.
     changeobjtypeto localedefault
@@ -11323,10 +11333,12 @@ else.
   nilad =: 0
 end.
 create_dissectobj_ f. (<1 2) {  y
-NB. In case this is a nilad, create the title to use.  If the title of v is empty, we must be on a named "_
-if. a: -: (<2 2) { y do.
+NB. In case this is a nilad, create the title to use.  If the tokenlist of v is empty, we must be on a named "_
+if. cop -.@-: ,'"' do.
+  niladtitle =: '(',cop,'n)'  NB. cop is not '"' - must be @n or ::n
+elseif. a: -: (<2 2) { y do.
   niladtitle =: ; (<:tokensource) ({ /: [) ;: usersentence__COCREATOR   NB. decr tokensource to account for MARK added
-else.
+elseif. do.
   niladtitle =: '(m"_)'
 end.
 
@@ -11355,12 +11367,18 @@ NB.?lintsaveglobals
 )
 
 NB. 1 if this verb may not have infinite rank, or if this node displays already
-shownilad =: 1:   NB. assuming " will be followed by not _
+shownilad =: 3 : 0
+y +. -. nilad    NB. assuming " will be followed by not _
+)
 
 NB. return string form of operands, not including instrumentation
-NB. Always use '"', which is the ACTION we perform; cop is the label we use in the rank stack
+NB. if nilad, empty cop means that the original noun was converted to noun"_; we display just the original
 defstring =: 3 : 0@]
-enparen^:(y=3) (defstring__uop 2) jd '"' jd (defstring__vop 3)
+if. nilad *. cop -.@-: ,'"' do.
+  enparen^:(y=3) (defstring__uop 2)
+else.
+  enparen^:(y=3) (defstring__uop 2) jd '"' jd (defstring__vop 3)
+end.
 )
 
 NB. return string form of operands, including instrumentation
@@ -14222,8 +14240,13 @@ NB. **** :: ****
 primlocale '::'
 
 create =: 3 : 0
+NB. For u@n, replace n with n"_ which is its equivalent.  The conjunction-name is a signal to " to suppress the "_ for display
+if. nilad =: * noun bwand (<2 0){::y do.
+  rank =. COCREATOR createnoun ('_');'';($0);_
+  y =. y 2}~ localerank 1 createmodifier (2{y) ,  (conj;'::';($0)) ,: rank
+end.
 if. 0 = bwand/ verb , > (<0 2;0) { y do.
-  failmsg 'domain error: operands of u ::v must be verbs'
+  failmsg 'domain error: left operand to :: must be a verb'
 end.
 create_dissectobj_ f. (<1 2) { y
 NB. Register this object so we can clean up at end
@@ -15336,6 +15359,7 @@ if. vvv =: * verb bwand (<0 0) {:: y do.
 NB. If it's vvv, see if starts with [: .  If so, go process it as u@:v
   if. 4 = stealthoperand__uop do.  NB. [:
     changeobjtypeto localeat
+    nilad =: 0   NB. used by localeat
 NB. Move the token values too
 NB. Use the conjunction-name as a way of flagging this as [: for display
     create ((1 { y) ,: conj;'[:';(<0 2){y) 0 1} y
@@ -16271,8 +16295,8 @@ runtests_base_ =: 0 : 0
 2 dissect 'i.&.> (2 3) $ 1 1 1 2 3 0.5'
 'domain error: operands to &: must be verbs' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '2&:+ 5'
 'domain error: operands to &: must be verbs' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+&:5 (2)'
-'domain error: operands to @ must be verbs' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '2@+ 5'
-'domain error: operands to @ must be verbs' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+@2 (5)'
+'domain error: left operand to @ must be a verb' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '2@+ 5'
+'domain error: left operand to :: must be a verb' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '2 :: + 5'
 'domain error: operands to @: must be verbs' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '2@:+ 5'
 'domain error: operands to @: must be verbs' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+@:2 (5)'
 'domain error: operands to &. must be verbs' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '+&.5 (2)'
@@ -16671,6 +16695,10 @@ ctup = 8
 2 dissect '5`6@.] 0'
 2 dissect '];.0"1 i. 2 5'
 2 dissect '(2 2$3) ((<1 1)&{);._3&.(2 0 1&|:) i. 7 10 3'
+2 dissect '".@''a'' 0' [ a =. 'abcde'
+2 dissect '5 ".@''a'' 0' [ a =. 'abcde'
+2 dissect '''abc'' + :: (i. 6) 1 2 3'
+2 dissect '+: :: (i. 6) ''abc'''
 )
 
 testtacit =: testtacit2"0
