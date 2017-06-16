@@ -2733,10 +2733,8 @@ NB. a selector that selects everything.  For recursions, the operand values for 
 NB. locale of the noun when the recursion starts.
     QP^:DEBTRAVDOWN '#logvalues '
 NB. selector and selop already set, keep them
-    NB. Since nouns appearing in u&v (ex: =&(i."0) are executed twice, so in that case
-    NB. discard all but the first one.
     if. 1 < #logvalues do.
-      NB. Since nouns appearing in u&v (ex: =&(i."0) are executed twice, so in that case
+      NB. Since nouns appearing in u&v (ex: =&(i."0) are executed twice, in that case
       NB. discard all but the first one.
       logvalues =: 1 {. logvalues
     end.
@@ -3105,7 +3103,7 @@ else.
     maxsize;($0);0   NB. framing error
   else.
     NB. framable: calculate fill cell, and see if fill needed
-    maxsize ; ((0;' ';a:;(s:'');(u: ' ');0) {::~ classes i. 1) ; -. *./ (-:"1 {.) exshapes
+    maxsize ; ((0;' ';a:;({.s:'');(u: ' ');0) {::~ classes i. 1) ; -. *./ (-:"1 {.) exshapes
   end.
 end.
 )
@@ -9309,7 +9307,7 @@ NB. Result is selresult
 performselection =: {
 
 NB. x is the selected indices that matched the selector
-NB. y is max size of a selresult as calculated by checkframe
+NB. y is (max size of a selresult as calculated by checkframe);< fill atom for the variable
 NB. Result is the shape we expect this result to have, for use in later traversal
 calcselresultshape =: 4 : 0
 'maxsize fillatom' =. y
@@ -13366,7 +13364,6 @@ if. cop__uop -: ';.' do.
   elseif. (partitionn e. _3 3) *. (0 ~: #gops__uop) do. failmsg 'domain error: gerund u not supported for u;.3 and u;._3'
   end.
 end.
-
 traversedowncalcselect y
 if. errorcode e. EEARLYERROR do. earlyerror x return. end.
 NB. If the partition is dyadic, it will need the VALUE of x.  We will extract that
@@ -16699,6 +16696,8 @@ ctup = 8
 2 dissect '5 ".@''a'' 0' [ a =. 'abcde'
 2 dissect '''abc'' + :: (i. 6) 1 2 3'
 2 dissect '+: :: (i. 6) ''abc'''
+2 dissect '</. s: ;: ''zero one two three four five'''
+2 dissect '<./ s: ;: ''zero one two three four five'''
 )
 
 testtacit =: testtacit2"0
