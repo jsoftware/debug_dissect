@@ -50,9 +50,9 @@ edisp_dissect_ =: 3 : '(":errorcode) , ''('' , (errorcodenames{::~2+errorcode) ,
 
 0 : 0
 alltests_dissect_''
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-testsandbox_base_ 1
-(3 ;< 'check';'no') testsandbox 2
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_dissect_
+testsandbox_dissect_ 1
+(3 ;< 'check';'no') testsandbox_dissect_ 2
 )
 
 alltests_dissect_ =: 3 : 0
@@ -63,30 +63,30 @@ displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 0
 config_displayshowstealth_dissect_ =: 0
 ('Step 0:',LF) 1!:2 SENTENCELOGFILE_dissect_
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_dissect_
 'Time after step 0: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayautoexpand2_dissect_ =: 1
 ('Step 1:',LF) 1!:2 SENTENCELOGFILE_dissect_
-0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@('/'&e. # LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_dissect_
 'Time after step 1: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayautoexpand2_dissect_ =: 0
 displayshowcompmods_dissect_ =: 1
 ('Step 2:',LF) 1!:2 SENTENCELOGFILE_dissect_
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_dissect_
 'Time after step 2: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 displayshowcompmods_dissect_ =: 0
 config_displayshowfillcalc_dissect_ =: 1
 ('Step 3:',LF) 1!:2 SENTENCELOGFILE_dissect_
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 ; ((#~  +./\ *. +./\.) ('$FILL$' +./@:E. ])@>) <;.2 runtests_dissect_
 'Time after step 3: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 6!:3 dly
 config_displayshowfillcalc_dissect_ =: 0
 config_displayshowstealth_dissect_ =: 1
 ('Step 4:',LF) 1!:2 SENTENCELOGFILE_dissect_
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_resize__y 0''^:(''''-:$) ' ,^:('dissect' +./@:E. ]) [: enparen_dissect_ 'NB.'&taketo);._2 runtests_dissect_
 'Time after step 4: %4.1f sec' PR_dissect_ stime -~ 6!:1''
 config_displayshowstealth_dissect_ =: 0
 )
@@ -713,7 +713,7 @@ NB. If the last word is a comment, delete it
 if. #queue do.  NB. following fails on no words
 NB. Get mask of words to discard: discard leading control words, or anything starting with a control word after a non-control
   dischdtl =. (*./\ ,: [: +./\ 0 , (2) </\ ]) iscw queue
-  if. (('.:' -.@-:~ {:) *. 'NB.' -: }:) 4 {. > {: queue do. dischdtl =. 1 (<1 _1)} dischdtl end.
+  if. (('.:' -.@e.~ {:) *. 'NB.' -: }:) 4 {. _1 {:: queue do. dischdtl =. 1 (<1 _1)} dischdtl end.
   NB. Get the sentence in the form the user gave it, by deleting the nonblank characters corresponding
   NB. to the discarded words.
   ndiscardshdtl =. dischdtl (#@(-.&' ')@;@#)"1 queue
@@ -5263,7 +5263,7 @@ NB. Get the spacing (amount at front, amount at end) for hw; convert to spacing 
 NB. the front space to the start, and the end space to the length); add to each box
   spacing =. (2&{.@:}.@>@}. {."1 y) ,."1/ (2&{.@:}.@>@}. {. y)
 NB. get the boxes (recursively if needed), add the spacing
-  bonly =. spacing + > {."1 sbbox =. findbbox@> 1 1 }. y
+  bonly =. spacing + 0 {::"1 sbbox =. findbbox@> 1 1 }. y  NB. obsolete > {."1
   bbox =. ((<0 0 0){spacing) ,: ( (+/@:(>./"1)@:({."1) , +/@:(>./)@:({:"1)) ) +/"2 bonly
   bbox ;< sbbox
 else.
@@ -5557,7 +5557,7 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
   NB. We just take the flag to be the very last flag of the last section.  It doesn't matter whether
   NB. the last node doesn't select; if it doesn't, it won't fill, and the value in the last node will be
   NB. the same as in the one before.
-  finalflags =. finalflags , {: > {: filledflags
+  finalflags =. finalflags , (_1;_1) {:: filledflags   NB. obsolete {: > {:
   NB. Format the fillinfo: (fillframe) if fill called for
   fillinfo =. finalflags (#   '(' , ')' ,~ ":)&.> finalframes
   NB. Each box in DOshapes represents a frame.  If a frame contains 0, indicate that fact by putting * after the frame
@@ -5948,7 +5948,7 @@ NB. when we ultimately try to select two axes.  So we reject it early
 if. 0 e. 0 {:: x do. INVALIDRECT return. end.
 NB. We must start with a selection; if it's a drop-down, prepend empty selection
 if. SFOPEN -: {. >y do. y =. (<2 0$0)&,&.> y end.
-sel =. (0 0,:1 1) (]  ,"1~  -@{:@$@]  |.!.0"1  ({.~ #)) > {. > y
+sel =. (0 0,:1 1) (]  ,"1~  -@{:@$@]  |.!.0"1  ({.~ #)) 0 {:: > y  NB. obsolete > {.
 remainingcsf =. }. > y
 axes =. (i. ((#~ -.) ; #~) [: |. $&1 0)@# shapeused =. 0 0 , 0 {:: x  NB. axes: 1;0 2   or 0 2;1 3
 NB. Normally, the selection does not exceed the size of the displayed result, since it came from a click on the display.
@@ -7476,7 +7476,7 @@ case. 1;2 do.
   tmodx =. ($fillmask)&#.&.> selectiontoticket sel1
 case. do.
   NB. Normal fillmasks, which may or may not be boxed (they will be boxed if they contained some boxed detail such as
-  tmodx =. frame #. > {. sel1   NB. only 1 atom allowed; make it an atom
+  tmodx =. frame #. 0 {:: sel1   NB. only 1 atom allowed; make it an atom   obsolete > {.
 end.
 tmodx {:: selresult
 )
@@ -15858,10 +15858,15 @@ loadconfig''
 
 
 
-NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ dissectinstanceforregression_dissect_ 4 : ''destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
+NB. 0!:1 ; <@(LF ,~ '(i. 0 0) [ dissectinstanceforregression_dissect_ 4 : ''destroy__x 0 [ dissect_dissectisi_paint__x 0''^:(0=#@]) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_dissect_
 NB. wd@('psel dissect;pclose'"_)"0 i. 100
-runtests_base_ =: 0 : 0
+runtests_dissect_ =: 0 : 0
+('Undissectable sentence: invalid word in sentence: NB' , '..') (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect 'select. 2 + 3 NB' , '..'
 2 dissect '2+''a'''
+2 dissect 'select. 2 + 3 do.'
+2 dissect 'select. 2 + 3 do. NB' , '..'
+2 dissect '2 + 3 select. NB' , '.. do. NB' , '..'
+2 dissect '2 + 3 NB' , '. 4:::'
 2 dissect '2,''a'''
 2 dissect '2 3+''a'''
 2 dissect '1 2 + ''ab'''
@@ -16735,11 +16740,11 @@ testbivalenth =: 3 : 0
 x * *: i. #y
 )
 
-testsandbox_base_ =: 3 : 0
+testsandbox_dissect_ =: 3 : 0
 1 testsandbox y
 :
 vn =. 1 2 3
-vn_base_ =: 'abc'
+vn_dissect_ =: 'abc'
 va =. &.>
 vc =. &
 vv =. 3 : ('y =. y + 1';'y =. y + 2')&.>
@@ -16786,8 +16791,8 @@ findnameloc_dissect_ 'tv__k__k',&< <,'b'
 
 0 : 0
 alltests''
-0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_base_
-testsandbox_base_ 1
+0!:2 ; <@(LF ,~ '3 : ''(i. 0 0) [ destroy__y 0 [ dissect_dissectisi_paint__y 0''^:(''''-:$) ' , [: enparen_dissect_ 'NB.'&taketo);._2 runtests_dissect_
+testsandbox_dissect_ 1
 )
 
 Note  'Overview of dissect'
