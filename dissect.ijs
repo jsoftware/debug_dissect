@@ -1918,8 +1918,8 @@ dissect_f1shift_fkey =: dissect_fmwikinuvoc_button
 4!:55^:(-.IFQT) 'dissect_f1_fkey';'dissect_f1shift_fkey'
 
 dissect_jctrl_fkey =: 3 : 0
-if. 0 < 4!:0 <'labrun_jlab_' do.
-  9!:27 'labrun_jlab_$0'   NB. create immex sentence
+if. 0 < 4!:0 <'lab_jlab_' do.
+  9!:27 'lab_jlab_ 0'   NB. create immex sentence
   9!:29 (1)
 end.
 0 0 $0
