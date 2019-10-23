@@ -22,6 +22,7 @@ NB. if any of the debugging switches is turned on, printf is required
 NOCLEANUP_dissect_ =: 0  NB. set to 1 for debugging to allow postmortem
 DEBPARSE_dissect_ =: 0   NB. set for parser printout
 DEBTRAVDOWN_dissect_ =: 0   NB. set for travdown printout
+DEBNOCATCH_dissect_ =: 0  NB. Set to allow debug to catch internal errors
 DEBHLIGHT_dissect_ =: 0   NB. set for highlight printout
 DEBSELECT_dissect_ =: 0   NB. set for selection printout incl opselin
 DEBHLIGHT2_dissect_ =: 0   NB. set for highlight printout - pixel details
@@ -465,7 +466,7 @@ end.
 s,LF, ; <@ARtostring y
 )
 
-parse =: 3 : 0  NB. called in dissect locale
+parse =: 3 : (('catch.';'catchd.') stringreplace^:DEBNOCATCH_dissect_ 0 : 0)  NB. called in dissect locale
 QP^:DEBTIME'startparse=?6!:1'''' '
 NB. dissectinstance should be empty when parse is called.  parse will then allocate the instance and run the parse,
 NB. which ends by executing the parsed verb.  display/nodisplay is then called to display the instance.
@@ -1360,7 +1361,7 @@ destroy__dissectinstance ''   NB. This will clear dissectinstance and restore
 y
 )
 
-display =: 3 : 0   NB. called in dissect locale
+display =: 3 : (('catch.';'catchd.') stringreplace^:DEBNOCATCH_dissect_ 0 : 0)   NB. called in dissect locale
 QP^:DEBTIME'startdisplay=?6!:1'''' '
 if. #dissectinstance do.
   try.
@@ -1643,7 +1644,7 @@ NB.?lintsaveglobals
 
 
 NB. y is 1 for an internal call that needs to refigure the placement
-dissect_dissectisi_paint =: 3 : 0
+dissect_dissectisi_paint =: 3 : (('catch.';'catchd.') stringreplace^:DEBNOCATCH_dissect_ 0 : 0)
 NB. To avoid an error loop, terminate quietly if there is an error
 try.
   NB. If we are highlighting a sentence, stop doing so
@@ -2147,9 +2148,14 @@ NB.?lintmsgsoff
   (l) =: clone__loc ''
 NB.?lintmsgson
 end.
+NB. Handle any post-clone initialization
+postclone''
 NB. Return the new locale
 cl
 )
+
+NB. default null postclone
+postclone =: ]
 
 NB. Switch object processor.  y is the name of the new object processor.
 NB. Replace the current path with the path to y (including y)
@@ -13338,6 +13344,9 @@ proplocales =: 3 : 0
 <^:(0=L.)@".@>^:(0 <: y) (1 , (y=3)) # ;: 'uop tokensource'
 )
 
+NB. Nilad, called after cloning this locale
+postclone =: 3 : 'xop__uop =: coname'''''  NB. Reach into partition to point back to selector
+
 NB. Set the valence used for executing this verb, and propagate to descendants
 NB. The descendant is always executed as a monad
 setvalence =: 3 : 0
@@ -16703,7 +16712,7 @@ ctup = 8
 2 dissect '''abc'' + :: (i. 6) 1 2 3'
 2 dissect '+: :: (i. 6) ''abc'''
 2 dissect '</. s: ;: ''zero one two three four five'''
-2 dissect '<./ s: ;: ''zero one two three four five'''
+2 dissect '1 1+&(1 1&([/.)) 1 1'
 )
 
 testtacit =: testtacit2"0
