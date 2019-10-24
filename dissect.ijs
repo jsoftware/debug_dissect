@@ -1680,6 +1680,10 @@ try.
   enablesz =. '01' {~ actualpctused >:"0 1 |.!.0 MAXNOUNPCTCHOICES  NB. Prepend 0 so that 9 eg will enable 10
   (0 { enablesz) (wdsetenable~   'fmmaxnounsizey' , ":)"0 MAXNOUNPCTCHOICES
   (1 { enablesz) (wdsetenable~   'fmmaxnounsizex' , ":)"0 MAXNOUNPCTCHOICES
+  NB. If current selection not enabled, remove the confusing check
+  ('fmmaxnounsizey' , ": MAXNOUNPCTCHOICES {~ 0 { maxnoundisplaysizex) wdsetvalue (0 { maxnoundisplaysizex) { 0 { enablesz
+  ('fmmaxnounsizex' , ": MAXNOUNPCTCHOICES {~ 1 { maxnoundisplaysizex) wdsetvalue (1 { maxnoundisplaysizex) { 1 { enablesz
+
   NB. If there are stealth/nilad operands on the display, enable the button and caption it
   NB. according to whether we are displaying them.  Enable the button if
   NB. (we are suppressing stealth and we suppressed something) or
@@ -5739,6 +5743,7 @@ end.
 
 NB. If selections have changed such that this locale cannot raise an explorer, delete any old one that exists
 if. 2 > #DOsize do. destroyexplorer '' end.
+QP^:DEBDOvn'DOsize pickrects '
 
 NB. The scrollpoint persists over reselection/redraw.  But if the scrollpoint has been reset (by initialization or
 NB. a higher selection), make sure scrollpoints makes the selection visible.  We are guaranteed to recreate the DOL
@@ -6686,7 +6691,7 @@ NB. of the empty was accounted for when the block was created
 NB.  If there are subDOLs, adjust the rects to leave a box margin
 boxyx =. dataorigin
 if. DEBOBJ do.
-  'DOL: xy=(%j,%j) xsizes=%j ysizes=%j' PR (<"0 |. y),xsizes;ysizes
+  'DOL: xy=(%j,%j) xsizes=%j ysizes=%j cliptlbr=%j' PR (<"0 |. y),xsizes;ysizes;cliptlbr
 end.
 if. emptydata =. 0 e. $ usedd =. data do.
   NB. The noun is empty.  Display it as empties, with shape up to the first 0 in the nounshape
@@ -7220,9 +7225,9 @@ if. sz -: {. dsizes =. maxnoundisplaysizes <."1 sz do.
 NB. The first display is big enough - discard the second one
   }: dsizes
 else.
-NB. Get size of 2 items, and of 1.  If max size is larger in both dimensions, we can use the calculated size,
-NB. so pick the first one that fits.  If none fits, use max size.  In any case, that's for the main view - we can explore the entire value
-  dsizes 0}~ ({. maxnoundisplaysizes) (,~ {~ >."1 i. [) (1 2,:1 1) extractDOLsizelimited y
+NB. Get full size, size of 2 items, and of 1.  For each dimension, use the first size that doesn't exceed max for the main form
+NB. That's for the main view - we can explore the entire value
+  dsizes 0}~ ({. maxnoundisplaysizes) (,~ {~ i.&1@:>:)"0 1 |: sz , (2 2,:1 1) extractDOLsizelimited y
 end.
 )
 
