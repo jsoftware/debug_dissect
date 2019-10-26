@@ -94,6 +94,7 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
+NB.  dissect '2 4 6 <@(]\) ''abcdefg'''  fails when you click
 NB. u :. v doesn't allow getting into u with right-click
 NB. Use #/. in a sentence; hover over it; tooltip is not descriptive
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
@@ -13391,10 +13392,12 @@ if. 1 < #x do.
     partitionx =: ''
   else.
     partitionx =: fillmask__xop frameselresult__xop selresult__xop
-    NB. If there is a selection at this level, apply it to find the correct x value
-    if. selectable *. sellevel < #selections do.
-      partitionx =: (sellevel{selections) { partitionx
-    end.
+    NB. Apply the accumulated selectors to the x input
+    for_s. sellevel__xop }. ((sellevel + selectable) <. #selections) {. selections do. partitionx =: s { partitionx end.
+NB. obsolete     NB. If there is a selection at this level, apply it to find the correct x value
+NB. obsolete     if. selectable *. sellevel < #selections do.
+NB. obsolete       partitionx =: (sellevel{selections) { partitionx
+NB. obsolete     end.
   end.
   NB.?lintsaveglobals
 end.
@@ -13725,8 +13728,7 @@ NB. result is (selframe);(frame);(frames of value to display);resultlevel;arglev
 calcdispframe =: 4 : 0
 NB.?lintonly xop =: <'dissectpartitionselector'
 itemctiny =: '' ($!.1,) ($^:(0<L.))@> {: x
-NB. The pseudoframe (# of partitions) is already in the stored data, since we logged every
-NB. call to u.  So make that the frame.  The number of partitions is:
+NB. The number of partitions is:
 NB. if x is nonnegative, (the number of items of y + 1) - x, but never negative
 NB. if x is negative, (the number of items of y) % |x, rounded up
 if. (3!:0 partitionx__xop) -.@e. 1 4 8 16 do. ny =. FRAMETOCREATEABORT
@@ -16718,6 +16720,7 @@ ctup = 8
 2 dissect '+: :: (i. 6) ''abc'''
 2 dissect '</. s: ;: ''zero one two three four five'''
 2 dissect '1 1+&(1 1&([/.)) 1 1'
+2 dissect '2 4 crash9_dissect_@(3&*)@(]\) i. 5'
 )
 
 testtacit =: testtacit2"0
