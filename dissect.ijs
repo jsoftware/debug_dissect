@@ -1139,7 +1139,7 @@ NB. Values for scrolltype, which tells what the user is doing
 'SCROLLTYPENONE SCROLLTYPEIMAGE SCROLLTYPESCROLLBAR SCROLLTYPESIZEDATA SCROLLTYPEWIREHIGH' =: i. 5
 
 NB. Following lines must match the menus!
-MAXNOUNPCTCHOICES =: 10 20 30 40 50 60 70 80 90
+MAXNOUNPCTCHOICES =: 5 10 20 30 40 50 60 70 80
 DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
