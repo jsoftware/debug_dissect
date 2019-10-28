@@ -94,7 +94,6 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
-NB.  dissect '2 4 6 <@(]\) ''abcdefg'''  fails when you click
 NB. u :. v doesn't allow getting into u with right-click
 NB. Use #/. in a sentence; hover over it; tooltip is not descriptive
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
@@ -1145,7 +1144,7 @@ DISPLAYPRECCHOICES =: 1 2 3 4 5 6 7 8 9
 MAXEXPLORERDISPLAYFRAC =: 0.8   NB. Amount of screen to allow for nouns in explorer
 
 NB. The tooltip size will be selected according to detail and expanded according to fontsize
-ISISIZEPERTTPOINT =: _2 ]\ 0 0   3 20   25 35   35 60   150 120
+ISISIZEPERTTPOINT =: _2 ]\ 0 0   3 20   25 35   30 60   50 120
 MINIMUMISISIZE =: 200 200     NB. minimum size for graphics - low to allow small screen
 TOOLTIPMAXPIXELS =: 900  NB. Max width of tooltip, in pixels
 TOOLTIPMAXFRAC =: 0.6  NB. Max tooltip width, as frac of isigraph width
@@ -1617,7 +1616,7 @@ NB. we leave enough room for the title/sentence display
 yxneeded =. topminsize >. scrolltlc -~ 0 {:: shifteddrawing =. scrolltlc sizeplacement placeddrawing
 NB. Get the current size of the isi; if insufficient, make it bigger, with expansion added
 if. initxy +. autosize *. yxneeded +./@:> 2 3 { cyxhw =. 1 0 3 2 { 0 ". wdqchildxywh 'dissectisi' do.
-  minisi =. MINIMUMISISIZE >. <. (tooltipdetailx{ISISIZEPERTTPOINT) * (<3 1) {:: fontchoices
+  minisi =. MINIMUMISISIZE >. <. (0.8 * screensize) <. (tooltipdetailx{ISISIZEPERTTPOINT) * (<3 1) {:: fontchoices  NB. Tooltip never more than much of the screen
   NB. For QT, always size the canvas to the full screen
   cyxhw =. (minisi >. autosize * EXPANSIONROOMAROUNDISI + yxneeded) 2 3} cyxhw
   if. IFQT do. wd 'set dissectisi wh _1 _1'
@@ -5118,7 +5117,7 @@ NB. Get offset into dissectisi of the top-left visible point
 yxvisible =. 0 >. - {. isiyxbr
 NB. Get br visible point of dissectisi in screen space, subtract screen tr of visible to get visible size
 NB. Remove 100 pixels of height to account for taskbar (major kludge)
-onscreensize =.  ((0 0 >. _36 0 + 3 2 { ". wd 'qscreen') <. {: isiyxbr) - (0 >. {. isiyxbr)
+onscreensize =.  ((0 0 >. _36 0 + 3 2 { 0 ". wd 'qscreen') <. {: isiyxbr) - (0 >. {. isiyxbr)
 NB. Return offset,:size
 yxvisible ,: onscreensize
 )
@@ -8186,13 +8185,13 @@ picklDOresizepos =: 4 : 0
 NB. Ignore resize in explorer.  The handle is not displayed, but the pick window is there
 if. exp do. '' return. end.
 NB. Read the pixels in the image
-pickpixels__COINSTANCE =: (, glqpixels) 0 0 , |. screensize =. (|. glqwh'')
+pickpixels__COINSTANCE =: (, glqpixels) 0 0 , |. windowsize =. (|. glqwh'')
 'scrollingtype__COINSTANCE scrollinglocale__COINSTANCE pickscrollcurryx__COINSTANCE' =: SCROLLTYPESIZEDATA;(coname'');(1 0 { sd)
 NB. There's a minimum size; but also don't try to resize width to smaller than the label.
 NB. Clear starting x position to get true width
 minsize =. MINRESIZABLE >. 0 , (<1 1) { topsize =. brect 0 (<a:;0 1)} (brect DOlabelpos) ,: (brect DOshapepos)
 NB. The maximum size is the size of the data, but also limited by screen size.  Remove top header from allowed size
-maxsize =. (extractDOLsize valueformat) <. <. RESIZEMAXFRAC * screensize - ((<1 0) { topsize),0
+maxsize =. (extractDOLsize valueformat) <. <. RESIZEMAXFRAC * windowsize - ((<1 0) { topsize),0
 NB. pickscrollinfo is table of yx: tl of data,min,max,startsize,startcursor
 pickscrollinfo__COINSTANCE =: ((exp { DOyx) + (<exp,0) {  DOdatapos) , minsize , maxsize , ((<exp;,1) { DOdatapos) , pickscrollcurryx
 ''
@@ -8723,7 +8722,7 @@ NB. DO NOT CLEAR sentence-hover status because we may be about to repaint and im
 NB. which we must be able to do with no mouse movement; but DO clear the block-hover locale, because
 NB. we may have redrawn the screen & the hovered-over block may have moved
 sentencehoverend =: 3 : 0
-if. #sentencehovertok +.&# blockhoverloc do.
+if. sentencehovertok +.&# blockhoverloc do.
   NB. Restore the unhighlighted sentence; restore the object only if we were
   NB. hovering over the sentence.  If we were hovering over the object, we may have scrolled,
   NB. and the original pixels are obsolete
