@@ -7011,7 +7011,7 @@ NB. Remove duplicated strt,end pairs
 runtext =. remstrtend runtext
 NB. Delete the first %al1%, replace others by 'also'
 runtext =. '%al1%' (taketo , takeafter) runtext
-if. #sx =. '%al1%' ss runtext do. runtext =. 'also ' (sx +/ i. #'also ')} runtext end.
+if. #sx =. '%al1%' ss runtext do. runtext =. 'also ' (,"0 sx +/ i. #'also ')} runtext end.
 runtext
 )
 
