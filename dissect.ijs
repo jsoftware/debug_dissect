@@ -7360,7 +7360,7 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
       end.
       NB. Get the explanation of frame
       tt =. tt , exegesisframe__frameloc labelloc;opno;datapresent
-      NB. Append the analysis of the 
+      NB. Append the analysis of the rank
       NB. Append any explanation unique to this line.  The y argument is the boxed rank text, [x,]y
       tt =. tt , exegesisranks (<ix;<<_2) { DOranks
       NB. (1 if this locale appears more than once);(1 if this is the last locale in the stack);(1 if this block displayed data)
@@ -7394,6 +7394,8 @@ if. #r =. (exp{DOlabelpospickrects) (_1 findpickhits) y do.
     labelloc =. ix { DOranklocales
     NB.?lintonly labelloc =. <'dissectobj'
     text =. defstring__labelloc 0
+    ". :: 0: 'tempnm =. ' , text
+    if. 3 = 4!:0 <'tempnm' do. text =. text , '  verb rank: ' , ": vranks__labelloc end.
   else.
     text =. displaylevrank
   end.
