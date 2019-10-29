@@ -1452,26 +1452,35 @@ NB. Useful nugget to suggest at startup
 tiplist =: <@(LF ('*' I.@:= ])} ]);._2 (0 : 0)
 to scroll the display, click and hold in an empty area, then move the mouse.
 click on a wire to highlight its entire network.
-hover over a word in the sentence at the top of the screen to highlight the block it creates.
-click on a word in the sentence at the top of the screen to focus the display on its block.
+hover over a word in the sentence at the top of the screen to highlight its block.
+click on a word in the sentence at the top of the screen to focus on its block.
 you can choose how big the data blocks are with the Sizes menu.
-use the Config menu to make future executions of dissect start with the current settings.
-when a block has a resize handle at the bottom-right, you can drag the handleto resize the block.
+use the Config menu to save the current settings as defaults for future executions of dissect.
+when a block has a bottom-right resize handle, drag the handle to resize the block.
 if the data won't fit in a block, you can right-click to get a fullscreen window on the data.
 to look inside a named verb, select a single result-cell and right-click the name.*You will get a new window (either dissect or debug).
 if a block shows no results, you might need to select a single result-cell of a later verb.
-the arguments that contributed to a selection are outlined in the same color used to indicate the selection.
+the arguments contributing to a selection are outlined in the same color as the selection.
 ] and [ are not normally shown, but you can change that in the Preferences menu.
 the << < > buttons allow you to undo and redo selections.
 the shape of a result is shown just above the values.
 when you make a selection, the path to the selection is shown below the shape.
-a parenthesized value in the shape indicates the presence of framing fill.
-the numbers to the side(s) of verb-names indicate the rank(s) of the cells that the verb was applied to.
+a parenthesized value in a shape indicates the presence of framing fill.
+the numbers to the side(s) of verb-names are the rank(s) of the cells the verb was applied to.
 right-click on the shape of a block (above the data) to copy the data to the clipboard.
 if the message displayed by a click is too small, click again for a bigger display.
 use the Preferences menu to set the font and sizes for display components.
 when a block is outlined in red, it means not all the data fit into the display.
 if your sentence has an error, dissect automatically selects to the point of error.
+if you have clicked in a sentence with error, the << button will reset selections to the point of error.
+you can set a PF key to dissect a sentence from a script or session log.
+you can set the debugger to dissect sentences automatically when you stop on them.
+dissect ignores control words, so you can dissect 'if. condition do.' as is. 
+hidden computation, such as in u/, u^:n, or u1`u2@v, can be seen by clicking in the result*to create an expansion block that shows the hidden computation.
+> in the shape or selection line indicates that an additional level of boxing has been added for display purposes.
+when a value has more than 2 axes, they alternate horizontal and vertical directions.*Blue lines in the value separate cells of rank 2 and up.
+the index list and boxing path to an atom are shown in the status line when you hover over the atom.
+left-click on a word in the block titles to see the NuVoc page for it.
 ) 
 tipoftheday =: 3 : 0
 ?~ >: 100 | <. 6!:1''
