@@ -1447,6 +1447,37 @@ Dissect's result from running the sentence did not match the result from running
 
 Do you want Dissect to display its result anyway?
 )
+
+NB. Useful nugget to suggest at startup
+tiplist =: <@(LF ('*' I.@:= ])} ]);._2 (0 : 0)
+to scroll the display, click and hold in an empty area, then move the mouse.
+click on a wire to highlight its entire network.
+hover over a word in the sentence at the top of the screen to highlight the block it creates.
+click on a word in the sentence at the top of the screen to focus the display on its block.
+you can choose how big the data blocks are with the Sizes menu.
+use the Config menu to make future executions of dissect start with the current settings.
+when a block has a resize handle at the bottom-right, you can drag the handleto resize the block.
+if the data won't fit in a block, you can right-click to get a fullscreen window on the data.
+to look inside a named verb, select a single result-cell and right-click the name.*You will get a new window (either dissect or debug).
+if a block shows no results, you might need to select a single result-cell of a later verb.
+the arguments that contributed to a selection are outlined in the same color used to indicate the selection.
+] and [ are not normally shown, but you can change that in the Preferences menu.
+the << < > buttons allow you to undo and redo selections.
+the shape of a result is shown just above the values.
+when you make a selection, the path to the selection is shown below the shape.
+a parenthesized value in the shape indicates the presence of framing fill.
+the numbers to the side(s) of verb-names indicate the rank(s) of the cells that the verb was applied to.
+right-click on the shape of a block (above the data) to copy the data to the clipboard.
+if the message displayed by a click is too small, click again for a bigger display.
+use the Preferences menu to set the font and sizes for display components.
+when a block is outlined in red, it means not all the data fit into the display.
+if your sentence has an error, dissect automatically selects to the point of error.
+) 
+tipoftheday =: 3 : 0
+?~ >: 100 | <. 6!:1''
+'Tip: ' , ({::~ ?@#) tiplist
+)
+
 NB. y is the results from running the user's original sentence and our instrumented version.
 displaymain =: 3 : 0  NB. called in dissectinstance locale
 NB. Make sure the results are the same
@@ -1507,7 +1538,8 @@ wd DISSECT
 winhwnd =: wd 'qhwndp'
 wd 'pn *Dissecting ' , usersentence
 'fmstatline' wdsetfont ;:^:_1 ":&.> 4 {:: fontchoices
-'fmstatline' wdsettext ''
+'fmstatline' wdsettext tipoftheday''
+statlinehastip =: 1  NB. set trapdoor: display stat line until we hover over something
 setformconfig''
 
 wdsetfocus 'dissectisi'
@@ -7459,7 +7491,7 @@ end.
 0 0$0
 )
 
-NB. Nilad.  Launch debug/dissect for right-click.  Result is tooltip text ti
+NB. Nilad.  Launch debug/dissect for right-click.  Result is tooltip text to
 NB. display (no tooltip if empty)
 pickrlaunchdebug =: 3 : 0
 'Only named verbs can be debugged.'
@@ -8316,7 +8348,7 @@ end.
 )
 
 NB. y is mouse position.  Write to the status line, which is a lot like a hover
-NB. This runs in the hovering locale, either the main form or an explorer
+NB. This runs in the main form only, since statline doesn't exist on explorer
 statlinedo =: 3 : 0
 stattext =. ''
 for_r. pr =. locpickrects (_1 findpickhits) y do.
@@ -8325,9 +8357,10 @@ for_r. pr =. locpickrects (_1 findpickhits) y do.
 NB.?lintonly pickloc =. <'dissectobj'
   if. 3 = 4!:0 <'statlineDO__pickloc' do.
     stattext =. statlineDO__pickloc hoverisexp;yx
+    statlinehastip =: 0  NB. First time we hit something, remove the tip forever
   end.
 end.
-'fmstatline' wdsettext stattext
+if. -. statlinehastip do. 'fmstatline' wdsettext stattext end.
 0 0$0
 )
 
