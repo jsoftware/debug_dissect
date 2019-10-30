@@ -1453,8 +1453,7 @@ Do you want Dissect to display its result anyway?
 )
 
 NB. Useful nugget to suggest at startup
-tiplist =: <@(LF ('*' I.@:= ])} ]);._2 (0 : 0)
-buy low, sell high.
+tiplist =: <@(LF ('*' I.@:= ])} ]);._2 (0 : 0)  NB. first line is next to display
 to scroll the display, click and hold in an empty area, then move the mouse.
 click on a wire to highlight its entire network.
 hover over a word in the sentence at the top of the screen to highlight its block.
@@ -1486,6 +1485,7 @@ hidden computation, such as in u/, u^:n, or u1`u2@v, can be seen by clicking in 
 when a value has more than 2 axes, they alternate horizontal and vertical directions.*Blue lines in the value separate cells of rank 2 and up.
 the index list and boxing path to an atom are shown in the status line when you hover over the atom.
 left-click on a word in the block titles to see the NuVoc page for it.
+buy low, sell high.
 ) 
 
 NB. y is the results from running the user's original sentence and our instrumented version.
@@ -1548,8 +1548,9 @@ wd DISSECT
 winhwnd =: wd 'qhwndp'
 wd 'pn *Dissecting ' , usersentence
 'fmstatline' wdsetfont ;:^:_1 ":&.> 4 {:: fontchoices
-?~ >: 100 | <. 6!:1''  NB. deal some random numbers
-'fmstatline' wdsettext 'Tip: ' , tiplist {::~ statlinetipno =: ?&.<:@# tiplist  NB. never deal 0; set indic of last line shown
+?~ >: <. {: 6!:0''  NB. deal some random numbers
+tiplist =: (({~ ?~@#)@}: , {:) tiplist  NB. create local tiplist, randomly ordered
+dissect_fmshowtip_button''  NB. show a starting tip
 setformconfig''
 
 wdsetfocus 'dissectisi'
@@ -1974,7 +1975,8 @@ end.
 )
 
 dissect_fmshowtip_button =: 3 : 0
-'fmstatline' wdsettext 'Tip: ' , tiplist {::~ statlinetipno =: >: (<: #tiplist) | >: | statlinetipno  NB. add 1, wrap to 1
+statlinehasnotip =: 0  NB. Indicate there is a tip to preserve
+'fmstatline' wdsettext 'Tip: ' , _1 {:: tiplist =: 1 |. tiplist
 )
 
 dissect_dissectisi_char =: 3 : 0
@@ -8371,10 +8373,10 @@ for_r. pr =. locpickrects (_1 findpickhits) y do.
 NB.?lintonly pickloc =. <'dissectobj'
   if. 3 = 4!:0 <'statlineDO__pickloc' do.
     stattext =. statlineDO__pickloc hoverisexp;yx
-    statlinetipno =: - | statlinetipno  NB. First time we hit something, remove the tip forever
+    statlinehasnotip =: 1   NB. First time we hit something, remove the tip forever
   end.
 end.
-if. statlinetipno <: 0 do. 'fmstatline' wdsettext stattext end.
+if. statlinehasnotip do. 'fmstatline' wdsettext stattext end.
 0 0$0
 )
 
