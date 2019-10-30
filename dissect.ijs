@@ -1215,6 +1215,8 @@ rem menusep;
 rem menupopz;
 rem menu fmwikidissect "View Wiki Page" "F1";
 rem menu fmwikinuvoc "View NuVoc Page" "Shift+F1";
+rem menusep;
+rem menu fmshowtip "Show a Tip";
 menupopz;
 xywh 3 4 20 18;cc fmshowerror button;cn "<<";
 xywh 26 4 20 18;cc fmbwd button;cn "<";
@@ -1283,6 +1285,8 @@ menupopz;
 menusep;
 menu fmwikidissect "View Wiki Page" "F1";
 menu fmwikinuvoc "View NuVoc Page" "Shift+F1";
+menusep;
+menu fmshowtip "Show a Tip";
 menupopz;
 bin vhh0;
 cc fmshowerror button;cn "<<";set fmshowerror wh 40 36;
@@ -1450,6 +1454,7 @@ Do you want Dissect to display its result anyway?
 
 NB. Useful nugget to suggest at startup
 tiplist =: <@(LF ('*' I.@:= ])} ]);._2 (0 : 0)
+buy low, sell high.
 to scroll the display, click and hold in an empty area, then move the mouse.
 click on a wire to highlight its entire network.
 hover over a word in the sentence at the top of the screen to highlight its block.
@@ -1482,10 +1487,6 @@ when a value has more than 2 axes, they alternate horizontal and vertical direct
 the index list and boxing path to an atom are shown in the status line when you hover over the atom.
 left-click on a word in the block titles to see the NuVoc page for it.
 ) 
-tipoftheday =: 3 : 0
-?~ >: 100 | <. 6!:1''
-'Tip: ' , ({::~ ?@#) tiplist
-)
 
 NB. y is the results from running the user's original sentence and our instrumented version.
 displaymain =: 3 : 0  NB. called in dissectinstance locale
@@ -1547,8 +1548,8 @@ wd DISSECT
 winhwnd =: wd 'qhwndp'
 wd 'pn *Dissecting ' , usersentence
 'fmstatline' wdsetfont ;:^:_1 ":&.> 4 {:: fontchoices
-'fmstatline' wdsettext tipoftheday''
-statlinehastip =: 1  NB. set trapdoor: display stat line until we hover over something
+?~ >: 100 | <. 6!:1''  NB. deal some random numbers
+'fmstatline' wdsettext 'Tip: ' , tiplist {::~ statlinetipno =: ?&.<:@# tiplist  NB. never deal 0; set indic of last line shown
 setformconfig''
 
 wdsetfocus 'dissectisi'
@@ -1970,6 +1971,10 @@ if. 0 < 4!:0 <'lab_jlab_' do.
   9!:29 (1)
 end.
 0 0 $0
+)
+
+dissect_fmshowtip_button =: 3 : 0
+'fmstatline' wdsettext 'Tip: ' , tiplist {::~ statlinetipno =: >: (<: #tiplist) | >: | statlinetipno  NB. add 1, wrap to 1
 )
 
 dissect_dissectisi_char =: 3 : 0
@@ -8366,10 +8371,10 @@ for_r. pr =. locpickrects (_1 findpickhits) y do.
 NB.?lintonly pickloc =. <'dissectobj'
   if. 3 = 4!:0 <'statlineDO__pickloc' do.
     stattext =. statlineDO__pickloc hoverisexp;yx
-    statlinehastip =: 0  NB. First time we hit something, remove the tip forever
+    statlinetipno =: - | statlinetipno  NB. First time we hit something, remove the tip forever
   end.
 end.
-if. -. statlinehastip do. 'fmstatline' wdsettext stattext end.
+if. statlinetipno <: 0 do. 'fmstatline' wdsettext stattext end.
 0 0$0
 )
 
