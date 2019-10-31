@@ -94,6 +94,7 @@ config_displayshowstealth_dissect_ =: 0
 
 
 NB. TODO
+NB. Should put 'atom' as shape of selection when it is shown filled with ()?
 NB. u :. v doesn't allow getting into u with right-click
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
@@ -1475,16 +1476,15 @@ the frame of the result is shown in the shape line before the purple result-cell
 an empty result-cell is shown as a gray rectangle.
 a value with leading 1 in the shape is shown in italics.*Examples: a one-atom list; an array with shape 1 4
 when you make a selection, the path to the selection is shown below the shape.
-a parenthesized value in a shape indicates the presence of framing fill.
+a parenthesized value at the end of the shape indicates the presence of framing fill.
 atoms added by framing fill are crosshatched.
 the cell where an error occurred is doubly crosshatched.
 the numbers to the side(s) of verb-names are the rank(s) of the cells the verb was applied to.
-right-click on the shape of a block (above the data) to copy the data to the clipboard.
 if the message displayed by a click is too small, click again for a bigger display.
 use the Preferences menu to set the font and sizes for display components.
 when a block is outlined in red, it means not all the data fit into the display.
 if your sentence has an error, dissect automatically selects to the point of error.
-if you have clicked in a sentence with error, the << button will reset selections to the point of error.
+if you have clicked in the dissection of a sentence with error, the << button will reset selections to the point of error.
 you can set a PF key to dissect a sentence from a script or session log.
 you can set the debugger to dissect sentences automatically when you stop on them.
 dissect ignores control words, so you can dissect 'if. condition do.' as is. 
@@ -1492,10 +1492,11 @@ hidden computation, such as in u/, u^:n, or u1`u2@v, can be seen by clicking in 
 results of different executions in an expansion block are each boxed so they can be collected into a single value. 
 > in the shape or selection line indicates that an additional level of boxing has been added for display purposes.
 when a value has more than 2 axes, they alternate horizontal and vertical directions.*Blue lines in the data separate cells of rank 2 and up.
-the index list and boxing path to an atom are shown in the status line when you hover over the atom.
+when the cursor is over a value, the status line (above the main display) shows the index list and boxing path to the atom under the cursor.
 left-click on a word in the block titles to see the NuVoc page for it.
+right-click on the shape of a block (above the data) to copy the data to the clipboard.
 when a cell is selected, right-click in the selection line (below the shape) to copy the cell to the clipboard.
-buy low, sell high.
+buy low; sell high.
 ) 
 
 NB. y is the results from running the user's original sentence and our instrumented version.
@@ -5642,10 +5643,10 @@ if. #af =. accumframe__inheritedtailforselectinfo 0  do.
   NB. shape if there is a selection.
   if. selectable__lastexecutednode *. sellevel__lastexecutednode < #selections__lastexecutednode do.
     NB. User selected a result.  Display its shape.
-    DOshapes =: DOshapes , <, $&.> extractselectedcell__lastexecutednode''
+    DOshapes =: DOshapes , <, ('atom' [^:(0=*@#@]) $)&.> extractselectedcell__lastexecutednode''
   elseif. (<resultlevel__lastexecutednode) -.@e. 0;1 do.
     NB. If the unselected result filled, don't repeat the shape - it will be in the fill
-    DOshapes =: DOshapes , <, < (_1 3) {:: af
+    DOshapes =: DOshapes , <, < 'atom' [^:(0=*@#@]) (_1 3) {:: af
   elseif. do.
     NB. But if the last node is a nonselecting dropdown (L: or each), we really have no idea of any shape
     NB. beyond the last node - they are incommensurate - so don't confuse things by showing one
