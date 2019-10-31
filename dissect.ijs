@@ -95,7 +95,6 @@ config_displayshowstealth_dissect_ =: 0
 
 NB. TODO
 NB. u :. v doesn't allow getting into u with right-click
-NB. Use #/. in a sentence; hover over it; tooltip is not descriptive
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
 NB. dissect '25{.(,.~ <@>:@i.@#) ;({."#. <@(0&#`({.@{.(;,)<@}."1)@.(1<#))/. ])/:~~.,/(+,/:~@,)"0/~3^~1+i.100'   slow
 NB. Put type of value into highlight line
@@ -1454,20 +1453,25 @@ Do you want Dissect to display its result anyway?
 
 NB. Useful nugget to suggest at startup
 tiplist =: <@(LF ('*' I.@:= ])} ]);._2 (0 : 0)  NB. first line is next to display
-to scroll the display, click and hold in an empty area, then move the mouse.
-click on a wire to highlight its entire network.
+to scroll the display, click-and-hold in an empty area, then move the mouse.
+click-and-hold on a wire to highlight its entire network.
 hover over a word in the sentence at the top of the screen to highlight its block.
 click on a word in the sentence at the top of the screen to focus on its block.
 you can choose how big the data blocks are with the Sizes menu.
 use the Config menu to save the current settings as defaults for future executions of dissect.
 when a block has a bottom-right resize handle, drag the handle to resize the block.
-if the data won't fit in a block, you can right-click to get a fullscreen window on the data.
+if the data won't fit in a block, you can right-click on the data to get a fullscreen window on the data.
 to look inside a named verb, select a single result-cell and right-click the name.*You will get a new window (either dissect or debug).
 if a block shows no results, you might need to select a single result-cell of a later verb.
 the arguments contributing to a selection are outlined in the same color as the selection.
+the word producing a selection is color-coded in the sentence.
 ] and [ are not normally shown, but you can change that in the Preferences menu.
 the << < > buttons allow you to undo and redo selections.
 the shape of a result is shown just above the values.
+the shape of the result-cells of a verb is shown in purple in the shape line.
+the frame of the result is shown in the shape line before the purple result-cell shape.*The frame is color-coded as selections are made.
+an empty result-cell is shown as a gray rectangle.
+a value with leading 1 in the shape is shown in italics.*Examples: a one-atom list; an array with shape 1 4
 when you make a selection, the path to the selection is shown below the shape.
 a parenthesized value in a shape indicates the presence of framing fill.
 the numbers to the side(s) of verb-names are the rank(s) of the cells the verb was applied to.
@@ -1482,9 +1486,10 @@ you can set the debugger to dissect sentences automatically when you stop on the
 dissect ignores control words, so you can dissect 'if. condition do.' as is. 
 hidden computation, such as in u/, u^:n, or u1`u2@v, can be seen by clicking in the result*to create an expansion block that shows the hidden computation.
 > in the shape or selection line indicates that an additional level of boxing has been added for display purposes.
-when a value has more than 2 axes, they alternate horizontal and vertical directions.*Blue lines in the value separate cells of rank 2 and up.
+when a value has more than 2 axes, they alternate horizontal and vertical directions.*Blue lines in the data separate cells of rank 2 and up.
 the index list and boxing path to an atom are shown in the status line when you hover over the atom.
 left-click on a word in the block titles to see the NuVoc page for it.
+when a cell is selected, right-click in the selection line (below the shape) to copy the cell to the clipboard.
 buy low, sell high.
 ) 
 
@@ -6954,15 +6959,15 @@ case. do.
 end.
 )
 
-NB. y is (shape of an operand),(frame), result is string describing the cell; singular if frame describes < 2 cells
+NB. y is (shape of an operand),(frame),(word to use for cell ('atom' or 'item') result is string describing the cell; singular if frame describes < 2 cells
 NB. If x is given, it overrides the singular/plural specification
 exegesisfmtcell =: 3 : 0
 (1 < */ 1 {:: y) exegesisfmtcell y
 :
-'shape frame' =. y
+'shape frame cellwd' =. y
 NB. Convert from operand shape to cell shape
 shape =. (#frame) }. shape
-x exegesisplural (4 <. #shape) {:: ('atom';((":shape) , '-atom list')) , (exegesisshapewithx shape)&,&.> ' table';' brick';' subarray'
+x exegesisplural (4 <. #shape) {:: (cellwd;((":shape) , '-',cellwd,' list')) , (exegesisshapewithx shape)&,&.> ' table';' brick';' subarray'
 )
 
 NB. y is (shape of a cell),(frame), result is string describing the frame; suitable for being follwed by a cell format, thus
@@ -7119,11 +7124,11 @@ shapes =. $^:(0<L.)&.> inputselopshapes
   NB. The verb applied to its entire operand
   if. 2=#inputselopshapes do.
     ftext =. 'Each argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
-    ftext =. ftext , 'x is ',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),'.',LF
-    ftext =. ftext , 'y is ',(exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames),'.',LF
+    ftext =. ftext , 'x is ',(exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(0&{) frames),'.',LF
+    ftext =. ftext , 'y is ',(exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(1&{) frames),'.',LF
    else.
     ftext =. 'The argument is a single cell, so there is a single result-cell.',LF    NB. If only 1 cell, can't analyze
-    ftext =. ftext , 'The argument is ',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),'.',LF
+    ftext =. ftext , 'The argument is ',(exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(0&{) frames),'.',LF
   end.
   res =. res , EXEGESISFRAMENOFRAME;ftext
 elseif. do.
@@ -7143,32 +7148,32 @@ elseif. do.
   select. */ frame
   case. 0 do.
     if. 1 = #vranks do.
-      ftext =. 'The argument is empty, so ', (exegesisindefinite exegesisfmtcell (0{::shapes);frame), ' of ' ,((0<#0{::shapes) exegesisplural 'fill') , ' are supplied to the ',vstring,'.',LF
+      ftext =. 'The argument is empty, so ', (exegesisindefinite exegesisfmtcell (<'atom') ,~ (0{::shapes);frame), ' of ' ,((0<#0{::shapes) exegesisplural 'fill') , ' are supplied to the ',vstring,'.',LF
     else.
       if. 1 1 -: emptyop =. 0&e.@> frames do.
-        ftext =. 'The arguments are empty, so cells of fill (on the left, ' , (exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames) , '; on the right, ' , (exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames) , ') are supplied to the ',vstring,'.',LF
+        ftext =. 'The arguments are empty, so cells of fill (on the left, ' , (exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(0&{) frames) , '; on the right, ' , (exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(1&{) frames) , ') are supplied to the ',vstring,'.',LF
       else.
         'ename nonename' =. 'xy' \: emptyop
-        ftext =. ename , ' is empty, so it is replaced by a cell of fill (' , (exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames) , '); ',LF
+        ftext =. ename , ' is empty, so it is replaced by a cell of fill (' , (exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(0&{) frames) , '); ',LF
         if. # (emptyop i. 0) {:: frames do.
-          ftext =. ftext , nonename, ' is broken into ' , (exegesisfmtframe shapes ,&((emptyop i. 0)&{) frames) , (exegesisfmtcell shapes ,&((emptyop i. 0)&{) frames),' which are supplied to the ',vstring,'.',LF
+          ftext =. ftext , nonename, ' is broken into ' , (exegesisfmtframe shapes ,&((emptyop i. 0)&{) frames) , (exegesisfmtcell (<'atom') ,~ shapes ,&((emptyop i. 0)&{) frames),' which are supplied to the ',vstring,'.',LF
         else.
-          ftext =. ftext , nonename , ' is a single cell, ', (exegesisindefinite exegesisfmtcell (0{::shapes);frame) , '.  These arguments are supplied to the ',vstring,'.',LF
+          ftext =. ftext , nonename , ' is a single cell, ', (exegesisindefinite exegesisfmtcell (<'atom') ,~ (0{::shapes);frame) , '.  These arguments are supplied to the ',vstring,'.',LF
         end.
       end.
     end.
     ftext =. ftext , 'The frame, ' , (":frame) , ', ' , (0{::ctense) , ' prepended to the result of the ',cvstring
   case. 1 do.
     if. 1 = #vranks do.
-      ftext =. 'There is only one cell, ', (exegesisindefinite exegesisfmtcell (0{::shapes);frame) , ' which is supplied to the ',vstring,'.',LF
+      ftext =. 'There is only one cell, ', (exegesisindefinite exegesisfmtcell (<'atom') ,~ (0{::shapes);frame) , ' which is supplied to the ',vstring,'.',LF
     else.
-      ftext =. 'Each argument has only one cell (on the left, ' , (exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames) , '; on the right, ' , (exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames) , ') which are supplied to the ',vstring,'.',LF
+      ftext =. 'Each argument has only one cell (on the left, ' , (exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(0&{) frames) , '; on the right, ' , (exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(1&{) frames) , ') which are supplied to the ',vstring,'.',LF
     end.
     ftext =. ftext , 'The frame, ' , (":frame) , ', ' , (0{::ctense) , ' prepended to the result of the ',cvstring
   case. do.
     if. 1 = #vranks do.
       ftext =. 'The frame is ',(":frame),'.',LF
-      ftext =. ftext , 'The argument is broken into ' , (exegesisfmtframe (0{::shapes);frame) , (exegesisfmtcell (0{::shapes);frame) , ', which will be supplied one by one to the ',vstring,'.',LF
+      ftext =. ftext , 'The argument is broken into ' , (exegesisfmtframe (0{::shapes);frame) , (exegesisfmtcell (<'atom') ,~ (0{::shapes);frame) , ', which will be supplied one by one to the ',vstring,'.',LF
     else.
       select. *@#@> frames
       case. 1 0 do.
@@ -7179,14 +7184,14 @@ elseif. do.
         ftext =. 'The frame of x is ',(": 0 {:: frames),' and the frame of y is ',(": 1 {:: frames),'.',LF
       end.
       if. # 0 {:: frames do.
-        ftext =. ftext , 'x is broken into ' , (exegesisfmtframe shapes ,&(0&{) frames) , (exegesisfmtcell shapes ,&(0&{) frames),'.',LF
+        ftext =. ftext , 'x is broken into ' , (exegesisfmtframe shapes ,&(0&{) frames) , (exegesisfmtcell (<'atom') ,~ shapes ,&(0&{) frames),'.',LF
       else.
-        ftext =. ftext , 'x is a single cell (',(exegesisindefinite exegesisfmtcell shapes ,&(0&{) frames),') that will be replicated for use with each cell of y.',LF
+        ftext =. ftext , 'x is a single cell (',(exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(0&{) frames),') that will be replicated for use with each cell of y.',LF
       end.
       if. # 1 {:: frames do.
-        ftext =. ftext , 'y is broken into ' , (exegesisfmtframe shapes ,&(1&{) frames) , (exegesisfmtcell shapes ,&(1&{) frames),'.',LF
+        ftext =. ftext , 'y is broken into ' , (exegesisfmtframe shapes ,&(1&{) frames) , (exegesisfmtcell (<'atom') ,~ shapes ,&(1&{) frames),'.',LF
       else.
-        ftext =. ftext , 'y is a single cell (',(exegesisindefinite exegesisfmtcell shapes ,&(1&{) frames),') that will be replicated for use with each cell of x.',LF
+        ftext =. ftext , 'y is a single cell (',(exegesisindefinite exegesisfmtcell (<'atom') ,~ shapes ,&(1&{) frames),') that will be replicated for use with each cell of x.',LF
       end.
       if. (i.&0@:=/ > frames) < <./ #@> frames do.
         ftext =. ftext , 'This is an agreement error.',LF
@@ -7195,7 +7200,7 @@ elseif. do.
       (0~:#surplusframe) *. 0 -.@e. #@> frames do.
         NB. cells of the short operand must be replicated, and not just a single cell.
         'short long' =. (>&#&>/ frames) |. 'x';'y'
-        ftext =. ftext , 'Each ',(0 exegesisfmtcell (0{::shapes);frame),' of ' , short , ' is replicated into ' , (exegesisfmtframe '';surplusframe) ,'identical cells, and then corresponding cells of x and y are supplied one by one to the ',vstring,'.',LF
+        ftext =. ftext , 'Each ',(0 exegesisfmtcell (<'atom') ,~ (0{::shapes);frame),' of ' , short , ' is replicated into ' , (exegesisfmtframe '';surplusframe) ,'identical cells, and then corresponding cells of x and y are supplied one by one to the ',vstring,'.',LF
       elseif. do.
         ftext =. ftext , 'Corresponding pairs of cells are supplied one by one to the ',vstring,'.',LF
       end.
@@ -8052,7 +8057,7 @@ if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrol
     if. sellevel <: #selections do.
       NB. Display the shape of the result
       rshape =. 0{::valueformat
-      disp =. disp , EXEGESISDATASHAPE ; 'This is ',(exegesisindefinite exegesisfmtcell rshape;''),'.',LF,LF
+      disp =. disp , EXEGESISDATASHAPE ; 'This is ',(exegesisindefinite exegesisfmtcell (<'atom') ,~ rshape;''),'.',LF,LF
 
       NB. y is y,x within the display rectangle.  Convert that to offset within the display of the entire noun, by adding
       NB. the offset of the top-left corner of the displayed box, and subtracting the display position of the normal
@@ -12576,7 +12581,7 @@ if. datapresent do.
     t =. 'This is the final result of applying a verb multiple times.  '
   end.
   if. #$vval do.
-    astg =. LF,'The v operand of ^: produced ' , (exegesisindefinite exegesisfmtcell ($vval);''),'.',LF
+    astg =. LF,'The v operand of ^: produced ' , (exegesisindefinite exegesisfmtcell (<'atom') ,~ ($vval);''),'.',LF
     astg =. astg , 'The verb is applied to the argument',((valence=2)#'s'),' for each atom of that array, and the result-cells are assembled into the final result.',LF
   else.
     astg =. ''
@@ -13442,8 +13447,8 @@ if. 1 < #x do.
     partitionx =: ''
   else.
     partitionx =: fillmask__xop frameselresult__xop selresult__xop
-    NB. Apply the accumulated selectors to the x input
-    for_s. sellevel__xop }. ((sellevel + selectable) <. #selections) {. selections do. partitionx =: s { partitionx end.
+    NB. Apply the accumulated selectors to the x input - if they can apply
+    if. selectable do. for_s. sellevel__xop }. ((sellevel + selectable) <. #selections) {. selections do. partitionx =: s { partitionx end. end.
 NB. obsolete     NB. If there is a selection at this level, apply it to find the correct x value
 NB. obsolete     if. selectable *. sellevel < #selections do.
 NB. obsolete       partitionx =: (sellevel{selections) { partitionx
@@ -13644,7 +13649,7 @@ elseif. endflag do.
   if. datapresent do.
     t =. LF,'This block %al1%shows the result of the verb:',LF,(defstring 0),CR,'which ',(exegesispartitiondesc''),'.',LF
     if. #selframe do.
-      t =. t , LF,'The results of execution on the partitions are assembled into ',(exegesisindefinite exegesisfmtcell selframe;''),' of result-cells.',LF
+      t =. t , LF,'The results of execution on the partitions are assembled into ',(exegesisindefinite exegesisfmtcell (<'item') ,~ selframe;''),' of result-cells.',LF
     end.
     if. (0 ~: #inputselopshapes) *. (0 ~: #selector) do.
       if. selectable *. sellevel < #selections do.
