@@ -1463,8 +1463,10 @@ when a block has a bottom-right resize handle, drag the handle to resize the blo
 if the data won't fit in a block, you can right-click on the data to get a fullscreen window on the data.
 to look inside a named verb, select a single result-cell and right-click the name.*You will get a new window (either dissect or debug).
 if a block shows no results, you might need to select a single result-cell of a later verb.
+when a display block contains the results of more than one verb*(as in +"1"2 which displays results of +"2, +"1, and +),*you may click more than once to select a result-cell of successive verbs.
 the arguments contributing to a selection are outlined in the same color as the selection.
 the word producing a selection is color-coded in the sentence.
+the smallest selected cell is indicated with a heavy outline.
 ] and [ are not normally shown, but you can change that in the Preferences menu.
 the << < > buttons allow you to undo and redo selections.
 the shape of a result is shown just above the values.
@@ -1474,6 +1476,8 @@ an empty result-cell is shown as a gray rectangle.
 a value with leading 1 in the shape is shown in italics.*Examples: a one-atom list; an array with shape 1 4
 when you make a selection, the path to the selection is shown below the shape.
 a parenthesized value in a shape indicates the presence of framing fill.
+atoms added by framing fill are crosshatched.
+the cell where an error occurred is doubly crosshatched.
 the numbers to the side(s) of verb-names are the rank(s) of the cells the verb was applied to.
 right-click on the shape of a block (above the data) to copy the data to the clipboard.
 if the message displayed by a click is too small, click again for a bigger display.
@@ -1485,6 +1489,7 @@ you can set a PF key to dissect a sentence from a script or session log.
 you can set the debugger to dissect sentences automatically when you stop on them.
 dissect ignores control words, so you can dissect 'if. condition do.' as is. 
 hidden computation, such as in u/, u^:n, or u1`u2@v, can be seen by clicking in the result*to create an expansion block that shows the hidden computation.
+results of different executions in an expansion block are each boxed so they can be collected into a single value. 
 > in the shape or selection line indicates that an additional level of boxing has been added for display purposes.
 when a value has more than 2 axes, they alternate horizontal and vertical directions.*Blue lines in the data separate cells of rank 2 and up.
 the index list and boxing path to an atom are shown in the status line when you hover over the atom.
@@ -13447,8 +13452,12 @@ if. 1 < #x do.
     partitionx =: ''
   else.
     partitionx =: fillmask__xop frameselresult__xop selresult__xop
-    NB. Apply the accumulated selectors to the x input - if they can apply
-    if. selectable do. for_s. sellevel__xop }. ((sellevel + selectable) <. #selections) {. selections do. partitionx =: s { partitionx end. end.
+    NB. Apply the accumulated selectors to the x input.  These have been specified for the result but may not have been applied to x.
+    NB. Apply, but stop when x has been selected as far as it can go, i. e. to the rank of the verb it applies to
+    for_s. sellevel__xop }. ((sellevel + selectable) <. #selections) {. selections do.
+     if. (#@$ partitionx) <: 0{vranks do. break. end.
+     partitionx =: s { partitionx
+    end.
 NB. obsolete     NB. If there is a selection at this level, apply it to find the correct x value
 NB. obsolete     if. selectable *. sellevel < #selections do.
 NB. obsolete       partitionx =: (sellevel{selections) { partitionx
