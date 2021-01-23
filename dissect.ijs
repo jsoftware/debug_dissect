@@ -92,8 +92,33 @@ config_displayshowstealth_dissect_ =: 1
 config_displayshowstealth_dissect_ =: 0
 )
 
+0 : 0
+traversebsp =: #@] }. (( (] , {:@[ + ({~ {.)~ <!.0 (1 { [))^:(0 <: {:@])~   ({~ {:) )^:_    ,&0.)^:(*@#@[)
+
+bsptest =: ".;._2 (0 : 0)
+0 1 2  NB. 0 coord0 > 1, 2 3
+0 0 0
+1 2 4  NB. 2 coord1 > 2, 4 5
+0 0 _1  NB. 3 leaf
+0 4 6  NB. 4 coord0 > 4, 6 7
+1 6 8  NB. 5 coord0 > 6, 8 9
+0 10 10  NB. 6 coord0>10, 10 11
+0 0 _1  NB. 7 leaf
+0 5 12  NB. 8 coord1>5, 12 13
+0 0 _1  NB. 9 leaf
+0 0 _1  NB. 10 leaf
+0 0 _1  NB. 11 leaf
+0 0 _1  NB. 12 leaf
+0 0 _1  NB. 13 leaf
+
+dissect 'bsptest traversebsp 2 2'
+when run, right-click traversebsp: does not subdissect
+dissect the sentence alone: localizes error to wrong block
+)
+
 
 NB. TODO
+NB. If big verb is too big for stack, show ... at end
 NB. Should put 'atom' as shape of selection when it is shown filled with ()?
 NB. u :. v doesn't allow getting into u with right-click
 NB. (,.4 3) toupper;.0 'abracadabra'  should highlight the implied selection from the ;.0?
@@ -186,6 +211,7 @@ config_displayshowstealth =: 0
 config_displayautoexpand2 =: 0   NB. Automatically show u/ on 2 items as dyad
 config_displayshowfillcalc =: 0  NB. Make a rankstack mark when fill-cell is used
 config_displayprecisionx =: 2   NB. default display precision
+displayshowtipoftheday =: 1  NB. Display a tip at startup
 )
 
 NB. Read & apply config file.  Run in dissect locale.
@@ -223,7 +249,7 @@ end.
 
 NB. Write current settings to config file.  Called in the instance that we want to save
 saveconfig =: 3 : 0
-NB. Save the config file witht he current level
+NB. Save the config file with the current level
 configfilelevel =: CONFIGFILELEVEL
 NB. Get the variable names we want to save under
 cnames =. {.@;:;._2 CONFIG
@@ -252,7 +278,7 @@ if. #y do.
   end.
 end.
 NB.?lintonly tooltipdelayx =: tooltipdetailx =: displayshowcompmods =: displayshowstructmods =: 0
-NB.?lintonly maxnoundisplaysizex =: 0 0 [ displayshowstealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: 0
+NB.?lintonly maxnoundisplaysizex =: 0 0 [ displayshowstealth =: displayautoexpand2 =: displayshowfillcalc =: displayprecisionx =: =: displayshowtipoftheday =: 0
 0 0$0
 NB.?lintsaveglobals
 )
@@ -1181,6 +1207,8 @@ menu fmshowcompmods "Show full compound-names";
 menu fmshowstructmods "Show @ @: hook fork etc";
 menu fmautoexpand2 "Show u/ on 2 items as dyad";
 menu fmshowfillcalc "Show when argument with empty frame is replaced by a cell of fills";
+menusep;
+menu fmshowtipoftheday "Show a helpful Tip at startup";
 menupopz;
 menupop "&Sizes";
 menupop "Max Block &Width as % of Screen";
@@ -1251,6 +1279,8 @@ menu fmshowcompmods "Show full compound-names";
 menu fmshowstructmods "Show @ @: hook fork etc";
 menu fmautoexpand2 "Show u/ on 2 items as dyad";
 menu fmshowfillcalc "Show when argument with empty frame is replaced by a cell of fills";
+menusep;
+menu fmshowtipoftheday "Show a helpful Tip at startup";
 menupopz;
 menupop "&Sizes";
 menupop "Max Block &Width as % of Screen";
@@ -1561,7 +1591,7 @@ wd 'pn *Dissecting ' , usersentence
 'fmstatline' wdsetfont ;:^:_1 ":&.> 4 {:: fontchoices
 ?~ >: <. {: 6!:0''  NB. deal some random numbers
 tiplist =: (({~ ?~@#)@}: , {:) tiplist  NB. create local tiplist, randomly ordered
-dissect_fmshowtip_button''  NB. show a starting tip
+dissect_fmshowtip_button displayshowtipoftheday  NB. show a starting tip if enabled, and set showtip flag
 setformconfig''
 
 wdsetfocus 'dissectisi'
@@ -1591,8 +1621,10 @@ end.
 NB. The sniff may have set scrollpoints based on the tiny screen, so reset them all
 propscroll__resultroot 0
 
-NB. Save the size of the screen, which we will use to decide max noun size.  h w
+NB. Save the size of the screen, which we will use to decide max noun size and scrollbar size.  h w
 screensize =: 3 2 { 0 ". wd 'qscreen'
+NB. Convert fraction-of-screen values to pixels
+(,&'PIXELS'&.> nm) =: (<./ screensize) (* ".)&> nm =. 'SCROLLBARWIDTH';'SCROLLBARMINWIDTH';'SCROLLBARENDTHICKNESS'
 
 NB. Set the initial selection of cells:
 NB. If the result is an sdt, the user is probably noodling around with a new sentence, so select everything
@@ -1744,7 +1776,7 @@ try.
   NB. (we are allowing stealth, which might be a config default)
   'fmshowstealth' wdsetenable ": displayshowstealth +. stealthopencountered
 
-  ('fm'&, wdsetvalue ":@:".@('display'&,))@> ;: 'showcompmods showstructmods autoexpand2 showfillcalc showstealth' 
+  ('fm'&, wdsetvalue ":@:".@('display'&,))@> ;: 'showcompmods showstructmods autoexpand2 showfillcalc showstealth showtipoftheday' 
   ('fm'&, wdsetvalue ":@:".)@> ;: 'tooltipctrl' 
   
   NB. Restore the user's environment before returing to immediate mode
@@ -1827,6 +1859,11 @@ NB. Toggle the state of fill-cell display
 dissect_fmshowfillcalc_button =: 3 : 0
 'fmshowfillcalc' wdsetvalue ": displayshowfillcalc =: -. displayshowfillcalc
 dissect_dissectisi_paint 1
+)
+NB. Toggle the state of startup-tip display
+dissect_fmshowtipoftheday_button =: 3 : 0
+'fmshowtipoftheday' wdsetvalue ": displayshowtipoftheday_dissect_ =: -. displayshowtipoftheday
+NB. No need to paint - it's for config only
 )
 NB. Toggle the state of tooltipctrl display
 dissect_fmtooltipctrl_button =: 3 : 0
@@ -1986,8 +2023,13 @@ end.
 )
 
 dissect_fmshowtip_button =: 3 : 0
-statlinehasnotip =: 0  NB. Indicate there is a tip to preserve
-'fmstatline' wdsettext 'Tip: ' , _1 {:: tiplist =: 1 |. tiplist
+if. y -: 0 do.  NB. first display with tip suppressed
+  statlinehasnotip =: 1 
+  'fmstatline' wdsettext ''
+else.
+  statlinehasnotip =: 0  NB. Indicate there is a tip to preserve
+  'fmstatline' wdsettext 'Tip: ' , _1 {:: tiplist =: 1 |. tiplist
+end.
 )
 
 dissect_dissectisi_char =: 3 : 0
@@ -4789,11 +4831,11 @@ NB. *************** end of router - start of display-object management *********
 RGBTOLUMINANCE =: +/@:*"1&0.2989 0.5870 0.1140
 
 
-SCROLLBARWIDTH =: 14  NB. width of scrollbar in pixels
-SCROLLBARMINWIDTH =: 12  NB. Minimum thickness of traveler
+SCROLLBARWIDTH =: 0.01  NB. width of scrollbar as fraction of min(screen height,screen width)
+SCROLLBARMINWIDTH =: 0.005  NB. Minimum thickness of traveler as fraction of min(screen height,screen width)
+SCROLLBARENDTHICKNESS =: SCROLLBARWIDTH  NB. width of scrollbar endcap as fraction of min(screen height,screen width)
 SCROLLBARCOLOR =: <192 192 192   NB. color for scrollbar - no pen
 SCROLLBARENDCOLOR =: <240 240 240
-SCROLLBARENDTHICKNESS =: 10
 SCROLLBARTRAVELERCOLOR =: <128 128 128
 SCROLLBARCORNERCOLOR =: <64 64 64
 
@@ -5445,7 +5487,6 @@ elseif. do.
   end.
   hw =. (+/ 2 2 ($,) (<0 2) {:: fontdesc) +"1 extentsyx
 end.
-  
 NB. combine the height/widths for the row & columns to get the size of each row/column
 NB. Get the transposition vector: we bring the odd axes (starting from the end) in front of the even
 NB. axes to get the display order.
@@ -5460,7 +5501,6 @@ NB. which will become the first of the next rank - except for the last, which do
 NB. Since the 1-pixel-wide line seems too narrow, add 1 extra space to each nonzero boundary
 bdynos =. rcshapes (+ *)@(1&(|.!.0))@:(0&(i.&1@:~:)@|."1)@(#: i.@#)&.> rcextents
 rcextents =. +/\&.> bdynos +&.> rcextents
-
 NB. Assemble final result
 origshape;rcextents,subDOLs
 NB.?lintsaveglobals
@@ -5735,7 +5775,7 @@ QP^:DEBDOL'valueformat '
   maxactualnounsize__COCREATOR =: maxactualnounsize__COCREATOR >. maxdispsize =. extractDOLsize valueformat
   NB. If data doesn't fit in the allocated area, append scrollbars as needed.  We install the
   NB. bars here; the endpoints and traveler are added when the box is drawn
-  hwtable =. hwtable +"1 SCROLLBARWIDTH * |."1 displayscrollbars =: hwtable <"1 extractDOLsize valueformat
+  hwtable =. hwtable +"1 SCROLLBARWIDTHPIXELS * |."1 displayscrollbars =: hwtable <"1 extractDOLsize valueformat
   datadesc =. ALIGNCENTER addalignmentrect hwtable
   NB. If the status block contains an assignment, move it to after the data.  Otherwise it's either empty
   NB. or has an error indicator; leave it before the data
@@ -6652,7 +6692,7 @@ NB. Restore cliprect to just the data area
   NB. If there are scrollbars, draw them
   if. +./ displayscrollbars do.
     't l b r' =. , DOyx +"1 +/\ DOdatapos  NB. t l b r of region
-    'sh sw' =. (2 * SCROLLBARENDTHICKNESS) -~ 'h w' =. ({: DOdatapos) - SCROLLBARWIDTH * |. displayscrollbars  NB. actual data h/w
+    'sh sw' =. (2 * SCROLLBARENDTHICKNESSPIXELS) -~ 'h w' =. ({: DOdatapos) - SCROLLBARWIDTHPIXELS * |. displayscrollbars  NB. actual data h/w
     
     datahw =. extractDOLsize valueformat
     QP^:DEBDOL 'displayscrollbars DOyx DOdatapos datahw t l b r h w scrollpoint sw sh '
@@ -6660,31 +6700,31 @@ NB. Restore cliprect to just the data area
     NB. draw horizontal scroll
     if. 1 { displayscrollbars do.
       NB. Draw the scrollbar itself
-      SCROLLBARCOLOR drawrect (vpos =. -/\. b , SCROLLBARWIDTH) ,. (l , w)
+      SCROLLBARCOLOR drawrect (vpos =. -/\. b , SCROLLBARWIDTHPIXELS) ,. (l , w)
       NB. Draw the endcaps
-      SCROLLBARENDCOLOR drawrect vpos ,."1 (l , SCROLLBARENDTHICKNESS) ,: (-/\. (l+w) , SCROLLBARENDTHICKNESS)
+      SCROLLBARENDCOLOR drawrect vpos ,."1 (l , SCROLLBARENDTHICKNESSPIXELS) ,: (-/\. (l+w) , SCROLLBARENDTHICKNESSPIXELS)
       NB. Calculate left & right scroll positions of the travelers, as pixel positions in the scrollbar
       scrolltravh =. <. sw * 0 >. 1 <. (+/\ (1 { scrollpoint) , w) % (1 { datahw)
       NB. Make sure the traveler has a minimum width so user can find it.
       NB. Distribute the added width toward the center of the region: negative for left, positive for right
       leeway =. (% -~/) (0,sw) - scrolltravh
       NB. Add needed thickness, and adjust right to account for the leading endcap
-      scrolltravh =. scrolltravh + SCROLLBARENDTHICKNESS + <. leeway * 0 >. SCROLLBARMINWIDTH - (-~/ scrolltravh)
+      scrolltravh =. scrolltravh + SCROLLBARENDTHICKNESSPIXELS + <. leeway * 0 >. SCROLLBARMINWIDTHPIXELS - (-~/ scrolltravh)
       SCROLLBARTRAVELERCOLOR drawrect vpos ,. -~/\ l + scrolltravh
     end.
     NB. vertical
     if. 0 { displayscrollbars do.
-      SCROLLBARCOLOR drawrect (hpos =. -/\. r , SCROLLBARWIDTH) ,.~ (t , h)
-      SCROLLBARENDCOLOR drawrect hpos ,.~"1 (t , SCROLLBARENDTHICKNESS) ,: (-/\. (t+h) , SCROLLBARENDTHICKNESS)
+      SCROLLBARCOLOR drawrect (hpos =. -/\. r , SCROLLBARWIDTHPIXELS) ,.~ (t , h)
+      SCROLLBARENDCOLOR drawrect hpos ,.~"1 (t , SCROLLBARENDTHICKNESSPIXELS) ,: (-/\. (t+h) , SCROLLBARENDTHICKNESSPIXELS)
       scrolltravv =. <. sh * 0 >. 1 <. (+/\ (0 { scrollpoint) , h) % (0 { datahw)
       leeway =. (% -~/) (0,sh) - scrolltravv
-      scrolltravv =. scrolltravv + SCROLLBARENDTHICKNESS + <. leeway * 0 >. SCROLLBARMINWIDTH - (-~/ scrolltravv)
+      scrolltravv =. scrolltravv + SCROLLBARENDTHICKNESSPIXELS + <. leeway * 0 >. SCROLLBARMINWIDTHPIXELS - (-~/ scrolltravv)
       SCROLLBARTRAVELERCOLOR drawrect hpos ,.~ -~/\ t + scrolltravv
     end.
     NB. If both scrollbars are drawn, the lower-right area, which was filled by data,
     NB. still has data, which is distracting.  Black it out
     if. 1 1 -: displayscrollbars do.
-      SCROLLBARCORNERCOLOR drawrect -/\. (b,r) ,: SCROLLBARWIDTH
+      SCROLLBARCORNERCOLOR drawrect -/\. (b,r) ,: SCROLLBARWIDTHPIXELS
     end.
     scrolltravelers =: (scrolltravv ,: scrolltravh) hwindex} scrolltravelers
     QP^:DEBDOL 'scrolltravelers '
@@ -8040,7 +8080,7 @@ hoveryx =. y
 NB. Ignore hover in the scrollbar
 NB. See which scrollbar, if any, the click is in
 dhw =. (<exp,1) { DOdatapos
-if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
+if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTHPIXELS * |. exp { displayscrollbars do.
   select. tooltipdetailx
   case. 0 do. text =. ''
   case. 1 do. text =. LF ,~ x statlineDOdatapos y
@@ -8138,7 +8178,7 @@ statlineDOdatapos =: 4 : 0
 exp =. x
 hoveryx =. y
 dhw =. (<exp,1) { DOdatapos
-if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars do.
+if. 0 = +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTHPIXELS * |. exp { displayscrollbars do.
   if. 2 = 3!:0 DOranks do. text =. 'noun'&[^:(0=#) DOranks
   else. text =. defstring 0
   end.
@@ -8178,15 +8218,15 @@ NB. Click in the data region.
 NB. If the click is in the scrollbar, handle scrolling
 NB. See which scrollbar, if any, the click is in
 dhw =. (<exp,1) { DOdatapos
-select. +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTH * |. exp { displayscrollbars
+select. +/ sclick =. |. y >: shw =. dhw - SCROLLBARWIDTHPIXELS * |. exp { displayscrollbars
 case. 1 do.
 NB. sclick is the mask indicating which axis was selected
 NB. select the information for the selected axis, for analysis
   'trav clickpos end bindlist spt' =. (sclickx =. sclick i. 1)&{&.> (exp{scrolltravelers);y;shw;(1 2{valueformat);(exp{scrollpoints)
   QP^:DEBPICK 'trav clickpos end bindlist spt '
 NB. Classify the click as +-creep, +-page, or click in traveler
-  assert. (-: /:~) SCROLLBARENDTHICKNESS,trav,end-SCROLLBARENDTHICKNESS
-  select. clickpos I.~ scrollbarsections =. SCROLLBARENDTHICKNESS,trav,end-SCROLLBARENDTHICKNESS
+  assert. (-: /:~)SCROLLBARENDTHICKNESSPIXELS,trav,end-SCROLLBARENDTHICKNESSPIXELS
+  select. clickpos I.~ scrollbarsections =. SCROLLBARENDTHICKNESSPIXELS,trav,end-SCROLLBARENDTHICKNESSPIXELS
   NB. If creep, move to the next index, or one screenful, whichever is smaller
     case. 0 do. NB. creep back
       newspt =. (spt (I.~ { 0 , ]) >bindlist) >. spt - end   NB. prev item, but no more than 1 screenful
@@ -8720,6 +8760,7 @@ case. do.
     (0 1 ; sd) hoverstart 1 0 { sd
   end.
 end.
+i. 0 0
 )
 
 NB. y is mouse position
@@ -9198,6 +9239,7 @@ elseif. do.
   NB. If button down, use larger radius but don't allow a new tooltip to start
   (1 0 ; sd) hoverstart 1 0 { sd
 end.
+i. 0 0
 )
 
 NB. mouse release.  If we are scrolling, set the new offset and redraw
@@ -12434,6 +12476,7 @@ NB. Perform selections for u - needed for display whether v ran or not
 traversedowncalcselect y
 NB. If v invalid, detect domain error
 if. errorcode__vop e. EFAILED do.
+SM'fail'
   errorcode =: EINVALIDVERB
 elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do.
   if. (0 < L. vval) *. ((1 < L. vval) +. -. ('';,0) e.~ $&.> vval) do. errorcode =: EINVALIDVERB
@@ -15945,7 +15988,7 @@ Reverse crosshatching indicates cells that were not executed owing to earlier er
 )
 
 cocurrent 'dissect'
-NB. Read the config file at startup
+NB. Read the config file at initial load.  Global config variables persist to end of session
 loadconfig''
 
 
@@ -16796,7 +16839,7 @@ ctup = 8
 2 dissect '</. s: ;: ''zero one two three four five'''
 2 dissect '1 1+&(1 1&([/.)) 1 1'
 2 dissect '2 4 crash9_dissect_@(3&*)@(]\) i. 5'
-)
+2 dissect '3 ([#~ (#$ 1{.~-))~ i.8')
 
 testtacit =: testtacit2"0
 testtacit2 =: *: + -:
