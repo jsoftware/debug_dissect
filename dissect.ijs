@@ -6477,6 +6477,7 @@ if. #ic do.
   glbrush ''
 else. glbrushnull''
 end.
+y =. <. y + 0.5  NB. force coordinates to integral
 glrect 0 0 1 1 +"1^:(-.IFQT) ,"2 |."1 y
 NB. If stippling called for, do it
 if. 3 < #ic do.
