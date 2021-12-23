@@ -2198,12 +2198,13 @@ codestroy''
 NB. for debugging, verify that the execution string has valid syntax
 NB. y is the string, and the result
 auditstg =: 3 : 0
-if. ~:/ '()' +/@:="0 _ y do.
+if. ~:/ '()' +/@:="0 _ y do. if. ~:/ '()' +/@:="0 _&;: y do.  NB. test as chars, then as tokens
+
   smoutput 'unbalanced parens'
   smoutput 'Error in exestring in locale ' , >coname''
   smoutput 'string: ' , y
   estring__ =: y
-end.
+end.end.
 y
 )
 
