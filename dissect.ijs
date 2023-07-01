@@ -185,10 +185,11 @@ coinsert 'jgl2'
 
 NB. The address of the jsoftware wiki
 JWIKIURL =: 'http://code.jsoftware.com/wiki/'
-
-defaultfonts =: (<"0 (12 12 14 8 10)) ,.~ (('Darwin';'Linux') i. <UNAME) { ".;._2 (0 : 0)
+defaultfonts =: (<"0 (12 12 14 8 10)) ,.~ (('Darwin';'Linux';'FreeBSD';'OpenBSD') i. <UNAME) { ".;._2 (0 : 0)
 '"Courier"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Mac version
 '"monospace"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Linux version
+'"monospace"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. FreeBSD version
+'"monospace"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. OpenBSD version
 '"Courier New"' ; '"Lucida Console"' ; '"Arial"' ; '"Arial"' ; '"Arial"'    NB. Version for all others
 )
 
