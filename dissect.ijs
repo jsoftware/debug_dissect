@@ -3589,7 +3589,7 @@ NB. should replace the selected portion with the fillmask and data that was calc
       NB. This happens only when we have an unknown number of items, such as in a recursion.  Here we support it in all
       NB. nodes that have a list for a result; this will embrace all selection nodes
       if. 1 >: #$>tmodx do. if. (>tmodx) >: #selresult do. selresult =: (>: > tmodx) {. selresult end. end.
-      fillmask =: (< fillmask__loc) sel1} fillmask
+      for_fm. sel1 do. fillmask =: (< fillmask__loc) fm} fillmask end.
       selresult =: (< fillmask__loc frameselresult__loc selresult__loc) tmodx} selresult
     case. do.
       NB. Normal fillmasks, which may or may not be boxed (they will be boxed if they contained some boxed detail such as
@@ -4321,7 +4321,7 @@ NB. To allow routing to them, we need to mark them as unrouted points for purpos
 NB. penaltyrollup.  We further need to mark the initial frontier as zero-length, but we do that
 NB. after we have culled the initial frontier.  It is OK to leave non-frontier points unblocked,
 NB. because no route can ever go to one, except when it is the target
-routinggrid =: (routingzero+RGRIDWINDOW) (< routendface)} routinggrid
+routinggrid =: (routingzero+RGRIDWINDOW) routendface} routinggrid
 if. TGTPROXFORROLLUP < RGRIDDIST * +/ | ({. routbydist) -&:(1 2&{"1) startroute do.
   NB. We roll up the penalties back toward the 'starting' end of the grid (for North, that's the South end)
   NB. But we install a large penalty at the start of every blockage, which will prevent runs from
@@ -4353,24 +4353,27 @@ if. penov do.
     penpos =. penpos ,. bjends =. (((<turnx;0) { allroutes) bwxor/ 2 3) ,: ((<turnx;1 2) { allroutes)
   else. bjends =. $0
   end.
-  penposb =. < ((,.~ <"1)~ <"0)/ penpos
-  penaltygrid =: (penov + penposb { penaltygrid) penposb} penaltygrid
+  penposb =. <"1 ((,.~ <"1)~ <"0)/ penpos
+  for_pp. penposb do. penaltygrid =: (penov + pp { penaltygrid) pp} penaltygrid end.
   NB. Adjacencies.  Add and subtract 1 from the crossing direction to find the place to add the penalty
   NB. Include the penalty on the crossing direction of bends/jogs too
-  penposb =. < (<"1@[ ,. (+&.>  (_1 1;0) |."0 _~  0&(e."1))~)/ penpos
-  penaltygrid =: (penneigh + penposb { penaltygrid) penposb} penaltygrid
+  penposb =. <"1 (<"1@[ ,. (+&.>  (_1 1;0) |."0 _~  0&(e."1))~)/ penpos
+  for_pp. penposb do. penaltygrid =: (penneigh + pp { penaltygrid) pp} penaltygrid end.
+NB. obsolete   penaltygrid =: (penneigh + penposb { penaltygrid) penposb} penaltygrid
   NB. Corners of a bend/jog count as a crossing + 2 neighbors too (in both directions), so the route doesn't avoid a crossing penalty by going through it;
   NB.  and then we throw in a jog penalty too, because routes crossing over a bend are really confusing
   NB. This probably overpenalizes the outer corner, but we really would rather leave that open, and it's easier to
   NB. calculate both corners
   if. #bjends do.
     NB. convert y0,x0 ,: y1,x1 to y0,x1 ,: y1,x0
-    penposb =. < a: ;"1 <"0 (_2) ({."1 ,. |.@:({:"1))\ {: bjends
-    penaltygrid =: (((RGRIDDIST*RPENALTYJOG)+pencross+2*penneigh) + penposb { penaltygrid) penposb} penaltygrid
+    penposb =. <"1 a: ;"1 <"0 (_2) ({."1 ,. |.@:({:"1))\ {: bjends
+    for_pp. ,penposb do. penaltygrid =: (((RGRIDDIST*RPENALTYJOG)+pencross+2*penneigh) + pp { penaltygrid) pp} penaltygrid end.
+NB. obsolete     penaltygrid =: (((RGRIDDIST*RPENALTYJOG)+pencross+2*penneigh) + penposb { penaltygrid) penposb} penaltygrid
   end.
   NB. Crossing.
-  penpos =. < (<"1 (2) bwxor dir) ,. <"0 yx
-  penaltygrid =: (pencross + penpos { penaltygrid) penpos} penaltygrid
+  penposb =. <"1 (<"1 (2) bwxor dir) ,. <"0 yx
+  for_pp. penposb do. penaltygrid =: (pencross + pp { penaltygrid) pp} penaltygrid end.
+NB. obsolete   penaltygrid =: (pencross + penpos { penaltygrid) penpos} penaltygrid
 end.
 
 routeoccwires
@@ -4657,7 +4660,7 @@ NB. Initialize board to 0 for frontier
 NB.   with special 'move type' to signal end-of-chain for backtracking
 NB. All the other endpoints, including the target itself, were marked as unreached when we started the
 NB. route, and we cannot have an interest in any that we have previously routed to
-routinggrid =: (routingzero + RMOVEEOC) (< (3) {."1 shelfmsk # frontier)} routinggrid
+routinggrid =: (routingzero + RMOVEEOC) ((3) {."1 shelfmsk # frontier)} routinggrid
 shelfmsk =. shelfmsk > frontmsk  NB. Don't shelve active points
 shelffrontier =. shelfmsk # frontier
 shelfmindist =. shelfmsk # fmindist
@@ -4690,8 +4693,8 @@ while. do.
 
     NB. Fetch current distance to each point in the active frontier, and replace with frontier
     NB. distance if it is shorter.  Remove points from frontier that could not move
-    frontbx =. < frontx =. 3 {."1 frontier
-    routinggrid =: ({:"1 frontier) frontbx} routinggrid
+    frontx =. 3 {."1 frontier
+    routinggrid =: ({:"1 frontier) frontx} routinggrid
 
     NB. Calculate minimum distance-to-target in the active frontier; see if we hit target
     tgtprox =. <./ fmindist =. frontx (<"1@[ { ]) minpengrid
@@ -4746,7 +4749,7 @@ while. do.
           NB. Fetch the distance-to-point for the improved points; convert them to move type 0 (=straight ahead)
           frontier =. frontier , (newfx =. newfx +"1 {.extblock) ,. impval =. (-RGRIDDIST) bwand newfx (<"1@[ { ]) rolledgrid
           NB. Store the new values
-          routinggrid =: impval (< newfx)} routinggrid
+          routinggrid =: impval newfx} routinggrid
           NB. Restore tgtprox/fmindist for the new points
           tgtprox =. <./ fmindist =. (3 {."1 frontier) (<"1@[ { ]) minpengrid
           fmindist =. fmindist + 3 {"1 frontier
