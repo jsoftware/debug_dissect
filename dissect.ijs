@@ -10796,7 +10796,7 @@ NB.?lintmsgsoff
 cocurrent@(0&cocreate)@([ coerase) newloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_ =: dissectprimindex_dissect_ , <;: y
 NB.?lintmsgson
 coinsert x , ' dissectobj'
-18!:4 newloc   NB. No named verb from here to the end!
+cocurrent newloc   NB. No named verb from here to the end!
 newloc
 )
 
@@ -15743,7 +15743,7 @@ dissectprimseqindex_dissect_ =: dissectprimseqindex_dissect_ , locname;seq
 cocurrent@(0&cocreate)@([ coerase) newloc =. <locname
 NB.?lintmsgson
 coinsert x , ' dissectobj'
-18!:4 newloc   NB. No named verb from here to the end!
+cocurrent newloc   NB. No named verb from here to the end!
 i. 0 0
 )
 
