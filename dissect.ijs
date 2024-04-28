@@ -10796,7 +10796,6 @@ NB.?lintmsgsoff
 cocurrent@(0&cocreate)@([ coerase) newloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_ =: dissectprimindex_dissect_ , <;: y
 NB.?lintmsgson
 coinsert x , ' dissectobj'
-cocurrent newloc   NB. No named verb from here to the end!
 newloc
 )
 
@@ -10806,7 +10805,7 @@ NB. between monad & dyad as to require different locales.  Executed inline durin
 NB. y is list of attribute class to include after the common class
 NB. The path for the valence is set to the bivalent locale, followed by locales given in y, followed by the
 NB.  path for the bivalent locale
-NB. Major side effect: locale is changed
+NB. Result is locale to switch to
 startvalence =: 4 : 0
 NB.?lintmsgsoff
 cocurrent@(0&cocreate)@([ coerase) newloc =. ,&x&.> baseloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_
@@ -10814,8 +10813,8 @@ NB.?lintmsgson
 ((/: =&(<,'z')) ~. (,    (;:y) , 18!:2) baseloc) 18!:2 newloc
 newloc   NB. Return locale name, which we will switch to
 )
-startmonad =: ([ 18!:4)@('monad'&startvalence)
-startdyad =: ([ 18!:4)@('dyad'&startvalence)
+startmonad =: ('monad'&startvalence)
+startdyad =: ('dyad'&startvalence)
 
 NB. Nilad.  Executed at setvalence time.  Inserts the monad/dyad locale and its path at the top of the search path
 NB. of the current object, depending on the valence.
@@ -11930,7 +11929,7 @@ enparen^:(y=3) (defstring__uop 2) jd cop
 )
 
 NB. The monadic valence:
-startmonad ''
+cocurrent startmonad ''
 
 NB. return string form of operands, not including instrumentation.
 NB. The expansion has the full form of the verb, so use it
@@ -12046,7 +12045,7 @@ res
 )
 
 NB. The dyadic valence:
-startdyad ''
+cocurrent startdyad ''
 
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0@]
@@ -13807,7 +13806,7 @@ NB. *** \ ***
 'dissectpartitionadverb dissectpartition' primlocale '\'
 
 NB. The monadic valence u\ y:
-localebslashmonad =. startmonad ''
+cocurrent localebslashmonad =. startmonad ''
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
 NB. y is natural frame(s) of the executed verb
@@ -13844,7 +13843,7 @@ exegesispartitiondesc =: 3 : 0
 'operates on prefixes of y of increasing length' 
 )
 
-localebslashdyad =. startdyad ''
+cocurrent localebslashdyad =. startdyad ''
 NB. The dyad x u\ y:
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
@@ -13948,7 +13947,7 @@ NB. *** \. ***
 
 
 NB. The monadic valence u\. y:
-startmonad >localebslashmonad
+cocurrent startmonad >localebslashmonad
 
 
 NB. calcdispframe comes from \
@@ -13978,7 +13977,7 @@ exegesispartitiondesc =: 3 : 0
 'operates on suffixes of y of decreasing length' 
 )
 
-startdyad >localebslashdyad
+cocurrent startdyad >localebslashdyad
 NB. The dyad x u\. y:
 
 NB. calcdispframe comes from \
@@ -14039,7 +14038,7 @@ NB. *** /. ***
 
 
 NB. The monadic valence u/. y:
-startmonad ''
+cocurrent startmonad ''
 
 
 NB. *** traversal support ***
@@ -14086,7 +14085,7 @@ exegesispartitiondesc =: 3 : 0
 'operates on diagonals of y' 
 )
 
-startdyad ''
+cocurrent startdyad ''
 NB. The dyad x u/. y:
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
@@ -14304,7 +14303,7 @@ end.
 
 
 NB. The monadic valence u;. y:
-startmonad ''
+cocurrent startmonad ''
 
 
 NB. *** traversal support ***
@@ -14352,7 +14351,7 @@ end.
 
 NB. the rest handled in the common locale
 
-startdyad ''
+cocurrent startdyad ''
 NB. The dyad x u;.n y:
 
 exegesispartitiondesc =: 3 : 0
@@ -14633,7 +14632,7 @@ NB. Result is _1 if selection is OK, 0 if point of error, 1=invalid
 NB. There is no way for this selection to fail, since there is only one result, and if we have anything we have everything
 auditselection =: _1:
 
-startmonad''
+cocurrent startmonad''
 
 NB. Traversal up and down the tree.
 NB. The result is the DOL, up through the result of u
@@ -14792,7 +14791,7 @@ end.
 
 )
 
-startdyad''
+cocurrent startdyad''
 
 NB. Traversal up and down the tree.
 NB. The result is the DOL, up through the result of u
@@ -15735,7 +15734,6 @@ NB. at the top of the search path
 NB. The class is erased first, in case there are definitions we need to lose
 NB. y is (name of locale);string containing the modifiers that will be handled in this
 NB. locale.  Result is the locale name.  Side effect: index extended
-NB. MAJOR SIDE EFFECT: locale is changed
 modseqlocale =: ''&$: : (4 : 0)
 'locname seq' =. y
 NB.?lintmsgsoff
@@ -15743,12 +15741,11 @@ dissectprimseqindex_dissect_ =: dissectprimseqindex_dissect_ , locname;seq
 cocurrent@(0&cocreate)@([ coerase) newloc =. <locname
 NB.?lintmsgson
 coinsert x , ' dissectobj'
-cocurrent newloc   NB. No named verb from here to the end!
-i. 0 0
+newloc
 )
 
 cocurrent 'dissectobj'
-modseqlocale 'dissecteach';'&.>'
+cocurrent modseqlocale 'dissecteach';'&.>'
 
 create =: 3 : 0
 create_dissectobj_ f. (<1 2) {  y
