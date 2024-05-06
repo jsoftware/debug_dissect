@@ -12045,7 +12045,7 @@ res
 )
 
 NB. The dyadic valence:
-cocurrent startdyad ''
+([ cocurrent) startdyad ''
 
 NB. return string form of operands, not including instrumentation
 defstring =: 3 : 0@]
@@ -13806,7 +13806,7 @@ NB. *** \ ***
 'dissectpartitionadverb dissectpartition' primlocale '\'
 
 NB. The monadic valence u\ y:
-cocurrent localebslashmonad =. startmonad ''
+localebslashmonad =. ([ cocurrent) startmonad ''
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
 NB. y is natural frame(s) of the executed verb
@@ -13843,7 +13843,7 @@ exegesispartitiondesc =: 3 : 0
 'operates on prefixes of y of increasing length' 
 )
 
-cocurrent localebslashdyad =. startdyad ''
+localebslashdyad =. ([ cocurrent) startdyad ''
 NB. The dyad x u\ y:
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
@@ -13947,7 +13947,7 @@ NB. *** \. ***
 
 
 NB. The monadic valence u\. y:
-cocurrent startmonad >localebslashmonad
+([ cocurrent) startmonad >localebslashmonad
 
 
 NB. calcdispframe comes from \
@@ -13977,7 +13977,7 @@ exegesispartitiondesc =: 3 : 0
 'operates on suffixes of y of decreasing length' 
 )
 
-cocurrent startdyad >localebslashdyad
+([ cocurrent) startdyad >localebslashdyad
 NB. The dyad x u\. y:
 
 NB. calcdispframe comes from \
@@ -14038,7 +14038,7 @@ NB. *** /. ***
 
 
 NB. The monadic valence u/. y:
-cocurrent startmonad ''
+([ cocurrent) startmonad ''
 
 
 NB. *** traversal support ***
@@ -14085,7 +14085,7 @@ exegesispartitiondesc =: 3 : 0
 'operates on diagonals of y' 
 )
 
-cocurrent startdyad ''
+([ cocurrent) startdyad ''
 NB. The dyad x u/. y:
 
 NB. x is selopshapes: box for each operand, containing $L:0 of the operand
@@ -14303,7 +14303,7 @@ end.
 
 
 NB. The monadic valence u;. y:
-cocurrent startmonad ''
+([ cocurrent) startmonad ''
 
 
 NB. *** traversal support ***
@@ -14351,7 +14351,7 @@ end.
 
 NB. the rest handled in the common locale
 
-cocurrent startdyad ''
+([ cocurrent) startdyad ''
 NB. The dyad x u;.n y:
 
 exegesispartitiondesc =: 3 : 0
@@ -14632,7 +14632,7 @@ NB. Result is _1 if selection is OK, 0 if point of error, 1=invalid
 NB. There is no way for this selection to fail, since there is only one result, and if we have anything we have everything
 auditselection =: _1:
 
-cocurrent startmonad''
+([ cocurrent) startmonad''
 
 NB. Traversal up and down the tree.
 NB. The result is the DOL, up through the result of u
@@ -14791,7 +14791,7 @@ end.
 
 )
 
-cocurrent startdyad''
+([ cocurrent) startdyad''
 
 NB. Traversal up and down the tree.
 NB. The result is the DOL, up through the result of u
