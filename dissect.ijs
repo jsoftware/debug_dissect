@@ -10789,8 +10789,7 @@ NB. x is object class(es) to include, default 'dissectobj'.  These classes are p
 NB. at the top of the search path
 NB. The class is erased first, in case there are definitions we need to lose
 NB. y is string containing the modifiers that will be handled in this
-NB. locale.  Result is the locale name.  Side effect: index extended
-NB. MAJOR SIDE EFFECT: locale is changed
+NB. locale.  Result is the new locale name.  Side effect: index extended
 primlocale =: ''&$: : (4 : 0)
 NB.?lintmsgsoff
 cocurrent@(0&cocreate)@([ coerase) newloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_ =: dissectprimindex_dissect_ , <;: y
@@ -10830,7 +10829,7 @@ newtype =. ((valence=2) { 'monad';'dyad') ,~&.> oldpreflen { oldpath
 
 NB. **** @ @: ****
 NB. Save the name of the locale that handles @@: - we use it in &&: and also in fork
-localeat_dissect_ =: 'dissectextendv' primlocale '@@:'
+localeat_dissect_ =: ([ cocurrent) 'dissectextendv' primlocale '@@:'
 
 NB. *** special arguments ***
 NB. cop starts with a space for hidden internal operations.  titlestring is always null, and we don't add an end-of-computation line
@@ -11035,7 +11034,7 @@ end.
 
 NB. **** & &: ****
 NB. Save the name of the locale that handles &&: - we use it in &. and &.:
-localecompose_dissect_ =: 'dissectextendv' primlocale '&&:'
+localecompose_dissect_ =: ([ cocurrent) 'dissectextendv' primlocale '&&:'
 
 NB. When we find out the valence, we change this to be like @@: if monad, and proceed here only for the dyad
 
@@ -11360,7 +11359,7 @@ cocurrent 'dissectobj'
 
 
 NB. **** &. &.: ****
-localedual_dissect_ =: (>localecompose_dissect_) primlocale '&.&.:'
+localedual_dissect_ =: ([ cocurrent) (>localecompose_dissect_) primlocale '&.&.:'
 NB. we emulate this with v^"_1@:u&[:]v.  The only thing we do here is defstring, so we can recover the original display form of the verb; and exegesis
 
 create =: 3 : 0
@@ -11445,7 +11444,7 @@ end.
 
 NB. **** u"n u"v m"n m"v****
 NB. We also come through here for u&n m&v, with the primitive changed to '&'; & for @n and :: n, with the primitive changed
-localerank_dissect_ =: primlocale '"'
+localerank_dissect_ =: ([ cocurrent) primlocale '"'
 
 create =: 3 : 0
 NB. Save the operands - locales of the verbs, and string form of the conj
@@ -11624,7 +11623,7 @@ end.
 
 NB. **** uL:n uS:n ****
 
-primlocale 'L:S:'
+([ cocurrent) primlocale 'L:S:'
 
 create =: 3 : 0
 if. 0 = verb bwand (<0 0) {:: y do.
@@ -11868,7 +11867,7 @@ end.
 )
 
 NB. **** m/ u/ ****
-primlocale '/'
+([ cocurrent) primlocale '/'
 
 create =: 3 : 0
 create_dissectobj_ f. (<1 2) {  y
@@ -12306,7 +12305,7 @@ end.
 
 
 NB. **** ^: ****
-localepower_dissect_ =: primlocale '^:'
+localepower_dissect_ =: ([ cocurrent) primlocale '^:'
 
 create =: 3 : 0
 NB. Save the original v, whether gerund, noun, or verb
@@ -13117,7 +13116,7 @@ ysource =. ,@(- *)&.> ({. > isfensureselection isftorank2 y)
 )
 
 NB. **** um`vn ****
-primlocale '`'
+([ cocurrent) primlocale '`'
 
 create =: 3 : 0
 create_dissectobj_ f. (<1 2) { y
@@ -13183,7 +13182,7 @@ NB. If the operand locale is a verb use it; otherwise see if a noun is a gerund.
 
 
 NB. **** u~ m~ ****
-primlocale '~'
+([ cocurrent) primlocale '~'
 
 create =: 3 : 0
 if. noun bwand (<0 0) {:: y do.
@@ -13253,7 +13252,7 @@ end.
 
 NB. **** m@.vn ****
 
-localeatdot =. 'dissectextendv' primlocale '@.'
+localeatdot =. ([ cocurrent) 'dissectextendv' primlocale '@.'
 
 create =: 3 : 0
 'uop cop vop' =: 1 {"1 y
@@ -13803,7 +13802,7 @@ cocurrent 'dissectobj'
 
 NB. *** \ ***
 
-'dissectpartitionadverb dissectpartition' primlocale '\'
+([ cocurrent) 'dissectpartitionadverb dissectpartition' primlocale '\'
 
 NB. The monadic valence u\ y:
 localebslashmonad =. ([ cocurrent) startmonad ''
@@ -13943,7 +13942,7 @@ end.
 
 NB. *** \. ***
 
-'dissectpartitionadverb dissectpartition' primlocale '\.'
+([ cocurrent) 'dissectpartitionadverb dissectpartition' primlocale '\.'
 
 
 NB. The monadic valence u\. y:
@@ -14034,7 +14033,7 @@ end.
 
 NB. *** /. ***
 
-'dissectfitok dissectirregularops dissectpartitionadverb dissectpartition' primlocale '/.'
+([ cocurrent) 'dissectfitok dissectirregularops dissectpartitionadverb dissectpartition' primlocale '/.'
 
 
 NB. The monadic valence u/. y:
@@ -14135,7 +14134,7 @@ exegesispartitiondesc =: 3 : 0
 
 NB. *** ;. ***
 
-dissectlocalesemidot_dissect_ =: 'dissectirregularops dissectpartitionconjunction dissectpartition' primlocale ';.'
+dissectlocalesemidot_dissect_ =: ([ cocurrent) 'dissectirregularops dissectpartitionconjunction dissectpartition' primlocale ';.'
 
 NB. We handle monads by creating a synthetic x and then handling as dyads.  So both valences
 NB. come through here
@@ -14375,7 +14374,7 @@ NB. the rest handled in the common locale
 
 NB. **** :: ****
 
-primlocale '::'
+([ cocurrent) primlocale '::'
 
 create =: 3 : 0
 NB. For u@n, replace n with n"_ which is its equivalent.  The conjunction-name is a signal to " to suppress the "_ for display
@@ -14538,7 +14537,7 @@ clearselect_dissect_ f. y
 )
 
 NB. *********** } ***********
-primlocale '}'
+([ cocurrent) primlocale '}'
 
 create =: 3 : 0
 NB. Switch to general verb if u is a verb
@@ -15009,7 +15008,7 @@ end.
 
 NB. **** !: ****
 
-localeforeign_dissect_ =: primlocale '!:'
+localeforeign_dissect_ =: ([ cocurrent) primlocale '!:'
 
 create =: 3 : 0
 NB. m and n must be nouns
@@ -15078,7 +15077,7 @@ proplocales =: 3 : 0
 
 NB. **** b. ****
 
-localebasic_dissect_ =: primlocale 'b.'
+localebasic_dissect_ =: ([ cocurrent) primlocale 'b.'
 
 create =: 3 : 0
 'uop cop' =: 1 {"1 y
@@ -15154,7 +15153,7 @@ proplocales =: 3 : 0
 
 NB. **** : ****
 
-primlocale ':'
+([ cocurrent) primlocale ':'
 
 create =: 3 : 0
 if. bwxor/ verb bwand > (<0 2;0) { y do.
@@ -15272,7 +15271,7 @@ traverse =: 4 : 'x traverse__actop y'
 
 NB. **** !. ****
 
-primlocale '!.'
+([ cocurrent) primlocale '!.'
 
 NB. Fit has very light footprint: it passes the fit-noun to u, which is responsible
 NB. for all display and inclusion into the sentence.  This is necessary since fit must be applied
@@ -15302,7 +15301,7 @@ NB. ******* verbs with explicit support ***********
 
 NB. *********** $: *************
 
-'dissectverb' primlocale '$:'
+([ cocurrent) ([ cocurrent) 'dissectverb' primlocale '$:'
 
 NB. y is (string form of the verb);tokens it came from
 create =: 3 : 0
@@ -15354,7 +15353,7 @@ PICKTOOLTIPMSGOK  NB. Indicate that we have overridden, abort selection
 
 NB. *********** 0-9: *************
 
-'dissectverb' primlocale '0:1:2:3:4:5:6:7:8:9:_1:_2:_3:_4:_5:_6:_7:_8:_9:_:__:'
+([ cocurrent) 'dissectverb' primlocale '0:1:2:3:4:5:6:7:8:9:_1:_2:_3:_4:_5:_6:_7:_8:_9:_:__:'
 
 NB. Set globals, then initialize display for the verb
 traverse =: endtraverse@:(4 : 0)
@@ -15372,7 +15371,7 @@ x ,&< coname'' NB. no v, so no change to the DOLs
 
 NB. **** { ****
 
-'dissectverb' primlocale '{'
+([ cocurrent) 'dissectverb' primlocale '{'
 
 setvalence =: 3 : 0
 NB. We only handle the dyad
@@ -15447,7 +15446,7 @@ end.
 
 
 NB. **** default ****
-localedefault_dissect_ =: primlocale ''
+localedefault_dissect_ =: ([ cocurrent) primlocale ''
 NB. Remove the last element in the search, to make this the 'search failed' locale
 dissectprimindex_dissect_ =: }: dissectprimindex_dissect_
 
