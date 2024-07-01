@@ -6,7 +6,7 @@ NB. The 2 1 gives the name-table sizes: 2 1 0 0 0 ...
 NB. The dissectionlist thing is to preserve the list over reloads, for debugging.  This is also its initialization
 NB. Don't delete a locale that we have switched to, to prevent interaction unpleasantness
 NB. 10 10 here is the starting position of the first window
-3 : 'dissectionlist_dissect_ =: d [ ((cocreate ([ coerase))"0~   2 1 {.~ #) y [ d =. (,:($0);10 10)&[^:(0=#) ".''dissectionlist_dissect_''' (coname'') -.~ locales
+3 : 'dissectionlist_dissect_ =: d [ ((cocreate ([ clear@:>))"0~   2 1 {.~ #) y [ d =. (,:($0);10 10)&[^:(0=#) ".''dissectionlist_dissect_''' (coname'') -.~ locales
 
 NB. DISSECTLEVEL is updated from time to time whenever there is a change to an external interface, indicating the dissect release level
 NB. at the time of the change
@@ -10792,7 +10792,7 @@ NB. y is string containing the modifiers that will be handled in this
 NB. locale.  Result is the new locale name.  Side effect: index extended
 primlocale =: ''&$: : (4 : 0)
 NB.?lintmsgsoff
-cocurrent@(0&cocreate)@([ coerase) newloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_ =: dissectprimindex_dissect_ , <;: y
+cocurrent@(0&cocreate)@([ clear@:>) newloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_ =: dissectprimindex_dissect_ , <;: y
 NB.?lintmsgson
 coinsert x , ' dissectobj'
 newloc
@@ -10807,7 +10807,7 @@ NB.  path for the bivalent locale
 NB. Result is locale to switch to
 startvalence =: 4 : 0
 NB.?lintmsgsoff
-cocurrent@(0&cocreate)@([ coerase) newloc =. ,&x&.> baseloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_
+cocurrent@(0&cocreate)@([ clear@:>) newloc =. ,&x&.> baseloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_
 NB.?lintmsgson
 ((/: =&(<,'z')) ~. (,    (;:y) , 18!:2) baseloc) 18!:2 newloc
 newloc   NB. Return locale name, which we will switch to
@@ -15737,7 +15737,7 @@ modseqlocale =: ''&$: : (4 : 0)
 'locname seq' =. y
 NB.?lintmsgsoff
 dissectprimseqindex_dissect_ =: dissectprimseqindex_dissect_ , locname;seq
-cocurrent@(0&cocreate)@([ coerase) newloc =. <locname
+cocurrent@(0&cocreate)@([ clear@:>) newloc =. <locname
 NB.?lintmsgson
 coinsert x , ' dissectobj'
 newloc
