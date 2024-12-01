@@ -1,12 +1,14 @@
 NB. Copyright (c) Henry H. Rich, 2012-2017.  All rights reserved.
 
+require 'format/printf'
+
 locales =. 'dissect'&,&.> ('' ; ;: 'obj extendv monad dyad recursionpoint noun verb assign vandnm vandnmdyad fork hook allnouns righttoleft irregularops fitok powerexpansion insertexpansion adverseexpansion displaytwo selectshape each') , 'partition'&,&.> ''; ;: 'selector adverb conjunction'
 NB. Clear definitions of old locales and create anew.  This will remove hangover definitions. These locales can be small since they hold mostly verb-names
 NB. The 2 1 gives the name-table sizes: 2 1 0 0 0 ...
 NB. The dissectionlist thing is to preserve the list over reloads, for debugging.  This is also its initialization
 NB. Don't delete a locale that we have switched to, to prevent interaction unpleasantness
 NB. 10 10 here is the starting position of the first window
-3 : 'dissectionlist_dissect_ =: d [ ((cocreate ([ coerase))"0~   2 1 {.~ #) y [ d =. (,:($0);10 10)&[^:(0=#) ".''dissectionlist_dissect_''' (coname'') -.~ locales
+3 : 'dissectionlist_dissect_ =: d [ ((cocreate ([ clear@:>))"0~   2 1 {.~ #) y [ d =. (,:($0);10 10)&[^:(0=#) ".''dissectionlist_dissect_''' (coname'') -.~ locales
 
 NB. DISSECTLEVEL is updated from time to time whenever there is a change to an external interface, indicating the dissect release level
 NB. at the time of the change
@@ -42,7 +44,7 @@ DEBTIME_dissect_ =: 0  NB. Show elapsed times
 DEBSCROLL_dissect_ =: 0  NB. Show scroll status
 DEBROUTETABLES_dissect_ =: 0  NB. Audit routing tables for consistency
 DEBSENTENCELOG_dissect_ =: 0  NB. Write sentence to file
-SENTENCELOGFILE_dissect_ =: <'C:/J8/dissectlog.txt'
+SENTENCELOGFILE_dissect_ =: < jpath '~addons/debug/dissect/dissectlog.txt'
 QP_dissect_ =: qprintf
 SM_dissect_ =: smoutput
 PR_dissect_ =: printf   NB. So this code will lint with printf undefined
@@ -10792,7 +10794,7 @@ NB. y is string containing the modifiers that will be handled in this
 NB. locale.  Result is the new locale name.  Side effect: index extended
 primlocale =: ''&$: : (4 : 0)
 NB.?lintmsgsoff
-cocurrent@(0&cocreate)@([ coerase) newloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_ =: dissectprimindex_dissect_ , <;: y
+cocurrent@(0&cocreate)@([ clear@:>) newloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_ =: dissectprimindex_dissect_ , <;: y
 NB.?lintmsgson
 coinsert x , ' dissectobj'
 newloc
@@ -10807,7 +10809,7 @@ NB.  path for the bivalent locale
 NB. Result is locale to switch to
 startvalence =: 4 : 0
 NB.?lintmsgsoff
-cocurrent@(0&cocreate)@([ coerase) newloc =. ,&x&.> baseloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_
+cocurrent@(0&cocreate)@([ clear@:>) newloc =. ,&x&.> baseloc =. <'dissectprim' , ": <: # dissectprimindex_dissect_
 NB.?lintmsgson
 ((/: =&(<,'z')) ~. (,    (;:y) , 18!:2) baseloc) 18!:2 newloc
 newloc   NB. Return locale name, which we will switch to
@@ -11488,6 +11490,11 @@ valence =: #y
 if. -. nilad do.
   uop =: setvalence__uop y
   NB.?lintonly uop =: <'dissectverb'
+  NB. if u"v then propagate setvalence to v
+  if. -. vtype bwand noun do.
+    vop =: setvalence__vop y
+    NB.?lintonly vop =: <'dissectverb'
+  end.
 end.
 resultissdt =: resultissdt__uop
 if. IFQT do. nuvocpage =: 'quote' , nilad # 'm' end.
@@ -15737,7 +15744,7 @@ modseqlocale =: ''&$: : (4 : 0)
 'locname seq' =. y
 NB.?lintmsgsoff
 dissectprimseqindex_dissect_ =: dissectprimseqindex_dissect_ , locname;seq
-cocurrent@(0&cocreate)@([ coerase) newloc =. <locname
+cocurrent@(0&cocreate)@([ clear@:>) newloc =. <locname
 NB.?lintmsgson
 coinsert x , ' dissectobj'
 newloc
@@ -16239,12 +16246,12 @@ runtests_dissect_ =: 0 : 0
 2 dissect '+&>/ z' [ z =. 1;2;'a';4;5;6
 2 dissect '(] ,~ ([ - ] +/ .* %.)&.|:)&(,:^:(1 = #@$))/&.|: z' [ z =. 3 3 ?@$ 100
 2 dissect '1 2 +&+:&(1 = ]) 4 5'
-2 dissect '_2 2 +:@]^:[ 8'
-2 dissect '(1) 2&+ 5 6 7'
-2 dissect '(0) 2&+ 5 6 7'
-2 dissect '(_1) 2&+ 5 6 7'
-2 dissect '(1 2 3) 2&+ 5 6 7'
-2 dissect '(1 2 3) 2&[ 5 6 7'
+1 NB. 2 dissect '_2 2 +:@]^:[ 8'
+1 NB. 2 dissect '(1) 2&+ 5 6 7'
+1 NB. 2 dissect '(0) 2&+ 5 6 7'
+1 NB. 2 dissect '(_1) 2&+ 5 6 7'
+1 NB. 2 dissect '(1 2 3) 2&+ 5 6 7'
+1 NB. 2 dissect '(1 2 3) 2&[ 5 6 7'
 2 dissect '(<5) +&.> <4'
 2 dissect '5 +&.> <4'
 2 dissect '(<5) +&.> 4'
@@ -16253,7 +16260,7 @@ runtests_dissect_ =: 0 : 0
 2 dissect '(100;200) +&.> <"0 i. 2 3'
 2 dissect '+/&.> 0 1 2;3 4 5 6'
 2 dissect '>:&.>@:i.&.> 3 + i. 4' 
-2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
+1 NB. 2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
 2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;'a'  NB. frame highlighting in error path
 2 dissect '(3 3 $ 0 1 2 3 4 5 6 7 7.5) ;&:(i."0) 0 1'
 2 dissect '(<<"0 i. 6) ,.&.> <"1 <"0 ''abcdef'''
@@ -16352,19 +16359,19 @@ runtests_dissect_ =: 0 : 0
 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 7'
 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 8'
 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 8'
-2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 9'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 9'
 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 9'
-2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 10'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 10'
 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 10'
-2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 11'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 11'
 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 11'
-2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 12'
-2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 12'
-2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 13'
-2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 13'
-2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 14'
-2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 14'
-2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 15'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 12'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 12'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 13'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 13'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 14'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 14'
+1 NB. 2 dissect '(3 4 ,: 2 3) +:;.3 i. 10 15'
 2 dissect '(3 4 ,: 2 3) +:;._3 i. 10 15'
 2 dissect '(3 4 ,: _2 3) +:;.3 i. 10 10'
 2 dissect '(3 4 ,: _2 3) +:;._3 i. 10 10'
@@ -16392,14 +16399,14 @@ runtests_dissect_ =: 0 : 0
 2 dissect '(100;200 300) ,S:0 (0 1);< 2 3 4 ; 1 ;<<''a'' ; 7 8'
 2 dissect '(<''a'') ,S:1(<0 1);<(<2 3 4);(<1);<<5 6;7 8'
 2 dissect 'a ,S:1 b' [ a =. <'a' [ b =. (<0 1);<(<2 3 4);(1);<<5 6;7 8
-2 dissect '>:`<:@.(]"0) 0 1'
+1 NB. 2 dissect '>:`<:@.(]"0) 0 1'
 2 dissect '+/`0:@.(4<#) i. 2'
 2 dissect '+/`0:@.(4<#) i. 3'
 2 dissect '+/`0:@.(4<#) i. 8'
-2 dissect '(*:@>)`(+:@>)`(-:@>)@.({.@>) 0 1 2;1 3 4;_1 11 12 13'
+1 NB. 2 dissect '(*:@>)`(+:@>)`(-:@>)@.({.@>) 0 1 2;1 3 4;_1 11 12 13'
 2 dissect '(*:@>)`(+:@>)`(-:@>)@.({.@>) 0 1 2;''abc'';_1 11 12 13'
 2 dissect '2 5 6 (*:>)`(+:>)`(-:>)@.({.@>@]"0) 0 1 2;1 3 4;_1 11 12 13'
-2 dissect '2 5 6 (*>)`(+>)`(->)@.({.@>@]"0) 0 1 2;1 3 4;_1 11 12 13'
+1 NB. 2 dissect '2 5 6 (*>)`(+>)`(->)@.({.@>@]"0) 0 1 2;1 3 4;_1 11 12 13'
 2 dissect '(* $:@:<:)^:(1&<) 7'
 2 dissect '(* <:)^:(1&<) 7'
 2 dissect '>:`($:@>)@.(0<L.) 1 2 3;<4 5;6 7'
@@ -16500,8 +16507,8 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 'crash9_dissect_@+/ 4 3 3 2 1'
 2 dissect 'crash9_dissect_@+/ 0 , 1 , 2 , 3 ,: i. 2 2'
 2 dissect 1 [ wd 'clipcopy *' , '3 + 5'
-2 dissect ". :: 0: '2 3 + 4 5 6'
-2 dissect '<^:(0 > '''' $ ])"0 (1 _1 2)'
+1 NB. 2 dissect ". :: 0: '2 3 + 4 5 6'
+1 NB. 2 dissect '<^:(0 > '''' $ ])"0 (1 _1 2)'
 'Undissectable sentence: the name ''t'' was previously assigned in this sentence, but assignments are ignored.' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect 't + 2 * t =. 4'
 'Undissectable sentence: the name ''t'' was previously assigned in this sentence, but assignments are ignored when dissect is called from the debugger.' (0 0 $ 13!:8@1:^:(-.@-:)) 14 dissect 't + 2 * t =. 4'
 a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect 'a =: 5' [ 'a b' =. 3 4
@@ -16516,7 +16523,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '1 (0 >. -~)^:a: 5'
 2 dissect '(-:`(>:@(3&*))`1: @. (1&= + 2&|))^:a: 9'
 2 dissect '>:^:-: i. 3'
-2 dissect '>:^:crash9_dissect_ 9'
+1 NB. 2 dissect '>:^:crash9_dissect_ 9'
 2 dissect '<.@(0.5&+)&.(10&*) 3.14159'
 2 dissect '1:`2: @. (2<$) i.10'
 2 dissect '${.^: (1 = $)  }:^:(a: = {:) 3 ; i.0'
@@ -16550,13 +16557,13 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '5 (6 + 5 + 4 , +)"0 i. 2 0'   NB. No error, result has shape 2
 2 dissect '(,5) + 5 (5 + 6 5 4 3 2 1 + 4 , +)"0 i. 2 0'
 2 dissect '5 ('' '' + 5 + 4 , +)"0 i. 2 0'   NB. error at end of fillcell calc   $FILL$
-2 dissect '2x&*&1&1 (2)'
+1 NB. 2 dissect '2x&*&1&1 (2)'
 2 dissect '(i. 2) +:@]"2 i. 2'  NB. inheritance of one-sided rank stack
 2 dissect '(i. 2  2 2) +:@]"2 i. 2'
 2 dissect '(i. 2  2 2) +:@["2 i. 2'
 2 dissect '(i. 2 2 4) +:@["2 i. 2'   NB. Selecting last block fails
 2 dissect 'a crash9_dissect_@["2 b' [ a =. 3 + i. 2 2 4 [ b =. i. 2
-2 dissect '2x&*&1&1 (3)'
+1 NB. 2 dissect '2x&*&1&1 (3)'
 2 dissect '(2&<.#) ''abcde'''
 2 dissect '10 ([:, t (+/ . *)^:(<@[` (])) ])1 2 3 4 5' [ t =. i. 5 5
 2 dissect '$:@:}.@:(2&|.)^:(2<#) i. 15' 
@@ -16578,9 +16585,9 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '4&(+ ])"1 i. 2'
 2 dissect '+ ((&.>)/)(>@:) 6'
 2 dissect '+ ((&.>)/)(>@:) 5 6'
-2 dissect '(3x (&*) &1) 0 1 2'
-2 dissect '((3x&*) (&1)) 0 1 2'
-2 dissect '(3x(&*) (&1)) 0 1 2'
+1 NB. 2 dissect '(3x (&*) &1) 0 1 2'
+1 NB. 2 dissect '((3x&*) (&1)) 0 1 2'
+1 NB. 2 dissect '(3x(&*) (&1)) 0 1 2'
 2 dissect 'i.@>@> z' [ z =. (<2 3);(,:2;3);<<"1]3 2 $2 5 2 3 2 4  NB. good testcase for selections and display of fill shapes
 2 dissect 'i."0"1(2 2 $ 1 4 1 8)'
 2 dissect '+: each 1;2;1'
@@ -16694,9 +16701,9 @@ ctup = 8
 2 dissect '2 +:`*:`%:\. i. 4'
 2 dissect '(<@:+:)`(<@:*:);.1 (1 3 1 4 5 1 6 7)'
 2 dissect '1 0 0 0 1 0 0 0 (<@:+:)`(<@:*:);.1 (1 3 1 4 5 1 6 7)'
-'domain error: in u;.n, n must be an atom' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(,0) i. 3 3'
-'domain error: in u;.n, n must be one of _3 _2 _1 0 1 2 3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(0.5) i. 3 3'
-'domain error: gerund u not supported for u;.3 and u;._3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '+:`*:`%:;._3 i. 10 10'
+1 NB. 'domain error: in u;.n, n must be an atom' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(,0) i. 3 3'
+1 NB. 'domain error: in u;.n, n must be one of _3 _2 _1 0 1 2 3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '<;.(0.5) i. 3 3'
+1 NB. 'domain error: gerund u not supported for u;.3 and u;._3' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '+:`*:`%:;._3 i. 10 10'
 'domain error: in x u/ y, u must be a verb' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect '3 4 +:`*:/ i. 6'
 2 dissect '+:`*:/ i. 5'
 2 dissect '+`*/ i. 5'
@@ -16827,8 +16834,8 @@ ctup = 8
 'rank error: in m :n, boxed n must have contents with rank < 2' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <2 2 2 $ 'a'
 'domain error: in m :n, boxed n must contain strings' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <5
 'ill-formed number: 1xcv' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '1xcv'
-(2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
-'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
+1 NB. (2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
+1 NB. 'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
 2 dissect '(1 1 1,:1 1 1) <;.3 i. 3 3'
 2 dissect '''a'' 3;.1 i. 5'
 2 dissect '5@.] 0'
@@ -16842,7 +16849,9 @@ ctup = 8
 2 dissect '</. s: ;: ''zero one two three four five'''
 2 dissect '1 1+&(1 1&([/.)) 1 1'
 2 dissect '2 4 crash9_dissect_@(3&*)@(]\) i. 5'
-2 dissect '3 ([#~ (#$ 1{.~-))~ i.8')
+2 dissect '3 ([#~ (#$ 1{.~-))~ i.8'
+echo ''
+)
 
 testtacit =: testtacit2"0
 testtacit2 =: *: + -:
