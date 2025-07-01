@@ -439,14 +439,6 @@ isnumeric =: isnumtype@[^:(0=]) isempty
 NB. Result is 0 if y is nonnumeric, 1 is numeric noninteger, 2 if integer (after conversion)
 isinteger =: (+   9&o. -: <.)~^:] isnumeric
 
-NB. Explicit type conversion to boxed if y has length 0. Unifies the type of null.
-NB. It is especially important since j9.7-beta4. Compare the results:
-NB. ]a =: 2 2 $ 1 ; (0 2 $ a:) ; 2 ; (0 2 $ a:)
-NB. ]b =: 2 2 $ 1 ; (0 2 $ a:) ; 2 ; (0 2 $ 0)
-NB. ; <@({. ,. >@{:)"1 a
-NB. ; <@({. ,. >@{:)"1 b
-converttypeifnull =: (0 2$a:)"_^:(0 = #)
-
  NB. *** end of utilities
 
 NB. possible starting variables, in name;type;value form
@@ -6011,7 +6003,7 @@ NB. bring them up to rank 2
 NB. If there is nothing to highlight, return empty.  We must test explicitly because isftorank2 behaves oddly on empty
 if. 0 e. $y do. 0 2$a:
 else.
-  (<x) ,. converttypeifnull , isftocsf > chainISFs&.>/&.|. a: , isftorank2 y
+  (<x) ,. , isftocsf > chainISFs&.>/&.|. a: , isftorank2 y
 end.
 )
 NB. x and y are contents of a single box of (an ISF that has been brought to level 2); i. e. x and y have boxing level 1 or 2
@@ -6679,7 +6671,7 @@ NB. selection is propagated up automatically
   QP^:DEBHLIGHT'hlights '
 NB. Draw accumulated highlight rects
 NB. Convert from style;(level;rect) to style;level;rect
-  hlights =. ; <@converttypeifnull@({. ,. >@{:)"1 hlights
+  hlights =. ; <@({. ,. >@{:)"1 hlights
   if. # hlights do.
     QP^:DEBHLIGHT2'drawhighlights:defstring=?defstring]0 hlights valueformat  valueformat(hlighttotlbr)2&{"1]hlights '
     mesh =. ((boxyx + 2 2 $ 1 _1 1 _1) +"2 |:"2) valueformat  hlighttotlbr 2&{"1 hlights
@@ -16843,7 +16835,7 @@ ctup = 8
 'domain error: in m :n, boxed n must contain strings' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <5
 'ill-formed number: 1xcv' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '1xcv'
 1 NB. (2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
-1 NB. 'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
+'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
 2 dissect '(1 1 1,:1 1 1) <;.3 i. 3 3'
 2 dissect '''a'' 3;.1 i. 5'
 2 dissect '5@.] 0'
