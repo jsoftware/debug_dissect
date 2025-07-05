@@ -470,6 +470,8 @@ NB. the result
 if. '__' +./@:E. name do.
   NB.?lintonly loc =. <'dissectobj'
   cocurrent loc
+  NB. If name is not defined in loc then the rhs of the assignment will not evaluate to noun
+  NB. and "noun result was required" error will occur in the for_l. condition.
   loc =. ('__' takeafter name)~
   name =. '__' taketo name
 end.
@@ -16908,7 +16910,8 @@ dissect arg
 
 crash9 =: ([ [ 13!:8^:]@(9 e. ,))"0
 
-3 : 0 ''
+NB. Test findnameloc.
+3 : 0
 tv_a_ =: +
 mv_a_ =: 3 : ('y + 5')
 dv_a_ =: 4 : ('2 * x';'x + y')"0
@@ -16929,7 +16932,7 @@ findnameloc_dissect_ 'tv',&< <,'b'
 findnameloc_dissect_ 'tv__l',&< <,'b'
 findnameloc_dissect_ 'tv__l',&< <,'c'
 findnameloc_dissect_ 'tv__k__k',&< <,'c'
-findnameloc_dissect_ 'tv__k__k',&< <,'b'
+findnameloc_dissect_ 'tv__k__k',&< <,'b' NB. This line is supposed to return an error.
 )
 
 
