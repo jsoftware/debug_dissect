@@ -470,7 +470,7 @@ NB. the result
 if. '__' +./@:E. name do.
   NB.?lintonly loc =. <'dissectobj'
   cocurrent loc
-  NB. If name is not defined in loc then the rhs of the assignment will not evaluate to noun
+  NB. If ('__' takeafter name) as a name is not defined in loc then the rhs of the assignment will not evaluate to noun
   NB. and "noun result was required" error will occur in the for_l. condition.
   loc =. ('__' takeafter name)~
   name =. '__' taketo name
@@ -3480,20 +3480,31 @@ if. errorcode <: EOK do.
 NB. If u has the error source then u@v should have failed short.   If u@v has no results,
 NB. inherit the u locale to replace it
 elseif. errorcode__loc e. EGENERR do.  NB. all errors but NOEXECD,UNEXECD
-  assert. errorcode e. EPROPERR [ 'u@v died but u@v was OK'  NB. if u died, u@v should be sick
-  if. errorcode e. EHASFILLMASK do.
-    NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
-    NB. If the failure was an early error, keep the early error but note that we now have a mask
-    if. errorcode__loc e. EEARLYERROR do.
-      errorcode =: (ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EINVALIDMODOPMASK) {~ (ENOAGREE,EINVALIDOP,EINVALIDVERB,EINVALIDMODOP) i. errorcode__loc
+  NB. In Roger's JE the error is not detected until u and v have finished. The error is in (u@v), not u or v.
+  NB. Now the error is detected as soon as the inhomogeneous result is returned. The error is still in (u@v);
+  NB. what is different is that it is signaled before (u@v) has created a result for each cell, but without an error in u or v.
+  NB. Compare the results of <^:([ echo)"0 (0 1 0) in J806 and current J version.
+  NB. It just means the following case (assert.) is no longer an error. When it occurs (condition is false) for example for dissect '<^:]"0 (0 1 0)'
+  NB. then we keep the errorcode unchanged.
+  NB. Autoselection of error depends on values encoded in fillmask and the first unexecuted cell will be selected. This is compatible with previous version
+  NB. where all results were calculated and no cell was selected by default.
+  
+  NB. obsolete  assert. errorcode e. EPROPERR [ 'u@v died but u@v was OK'  NB. if u died, u@v should be sick
+  if. errorcode e. EPROPERR do.
+    if. errorcode e. EHASFILLMASK do.
+      NB. Inherit the fact of failure, but preserve existing data.  If we failed framing or agreement, pass that up the line
+      NB. If the failure was an early error, keep the early error but note that we now have a mask
+      if. errorcode__loc e. EEARLYERROR do.
+        errorcode =: (ENOAGREEMASK,EINVALIDOPMASK,EINVALIDVERBMASK,EINVALIDMODOPMASK) {~ (ENOAGREE,EINVALIDOP,EINVALIDVERB,EINVALIDMODOP) i. errorcode__loc
+      else.
+        errorcode =: (#.(errorcode__loc e. EALLFRAMING) , errorcode e. EHASVALIDFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC  NB. Inherit the error indic
+      end.
     else.
-      errorcode =: (#.(errorcode__loc e. EALLFRAMING) , errorcode e. EHASVALIDFILLMASK) { EABORTED,EEXEC,EFRAMINGABORT,EFRAMINGEXEC  NB. Inherit the error indic
+      NB. u@:v has no result - replace it with u, provided u has real data
+      replaceresult =. errorcode__loc e. EHASFILLMASK
+      NB. We also have to inherit the status
+      errorcode =: errorcode__loc
     end.
-  else.
-NB. u@:v has no result - replace it with u, provided u has real data
-    replaceresult =. errorcode__loc e. EHASFILLMASK
-    NB. We also have to inherit the status
-    errorcode =: errorcode__loc
   end.
 elseif. (errorcode__loc = ENOEXECD) *. (errorcode = EUNEXECD) do.
 NB. If u@v had results but u didn't, the explanation must be that v failed (perhaps we should signal a different error code for u).
@@ -12490,7 +12501,7 @@ NB. Perform selections for u - needed for display whether v ran or not
 traversedowncalcselect y
 NB. If v invalid, detect domain error
 if. errorcode__vop e. EFAILED do.
-SM'fail'
+  SM^:DEBTRAVDOWN 'fail'
   errorcode =: EINVALIDVERB
 elseif. errorcode__vop -.@e. ENOOPS,ENOSEL do.
   if. (0 < L. vval) *. ((1 < L. vval) +. -. ('';,0) e.~ $&.> vval) do. errorcode =: EINVALIDVERB
@@ -16262,7 +16273,7 @@ runtests_dissect_ =: 0 : 0
 2 dissect '(100;200) +&.> <"0 i. 2 3'
 2 dissect '+/&.> 0 1 2;3 4 5 6'
 2 dissect '>:&.>@:i.&.> 3 + i. 4' 
-1 NB. 2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
+2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;0  NB. interesting selections
 2 dissect '(1&+@>)"1 z' [ z =. 2 2 $ 1 2;3;4;'a'  NB. frame highlighting in error path
 2 dissect '(3 3 $ 0 1 2 3 4 5 6 7 7.5) ;&:(i."0) 0 1'
 2 dissect '(<<"0 i. 6) ,.&.> <"1 <"0 ''abcdef'''
@@ -16275,7 +16286,7 @@ runtests_dissect_ =: 0 : 0
 2 dissect '>:&.> 1;2;3;''a'''
 2 dissect '>:&.> ''a'';1;2;3'
 2 dissect '>:&.> 1;''a'';2;3'
-2 dissect'((* -> *) -> * -> *.) i:9'  NB. display tester
+2 dissect '((* -> *) -> * -> *.) i:9'  NB. display tester
 2 dissect '+:\ i. 4'
 2 dissect '+:\\ i. 3 4'
 2 dissect '3 +:\ i. 5'
@@ -16509,8 +16520,8 @@ dissect 2 3 $ 3;(<'base');'qqq+3'  ; 'qqq';0;<6
 2 dissect 'crash9_dissect_@+/ 4 3 3 2 1'
 2 dissect 'crash9_dissect_@+/ 0 , 1 , 2 , 3 ,: i. 2 2'
 2 dissect 1 [ wd 'clipcopy *' , '3 + 5'
-1 NB. 2 dissect ". :: 0: '2 3 + 4 5 6'
-1 NB. 2 dissect '<^:(0 > '''' $ ])"0 (1 _1 2)'
+2 dissect '". :: 0: ''2 3 + 4 5 6'''
+2 dissect '<^:(0 > '''' $ ])"0 (1 _1 2)' NB. assembly error
 'Undissectable sentence: the name ''t'' was previously assigned in this sentence, but assignments are ignored.' (0 0 $ 13!:8@1:^:(-.@-:)) 6 dissect 't + 2 * t =. 4'
 'Undissectable sentence: the name ''t'' was previously assigned in this sentence, but assignments are ignored when dissect is called from the debugger.' (0 0 $ 13!:8@1:^:(-.@-:)) 14 dissect 't + 2 * t =. 4'
 a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect 'a =: 5' [ 'a b' =. 3 4
@@ -16525,7 +16536,7 @@ a (] [ 3 (0 0 $ 13!:8@1:^:(-.@-:)) [) ] ] 6 dissect '(''a'') =: 5' [ 'a b' =. 3 
 2 dissect '1 (0 >. -~)^:a: 5'
 2 dissect '(-:`(>:@(3&*))`1: @. (1&= + 2&|))^:a: 9'
 2 dissect '>:^:-: i. 3'
-1 NB. 2 dissect '>:^:crash9_dissect_ 9'
+2 dissect '>:^:crash9_dissect_ 9'
 2 dissect '<.@(0.5&+)&.(10&*) 3.14159'
 2 dissect '1:`2: @. (2<$) i.10'
 2 dissect '${.^: (1 = $)  }:^:(a: = {:) 3 ; i.0'
@@ -16836,7 +16847,7 @@ ctup = 8
 'rank error: in m :n, boxed n must have contents with rank < 2' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <2 2 2 $ 'a'
 'domain error: in m :n, boxed n must contain strings' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '0 : a' [ a =. <5
 'ill-formed number: 1xcv' (0 0 $ 13!:8@1:^:(-.@-:)) 2 dissect '1xcv'
-1 NB. (2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
+'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ - (1 : ''`u'') `:6)1j1'
 'dissect restriction: an explicit modifier must return a verb' (0 0 $ 13!:8@1:^:(-.@-:)) (2 ;< 'check';'no') dissect '(+ (+ 1 : ''~'')) 4'
 2 dissect '(1 1 1,:1 1 1) <;.3 i. 3 3'
 2 dissect '''a'' 3;.1 i. 5'
