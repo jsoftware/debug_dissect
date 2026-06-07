@@ -3218,7 +3218,7 @@ else.
   bshp =. , |.@$&.> y
   NB. Extend each shape with 1s to the maximum length; then take maximum across all axes; then reverse back to original order
   maxsize =. |. >./ exshapes =. (>./ #@> bshp)&({.!.1)@> bshp
-  if. 2 <: +/ classes =. 0 ~: 16c74dd 16b0802 16b8020 16b30000  bwand bwor/ ((0 -.@e. $) * 3!:0)@> y do.
+  if. 2 <: +/ classes =. 0 ~: 16b74dd 16b0802 16b8020 16b30000  bwand bwor/ ((0 -.@e. $) * 3!:0)@> y do.
     maxsize;($0);0   NB. framing error
   else.
     NB. framable: calculate fill cell, and see if fill needed
